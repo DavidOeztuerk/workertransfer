@@ -8,16 +8,22 @@ using WorkerTransfer.Transfer.Application.Ports;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Consent;
 
-/// <summary>Wo der Consent-Ledger antwortet.</summary>
+/// <summary>Where the consent ledger answers.</summary>
+/// <remarks>
+/// The property names ARE the environment keys (<c>Consent__Adresse</c>,
+/// <c>Consent__Zeitueberschreitung</c>), so they stay German until the keys are
+/// renamed everywhere at once — in compose, in the chart and in
+/// <c>.env.example</c>.
+/// </remarks>
 public sealed class ConsentSettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "Consent";
 
-    /// <summary>Die Basisadresse des Ledgers.</summary>
+    /// <summary>The ledger's base address.</summary>
     public string Adresse { get; set; } = string.Empty;
 
-    /// <summary>Wie lange eine Frage dauern darf.</summary>
+    /// <summary>How long a question may take.</summary>
     /// <remarks>
     /// Short on purpose. A silent ledger has to become a 503 quickly; hanging
     /// on it would turn a slow dependency into a service that answers nothing
@@ -29,7 +35,7 @@ public sealed class ConsentSettings
 /// <summary>What a grant looks like on the wire.</summary>
 internal sealed record Grant(Guid SubjectId, string Capability);
 
-/// <summary>Wie ein Revocation aussieht.</summary>
+/// <summary>What a revocation looks like on the wire.</summary>
 /// <remarks>
 /// The ledger demands a reason for a revocation and none for a grant: taking
 /// something away has to be explicable, giving it does not.
@@ -52,16 +58,16 @@ public sealed class HttpConsentGate(
     IOptions<ConsentSettings> settings,
     ILogger<HttpConsentGate> log) : IConsentGate
 {
-    /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
-    public const string Klient = "consent";
+    /// <summary>The name the client is registered under.</summary>
+    public const string ClientName = "consent";
 
-    /// <summary>Snake_case in beide Richtungen — die Form, die der Ledger spricht.</summary>
+    /// <summary>Snake_case in both directions — the form the ledger speaks.</summary>
     private static readonly JsonSerializerOptions Format = new(JsonSerializerDefaults.Web)
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    private const string Reason = "Zugriff auf den Marktstatus zurückgezogen";
+    private const string Reason = "access to the market status withdrawn";
 
     private readonly ConsentSettings _settings = settings.Value;
 
@@ -77,38 +83,38 @@ public sealed class HttpConsentGate(
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<bool>> MayEachSeeMarketAsync(
-        IReadOnlyList<(SubjectId Subject, TenantId Company)> paare,
+        IReadOnlyList<(SubjectId Subject, TenantId Company)> pairs,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(paare);
+        ArgumentNullException.ThrowIfNull(pairs);
 
-        var urteile = new List<bool>(paare.Count);
+        var verdicts = new List<bool>(pairs.Count);
 
         // Chunked, because the ledger caps a batch question. Several round
         // trips are still one per hundred instead of one per row.
-        foreach (var stapel in paare.Chunk(ConsentLimits.HoechsteSammelgroesse))
+        foreach (var batch in pairs.Chunk(ConsentLimits.HoechsteSammelgroesse))
         {
-            var frage = new ConsentBatchQuestionV1(
-                [.. stapel.Select(pair => new ConsentQuestionV1(
+            var question = new ConsentBatchQuestionV1(
+                [.. batch.Select(pair => new ConsentQuestionV1(
                     pair.Subject.Value, ConsentKey.Market(pair.Company)))]);
 
             var response = await AskAsync<ConsentBatchQuestionV1,
-                ConsentBatchResponseV1>("/consent/check-batch", frage, cancellationToken);
+                ConsentBatchResponseV1>("/consent/check-batch", question, cancellationToken);
 
             // The order is part of the contract, and so is the length. A
             // mismatched answer is refused instead of guessed at: aligning it
             // wrongly would show the wrong person's status.
-            if (response.Results.Count != stapel.Length)
+            if (response.Results.Count != batch.Length)
             {
                 throw new ConsentGateSilent(
-                    $"Der Ledger beantwortete {stapel.Length} Fragen mit "
-                    + $"{response.Results.Count} Antworten.");
+                    $"The ledger answered {batch.Length} questions with "
+                    + $"{response.Results.Count} answers.");
             }
 
-            urteile.AddRange(response.Results.Select(Gilt));
+            verdicts.AddRange(response.Results.Select(Holds));
         }
 
-        return urteile;
+        return verdicts;
     }
 
     /// <inheritdoc />
@@ -128,29 +134,29 @@ public sealed class HttpConsentGate(
             cancellationToken);
 
     /// <summary>Granted and not deleted. Everything else is a no.</summary>
-    private static bool Gilt(ConsentResponseV1 response) =>
+    private static bool Holds(ConsentResponseV1 response) =>
         response.Granted && !response.Deleted;
 
     private async Task<bool> GrantedAsync(
-        SubjectId subject, string skill, CancellationToken cancellationToken)
+        SubjectId subject, string capability, CancellationToken cancellationToken)
     {
         var response = await AskAsync<ConsentQuestionV1, ConsentResponseV1>(
             "/consent/check",
-            new ConsentQuestionV1(subject.Value, skill),
+            new ConsentQuestionV1(subject.Value, capability),
             cancellationToken);
 
-        return Gilt(response);
+        return Holds(response);
     }
 
-    private async Task<TResponse> AskAsync<TFrage, TResponse>(
-        string path, TFrage body, CancellationToken cancellationToken)
+    private async Task<TResponse> AskAsync<TQuestion, TResponse>(
+        string path, TQuestion body, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(_settings.Adresse))
         {
-            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse is not configured.");
         }
 
-        using var client = factory.CreateClient(Klient);
+        using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
@@ -172,13 +178,13 @@ public sealed class HttpConsentGate(
         }
         catch (HttpRequestException error)
         {
-            log.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
-            throw new ConsentGateSilent("consent-service ist nicht erreichbar.", error);
+            log.LogWarning("Consent ledger unreachable ({Kind})", error.GetType().Name);
+            throw new ConsentGateSilent("consent-service is unreachable.", error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            log.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
-            throw new ConsentGateSilent("consent-service antwortete nicht rechtzeitig.", error);
+            log.LogWarning("Consent ledger did not answer in time");
+            throw new ConsentGateSilent("consent-service did not answer in time.", error);
         }
 
         using (response)
@@ -189,22 +195,22 @@ public sealed class HttpConsentGate(
                 // problem, and no statement about whether the person
                 // consented.
                 log.LogWarning(
-                    "Consent-Ledger antwortete mit {Code}", (int)response.StatusCode);
+                    "Consent ledger answered with {Code}", (int)response.StatusCode);
 
                 throw new ConsentGateSilent(
-                    $"consent-service antwortete mit {(int)response.StatusCode}.");
+                    $"consent-service answered with {(int)response.StatusCode}.");
             }
 
             try
             {
                 return await response.Content.ReadFromJsonAsync<TResponse>(
                            Format, cancellationToken)
-                       ?? throw new ConsentGateSilent("consent-service sandte nichts.");
+                       ?? throw new ConsentGateSilent("consent-service sent nothing.");
             }
             catch (JsonException error)
             {
                 throw new ConsentGateSilent(
-                    "consent-service sandte eine unbrauchbare Antwort.", error);
+                    "consent-service sent an unusable answer.", error);
             }
         }
     }

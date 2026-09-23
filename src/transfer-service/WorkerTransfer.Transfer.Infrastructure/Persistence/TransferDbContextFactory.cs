@@ -11,7 +11,7 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 /// </remarks>
 public static class TransferDbContextFactory
 {
-    /// <summary>Die DataSource.</summary>
+    /// <summary>The data source.</summary>
     public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
@@ -22,7 +22,7 @@ public static class TransferDbContextFactory
             new DbContextOptionsBuilder<TransferDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Job, an der die Nachverfolgung ausgeschaltet wird, damit
+    /// The one place where tracking is switched off, so that
     /// container, tests and <c>dotnet ef</c> do not end up with different
     /// models.
     /// </summary>
@@ -56,6 +56,6 @@ public sealed class TransferDesignTimeFactory : IDesignTimeDbContextFactory<Tran
         new((DbContextOptions<TransferDbContext>)TransferDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<TransferDbContext>(),
-                "Host=entwurfszeit;Database=transfer")
+                "Host=design-time;Database=transfer")
             .Options);
 }

@@ -15,33 +15,33 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Transfer.Tests;
 
-/// <summary>Der Case: drei Ja, jederzeit ein Nein.</summary>
+/// <summary>The case: three yeses, a no at any time.</summary>
 [Collection(PostgresCollection.Name)]
 public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeLedger _ledger = new();
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
+            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
-                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
-                // Angebot und Abschluss verlangen seit PBI-2 einen `admin`.
-                // Diese Reihen messen den Case und nicht die Rolle — also
-                // antwortet die Probe wie eine Inhaberin. `RollenTests` dreht
-                // sie auf `member`.
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, ProbeDelivery>());
+                // Offer and completion demand an `admin` since PBI-2. These
+                // suites measure the case and not the role — so the probe
+                // answers like an owner. `CompanyRoleTests` turns it to
+                // `member`.
                 services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => new RoleProbe()));
             });
         });
@@ -51,17 +51,17 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsFirma(Guid company) => Mit(TokenShape.Company(Guid.CreateVersion7(), company));
+    private HttpClient AsCompany(Guid company) => With(TokenShape.Company(Guid.CreateVersion7(), company));
 
-    private HttpClient AlsPerson(Guid subject) => Mit(TokenShape.Person(subject));
+    private HttpClient AsPerson(Guid subject) => With(TokenShape.Person(subject));
 
-    private HttpClient Mit(string token)
+    private HttpClient With(string token)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
         return browser;
@@ -70,62 +70,62 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     private static async Task<JsonElement> Json(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Eine ansprechbare Person, deren Status dieser Firma freigegeben ist.</summary>
-    private async Task<Guid> Ansprechbar(
+    /// <summary>An approachable person whose status is released to this company.</summary>
+    private async Task<Guid> Approachable(
         Guid company, bool isEmployed = false, string state = "listening")
     {
         var subject = Guid.CreateVersion7();
 
-        await AlsPerson(subject).PutAsJsonAsync("/market/me", new
+        await AsPerson(subject).PutAsJsonAsync("/market/me", new
         {
             availability = state, employed = isEmployed, note = string.Empty
         });
 
-        _ledger.MarktFrei.Add((subject, company));
+        _ledger.MarketReleased.Add((subject, company));
 
         return subject;
     }
 
-    private Task<HttpResponseMessage> ZeigeInteresse(Guid company, Guid subject) =>
-        AlsFirma(company).PostAsJsonAsync("/transfers", new
+    private Task<HttpResponseMessage> ShowInterest(Guid company, Guid subject) =>
+        AsCompany(company).PostAsJsonAsync("/transfers", new
         {
-            subject_id = subject, message = "Wir hätten da etwas."
+            subject_id = subject, message = "We might have something for you."
         });
 
     /// <summary>The whole path: interest, conversation, offer, acceptance, completion.</summary>
     [Fact]
-    public async Task Interesse_Gespraech_Angebot_Annahme_Abschluss()
+    public async Task Interest_conversation_offer_acceptance_completion()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
-        var ihr = AlsPerson(anna);
-        var sie = AlsFirma(company);
+        var anna = await Approachable(company);
+        var asAnna = AsPerson(anna);
+        var asCompany = AsCompany(company);
 
-        var angelegt = await ZeigeInteresse(company, anna);
+        var created = await ShowInterest(company, anna);
 
-        angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
-        (await Json(angelegt)).GetProperty("status").GetString().Should().Be("interested");
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await Json(created)).GetProperty("status").GetString().Should().Be("interested");
 
-        var id = (await Json(angelegt)).GetProperty("id").GetGuid();
+        var id = (await Json(created)).GetProperty("id").GetGuid();
 
-        (await ihr.PostAsync($"/transfers/{id}/accept-talk", null))
+        (await asAnna.PostAsync($"/transfers/{id}/accept-talk", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var angeboten = await sie.PostAsJsonAsync($"/transfers/{id}/offer", new
+        var offered = await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "Wir bieten die Stelle an.", start_on = "2026-10", fee_cents = 250_000L
+            note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
         });
 
-        angeboten.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(angeboten)).GetProperty("offer_fee_cents").GetInt64().Should().Be(250_000);
+        offered.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(offered)).GetProperty("offer_fee_cents").GetInt64().Should().Be(250_000);
 
-        (await ihr.PostAsync($"/transfers/{id}/accept-offer", null))
+        (await asAnna.PostAsync($"/transfers/{id}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var fertig = await sie.PostAsync($"/transfers/{id}/complete", null);
+        var done = await asCompany.PostAsync($"/transfers/{id}/complete", null);
 
-        fertig.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(fertig)).GetProperty("status").GetString().Should().Be("completed");
+        done.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(done)).GetProperty("status").GetString().Should().Be("completed");
     }
 
     /// <summary>
@@ -136,30 +136,30 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task With_a_release_requirement_the_person_completes()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company, isEmployed: true);
-        var ihr = AlsPerson(anna);
-        var sie = AlsFirma(company);
+        var anna = await Approachable(company, isEmployed: true);
+        var asAnna = AsPerson(anna);
+        var asCompany = AsCompany(company);
 
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
-        (await Json(await ihr.GetAsync("/transfers/me")))
+        (await Json(await asAnna.GetAsync("/transfers/me")))
             .EnumerateArray().Single()
             .GetProperty("requires_release").GetBoolean().Should().BeTrue();
 
-        await ihr.PostAsync($"/transfers/{id}/accept-talk", null);
-        await sie.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Angebot." });
-        await ihr.PostAsync($"/transfers/{id}/accept-offer", null);
+        await asAnna.PostAsync($"/transfers/{id}/accept-talk", null);
+        await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Offer." });
+        await asAnna.PostAsync($"/transfers/{id}/accept-offer", null);
 
         // The company may NOT complete now.
-        var zuFrueh = await sie.PostAsync($"/transfers/{id}/complete", null);
+        var tooEarly = await asCompany.PostAsync($"/transfers/{id}/complete", null);
 
-        zuFrueh.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        tooEarly.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        var bestaetigt = await ihr.PostAsync($"/transfers/{id}/confirm-release", null);
+        var confirmed = await asAnna.PostAsync($"/transfers/{id}/confirm-release", null);
 
-        bestaetigt.StatusCode.Should().Be(HttpStatusCode.OK);
+        confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await Json(bestaetigt);
+        var body = await Json(confirmed);
         body.GetProperty("status").GetString().Should().Be("completed");
         body.GetProperty("release_confirmed").GetBoolean().Should().BeTrue();
     }
@@ -171,18 +171,18 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Without_a_release_requirement_there_is_nothing_to_confirm()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
-        var ihr = AlsPerson(anna);
-        var sie = AlsFirma(company);
+        var anna = await Approachable(company);
+        var asAnna = AsPerson(anna);
+        var asCompany = AsCompany(company);
 
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
-        await ihr.PostAsync($"/transfers/{id}/accept-talk", null);
-        await sie.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Angebot." });
-        await ihr.PostAsync($"/transfers/{id}/accept-offer", null);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await asAnna.PostAsync($"/transfers/{id}/accept-talk", null);
+        await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Offer." });
+        await asAnna.PostAsync($"/transfers/{id}/accept-offer", null);
 
-        var unnoetig = await ihr.PostAsync($"/transfers/{id}/confirm-release", null);
+        var needless = await asAnna.PostAsync($"/transfers/{id}/confirm-release", null);
 
-        unnoetig.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        needless.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     /// <summary>
@@ -193,18 +193,18 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task The_release_requirement_is_copied_at_creation()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company, isEmployed: true);
-        var ihr = AlsPerson(anna);
+        var anna = await Approachable(company, isEmployed: true);
+        var asAnna = AsPerson(anna);
 
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
         // They resign in the middle of the conversation.
-        await ihr.PutAsJsonAsync("/market/me", new
+        await asAnna.PutAsJsonAsync("/market/me", new
         {
             availability = "listening", employed = false, note = string.Empty
         });
 
-        var now = (await Json(await ihr.GetAsync("/transfers/me")))
+        var now = (await Json(await asAnna.GetAsync("/transfers/me")))
             .EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == id);
 
         now.GetProperty("requires_release").GetBoolean().Should().BeTrue();
@@ -219,21 +219,21 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     /// missing.
     /// </remarks>
     [Fact]
-    public void Die_Freigabepflicht_hat_keinen_Setzer()
+    public void The_release_requirement_has_no_setter()
     {
         typeof(Domain.Cases.Transfer)
-            .GetProperty(nameof(Domain.Cases.Transfer.BrauchtFreigabe))!
+            .GetProperty(nameof(Domain.Cases.Transfer.NeedsRelease))!
             .CanWrite.Should().BeFalse();
     }
 
-    /// <summary>Die Release erlaubt zu SEHEN, nicht zu STÖREN.</summary>
+    /// <summary>The release permits SEEING, not DISTURBING.</summary>
     [Fact]
     public async Task Unavailable_means_no_even_with_a_release()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company, state: "unavailable");
+        var anna = await Approachable(company, state: "unavailable");
 
-        var attempt = await ZeigeInteresse(company, anna);
+        var attempt = await ShowInterest(company, anna);
 
         attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -250,19 +250,19 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task The_three_nos_look_the_same()
     {
         var company = Guid.CreateVersion7();
-        var ohneStatus = Guid.CreateVersion7();
-        var ohneFreigabe = Guid.CreateVersion7();
-        await AlsPerson(ohneFreigabe).PutAsJsonAsync("/market/me", new
+        var withoutStatus = Guid.CreateVersion7();
+        var withoutRelease = Guid.CreateVersion7();
+        await AsPerson(withoutRelease).PutAsJsonAsync("/market/me", new
         {
             availability = "open", employed = false, note = string.Empty
         });
-        var nichtAnsprechbar = await Ansprechbar(company, state: "unavailable");
+        var notApproachable = await Approachable(company, state: "unavailable");
 
         var responses = new List<string>();
 
-        foreach (var subject in new[] { ohneStatus, ohneFreigabe, nichtAnsprechbar })
+        foreach (var subject in new[] { withoutStatus, withoutRelease, notApproachable })
         {
-            var response = await ZeigeInteresse(company, subject);
+            var response = await ShowInterest(company, subject);
             response.StatusCode.Should().Be(HttpStatusCode.NotFound);
             responses.Add(
                 (await Json(response)).GetProperty("detail").GetString() ?? string.Empty);
@@ -278,28 +278,28 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Only_one_case_runs_per_pair()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
+        var anna = await Approachable(company);
 
-        await ZeigeInteresse(company, anna);
-        var zweiter = await ZeigeInteresse(company, anna);
+        await ShowInterest(company, anna);
+        var second = await ShowInterest(company, anna);
 
-        zweiter.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    /// <summary>Nach einer Absage darf ein neuer beginnen.</summary>
+    /// <summary>After a refusal a new one may begin.</summary>
     [Fact]
     public async Task After_the_refusal_a_new_one_may_begin()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
+        var anna = await Approachable(company);
 
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
-        await AlsPerson(anna).PostAsync($"/transfers/{id}/decline", null);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await AsPerson(anna).PostAsync($"/transfers/{id}/decline", null);
 
-        var neuer = await ZeigeInteresse(company, anna);
+        var fresh = await ShowInterest(company, anna);
 
-        neuer.StatusCode.Should().Be(HttpStatusCode.Created);
-        (await Json(neuer)).GetProperty("id").GetGuid().Should().NotBe(id);
+        fresh.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await Json(fresh)).GetProperty("id").GetGuid().Should().NotBe(id);
     }
 
     /// <summary>
@@ -310,33 +310,33 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Declining_works_from_every_running_state()
     {
         var company = Guid.CreateVersion7();
-        var sie = AlsFirma(company);
+        var asCompany = AsCompany(company);
 
-        foreach (var bisWohin in new[] { "interested", "talking", "offered", "accepted" })
+        foreach (var upTo in new[] { "interested", "talking", "offered", "accepted" })
         {
-            var anna = await Ansprechbar(company);
-            var ihr = AlsPerson(anna);
-            var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+            var anna = await Approachable(company);
+            var asAnna = AsPerson(anna);
+            var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
-            if (bisWohin != "interested")
+            if (upTo != "interested")
             {
-                await ihr.PostAsync($"/transfers/{id}/accept-talk", null);
+                await asAnna.PostAsync($"/transfers/{id}/accept-talk", null);
             }
 
-            if (bisWohin is "offered" or "accepted")
+            if (upTo is "offered" or "accepted")
             {
-                await sie.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Angebot." });
+                await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Offer." });
             }
 
-            if (bisWohin == "accepted")
+            if (upTo == "accepted")
             {
-                await ihr.PostAsync($"/transfers/{id}/accept-offer", null);
+                await asAnna.PostAsync($"/transfers/{id}/accept-offer", null);
             }
 
-            var abgesagt = await ihr.PostAsync($"/transfers/{id}/decline", null);
+            var declined = await asAnna.PostAsync($"/transfers/{id}/decline", null);
 
-            abgesagt.StatusCode.Should().Be(HttpStatusCode.OK, $"aus {bisWohin} heraus");
-            (await Json(abgesagt)).GetProperty("status").GetString().Should().Be("declined");
+            declined.StatusCode.Should().Be(HttpStatusCode.OK, $"out of {upTo}");
+            (await Json(declined)).GetProperty("status").GetString().Should().Be("declined");
         }
     }
 
@@ -345,16 +345,16 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Somebody_elses_case_is_404_and_not_403()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+        var anna = await Approachable(company);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
-        var fremdePerson = await AlsPerson(Guid.CreateVersion7())
+        var otherPerson = await AsPerson(Guid.CreateVersion7())
             .PostAsync($"/transfers/{id}/accept-talk", null);
-        var fremdeFirma = await AlsFirma(Guid.CreateVersion7())
+        var otherCompany = await AsCompany(Guid.CreateVersion7())
             .PostAsync($"/transfers/{id}/withdraw", null);
 
-        fremdePerson.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        fremdeFirma.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        otherPerson.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        otherCompany.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>There is no negative fee.</summary>
@@ -362,16 +362,16 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task A_negative_fee_is_refused()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
-        await AlsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
+        var anna = await Approachable(company);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await AsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
 
-        var angebot = await AlsFirma(company).PostAsJsonAsync($"/transfers/{id}/offer", new
+        var offer = await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "Angebot.", fee_cents = -1L
+            note = "Offer.", fee_cents = -1L
         });
 
-        angebot.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        offer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Only the company's moves are notified.</summary>
@@ -385,35 +385,35 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Only_the_companys_moves_are_notified()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Ansprechbar(company);
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+        var anna = await Approachable(company);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
-        // Interesse: gemeldet.
-        await using (var nachInteresse = postgres.Context())
+        // Interest: notified.
+        await using (var afterInterest = postgres.Context())
         {
-            (await nachInteresse.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
+            (await afterInterest.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
                 .Should().Be(1);
         }
 
-        // Ihr Zug: nicht gemeldet.
-        await AlsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
+        // Her move: not notified.
+        await AsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
 
-        await using (var nachIhremZug = postgres.Context())
+        await using (var afterHerMove = postgres.Context())
         {
-            (await nachIhremZug.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
+            (await afterHerMove.Set<OutboxRow>().CountAsync(row => row.UserId == anna))
                 .Should().Be(1);
         }
 
-        // Ihr Angebot: gemeldet.
-        await AlsFirma(company).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Ja." });
+        // Their offer: notified.
+        await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Yes." });
 
-        await using var nachAngebot = postgres.Context();
-        var vermerke = await nachAngebot.Set<OutboxRow>()
+        await using var afterOffer = postgres.Context();
+        var notes = await afterOffer.Set<OutboxRow>()
             .Where(row => row.UserId == anna)
             .ToListAsync();
 
-        vermerke.Should().HaveCount(2);
-        vermerke.Should().OnlyContain(row => row.Kind == "transfer_update");
+        notes.Should().HaveCount(2);
+        notes.Should().OnlyContain(row => row.Kind == "transfer_update");
     }
 
     /// <summary>
@@ -425,36 +425,36 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var company = Guid.CreateVersion7();
         var anna = Guid.CreateVersion7();
-        _ledger.ProfilFrei.Add(anna);
-        var ihr = AlsPerson(anna);
+        _ledger.ProfileReleased.Add(anna);
+        var asAnna = AsPerson(anna);
 
-        await ihr.PutAsJsonAsync("/market/me", new
+        await asAnna.PutAsJsonAsync("/market/me", new
         {
             availability = "listening", employed = false, note = string.Empty
         });
 
         var request = (await Json(
-                await AlsFirma(company).PostAsync($"/market/{anna}/requests", null)))
+                await AsCompany(company).PostAsync($"/market/{anna}/requests", null)))
             .GetProperty("id").GetGuid();
-        await ihr.PostAsync($"/market/requests/{request}/grant", null);
+        await asAnna.PostAsync($"/market/requests/{request}/grant", null);
 
-        var id = (await Json(await ZeigeInteresse(company, anna))).GetProperty("id").GetGuid();
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
 
-        await ihr.PostAsync($"/market/requests/{request}/revoke", null);
+        await asAnna.PostAsync($"/market/requests/{request}/revoke", null);
 
-        var laeuftNoch = (await Json(await ihr.GetAsync("/transfers/me")))
+        var stillRunning = (await Json(await asAnna.GetAsync("/transfers/me")))
             .EnumerateArray().Single(entry => entry.GetProperty("id").GetGuid() == id);
 
-        laeuftNoch.GetProperty("status").GetString().Should().Be("interested");
+        stillRunning.GetProperty("status").GetString().Should().Be("interested");
     }
 
-    /// <summary>Interesse zeigt nur ein Unternehmen.</summary>
+    /// <summary>Only a company shows interest.</summary>
     [Fact]
     public async Task A_private_person_shows_no_interest()
     {
-        var response = await AlsPerson(Guid.CreateVersion7()).PostAsJsonAsync("/transfers", new
+        var response = await AsPerson(Guid.CreateVersion7()).PostAsJsonAsync("/transfers", new
         {
-            subject_id = Guid.CreateVersion7(), message = "Hallo."
+            subject_id = Guid.CreateVersion7(), message = "Hello."
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);

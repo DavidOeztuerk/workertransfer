@@ -185,7 +185,7 @@ public class VocabularyTests
     [
         .. Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
         .. Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,
-        .. Transfer.Infrastructure.TransferInfrastructure.Wortausnahmen
+        .. Transfer.Infrastructure.TransferInfrastructure.TermExceptions
     ];
 
     /// <summary>One service's exemptions — from its composition root, not from here.</summary>
@@ -193,7 +193,7 @@ public class VocabularyTests
     {
         "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
         "applications" => Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,
-        "transfer" => Transfer.Infrastructure.TransferInfrastructure.Wortausnahmen,
+        "transfer" => Transfer.Infrastructure.TransferInfrastructure.TermExceptions,
         _ => []
     };
 }

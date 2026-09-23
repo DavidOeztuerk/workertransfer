@@ -21,13 +21,13 @@ public static class CaseEndpoints
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var cases = Responses.Abgesichert(app.MapGroup("/transfers"));
+        var cases = Responses.Guarded(app.MapGroup("/transfers"));
 
         // A company shows interest. Precondition: the market status is released
         // to this company AND the person is approachable. `unavailable` means
         // no, even with a release — the release permits seeing, not disturbing.
         cases.MapPost("/", async (
-            InteresseZeigenV1 body,
+            ShowInterestV1 body,
             IMediator mediator,
             ICurrentPrincipal principal,
             HttpContext context,
@@ -40,10 +40,9 @@ public static class CaseEndpoints
 
             ArgumentNullException.ThrowIfNull(body);
 
-            // Ohne `subjectId` gibt es niemanden, an dem Interesse bestuende.
-            // Der leere Guid lief frueher bis in `new SubjectId(...)` und kam
-            // als 500 zurueck (D2) — eine kaputte ResumeRequest, keine kaputte
-            // Anwendung.
+            // Without `subjectId` there is nobody to be interested in. The empty
+            // Guid used to run all the way into `new SubjectId(...)` and came
+            // back as 500 (D2) — a broken request, not a broken application.
             if (body.SubjectId == Guid.Empty)
             {
                 await ProblemDetailsMiddleware.Write(
@@ -72,11 +71,11 @@ public static class CaseEndpoints
                 return;
             }
 
-            var meine = await mediator.Send(
+            var mine = await mediator.Send(
                 new MyCasesQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                meine.Select(Responses.Zu), cancellationToken);
+                mine.Select(Responses.ToWire), cancellationToken);
         });
 
         cases.MapGet("/", async (
@@ -90,22 +89,22 @@ public static class CaseEndpoints
                 return;
             }
 
-            var ihre = await mediator.Send(new CompanyCasesQuery(company), cancellationToken);
+            var theirs = await mediator.Send(new CompanyCasesQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                ihre.Select(Responses.Zu), cancellationToken);
+                theirs.Select(Responses.ToWire), cancellationToken);
         });
 
         cases.MapPost("/{id:guid}/accept-talk", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Person(id, Personenzug.AcceptConversationCommand, mediator, principal, context,
+            Person(id, PersonMove.AcceptConversation, mediator, principal, context,
                 cancellationToken));
 
         cases.MapPost("/{id:guid}/accept-offer", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Person(id, Personenzug.AcceptOfferCommand, mediator, principal, context,
+            Person(id, PersonMove.AcceptOffer, mediator, principal, context,
                 cancellationToken));
 
         // The person confirms that their employer lets them go. The platform
@@ -115,7 +114,7 @@ public static class CaseEndpoints
         cases.MapPost("/{id:guid}/confirm-release", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Person(id, Personenzug.ConfirmReleaseCommand, mediator, principal, context,
+            Person(id, PersonMove.ConfirmRelease, mediator, principal, context,
                 cancellationToken));
 
         // Always possible, from every running state. A process one cannot get
@@ -123,11 +122,11 @@ public static class CaseEndpoints
         cases.MapPost("/{id:guid}/decline", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Person(id, Personenzug.Absagen, mediator, principal, context, cancellationToken));
+            Person(id, PersonMove.Decline, mediator, principal, context, cancellationToken));
 
         cases.MapPost("/{id:guid}/offer", async (
             Guid id,
-            AngebotV1 body,
+            OfferV1 body,
             IMediator mediator,
             ICurrentPrincipal principal,
             HttpContext context,
@@ -146,32 +145,32 @@ public static class CaseEndpoints
 
             await Responses.Write(context, result, cancellationToken);
         })
-        // Ein Angebot nennt Eintrittstermin und Gebuehr — es bindet das
-        // Unternehmen, und darum verlangt es einen `admin`. Aufgeloest aus der
-        // Mitgliedschaftstabelle von identity-service, nie aus dem Token.
+        // An offer names a start date and a fee — it binds the company, and
+        // that is why it demands an `admin`. Resolved from the membership table
+        // of identity-service, never from the token.
         .RequireAuthorization(AdminPermissionExtensions.Richtlinie(CasePermissions.Offer));
 
         cases.MapPost("/{id:guid}/complete", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Company(id, CompanySwitch.Complete, mediator, principal, context, cancellationToken))
+            Company(id, CompanyMove.Complete, mediator, principal, context, cancellationToken))
             .RequireAuthorization(
                 AdminPermissionExtensions.Richtlinie(CasePermissions.Complete));
 
-        // KEIN Firmenrecht: wer einen Case anfangen darf, muss ihn beenden
-        // duerfen. Sonst waere die Einladung eine Falle — derselbe Satz, den
-        // `/decline` fuer die Person schon traegt.
+        // NO company permission: whoever may start a case must be allowed to
+        // end it. Otherwise the invitation would be a trap — the same sentence
+        // `/decline` already carries for the person.
         cases.MapPost("/{id:guid}/withdraw", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Company(id, CompanySwitch.WithdrawCommand, mediator, principal, context, cancellationToken));
+            Company(id, CompanyMove.Withdraw, mediator, principal, context, cancellationToken));
 
         return app;
     }
 
     private static async Task Person(
         Guid id,
-        Personenzug zug,
+        PersonMove move,
         IMediator mediator,
         ICurrentPrincipal principal,
         HttpContext context,
@@ -184,14 +183,14 @@ public static class CaseEndpoints
         }
 
         var result = await mediator.Send(
-            new PersonMoveCommand(id, actor.Subject, zug), cancellationToken);
+            new PersonMoveCommand(id, actor.Subject, move), cancellationToken);
 
         await Responses.Write(context, result, cancellationToken);
     }
 
     private static async Task Company(
         Guid id,
-        CompanySwitch zug,
+        CompanyMove move,
         IMediator mediator,
         ICurrentPrincipal principal,
         HttpContext context,
@@ -202,7 +201,7 @@ public static class CaseEndpoints
             return;
         }
 
-        var result = await mediator.Send(new CompanySwitchCommand(id, company, zug), cancellationToken);
+        var result = await mediator.Send(new CompanyMoveCommand(id, company, move), cancellationToken);
 
         await Responses.Write(context, result, cancellationToken);
     }

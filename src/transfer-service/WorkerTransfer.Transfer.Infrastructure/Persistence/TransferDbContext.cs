@@ -5,7 +5,7 @@ using WorkerTransfer.Transfer.Domain.Cases;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>market_status</c>.</summary>
+/// <summary>One row of <c>market_status</c>.</summary>
 public sealed class MarketRow
 {
     /// <summary>The subject id. It <em>is</em> the key.</summary>
@@ -49,7 +49,7 @@ public sealed class RequestRow
     public DateTime? AnsweredAt { get; set; }
 }
 
-/// <summary>Eine Zeile von <c>transfers</c>.</summary>
+/// <summary>One row of <c>transfers</c>.</summary>
 public sealed class CaseRow
 {
     public Guid Id { get; set; }
@@ -77,7 +77,7 @@ public sealed class CaseRow
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>Die drei Tabellen, die dieser Dienst besitzt — und seine Outbox.</summary>
+/// <summary>The three tables this service owns — and its outbox.</summary>
 /// <remarks>
 /// There is no shared database and therefore no shared outbox either
 /// (ADR-0004/0025) — it hangs in <em>this</em> context, so the intent commits
@@ -86,10 +86,10 @@ public sealed class CaseRow
 public sealed class TransferDbContext(DbContextOptions<TransferDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die MarketStatus.</summary>
+    /// <summary>The market statuses.</summary>
     public DbSet<MarketRow> MarketStatus => Set<MarketRow>();
 
-    /// <summary>Die Anfragen.</summary>
+    /// <summary>The market requests.</summary>
     public DbSet<RequestRow> Requests => Set<RequestRow>();
 
     /// <summary>The cases.</summary>
@@ -103,14 +103,14 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
         modelBuilder.Entity<MarketRow>(entity =>
         {
             entity.ToTable("market_status");
-            // KEINE zweite Spalte fuer die Person. Der Schluessel IST sie, und
-            // `market_requests` und `transfers` fuehren daneben eine eigene
-            // `subject_id` — wer die beiden vergleicht, haelt das hier fuer
-            // vergessen und traegt die Spalte nach. Dann stuenden zwei Angaben
-            // ueber denselben Menschen nebeneinander, und die Erasure (ADR-0027)
-            // traefe die eine und liesse die andere stehen. Die Anmerkung sagt es
-            // stattdessen aus: sie ist das, was `LoeschempfaengerTests` liest, wo
-            // kein Spaltenname zu finden ist.
+            // NO second column for the person. The key IS the person, and
+            // `market_requests` and `transfers` carry a `subject_id` of their
+            // own beside it — whoever compares the two takes this for an
+            // oversight and adds the column. Then two statements about the same
+            // human being would stand side by side, and the erasure (ADR-0027)
+            // would hit the one and leave the other. The annotation says it
+            // instead: it is what `LoeschempfaengerTests` reads where no column
+            // name is to be found.
             entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
@@ -139,7 +139,7 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             entity.HasIndex(row => row.SubjectId);
             entity.HasIndex(row => row.TenantId);
 
-            // Einmal fragen — in der Datenbank und nicht nur im Handler, denn
+            // Ask once — in the database and not only in the handler, because
             // two concurrent requests would both get through a check in code,
             // and a refusal would have no effect.
             entity.HasIndex(row => new { row.SubjectId, row.TenantId })
@@ -174,13 +174,13 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             entity.HasIndex(row => row.SubjectId);
             entity.HasIndex(row => row.TenantId);
 
-            // Genau EIN laufender Case je (Person, Unternehmen). Ein zweiter
+            // Exactly ONE running case per (person, company). A second one
             // would be following up past the refusal. A partial index, because
             // completed cases may stand side by side any number of times.
             entity.HasIndex(row => new { row.SubjectId, row.TenantId })
                 .IsUnique()
                 .HasDatabaseName("uq_running_transfer")
-                .HasFilter(Laufendfilter());
+                .HasFilter(RunningFilter());
         });
 
         modelBuilder.ConfigureOutbox();
@@ -188,13 +188,13 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
         base.OnModelCreating(modelBuilder);
     }
 
-    /// <summary>Der Teilindex-Filter, aus derselben Menge wie das Aggregat.</summary>
+    /// <summary>The partial-index filter, from the same set as the aggregate.</summary>
     /// <remarks>
     /// Built from <see cref="TransferStates.Running"/> rather than copied here:
     /// two lists that mean the same thing drift apart — and the database would
     /// be the one that does not say so.
     /// </remarks>
-    private static string Laufendfilter() =>
+    private static string RunningFilter() =>
         "status IN ("
         + string.Join(", ", TransferStates.Running.Select(
             state => $"'{TransferStates.Word(state)}'"))

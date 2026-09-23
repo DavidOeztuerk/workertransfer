@@ -19,12 +19,12 @@ namespace WorkerTransfer.Transfer.Api;
 /// </remarks>
 public static class MarketEndpoints
 {
-    /// <summary>Bildet die acht Routen des Marktes ab.</summary>
+    /// <summary>Maps the eight routes of the market.</summary>
     public static IEndpointRouteBuilder MapMarketEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var market = Responses.Abgesichert(app.MapGroup("/market"));
+        var market = Responses.Guarded(app.MapGroup("/market"));
 
         market.MapPut("/me", async (
             WriteMarketStatusV1 body,
@@ -60,7 +60,7 @@ public static class MarketEndpoints
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(
-                    Responses.Zu(status), cancellationToken);
+                    Responses.ToWire(status), cancellationToken);
             }
             catch (MarketError error)
             {
@@ -88,7 +88,7 @@ public static class MarketEndpoints
             var status = await mediator.Send(
                 new MyMarketStatusQuery(actor.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Responses.Zu(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
         });
 
         // Who asked — and what holds right now. `active` comes fresh from the
@@ -106,11 +106,11 @@ public static class MarketEndpoints
                 return;
             }
 
-            var meine = await mediator.Send(
+            var mine = await mediator.Send(
                 new MyRequestsQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                meine.Select(ansicht => Responses.Zu(ansicht.ResumeRequest, ansicht.Aktiv)),
+                mine.Select(view => Responses.ToWire(view.MarketRequest, view.Active)),
                 cancellationToken);
         });
 
@@ -131,19 +131,19 @@ public static class MarketEndpoints
                 new CompanyRequestsQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                requests.Select(request => Responses.Zu(request, aktiv: null)),
+                requests.Select(request => Responses.ToWire(request, active: null)),
                 cancellationToken);
         });
 
         market.MapPost("/requests/{id:guid}/grant", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Beantworte(id, erteilen: true, mediator, principal, context, cancellationToken));
+            Answer(id, grant: true, mediator, principal, context, cancellationToken));
 
         market.MapPost("/requests/{id:guid}/decline", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
-            Beantworte(id, erteilen: false, mediator, principal, context, cancellationToken));
+            Answer(id, grant: false, mediator, principal, context, cancellationToken));
 
         // The revocation takes effect in the ledger, not in the case. A running
         // transfer stays: it has a door and a refusal of its own.
@@ -163,7 +163,7 @@ public static class MarketEndpoints
             var result = await mediator.Send(
                 new RevokeAccessCommand(id, actor.Subject), cancellationToken);
 
-            await Responses.Write(context, result, cancellationToken, aktiv: false);
+            await Responses.Write(context, result, cancellationToken, active: false);
         });
 
         // "May I see whether you are listening right now?" — the easier of the
@@ -191,11 +191,11 @@ public static class MarketEndpoints
                     new SubjectId(subjectId), company, actor.Subject),
                 cancellationToken);
 
-            // Das anfragende Unternehmen bekommt kein `active`: es hat die
-            // Antwort schon in Form des Status, den es sieht oder nicht sieht.
+            // The asking company gets no `active`: it has the answer already in
+            // the form of the status it sees or does not see.
             await Responses.Write(
                 context, result, cancellationToken,
-                aktiv: null, erfolg: StatusCodes.Status201Created);
+                active: null, successStatus: StatusCodes.Status201Created);
         });
 
         market.MapGet("/{subjectId:guid}", async (
@@ -225,15 +225,15 @@ public static class MarketEndpoints
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Responses.Zu(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
         });
 
         return app;
     }
 
-    private static async Task Beantworte(
+    private static async Task Answer(
         Guid id,
-        bool erteilen,
+        bool grant,
         IMediator mediator,
         ICurrentPrincipal principal,
         HttpContext context,
@@ -246,8 +246,8 @@ public static class MarketEndpoints
         }
 
         var result = await mediator.Send(
-            new AnswerRequestCommand(id, actor.Subject, erteilen), cancellationToken);
+            new AnswerRequestCommand(id, actor.Subject, grant), cancellationToken);
 
-        await Responses.Write(context, result, cancellationToken, aktiv: erteilen);
+        await Responses.Write(context, result, cancellationToken, active: grant);
     }
 }

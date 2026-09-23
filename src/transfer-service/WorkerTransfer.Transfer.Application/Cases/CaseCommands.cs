@@ -16,10 +16,10 @@ public abstract record CaseResult
     }
 
     /// <summary>It worked.</summary>
-    public sealed record Erledigt(Transfer.Domain.Cases.Transfer Case) : CaseResult;
+    public sealed record Done(Transfer.Domain.Cases.Transfer Case) : CaseResult;
 
     /// <summary>Not present OR not yours — from outside the same thing.</summary>
-    public sealed record Unbekannt : CaseResult;
+    public sealed record Unknown : CaseResult;
 
     /// <summary>
     /// No status, no release, or <c>unavailable</c> — all the same to the
@@ -29,59 +29,59 @@ public abstract record CaseResult
     /// Otherwise the endpoint would be an oracle about who is on the platform
     /// and who is listening right now.
     /// </remarks>
-    public sealed record NichtAnsprechbar : CaseResult;
+    public sealed record NotApproachable : CaseResult;
 
     /// <summary>One is already running.</summary>
     public sealed record AlreadyRunning : CaseResult;
 
     /// <summary>The input is fine, the state does not fit.</summary>
-    public sealed record StateConflict(string Grund) : CaseResult;
+    public sealed record StateConflict(string Reason) : CaseResult;
 
     /// <summary>Something about the input is wrong.</summary>
-    public sealed record Eingabe(string Grund) : CaseResult;
+    public sealed record InvalidInput(string Reason) : CaseResult;
 }
 
 /// <summary>Which move the person makes.</summary>
-public enum Personenzug
+public enum PersonMove
 {
     /// <summary>Agree to a conversation.</summary>
-    AcceptConversationCommand,
+    AcceptConversation,
 
     /// <summary>Accept the offer.</summary>
-    AcceptOfferCommand,
+    AcceptOffer,
 
     /// <summary>Confirm the employer's release.</summary>
-    ConfirmReleaseCommand,
+    ConfirmRelease,
 
     /// <summary>Decline.</summary>
-    Absagen
+    Decline
 }
 
 /// <summary>Which move the company makes.</summary>
-public enum CompanySwitch
+public enum CompanyMove
 {
     /// <summary>Complete.</summary>
     Complete,
 
     /// <summary>Withdraw.</summary>
-    WithdrawCommand
+    Withdraw
 }
 
 /// <summary>A company shows interest.</summary>
-public sealed record ShowInterestCommand(SubjectId Subject, TenantId Company, string Nachricht)
+public sealed record ShowInterestCommand(SubjectId Subject, TenantId Company, string Message)
     : ICommandMessage<CaseResult>;
 
 /// <summary>The person moves their case.</summary>
-public sealed record PersonMoveCommand(Guid Id, SubjectId Subject, Personenzug Zug)
+public sealed record PersonMoveCommand(Guid Id, SubjectId Subject, PersonMove Move)
     : ICommandMessage<CaseResult>;
 
 /// <summary>The company moves the case.</summary>
-public sealed record CompanySwitchCommand(Guid Id, TenantId Company, CompanySwitch Zug)
+public sealed record CompanyMoveCommand(Guid Id, TenantId Company, CompanyMove Move)
     : ICommandMessage<CaseResult>;
 
 /// <summary>The company makes an offer.</summary>
 public sealed record MakeOfferCommand(
-    Guid Id, TenantId Company, string Text, string? Beginn, long? FeeCents)
+    Guid Id, TenantId Company, string Text, string? Start, long? FeeCents)
     : ICommandMessage<CaseResult>;
 
 /// <summary>This person's cases.</summary>
@@ -96,12 +96,12 @@ public sealed record CompanyCasesQuery(TenantId Company)
 public sealed class CaseCommands(
     ITransferStore store,
     IMarketStore market,
-    IConsentGate tor,
+    IConsentGate gate,
     IOutbox outbox,
     TimeProvider clock) :
     IRequestHandler<ShowInterestCommand, CaseResult>,
     IRequestHandler<PersonMoveCommand, CaseResult>,
-    IRequestHandler<CompanySwitchCommand, CaseResult>,
+    IRequestHandler<CompanyMoveCommand, CaseResult>,
     IRequestHandler<MakeOfferCommand, CaseResult>,
     IRequestHandler<MyCasesQuery, IReadOnlyList<Transfer.Domain.Cases.Transfer>>,
     IRequestHandler<CompanyCasesQuery, IReadOnlyList<Transfer.Domain.Cases.Transfer>>
@@ -116,20 +116,20 @@ public sealed class CaseCommands(
 
         if (status is null)
         {
-            return new CaseResult.NichtAnsprechbar();
+            return new CaseResult.NotApproachable();
         }
 
         // ConsentGateSilent deliberately flies through: the endpoint turns it
         // into 503.
-        if (!await tor.MaySeeMarketAsync(request.Subject, request.Company, cancellationToken))
+        if (!await gate.MaySeeMarketAsync(request.Subject, request.Company, cancellationToken))
         {
-            return new CaseResult.NichtAnsprechbar();
+            return new CaseResult.NotApproachable();
         }
 
-        if (!status.Ansprechbar)
+        if (!status.IsApproachable)
         {
             // The release permits SEEING, not DISTURBING.
-            return new CaseResult.NichtAnsprechbar();
+            return new CaseResult.NotApproachable();
         }
 
         // A second running case would be following up past the refusal.
@@ -143,24 +143,24 @@ public sealed class CaseCommands(
 
         try
         {
-            caseItem = Transfer.Domain.Cases.Transfer.Zeige_Interesse(
+            caseItem = Transfer.Domain.Cases.Transfer.ShowInterest(
                 request.Subject,
                 request.Company,
                 // Copied from the market status, so a later change does not
                 // shift the terms of a running case retroactively.
                 status.IsEmployed,
-                request.Nachricht,
+                request.Message,
                 clock.GetUtcNow());
         }
         catch (CaseError error)
         {
-            return new CaseResult.Eingabe(error.Message);
+            return new CaseResult.InvalidInput(error.Message);
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
-        await Melde(caseItem, cancellationToken);
+        await Notify(caseItem, cancellationToken);
 
-        return new CaseResult.Erledigt(caseItem);
+        return new CaseResult.Done(caseItem);
     }
 
     /// <inheritdoc />
@@ -173,26 +173,26 @@ public sealed class CaseCommands(
 
         if (caseItem is null || caseItem.Subject != request.Subject)
         {
-            return new CaseResult.Unbekannt();
+            return new CaseResult.Unknown();
         }
 
         var now = clock.GetUtcNow();
 
         try
         {
-            switch (request.Zug)
+            switch (request.Move)
             {
-                case Personenzug.AcceptConversationCommand:
+                case PersonMove.AcceptConversation:
                     caseItem.AcceptConversation(request.Subject, now);
                     break;
-                case Personenzug.AcceptOfferCommand:
+                case PersonMove.AcceptOffer:
                     caseItem.AcceptOffer(request.Subject, now);
                     break;
-                case Personenzug.ConfirmReleaseCommand:
+                case PersonMove.ConfirmRelease:
                     caseItem.ConfirmRelease(request.Subject, now);
                     break;
-                case Personenzug.Absagen:
-                    caseItem.Sage_ab(request.Subject, now);
+                case PersonMove.Decline:
+                    caseItem.Decline(request.Subject, now);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(request));
@@ -200,7 +200,7 @@ public sealed class CaseCommands(
         }
         catch (CaseError error)
         {
-            return Zu(error);
+            return ToResult(error);
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
@@ -208,12 +208,12 @@ public sealed class CaseCommands(
         // The person's moves are NOT notified: they know what they did, and a
         // mail to a company distribution list carrying a human being's name
         // would be the same leak channel, only the other way round.
-        return new CaseResult.Erledigt(caseItem);
+        return new CaseResult.Done(caseItem);
     }
 
     /// <inheritdoc />
     public async Task<CaseResult> Handle(
-        CompanySwitchCommand request, CancellationToken cancellationToken)
+        CompanyMoveCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -221,19 +221,19 @@ public sealed class CaseCommands(
 
         if (caseItem is null || caseItem.Company != request.Company)
         {
-            return new CaseResult.Unbekannt();
+            return new CaseResult.Unknown();
         }
 
         var now = clock.GetUtcNow();
 
         try
         {
-            switch (request.Zug)
+            switch (request.Move)
             {
-                case CompanySwitch.Complete:
-                    caseItem.Schliesse_ab(now);
+                case CompanyMove.Complete:
+                    caseItem.Complete(now);
                     break;
-                case CompanySwitch.WithdrawCommand:
+                case CompanyMove.Withdraw:
                     caseItem.Withdraw(now);
                     break;
                 default:
@@ -242,13 +242,13 @@ public sealed class CaseCommands(
         }
         catch (CaseError error)
         {
-            return Zu(error);
+            return ToResult(error);
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
-        await Melde(caseItem, cancellationToken);
+        await Notify(caseItem, cancellationToken);
 
-        return new CaseResult.Erledigt(caseItem);
+        return new CaseResult.Done(caseItem);
     }
 
     /// <inheritdoc />
@@ -261,23 +261,23 @@ public sealed class CaseCommands(
 
         if (caseItem is null || caseItem.Company != request.Company)
         {
-            return new CaseResult.Unbekannt();
+            return new CaseResult.Unknown();
         }
 
         try
         {
             caseItem.MakeOffer(
-                request.Text, request.Beginn, request.FeeCents, clock.GetUtcNow());
+                request.Text, request.Start, request.FeeCents, clock.GetUtcNow());
         }
         catch (CaseError error)
         {
-            return Zu(error);
+            return ToResult(error);
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
-        await Melde(caseItem, cancellationToken);
+        await Notify(caseItem, cancellationToken);
 
-        return new CaseResult.Erledigt(caseItem);
+        return new CaseResult.Done(caseItem);
     }
 
     /// <inheritdoc />
@@ -304,15 +304,15 @@ public sealed class CaseCommands(
     /// call after the commit here whose error was swallowed — the case stayed,
     /// the notification was gone for good.
     /// </remarks>
-    private Task Melde(
+    private Task Notify(
         Transfer.Domain.Cases.Transfer caseItem, CancellationToken cancellationToken) =>
         outbox.NoteAsync(caseItem.Subject, NotificationKinds.Moved, cancellationToken);
 
-    private static CaseResult Zu(CaseError error) => error switch
+    private static CaseResult ToResult(CaseError error) => error switch
     {
         // Somebody else's case is like none from outside.
-        NotYours => new CaseResult.Unbekannt(),
+        NotYours => new CaseResult.Unknown(),
         TransitionNotAllowed => new CaseResult.StateConflict(error.Message),
-        _ => new CaseResult.Eingabe(error.Message)
+        _ => new CaseResult.InvalidInput(error.Message)
     };
 }

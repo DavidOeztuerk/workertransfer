@@ -7,10 +7,10 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Transfer.Api;
 
-/// <summary><c>POST /erasure</c> — der Eingang der Kaskade in diesen Dienst.</summary>
+/// <summary><c>POST /erasure</c> — where the cascade enters this service.</summary>
 public static class ErasureEndpoints
 {
-    /// <summary>Der Header, den der Ursprung vorlegt.</summary>
+    /// <summary>The header the origin presents.</summary>
     private const string SecretHeader = "X-Erasure-Secret";
 
     /// <summary>Maps the one endpoint the erasure cascade calls.</summary>
@@ -36,7 +36,7 @@ public static class ErasureEndpoints
                 return;
             }
 
-            var behalten = await mediator.Send(
+            var kept = await mediator.Send(
                 new ErasePersonCommand(new Noelia.Core.Identity.SubjectId(body.UserId)),
                 cancellationToken);
 
@@ -45,7 +45,7 @@ public static class ErasureEndpoints
             // learn of it instead of guessing — suspended is not skipped
             // (ADR-0027 §3.4).
             await context.Response.WriteAsJsonAsync(
-                new ErasureReceiptV1(behalten), cancellationToken);
+                new ErasureReceiptV1(kept), cancellationToken);
         });
 
         return app;

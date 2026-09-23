@@ -22,26 +22,26 @@ namespace WorkerTransfer.Transfer.Tests;
 [Collection(PostgresCollection.Name)]
 public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Loeschgeheimnis = "loesch-geheimnis";
+    private const string ErasureSecret = "erasure-secret";
 
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
+            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate, ProbeLedger>());
-                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, ProbeDelivery>());
             });
         });
 
@@ -50,7 +50,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
@@ -61,7 +61,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// been flipped.
     /// </remarks>
     [Fact]
-    public void Der_Schalter_steht_auf_aus()
+    public void The_switch_stands_at_off()
     {
         Retention.KeepPaid.Should().BeFalse();
     }
@@ -75,7 +75,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// aggregate's set of final states.
     /// </remarks>
     [Fact]
-    public void Abgeschlossen_heisst_accepted_oder_completed()
+    public void Completed_means_accepted_or_completed()
     {
         Retention.Completed.Should().Equal(
             TransferState.Accepted, TransferState.Completed);
@@ -87,20 +87,20 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var company = Guid.CreateVersion7();
-        var bezahlt = await Case(anna, company, "completed", gebuehr: 500_000);
-        var laufend = await Case(anna, Guid.CreateVersion7(), "talking");
+        var paid = await Case(anna, company, "completed", fee: 500_000);
+        var running = await Case(anna, Guid.CreateVersion7(), "talking");
         await Status(anna);
 
-        var response = await Loesche(anna);
+        var response = await Erase(anna);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        quittung.GetProperty("retained").GetInt32().Should().Be(0);
+        var receipt = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        receipt.GetProperty("retained").GetInt32().Should().Be(0);
 
         await using var context = postgres.Context();
-        (await context.Cases.AnyAsync(row => row.Id == bezahlt)).Should().BeFalse();
-        (await context.Cases.AnyAsync(row => row.Id == laufend)).Should().BeFalse();
+        (await context.Cases.AnyAsync(row => row.Id == paid)).Should().BeFalse();
+        (await context.Cases.AnyAsync(row => row.Id == running)).Should().BeFalse();
         (await context.MarketStatus.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
@@ -117,32 +117,32 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task The_flipped_switch_covers_exactly_the_paid_completion()
     {
         var anna = Guid.CreateVersion7();
-        var abgeschlossenBezahlt = await Case(
-            anna, Guid.CreateVersion7(), "completed", gebuehr: 500_000);
-        var angenommenBezahlt = await Case(
-            anna, Guid.CreateVersion7(), "accepted", gebuehr: 1);
-        var abgeschlossenUnbezahlt = await Case(anna, Guid.CreateVersion7(), "completed");
-        var angebotBezahlt = await Case(
-            anna, Guid.CreateVersion7(), "offered", gebuehr: 500_000);
-        var abgesagtBezahlt = await Case(
-            anna, Guid.CreateVersion7(), "declined", gebuehr: 500_000);
+        var completedPaid = await Case(
+            anna, Guid.CreateVersion7(), "completed", fee: 500_000);
+        var acceptedPaid = await Case(
+            anna, Guid.CreateVersion7(), "accepted", fee: 1);
+        var completedUnpaid = await Case(anna, Guid.CreateVersion7(), "completed");
+        var offeredPaid = await Case(
+            anna, Guid.CreateVersion7(), "offered", fee: 500_000);
+        var declinedPaid = await Case(
+            anna, Guid.CreateVersion7(), "declined", fee: 500_000);
 
         await using var context = postgres.Context();
-        var bestand = new EfErasureLedger(context);
+        var ledger = new EfErasureLedger(context);
 
-        var behalten = await bestand.DeleteAsync(
+        var kept = await ledger.DeleteAsync(
             new SubjectId(anna), keepPaid: true);
 
-        behalten.Should().Be(2);
+        kept.Should().Be(2);
 
-        var uebrig = await context.Cases
+        var left = await context.Cases
             .Where(row => row.SubjectId == anna)
             .Select(row => row.Id)
             .ToListAsync();
 
-        uebrig.Should().BeEquivalentTo([abgeschlossenBezahlt, angenommenBezahlt]);
-        uebrig.Should().NotContain(
-            [abgeschlossenUnbezahlt, angebotBezahlt, abgesagtBezahlt]);
+        left.Should().BeEquivalentTo([completedPaid, acceptedPaid]);
+        left.Should().NotContain(
+            [completedUnpaid, offeredPaid, declinedPaid]);
     }
 
     /// <summary>
@@ -158,28 +158,28 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task Having_been_asked_about_falls_having_asked_stays_without_the_name()
     {
         var recruiter = Guid.CreateVersion7();
-        var ueberIhn = await ResumeRequest(recruiter, Guid.CreateVersion7(), Guid.CreateVersion7());
-        var vonIhm = await ResumeRequest(Guid.CreateVersion7(), Guid.CreateVersion7(), recruiter);
+        var aboutThem = await MarketRequest(recruiter, Guid.CreateVersion7(), Guid.CreateVersion7());
+        var byThem = await MarketRequest(Guid.CreateVersion7(), Guid.CreateVersion7(), recruiter);
 
-        await Loesche(recruiter);
+        await Erase(recruiter);
 
         await using var context = postgres.Context();
 
-        (await context.Requests.AnyAsync(row => row.Id == ueberIhn)).Should().BeFalse();
+        (await context.Requests.AnyAsync(row => row.Id == aboutThem)).Should().BeFalse();
 
-        var geblieben = await context.Requests.SingleAsync(row => row.Id == vonIhm);
-        geblieben.RequestedBy.Should().BeNull("der Vorgang gehört dem Unternehmen");
+        var remaining = await context.Requests.SingleAsync(row => row.Id == byThem);
+        remaining.RequestedBy.Should().BeNull("the case belongs to the company");
     }
 
-    /// <summary>Ein ausstehender Vermerk an ein Konto, das es nicht mehr gibt.</summary>
+    /// <summary>A pending note to an account that no longer exists.</summary>
     [Fact]
     public async Task The_erasure_clears_this_human_beings_outbox()
     {
         var anna = Guid.CreateVersion7();
 
-        await using (var vorher = postgres.Context())
+        await using (var before = postgres.Context())
         {
-            vorher.Set<OutboxRow>().Add(new OutboxRow
+            before.Set<OutboxRow>().Add(new OutboxRow
             {
                 Id = Guid.CreateVersion7(),
                 UserId = anna,
@@ -187,13 +187,13 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
                 CreatedAt = DateTime.UtcNow
             });
 
-            await vorher.SaveChangesAsync();
+            await before.SaveChangesAsync();
         }
 
-        await Loesche(anna);
+        await Erase(anna);
 
-        await using var nachher = postgres.Context();
-        (await nachher.Set<OutboxRow>().AnyAsync(row => row.UserId == anna))
+        await using var after = postgres.Context();
+        (await after.Set<OutboxRow>().AnyAsync(row => row.UserId == anna))
             .Should().BeFalse();
     }
 
@@ -202,27 +202,27 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task The_erasure_strikes_only_this_human_being()
     {
         var anna = Guid.CreateVersion7();
-        var jemand = Guid.CreateVersion7();
+        var someone = Guid.CreateVersion7();
         await Status(anna);
-        await Status(jemand);
-        var fremder = await Case(jemand, Guid.CreateVersion7(), "talking");
+        await Status(someone);
+        var other = await Case(someone, Guid.CreateVersion7(), "talking");
 
-        await Loesche(anna);
+        await Erase(anna);
 
         await using var context = postgres.Context();
-        (await context.MarketStatus.AnyAsync(row => row.Id == jemand)).Should().BeTrue();
-        (await context.Cases.AnyAsync(row => row.Id == fremder)).Should().BeTrue();
+        (await context.MarketStatus.AnyAsync(row => row.Id == someone)).Should().BeTrue();
+        (await context.Cases.AnyAsync(row => row.Id == other)).Should().BeTrue();
     }
 
-    /// <summary>Ohne das Geheimnis passiert nichts.</summary>
+    /// <summary>Without the secret nothing happens.</summary>
     [Fact]
     public async Task Without_the_right_secret_nothing_is_erased()
     {
         var anna = Guid.CreateVersion7();
         await Status(anna);
 
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "guessed");
 
         var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
@@ -242,14 +242,14 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid subject)
+    private Task<HttpResponseMessage> Erase(Guid subject)
     {
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", ErasureSecret);
         return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
@@ -263,7 +263,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             Id = subject,
             Availability = "listening",
             Employed = false,
-            Note = "Nur Remote.",
+            Note = "Remote only.",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -276,7 +276,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// Straight into the table: reaching a paid completion over the routes costs
     /// five calls and checks nothing here that is not checked elsewhere already.
     /// </remarks>
-    private async Task<Guid> Case(Guid subject, Guid company, string state, long? gebuehr = null)
+    private async Task<Guid> Case(Guid subject, Guid company, string state, long? fee = null)
     {
         await using var context = postgres.Context();
         var now = DateTime.UtcNow;
@@ -286,9 +286,9 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             SubjectId = subject,
             TenantId = company,
             Status = state,
-            Message = "Wir hätten da etwas.",
-            OfferNote = gebuehr is null ? string.Empty : "Angebot.",
-            OfferFeeCents = gebuehr,
+            Message = "We might have something for you.",
+            OfferNote = fee is null ? string.Empty : "Offer.",
+            OfferFeeCents = fee,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -299,15 +299,15 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         return row.Id;
     }
 
-    private async Task<Guid> ResumeRequest(Guid ueberWen, Guid company, Guid frager)
+    private async Task<Guid> MarketRequest(Guid about, Guid company, Guid requestedBy)
     {
         await using var context = postgres.Context();
         var row = new RequestRow
         {
             Id = Guid.CreateVersion7(),
-            SubjectId = ueberWen,
+            SubjectId = about,
             TenantId = company,
-            RequestedBy = frager,
+            RequestedBy = requestedBy,
             Status = "PENDING",
             CreatedAt = DateTime.UtcNow
         };

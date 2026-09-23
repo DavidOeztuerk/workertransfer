@@ -117,11 +117,11 @@ public sealed class Transfer
         SubjectId subject,
         TenantId company,
         TransferState state,
-        bool brauchtFreigabe,
+        bool needsRelease,
         bool releaseConfirmed,
         string message,
-        string angebotstext,
-        string? angebotsbeginn,
+        string offerText,
+        string? offerStart,
         long? offerFeeCents,
         DateTimeOffset createdAt,
         DateTimeOffset changedAt)
@@ -130,11 +130,11 @@ public sealed class Transfer
         Subject = subject;
         Company = company;
         State = state;
-        BrauchtFreigabe = brauchtFreigabe;
+        NeedsRelease = needsRelease;
         ReleaseConfirmed = releaseConfirmed;
-        Nachricht = message;
-        OfferText = angebotstext;
-        OfferStart = angebotsbeginn;
+        Message = message;
+        OfferText = offerText;
+        OfferStart = offerStart;
         OfferFeeCents = offerFeeCents;
         CreatedAt = createdAt;
         ChangedAt = changedAt;
@@ -159,14 +159,14 @@ public sealed class Transfer
     /// change the terms of an offer retroactively — and a company cannot hope
     /// the rule will still change.
     /// </remarks>
-    public bool BrauchtFreigabe { get; }
+    public bool NeedsRelease { get; }
 
     /// <summary>Confirmed by the <em>person</em>.</summary>
     /// <remarks>The platform does not check it and cannot.</remarks>
     public bool ReleaseConfirmed { get; private set; }
 
     /// <summary>What the company wrote.</summary>
-    public string Nachricht { get; }
+    public string Message { get; }
 
     /// <summary>What stands in the offer.</summary>
     public string OfferText { get; private set; }
@@ -196,13 +196,13 @@ public sealed class Transfer
     public bool IsRunning => TransferStates.Running.Contains(State);
 
     /// <summary>A company shows interest.</summary>
-    public static Transfer Zeige_Interesse(
+    public static Transfer ShowInterest(
         SubjectId subject,
         TenantId company,
-        bool brauchtFreigabe,
+        bool needsRelease,
         string message,
         DateTimeOffset now) =>
-        new(Guid.CreateVersion7(), subject, company, TransferState.Interested, brauchtFreigabe,
+        new(Guid.CreateVersion7(), subject, company, TransferState.Interested, needsRelease,
             releaseConfirmed: false, Text("Message", message), string.Empty,
             null, null, now, now);
 
@@ -212,33 +212,33 @@ public sealed class Transfer
         SubjectId subject,
         TenantId company,
         TransferState state,
-        bool brauchtFreigabe,
+        bool needsRelease,
         bool releaseConfirmed,
         string message,
-        string angebotstext,
-        string? angebotsbeginn,
+        string offerText,
+        string? offerStart,
         long? offerFeeCents,
         DateTimeOffset createdAt,
         DateTimeOffset changedAt) =>
-        new(id, subject, company, state, brauchtFreigabe, releaseConfirmed, message,
-            angebotstext, angebotsbeginn, offerFeeCents, createdAt, changedAt);
+        new(id, subject, company, state, needsRelease, releaseConfirmed, message,
+            offerText, offerStart, offerFeeCents, createdAt, changedAt);
 
     // --- The person ------------------------------------------------------
 
     /// <summary>The person agrees to a conversation.</summary>
-    public void AcceptConversation(SubjectId durch, DateTimeOffset now)
+    public void AcceptConversation(SubjectId actor, DateTimeOffset now)
     {
-        Meiner(durch);
-        Genau(TransferState.Interested, "opened for talks");
-        Nach(TransferState.Talking, now);
+        EnsureMine(actor);
+        EnsureState(TransferState.Interested, "opened for talks");
+        MoveTo(TransferState.Talking, now);
     }
 
     /// <summary>The person accepts the offer.</summary>
-    public void AcceptOffer(SubjectId durch, DateTimeOffset now)
+    public void AcceptOffer(SubjectId actor, DateTimeOffset now)
     {
-        Meiner(durch);
-        Genau(TransferState.Offered, "accepted");
-        Nach(TransferState.Accepted, now);
+        EnsureMine(actor);
+        EnsureState(TransferState.Offered, "accepted");
+        MoveTo(TransferState.Accepted, now);
     }
 
     /// <summary>The person confirms that their employer lets them go.</summary>
@@ -247,18 +247,18 @@ public sealed class Transfer
     /// employer nor the contract. What the step achieves is asking the question
     /// and recording the answer.
     /// </remarks>
-    public void ConfirmRelease(SubjectId durch, DateTimeOffset now)
+    public void ConfirmRelease(SubjectId actor, DateTimeOffset now)
     {
-        Meiner(durch);
-        Genau(TransferState.Accepted, "released");
+        EnsureMine(actor);
+        EnsureState(TransferState.Accepted, "released");
 
-        if (!BrauchtFreigabe)
+        if (!NeedsRelease)
         {
             throw new TransitionNotAllowed(State, "released without needing a release");
         }
 
         ReleaseConfirmed = true;
-        Nach(TransferState.Completed, now);
+        MoveTo(TransferState.Completed, now);
     }
 
     /// <summary>The person declines.</summary>
@@ -266,20 +266,20 @@ public sealed class Transfer
     /// Always possible, from every running state. A process one cannot get out
     /// of is no process but a trap.
     /// </remarks>
-    public void Sage_ab(SubjectId durch, DateTimeOffset now)
+    public void Decline(SubjectId actor, DateTimeOffset now)
     {
-        Meiner(durch);
-        Laufend("declined");
-        Nach(TransferState.Declined, now);
+        EnsureMine(actor);
+        EnsureRunning("declined");
+        MoveTo(TransferState.Declined, now);
     }
 
     // --- The company -----------------------------------------------------
 
     /// <summary>The company makes an offer.</summary>
     public void MakeOffer(
-        string text, string? beginn, long? feeCents, DateTimeOffset now)
+        string text, string? start, long? feeCents, DateTimeOffset now)
     {
-        Genau(TransferState.Talking, "offered");
+        EnsureState(TransferState.Talking, "offered");
 
         if (feeCents is < 0)
         {
@@ -287,9 +287,9 @@ public sealed class Transfer
         }
 
         OfferText = Text("Offer", text);
-        OfferStart = beginn;
+        OfferStart = start;
         OfferFeeCents = feeCents;
-        Nach(TransferState.Offered, now);
+        MoveTo(TransferState.Offered, now);
     }
 
     /// <summary>The company completes.</summary>
@@ -298,39 +298,39 @@ public sealed class Transfer
     /// to make. The person has already said yes with
     /// <see cref="AcceptOffer"/>.
     /// </remarks>
-    public void Schliesse_ab(DateTimeOffset now)
+    public void Complete(DateTimeOffset now)
     {
-        Genau(TransferState.Accepted, "completed");
+        EnsureState(TransferState.Accepted, "completed");
 
-        if (BrauchtFreigabe)
+        if (NeedsRelease)
         {
             // For as long as a release is needed, the person completes — they
             // are the only one who knows whether it is there.
             throw new TransitionNotAllowed(State, "completed before the release is confirmed");
         }
 
-        Nach(TransferState.Completed, now);
+        MoveTo(TransferState.Completed, now);
     }
 
     /// <summary>The company withdraws.</summary>
     public void Withdraw(DateTimeOffset now)
     {
-        Laufend("withdrawn");
-        Nach(TransferState.Withdrawn, now);
+        EnsureRunning("withdrawn");
+        MoveTo(TransferState.Withdrawn, now);
     }
 
     // --- Shared ----------------------------------------------------------
 
     private static string Text(string field, string? value)
     {
-        var bereinigt = (value ?? string.Empty).Trim();
+        var trimmed = (value ?? string.Empty).Trim();
 
-        return bereinigt.Length > MaxTextLength
+        return trimmed.Length > MaxTextLength
             ? throw new TextError(field, MaxTextLength)
-            : bereinigt;
+            : trimmed;
     }
 
-    private void Meiner(SubjectId principal)
+    private void EnsureMine(SubjectId principal)
     {
         if (principal != Subject)
         {
@@ -338,15 +338,15 @@ public sealed class Transfer
         }
     }
 
-    private void Genau(TransferState gewollt, string what)
+    private void EnsureState(TransferState expected, string what)
     {
-        if (State != gewollt)
+        if (State != expected)
         {
             throw new TransitionNotAllowed(State, what);
         }
     }
 
-    private void Laufend(string what)
+    private void EnsureRunning(string what)
     {
         if (!IsRunning)
         {
@@ -354,7 +354,7 @@ public sealed class Transfer
         }
     }
 
-    private void Nach(TransferState target, DateTimeOffset now)
+    private void MoveTo(TransferState target, DateTimeOffset now)
     {
         State = target;
         ChangedAt = now;

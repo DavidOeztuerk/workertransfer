@@ -11,7 +11,7 @@ public sealed record SaveMarketStatusCommand(
     SubjectId Subject,
     Availability Availability,
     bool IsEmployed,
-    string Notiz) : ICommandMessage<MarketStatus>;
+    string Remark) : ICommandMessage<MarketStatus>;
 
 /// <summary>One's own market status.</summary>
 /// <remarks>
@@ -29,7 +29,7 @@ public sealed record VisibleMarketStatusQuery(SubjectId Subject, TenantId Compan
 /// <summary>Writes and reads the market status.</summary>
 public sealed class MarketCommands(
     IMarketStore store,
-    IConsentGate tor,
+    IConsentGate gate,
     TimeProvider clock) :
     IRequestHandler<SaveMarketStatusCommand, MarketStatus>,
     IRequestHandler<MyMarketStatusQuery, MarketStatus>,
@@ -49,12 +49,12 @@ public sealed class MarketCommands(
         {
             status = MarketStatus.Create(
                 request.Subject, request.Availability, request.IsEmployed,
-                request.Notiz, now);
+                request.Remark, now);
         }
         else
         {
-            existing.Aendere(
-                request.Availability, request.IsEmployed, request.Notiz, now);
+            existing.Change(
+                request.Availability, request.IsEmployed, request.Remark, now);
 
             status = existing;
         }
@@ -71,7 +71,7 @@ public sealed class MarketCommands(
         ArgumentNullException.ThrowIfNull(request);
 
         return await store.GetAsync(request.Subject, cancellationToken)
-               ?? MarketStatus.Voreingestellt(request.Subject, clock.GetUtcNow());
+               ?? MarketStatus.Default(request.Subject, clock.GetUtcNow());
     }
 
     /// <inheritdoc />
@@ -94,7 +94,7 @@ public sealed class MarketCommands(
         // same thing from outside — and that counts double here, because the
         // mere existence of the statement "this person is listening" can do
         // harm.
-        return await tor.MaySeeMarketAsync(request.Subject, request.Company, cancellationToken)
+        return await gate.MaySeeMarketAsync(request.Subject, request.Company, cancellationToken)
             ? status
             : null;
     }

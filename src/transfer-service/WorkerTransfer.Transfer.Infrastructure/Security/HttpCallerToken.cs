@@ -30,9 +30,9 @@ public sealed class HttpCallerToken(IHttpContextAccessor accessor) : ICallerToke
                 return header["Bearer ".Length..];
             }
 
-            return request.Cookies.TryGetValue("access", out var ausCookie)
-                   && !string.IsNullOrEmpty(ausCookie)
-                ? ausCookie
+            return request.Cookies.TryGetValue("access", out var fromCookie)
+                   && !string.IsNullOrEmpty(fromCookie)
+                ? fromCookie
                 : null;
         }
     }

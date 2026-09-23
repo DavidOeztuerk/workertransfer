@@ -5,9 +5,9 @@ using WorkerTransfer.Transfer.Api.Authorization;
 using WorkerTransfer.Transfer.Infrastructure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
-// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
 WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,13 +17,13 @@ const string serviceName = "transfer-service";
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
-// Zwei Handlungen binden das Unternehmen: ein Angebot (Termin und Gebuehr) und
-// der Abschluss. Wer sie darf, entscheidet die MITGLIEDSCHAFTSTABELLE von
-// identity-service, je ResumeRequest — eine Rolle im Token wirkte nach einer
-// Entfernung erst beim Ablauf.
+// Two actions bind the company: an offer (date and fee) and the completion.
+// Who may take them, the MEMBERSHIP TABLE of identity-service decides, per
+// request — a role in the token would take effect after a removal only at
+// expiry.
 //
-// `withdraw` steht absichtlich nicht dabei: wer anfangen darf, muss aufhoeren
-// duerfen.
+// `withdraw` is deliberately not among them: whoever may start must be allowed
+// to stop.
 builder.Services.AddAdminrechte(
     builder.Configuration,
     CasePermissions.Offer,
@@ -36,7 +36,7 @@ builder.Services.AddTransferInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
+// Migrate first, then serve (ADR-0010).
 await app.MigrateSchemaAsync<TransferDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);

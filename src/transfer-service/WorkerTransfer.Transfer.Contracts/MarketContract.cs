@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace WorkerTransfer.Transfer.Contracts;
 
-/// <summary>Ein MarketStatus, wie er gelesen wird.</summary>
+/// <summary>A market status as it is read.</summary>
 public sealed record MarketStatusV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("availability")] string Availability,
@@ -43,7 +43,7 @@ public sealed record MarketRequestV1(
     /// </remarks>
     [property: JsonPropertyName("active")] bool? Active);
 
-/// <summary>Ein Transfer-Case, wie er gelesen wird.</summary>
+/// <summary>A transfer case as it is read.</summary>
 public sealed record TransferV1(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
@@ -58,13 +58,13 @@ public sealed record TransferV1(
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
-/// <summary>Was ein Unternehmen schickt, um Interesse zu zeigen.</summary>
-public sealed record InteresseZeigenV1(
+/// <summary>What a company sends to show interest.</summary>
+public sealed record ShowInterestV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId,
     [property: JsonPropertyName("message")] string Message = "");
 
-/// <summary>Ein Angebot.</summary>
-public sealed record AngebotV1(
+/// <summary>An offer.</summary>
+public sealed record OfferV1(
     [property: JsonPropertyName("note")] string Note = "",
     [property: JsonPropertyName("start_on")] string? StartOn = null,
     [property: JsonPropertyName("fee_cents")] long? FeeCents = null);

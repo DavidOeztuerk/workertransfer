@@ -8,14 +8,14 @@ using WorkerTransfer.Transfer.Domain.Requests;
 namespace WorkerTransfer.Transfer.Application.Requests;
 
 /// <summary>How a request turned out.</summary>
-public abstract record ResumeRequestResult
+public abstract record MarketRequestResult
 {
-    private ResumeRequestResult()
+    private MarketRequestResult()
     {
     }
 
     /// <summary>It worked.</summary>
-    public sealed record Erledigt(MarketRequest ResumeRequest) : ResumeRequestResult;
+    public sealed record Done(MarketRequest MarketRequest) : MarketRequestResult;
 
     /// <summary>
     /// Not visible, not present, not mine — from outside the same thing.
@@ -24,13 +24,13 @@ public abstract record ResumeRequestResult
     /// The difference would be especially expensive here: the mere existence of
     /// the statement gives something away.
     /// </remarks>
-    public sealed record NichtSichtbar : ResumeRequestResult;
+    public sealed record NotVisible : MarketRequestResult;
 
     /// <summary>This company has already asked.</summary>
-    public sealed record SchonGefragt : ResumeRequestResult;
+    public sealed record AlreadyAsked : MarketRequestResult;
 
     /// <summary>The state does not fit.</summary>
-    public sealed record StateConflict(string Grund) : ResumeRequestResult;
+    public sealed record StateConflict(string Reason) : MarketRequestResult;
 }
 
 /// <summary>"May I see whether you are listening right now?"</summary>
@@ -39,19 +39,19 @@ public abstract record ResumeRequestResult
 /// Answering it costs nothing: whoever is <c>unavailable</c> and releases shows
 /// exactly that, and nobody was disturbed.
 /// </remarks>
-public sealed record RequestMarketStatusCommand(SubjectId Subject, TenantId Company, SubjectId Frager)
-    : ICommandMessage<ResumeRequestResult>;
+public sealed record RequestMarketStatusCommand(SubjectId Subject, TenantId Company, SubjectId RequestedBy)
+    : ICommandMessage<MarketRequestResult>;
 
 /// <summary>The person answers.</summary>
-public sealed record AnswerRequestCommand(Guid Id, SubjectId Subject, bool Erteilen)
-    : ICommandMessage<ResumeRequestResult>;
+public sealed record AnswerRequestCommand(Guid Id, SubjectId Subject, bool Grant)
+    : ICommandMessage<MarketRequestResult>;
 
 /// <summary>The person takes the access back.</summary>
-public sealed record RevokeAccessCommand(Guid Id, SubjectId Subject) : ICommandMessage<ResumeRequestResult>;
+public sealed record RevokeAccessCommand(Guid Id, SubjectId Subject) : ICommandMessage<MarketRequestResult>;
 
 /// <summary>The requests about me, with the ledger's verdict beside them.</summary>
 public sealed record MyRequestsQuery(SubjectId Subject)
-    : IQueryMessage<IReadOnlyList<ResumeRequestView>>;
+    : IQueryMessage<IReadOnlyList<MarketRequestView>>;
 
 /// <summary>This company's requests.</summary>
 /// <remarks>
@@ -66,22 +66,22 @@ public sealed record CompanyRequestsQuery(TenantId Company) : IQueryMessage<IRea
 /// after a revocation <c>GRANTED</c> stays standing, <c>Active</c> falls to
 /// false. That is exactly why the permission does not stand in the case.
 /// </remarks>
-public sealed record ResumeRequestView(MarketRequest ResumeRequest, bool? Aktiv);
+public sealed record MarketRequestView(MarketRequest MarketRequest, bool? Active);
 
 /// <summary>Asks, answers and revokes requests.</summary>
 public sealed class RequestCommands(
     IRequestStore store,
-    IConsentGate tor,
+    IConsentGate gate,
     IOutbox outbox,
     TimeProvider clock) :
-    IRequestHandler<RequestMarketStatusCommand, ResumeRequestResult>,
-    IRequestHandler<AnswerRequestCommand, ResumeRequestResult>,
-    IRequestHandler<RevokeAccessCommand, ResumeRequestResult>,
-    IRequestHandler<MyRequestsQuery, IReadOnlyList<ResumeRequestView>>,
+    IRequestHandler<RequestMarketStatusCommand, MarketRequestResult>,
+    IRequestHandler<AnswerRequestCommand, MarketRequestResult>,
+    IRequestHandler<RevokeAccessCommand, MarketRequestResult>,
+    IRequestHandler<MyRequestsQuery, IReadOnlyList<MarketRequestView>>,
     IRequestHandler<CompanyRequestsQuery, IReadOnlyList<MarketRequest>>
 {
     /// <inheritdoc />
-    public async Task<ResumeRequestResult> Handle(
+    public async Task<MarketRequestResult> Handle(
         RequestMarketStatusCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -90,9 +90,9 @@ public sealed class RequestCommands(
         // market status. Checking both would be an oracle: "has already kept a
         // market status" is information about the person that nobody should be
         // able to ask for — and it would be especially telling here.
-        if (!await tor.MaySeeProfileAsync(request.Subject, cancellationToken))
+        if (!await gate.MaySeeProfileAsync(request.Subject, cancellationToken))
         {
-            return new ResumeRequestResult.NichtSichtbar();
+            return new MarketRequestResult.NotVisible();
         }
 
         // Ask once. Without this rule a refusal would have no effect: whoever
@@ -101,11 +101,11 @@ public sealed class RequestCommands(
         // weaker one.
         if (await store.GetAsync(request.Subject, request.Company, cancellationToken) is not null)
         {
-            return new ResumeRequestResult.SchonGefragt();
+            return new MarketRequestResult.AlreadyAsked();
         }
 
-        var requestRecord = MarketRequest.Oeffne(
-            request.Subject, request.Company, request.Frager, clock.GetUtcNow());
+        var requestRecord = MarketRequest.Open(
+            request.Subject, request.Company, request.RequestedBy, clock.GetUtcNow());
 
         await store.SaveAsync(requestRecord, cancellationToken);
 
@@ -114,11 +114,11 @@ public sealed class RequestCommands(
         await outbox.NoteAsync(
             request.Subject, NotificationKinds.Requested, cancellationToken);
 
-        return new ResumeRequestResult.Erledigt(requestRecord);
+        return new MarketRequestResult.Done(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<ResumeRequestResult> Handle(
+    public async Task<MarketRequestResult> Handle(
         AnswerRequestCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -129,29 +129,29 @@ public sealed class RequestCommands(
         // and not mine are the same thing from outside.
         if (requestRecord is null || requestRecord.Subject != request.Subject)
         {
-            return new ResumeRequestResult.NichtSichtbar();
+            return new MarketRequestResult.NotVisible();
         }
 
         var now = clock.GetUtcNow();
 
         try
         {
-            if (request.Erteilen)
+            if (request.Grant)
             {
-                requestRecord.Erteile(request.Subject, now);
+                requestRecord.Grant(request.Subject, now);
             }
             else
             {
-                requestRecord.Lehne_ab(request.Subject, now);
+                requestRecord.Decline(request.Subject, now);
             }
         }
         catch (AlreadyAnswered error)
         {
-            return new ResumeRequestResult.StateConflict(error.Message);
+            return new MarketRequestResult.StateConflict(error.Message);
         }
         catch (NotTheOneAsked)
         {
-            return new ResumeRequestResult.NichtSichtbar();
+            return new MarketRequestResult.NotVisible();
         }
 
         // The ledger first, the case second: if the ledger fails,
@@ -163,22 +163,22 @@ public sealed class RequestCommands(
         // — the one way in which this system could fail OPEN to the outside.
         // And here it would be most expensive: the permission says "this person
         // is listening".
-        if (request.Erteilen)
+        if (request.Grant)
         {
-            await tor.GrantAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
+            await gate.GrantAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
         }
         else
         {
-            await tor.RevokeAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
+            await gate.RevokeAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
         }
 
         await store.SaveAsync(requestRecord, cancellationToken);
 
-        return new ResumeRequestResult.Erledigt(requestRecord);
+        return new MarketRequestResult.Done(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<ResumeRequestResult> Handle(
+    public async Task<MarketRequestResult> Handle(
         RevokeAccessCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -187,7 +187,7 @@ public sealed class RequestCommands(
 
         if (requestRecord is null || requestRecord.Subject != request.Subject)
         {
-            return new ResumeRequestResult.NichtSichtbar();
+            return new MarketRequestResult.NotVisible();
         }
 
         // The revocation takes effect in the ledger, not in the case.
@@ -195,13 +195,13 @@ public sealed class RequestCommands(
         // revocation would rewrite the history, and whether the access holds
         // only the ledger says anyway. A running transfer case stays: it has a
         // door and a refusal of its own.
-        await tor.RevokeAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
+        await gate.RevokeAsync(requestRecord.Subject, requestRecord.Company, cancellationToken);
 
-        return new ResumeRequestResult.Erledigt(requestRecord);
+        return new MarketRequestResult.Done(requestRecord);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ResumeRequestView>> Handle(
+    public async Task<IReadOnlyList<MarketRequestView>> Handle(
         MyRequestsQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -210,21 +210,21 @@ public sealed class RequestCommands(
 
         // Ask only for granted requests: for PENDING and DECLINED the answer is
         // fixed, and every question costs a round trip.
-        var erteilte = requestRecords.Where(a => a.State is RequestState.Granted).ToList();
+        var granted = requestRecords.Where(a => a.State is RequestState.Granted).ToList();
 
-        var urteile = await tor.MayEachSeeMarketAsync(
-            [.. erteilte.Select(a => (a.Subject, a.Company))], cancellationToken);
+        var verdicts = await gate.MayEachSeeMarketAsync(
+            [.. granted.Select(a => (a.Subject, a.Company))], cancellationToken);
 
-        var aktivNachId = erteilte
-            .Select((requestRecord, job) => (requestRecord.Id, Aktiv: urteile[job]))
-            .ToDictionary(pair => pair.Id, pair => pair.Aktiv);
+        var activeById = granted
+            .Select((requestRecord, index) => (requestRecord.Id, Active: verdicts[index]))
+            .ToDictionary(pair => pair.Id, pair => pair.Active);
 
         return
         [
-            .. requestRecords.Select(requestRecord => new ResumeRequestView(
+            .. requestRecords.Select(requestRecord => new MarketRequestView(
                 requestRecord,
                 requestRecord.State is RequestState.Granted
-                    ? aktivNachId.GetValueOrDefault(requestRecord.Id)
+                    ? activeById.GetValueOrDefault(requestRecord.Id)
                     : false))
         ];
     }

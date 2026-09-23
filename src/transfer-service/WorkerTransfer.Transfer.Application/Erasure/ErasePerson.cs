@@ -18,7 +18,7 @@ public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int
 /// something stays, the origin should learn of it instead of guessing
 /// (ADR-0027 §3.4).
 /// </remarks>
-public sealed class ErasePersonHandler(IErasureLedger bestand)
+public sealed class ErasePersonHandler(IErasureLedger ledger)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
@@ -26,6 +26,6 @@ public sealed class ErasePersonHandler(IErasureLedger bestand)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return bestand.DeleteAsync(request.Subject, Retention.KeepPaid, cancellationToken);
+        return ledger.DeleteAsync(request.Subject, Retention.KeepPaid, cancellationToken);
     }
 }

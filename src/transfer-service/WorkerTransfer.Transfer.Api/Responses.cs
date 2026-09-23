@@ -46,15 +46,15 @@ public static class Responses
     /// out.
     /// </para>
     /// </remarks>
-    public static RouteGroupBuilder Abgesichert(RouteGroupBuilder group)
+    public static RouteGroupBuilder Guarded(RouteGroupBuilder group)
     {
         ArgumentNullException.ThrowIfNull(group);
 
-        group.AddEndpointFilter(async (call, weiter) =>
+        group.AddEndpointFilter(async (call, next) =>
         {
             try
             {
-                return await weiter(call);
+                return await next(call);
             }
             catch (ConsentGateSilent)
             {
@@ -99,25 +99,25 @@ public static class Responses
         return company.Tenant;
     }
 
-    /// <summary>Schreibt das Ergebnis einer ResumeRequest.</summary>
+    /// <summary>Writes the result of a market request.</summary>
     public static async Task Write(
         HttpContext context,
-        ResumeRequestResult result,
+        MarketRequestResult result,
         CancellationToken cancellationToken,
-        bool? aktiv,
-        int erfolg = StatusCodes.Status200OK)
+        bool? active,
+        int successStatus = StatusCodes.Status200OK)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         switch (result)
         {
-            case ResumeRequestResult.Erledigt erledigt:
-                context.Response.StatusCode = erfolg;
+            case MarketRequestResult.Done done:
+                context.Response.StatusCode = successStatus;
                 await context.Response.WriteAsJsonAsync(
-                    Zu(erledigt.ResumeRequest, aktiv), cancellationToken);
+                    ToWire(done.MarketRequest, active), cancellationToken);
                 return;
 
-            case ResumeRequestResult.NichtSichtbar:
+            case MarketRequestResult.NotVisible:
                 // Not present, not released, not mine — all the same thing.
                 // The difference would be especially expensive here.
                 await ProblemDetailsMiddleware.Write(
@@ -125,44 +125,44 @@ public static class Responses
                     "Request failed", "No such market status");
                 return;
 
-            case ResumeRequestResult.SchonGefragt:
+            case MarketRequestResult.AlreadyAsked:
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status409Conflict,
                     "Request failed", "This company has already asked");
                 return;
 
-            case ResumeRequestResult.StateConflict konflikt:
+            case MarketRequestResult.StateConflict conflict:
                 await ProblemDetailsMiddleware.Write(
-                    context, StatusCodes.Status409Conflict, "Request failed", konflikt.Grund);
+                    context, StatusCodes.Status409Conflict, "Request failed", conflict.Reason);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
+                throw new InvalidOperationException($"Unhandled result: {result}");
         }
     }
 
-    /// <summary>Schreibt das Ergebnis eines Vorgangs.</summary>
+    /// <summary>Writes the result of a case.</summary>
     public static async Task Write(
         HttpContext context,
         CaseResult result,
         CancellationToken cancellationToken,
-        int erfolg = StatusCodes.Status200OK)
+        int successStatus = StatusCodes.Status200OK)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         switch (result)
         {
-            case CaseResult.Erledigt erledigt:
-                context.Response.StatusCode = erfolg;
-                await context.Response.WriteAsJsonAsync(Zu(erledigt.Case), cancellationToken);
+            case CaseResult.Done done:
+                context.Response.StatusCode = successStatus;
+                await context.Response.WriteAsJsonAsync(ToWire(done.Case), cancellationToken);
                 return;
 
-            case CaseResult.Unbekannt:
+            case CaseResult.Unknown:
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "No such transfer");
                 return;
 
-            case CaseResult.NichtAnsprechbar:
+            case CaseResult.NotApproachable:
                 // No status, no release, or "not right now" — all the same to
                 // the outside. Otherwise the endpoint would be an oracle about
                 // who is listening.
@@ -176,25 +176,25 @@ public static class Responses
                     "Request failed", "There is already a running transfer");
                 return;
 
-            case CaseResult.StateConflict konflikt:
-                // Die Eingabe ist in Ordnung, der Zustand passt nicht.
+            case CaseResult.StateConflict conflict:
+                // The input is fine, the state does not fit.
                 await ProblemDetailsMiddleware.Write(
-                    context, StatusCodes.Status409Conflict, "Request failed", konflikt.Grund);
+                    context, StatusCodes.Status409Conflict, "Request failed", conflict.Reason);
                 return;
 
-            case CaseResult.Eingabe eingabe:
+            case CaseResult.InvalidInput invalid:
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", eingabe.Grund);
+                    "Request failed", invalid.Reason);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
+                throw new InvalidOperationException($"Unhandled result: {result}");
         }
     }
 
-    /// <summary>Ein MarketStatus auf der Leitung.</summary>
-    public static MarketStatusV1 Zu(MarketStatus status)
+    /// <summary>A market status on the wire.</summary>
+    public static MarketStatusV1 ToWire(MarketStatus status)
     {
         ArgumentNullException.ThrowIfNull(status);
 
@@ -202,15 +202,15 @@ public static class Responses
             status.Subject.Value,
             Availabilities.Word(status.Availability),
             status.IsEmployed,
-            status.Notiz,
-            // Abgeleitet mitgeschickt: sonst reimt sich jeder Client die Regel
-            // selbst zusammen, und irgendeiner reimt sie falsch.
-            status.Ansprechbar,
+            status.Remark,
+            // Derived and sent along: otherwise every client works the rule out
+            // for itself, and one of them works it out wrongly.
+            status.IsApproachable,
             status.ChangedAt);
     }
 
-    /// <summary>Eine ResumeRequest auf der Leitung.</summary>
-    public static MarketRequestV1 Zu(MarketRequest request, bool? aktiv)
+    /// <summary>A market request on the wire.</summary>
+    public static MarketRequestV1 ToWire(MarketRequest request, bool? active)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -220,12 +220,12 @@ public static class Responses
             request.Company.Value,
             RequestStates.Word(request.State),
             request.CreatedAt,
-            request.BeantwortetAm,
-            aktiv);
+            request.AnsweredAt,
+            active);
     }
 
-    /// <summary>Ein Case auf der Leitung.</summary>
-    public static TransferV1 Zu(Domain.Cases.Transfer caseItem)
+    /// <summary>A case on the wire.</summary>
+    public static TransferV1 ToWire(Domain.Cases.Transfer caseItem)
     {
         ArgumentNullException.ThrowIfNull(caseItem);
 
@@ -234,9 +234,9 @@ public static class Responses
             caseItem.Subject.Value,
             caseItem.Company.Value,
             TransferStates.Word(caseItem.State),
-            caseItem.BrauchtFreigabe,
+            caseItem.NeedsRelease,
             caseItem.ReleaseConfirmed,
-            caseItem.Nachricht,
+            caseItem.Message,
             caseItem.OfferText,
             caseItem.OfferStart,
             caseItem.OfferFeeCents,

@@ -80,7 +80,7 @@ public static class TransferInfrastructure
         services.AddCQRS(typeof(SaveMarketStatusCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
@@ -97,14 +97,16 @@ public static class TransferInfrastructure
     /// and therefore stands on the list.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<TermException> Wortausnahmen { get; } =
+    public static IReadOnlyList<TermException> TermExceptions { get; } =
     [
         new("MarketStatusV1.Note", Note),
         new("WriteMarketStatusV1.Note", Note),
-        new("AngebotV1.Note", Note),
+        new("OfferV1.Note", Note),
         new("TransferV1.OfferNote", Note)
     ];
 
+    // German on purpose: the reason appears in the finding, and the finding goes
+    // into the German evidence documents.
     private const string Note =
         "englisch note = Anmerkung — was die Person zu ihrem Marktstatus "
         + "schreibt, beziehungsweise was ein Unternehmen zu seinem Angebot "
@@ -120,25 +122,25 @@ public static class TransferInfrastructure
     /// the configuration, is therefore the same for every service and stands in
     /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(RequestState).Assembly, typeof(MarketStatusV1).Assembly],
-            Wortausnahmen));
+            TermExceptions));
 
-        // None KI-Naht: `ProviderCheck` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
+        // No AI seam: `ProviderCheck` without a source reports NichtAnwendbar,
+        // and that is expressly NO green tick — a tick on something that does
+        // not apply here at all would be noise in the document that is meant
+        // to cut through noise.
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        // No further type stands between the question and the ledger — the
+        // precondition ADR-0013 fails on in practice. A cache in front of it is
+        // noticed by nobody, because everything keeps working, only with the
+        // state from a moment ago.
         services.AddSingleton<ISecurityCheck>(provider =>
             new RevocationCheck<IConsentGate>(
                 provider, typeof(HttpConsentGate)));

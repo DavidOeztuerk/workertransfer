@@ -30,27 +30,27 @@ namespace WorkerTransfer.Transfer.Tests;
 [Collection(PostgresCollection.Name)]
 public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
 {
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeLedger _ledger = new();
-    private readonly RoleProbe _rollen = new();
+    private readonly RoleProbe _roles = new();
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:transfer", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
+            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
-                services.Replace(ServiceDescriptor.Scoped<IDelivery, Probezustellung>());
-                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _rollen));
+                services.Replace(ServiceDescriptor.Scoped<IDelivery, ProbeDelivery>());
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
             });
         });
 
@@ -59,168 +59,167 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
-    private HttpClient Mit(string token)
+    private HttpClient With(string token)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
         return browser;
     }
 
-    private HttpClient AlsFirma(Guid company, Guid? subject = null) =>
-        Mit(TokenShape.Company(subject ?? Guid.CreateVersion7(), company));
+    private HttpClient AsCompany(Guid company, Guid? subject = null) =>
+        With(TokenShape.Company(subject ?? Guid.CreateVersion7(), company));
 
-    private HttpClient AlsPerson(Guid subject) => Mit(TokenShape.Person(subject));
+    private HttpClient AsPerson(Guid subject) => With(TokenShape.Person(subject));
 
     private static async Task<JsonElement> Json(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Ein laufender Case, bis kurz vor das Angebot.</summary>
-    private async Task<(Guid Case, Guid Subject)> ImGespraech(Guid company)
+    /// <summary>A running case, up to just before the offer.</summary>
+    private async Task<(Guid Case, Guid Subject)> InConversation(Guid company)
     {
         var subject = Guid.CreateVersion7();
 
-        await AlsPerson(subject).PutAsJsonAsync("/market/me", new
+        await AsPerson(subject).PutAsJsonAsync("/market/me", new
         {
             availability = "listening", employed = false, note = string.Empty
         });
 
-        _ledger.MarktFrei.Add((subject, company));
+        _ledger.MarketReleased.Add((subject, company));
 
-        var angelegt = await AlsFirma(company).PostAsJsonAsync("/transfers", new
+        var created = await AsCompany(company).PostAsJsonAsync("/transfers", new
         {
-            subject_id = subject, message = "Wir hätten da etwas."
+            subject_id = subject, message = "We might have something for you."
         });
 
-        angelegt.StatusCode.Should().Be(HttpStatusCode.Created);
-        var id = (await Json(angelegt)).GetProperty("id").GetGuid();
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await Json(created)).GetProperty("id").GetGuid();
 
-        (await AlsPerson(subject).PostAsync($"/transfers/{id}/accept-talk", null))
+        (await AsPerson(subject).PostAsync($"/transfers/{id}/accept-talk", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         return (id, subject);
     }
 
-    private static Task<HttpResponseMessage> Angebot(HttpClient browser, Guid caseItem) =>
+    private static Task<HttpResponseMessage> Offer(HttpClient browser, Guid caseItem) =>
         browser.PostAsJsonAsync($"/transfers/{caseItem}/offer", new
         {
-            note = "Wir bieten die Stelle an.", start_on = "2026-10", fee_cents = 250_000L
+            note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
         });
 
-    /// <summary>Ein <c>member</c> macht kein Angebot.</summary>
+    /// <summary>A <c>member</c> makes no offer.</summary>
     [Fact]
     public async Task Only_an_admin_makes_an_offer()
     {
         var company = Guid.CreateVersion7();
-        var (caseItem, _) = await ImGespraech(company);
+        var (caseItem, _) = await InConversation(company);
 
-        _rollen.Antwort = CompanyRole.Mitglied;
-        var alsMitglied = await Angebot(AlsFirma(company), caseItem);
+        _roles.Answer = CompanyRole.Mitglied;
+        var asMember = await Offer(AsCompany(company), caseItem);
 
-        alsMitglied.StatusCode.Should().Be(
-            HttpStatusCode.Forbidden, "ein Angebot nennt Termin und Gebuehr");
+        asMember.StatusCode.Should().Be(
+            HttpStatusCode.Forbidden, "an offer names a date and a fee");
 
-        _rollen.Antwort = CompanyRole.Admin;
-        var alsAdmin = await Angebot(AlsFirma(company), caseItem);
+        _roles.Answer = CompanyRole.Admin;
+        var asAdmin = await Offer(AsCompany(company), caseItem);
 
-        alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
+        asAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    /// <summary>Und schliesst keinen Case ab.</summary>
+    /// <summary>And completes no case.</summary>
     [Fact]
     public async Task Only_an_admin_completes_a_case()
     {
         var company = Guid.CreateVersion7();
-        var (caseItem, subject) = await ImGespraech(company);
+        var (caseItem, subject) = await InConversation(company);
 
-        _rollen.Antwort = CompanyRole.Admin;
-        (await Angebot(AlsFirma(company), caseItem)).StatusCode.Should().Be(HttpStatusCode.OK);
+        _roles.Answer = CompanyRole.Admin;
+        (await Offer(AsCompany(company), caseItem)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Kein `confirm-release`: die Person hier ist nicht beschaeftigt, es
-        // gibt also niemanden, der sie gehen lassen muesste.
-        (await AlsPerson(subject).PostAsync($"/transfers/{caseItem}/accept-offer", null))
+        // No `confirm-release`: the person here is not employed, so there is
+        // nobody who would have to let them go.
+        (await AsPerson(subject).PostAsync($"/transfers/{caseItem}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _rollen.Antwort = CompanyRole.Mitglied;
-        var alsMitglied = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/complete", null);
+        _roles.Answer = CompanyRole.Mitglied;
+        var asMember = await AsCompany(company).PostAsync($"/transfers/{caseItem}/complete", null);
 
-        alsMitglied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        asMember.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        _rollen.Antwort = CompanyRole.Admin;
-        var alsAdmin = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/complete", null);
+        _roles.Answer = CompanyRole.Admin;
+        var asAdmin = await AsCompany(company).PostAsync($"/transfers/{caseItem}/complete", null);
 
-        alsAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(alsAdmin)).GetProperty("status").GetString().Should().Be("completed");
+        asAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(asAdmin)).GetProperty("status").GetString().Should().Be("completed");
     }
 
     /// <summary>
-    /// Ein <c>member</c> spricht an, zeigt Interesse — und zieht wieder
-    /// zurueck.
+    /// A <c>member</c> approaches, shows interest — and withdraws again.
     /// </summary>
     /// <remarks>
-    /// Die Haelfte, die leicht verlorengeht. <c>withdraw</c> traegt absichtlich
-    /// kein Firmenrecht: ein Verfahren, aus dem man nicht aussteigen kann, ist
-    /// kein Verfahren, sondern eine Falle — derselbe Satz, den <c>/decline</c>
-    /// fuer die Person schon traegt.
+    /// The half that is easily lost. <c>withdraw</c> deliberately carries no
+    /// company permission: a process one cannot get out of is no process but a
+    /// trap — the same sentence <c>/decline</c> already carries for the
+    /// person.
     /// </remarks>
     [Fact]
     public async Task A_member_shows_interest_and_withdraws_it()
     {
         var company = Guid.CreateVersion7();
-        var (caseItem, _) = await ImGespraech(company);
+        var (caseItem, _) = await InConversation(company);
 
-        _rollen.Antwort = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Mitglied;
 
-        var zurueck = await AlsFirma(company).PostAsync($"/transfers/{caseItem}/withdraw", null);
+        var withdrawn = await AsCompany(company).PostAsync($"/transfers/{caseItem}/withdraw", null);
 
-        zurueck.StatusCode.Should().Be(
-            HttpStatusCode.OK, "wer anfangen darf, muss aufhoeren duerfen");
+        withdrawn.StatusCode.Should().Be(
+            HttpStatusCode.OK, "whoever may start must be allowed to stop");
     }
 
-    /// <summary>Gefragt wird nach der Firma aus dem TOKEN.</summary>
+    /// <summary>What is asked for is the company from the TOKEN.</summary>
     [Fact]
     public async Task What_is_asked_for_is_the_tenant_from_the_token()
     {
         var company = Guid.CreateVersion7();
         var subject = Guid.CreateVersion7();
-        var (caseItem, _) = await ImGespraech(company);
+        var (caseItem, _) = await InConversation(company);
 
-        await Angebot(AlsFirma(company, subject), caseItem);
+        await Offer(AsCompany(company, subject), caseItem);
 
-        _rollen.Zuletzt.Should().Be((subject, company));
+        _roles.Last.Should().Be((subject, company));
     }
 
-    /// <summary>Schweigt die Rollenauskunft, ist das kein Nein.</summary>
+    /// <summary>A silent role lookup is not a no.</summary>
     [Fact]
     public async Task A_silent_role_lookup_is_not_a_no()
     {
         var company = Guid.CreateVersion7();
-        var (caseItem, _) = await ImGespraech(company);
+        var (caseItem, _) = await InConversation(company);
 
-        _rollen.Schweigt = true;
-        var response = await Angebot(AlsFirma(company), caseItem);
+        _roles.Silent = true;
+        var response = await Offer(AsCompany(company), caseItem);
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>
-    /// Ohne Token 401, als Person ohne Firma 403 — die Richtlinie aendert
-    /// daran nichts.
+    /// Without a token 401, as a person without a company 403 — the policy
+    /// changes nothing about that.
     /// </summary>
     [Fact]
     public async Task Without_a_token_and_without_a_company_it_stays_as_it_was()
     {
         var company = Guid.CreateVersion7();
-        var (caseItem, subject) = await ImGespraech(company);
+        var (caseItem, subject) = await InConversation(company);
 
-        (await Angebot(_dienst.CreateClient(), caseItem))
+        (await Offer(_service.CreateClient(), caseItem))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        (await Angebot(AlsPerson(subject), caseItem))
+        (await Offer(AsPerson(subject), caseItem))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

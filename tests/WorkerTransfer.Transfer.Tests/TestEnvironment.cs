@@ -9,7 +9,7 @@ using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Transfer.Tests;
 
-/// <summary>Ein echtes Postgres mit dem Schema dieses Dienstes.</summary>
+/// <summary>A real Postgres with this service's schema.</summary>
 public sealed class Postgres : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
@@ -81,15 +81,15 @@ public static class TokenShape
 
     private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> ansprueche = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
+        List<Claim> claims = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
 
         if (company is { } tenant)
         {
-            ansprueche.Add(new Claim("tenant", tenant.ToString()));
+            claims.Add(new Claim("tenant", tenant.ToString()));
         }
 
         var token = new JwtSecurityToken(
-            issuer: Issuer, audience: Audience, claims: ansprueche,
+            issuer: Issuer, audience: Audience, claims: claims,
             expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: new SigningCredentials(
                 new ECDsaSecurityKey(Curve) { KeyId = KeyId },
@@ -111,23 +111,23 @@ public static class TokenShape
 /// </remarks>
 public sealed class RoleProbe : ICompanyRoles
 {
-    /// <summary>Was sie antwortet.</summary>
-    public CompanyRole Antwort { get; set; } = CompanyRole.Admin;
+    /// <summary>What it answers.</summary>
+    public CompanyRole Answer { get; set; } = CompanyRole.Admin;
 
-    /// <summary>Ob sie stattdessen schweigt — der Ausfall von identity-service.</summary>
-    public bool Schweigt { get; set; }
+    /// <summary>Whether it stays silent instead — identity-service being out.</summary>
+    public bool Silent { get; set; }
 
-    /// <summary>Wonach zuletzt gefragt wurde.</summary>
-    public (Guid Subject, Guid Company)? Zuletzt { get; private set; }
+    /// <summary>What it was last asked.</summary>
+    public (Guid Subject, Guid Company)? Last { get; private set; }
 
     /// <inheritdoc />
     public Task<CompanyRole> RoleAsync(
         Guid subject, Guid company, CancellationToken cancellationToken = default)
     {
-        Zuletzt = (subject, company);
+        Last = (subject, company);
 
-        return Schweigt
-            ? throw new RoleLookupSilent("Die Probe schweigt.")
-            : Task.FromResult(Antwort);
+        return Silent
+            ? throw new RoleLookupSilent("The probe is silent.")
+            : Task.FromResult(Answer);
     }
 }

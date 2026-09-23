@@ -6,7 +6,7 @@ using WorkerTransfer.Transfer.Domain.Cases;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
-/// <summary>Liest und schreibt <c>market_status</c>.</summary>
+/// <summary>Reads and writes <c>market_status</c>.</summary>
 public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
 {
     /// <inheritdoc />
@@ -36,7 +36,7 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
                 Id = status.Subject.Value,
                 Availability = Availabilities.Word(status.Availability),
                 Employed = status.IsEmployed,
-                Note = status.Notiz,
+                Note = status.Remark,
                 CreatedAt = status.CreatedAt.UtcDateTime,
                 UpdatedAt = status.ChangedAt.UtcDateTime
             });
@@ -46,7 +46,7 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
 
         existing.Availability = Availabilities.Word(status.Availability);
         existing.Employed = status.IsEmployed;
-        existing.Note = status.Notiz;
+        existing.Note = status.Remark;
         existing.UpdatedAt = status.ChangedAt.UtcDateTime;
     }
 
@@ -55,14 +55,14 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
             new SubjectId(row.Id),
             Availabilities.Read(row.Availability)
             ?? throw new InvalidOperationException(
-                $"Unbekannte Verfügbarkeit in der Datenbank: {row.Availability}"),
+                $"Unknown availability in the database: {row.Availability}"),
             row.Employed,
             row.Note,
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
             new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
 }
 
-/// <summary>Liest und schreibt <c>market_requests</c>.</summary>
+/// <summary>Reads and writes <c>market_requests</c>.</summary>
 public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
 {
     /// <inheritdoc />
@@ -103,10 +103,10 @@ public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
                 Id = request.Id,
                 SubjectId = request.Subject.Value,
                 TenantId = request.Company.Value,
-                RequestedBy = request.Frager?.Value,
+                RequestedBy = request.RequestedBy?.Value,
                 Status = RequestStates.Word(request.State),
                 CreatedAt = request.CreatedAt.UtcDateTime,
-                AnsweredAt = request.BeantwortetAm?.UtcDateTime
+                AnsweredAt = request.AnsweredAt?.UtcDateTime
             });
 
             return;
@@ -116,7 +116,7 @@ public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
         // an assignment that could change them would be the way to attribute a
         // request to somebody else after the fact.
         existing.Status = RequestStates.Word(request.State);
-        existing.AnsweredAt = request.BeantwortetAm?.UtcDateTime;
+        existing.AnsweredAt = request.AnsweredAt?.UtcDateTime;
     }
 
     /// <inheritdoc />
@@ -148,17 +148,17 @@ public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
             row.Id,
             new SubjectId(row.SubjectId),
             new TenantId(row.TenantId),
-            row.RequestedBy is { } frager ? new SubjectId(frager) : null,
+            row.RequestedBy is { } requestedBy ? new SubjectId(requestedBy) : null,
             RequestStates.Read(row.Status)
             ?? throw new InvalidOperationException(
-                $"Unbekannter Anfragestand in der Datenbank: {row.Status}"),
+                $"Unknown request state in the database: {row.Status}"),
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
-            row.AnsweredAt is { } beantwortet
-                ? new DateTimeOffset(beantwortet, TimeSpan.Zero)
+            row.AnsweredAt is { } answeredAt
+                ? new DateTimeOffset(answeredAt, TimeSpan.Zero)
                 : null);
 }
 
-/// <summary>Liest und schreibt <c>transfers</c>.</summary>
+/// <summary>Reads and writes <c>transfers</c>.</summary>
 public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
 {
     private static readonly string[] Running =
@@ -206,18 +206,18 @@ public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
                 TenantId = caseItem.Company.Value,
                 // Message and release requirement stand only here: both are
                 // fixed at creation and never changed afterwards.
-                RequiresRelease = caseItem.BrauchtFreigabe,
-                Message = caseItem.Nachricht,
+                RequiresRelease = caseItem.NeedsRelease,
+                Message = caseItem.Message,
                 CreatedAt = caseItem.CreatedAt.UtcDateTime
             };
 
-            Transfer_(caseItem, row);
+            Apply(caseItem, row);
             context.Cases.Add(row);
 
             return;
         }
 
-        Transfer_(caseItem, existing);
+        Apply(caseItem, existing);
     }
 
     /// <inheritdoc />
@@ -244,7 +244,7 @@ public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
         return [.. rows.Select(ToAggregate)];
     }
 
-    private static void Transfer_(Domain.Cases.Transfer caseItem, CaseRow row)
+    private static void Apply(Domain.Cases.Transfer caseItem, CaseRow row)
     {
         row.Status = TransferStates.Word(caseItem.State);
         row.ReleaseConfirmed = caseItem.ReleaseConfirmed;
@@ -261,7 +261,7 @@ public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
             new TenantId(row.TenantId),
             TransferStates.Read(row.Status)
             ?? throw new InvalidOperationException(
-                $"Unbekannter Transferstand in der Datenbank: {row.Status}"),
+                $"Unknown transfer state in the database: {row.Status}"),
             row.RequiresRelease,
             row.ReleaseConfirmed,
             row.Message,

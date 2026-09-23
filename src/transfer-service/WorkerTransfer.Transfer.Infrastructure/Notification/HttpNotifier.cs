@@ -5,21 +5,27 @@ using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Notification;
 
-/// <summary>Wohin Benachrichtigungen gehen, und was sie als unsere ausweist.</summary>
+/// <summary>Where notifications go, and what identifies them as ours.</summary>
+/// <remarks>
+/// The property names ARE the environment keys (<c>Notifications__Adresse</c>,
+/// <c>…__Zeitueberschreitung</c>, <c>…__Geheimnis</c>), so they stay German
+/// until the keys are renamed everywhere at once — in compose, in the chart and
+/// in <c>.env.example</c>.
+/// </remarks>
 public sealed class NotificationSettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "Notifications";
 
-    /// <summary>Die Basisadresse des notification-service.</summary>
+    /// <summary>The base address of notification-service.</summary>
     public string Adresse { get; set; } = string.Empty;
 
-    /// <summary>Wie lange auf eine Antwort gewartet wird.</summary>
+    /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
-    /// Fuenf Sekunden, wie bei jedem anderen Dienst-zu-Dienst-Aufruf hier.
-    /// OHNE diese Zeile gilt die Vorgabe von <c>HttpClient</c>: HUNDERT
-    /// Sekunden. Das ist kein Zeitlimit, das ist ein haengender Aufruf mit
-    /// einem Ende irgendwann — und er haengt den Aufrufer mit.
+    /// Five seconds, as with every other service-to-service call here. WITHOUT
+    /// this line <c>HttpClient</c>'s default applies: a HUNDRED seconds. That is
+    /// no time limit but a hanging call with an end some time — and it hangs the
+    /// caller with it.
     /// </remarks>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 
@@ -51,12 +57,12 @@ public sealed class HttpNotifier(
     {
         if (string.IsNullOrEmpty(_settings.Adresse))
         {
-            throw new InvalidOperationException("Notifications:Adresse ist nicht gesetzt.");
+            throw new InvalidOperationException("Notifications:Adresse is not configured.");
         }
 
         if (string.IsNullOrEmpty(_settings.Geheimnis))
         {
-            throw new InvalidOperationException("Notifications:Geheimnis ist nicht gesetzt.");
+            throw new InvalidOperationException("Notifications:Geheimnis is not configured.");
         }
 
         using var client = factory.CreateClient(nameof(HttpNotifier));

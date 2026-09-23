@@ -7,8 +7,8 @@ namespace WorkerTransfer.Transfer.Application.Ports;
 /// Neither show nor deny: both would be an assertion about the person that
 /// nobody can make just now. The endpoint turns it into 503.
 /// </remarks>
-public sealed class ConsentGateSilent(string reason, Exception? ursache = null)
-    : Exception(reason, ursache);
+public sealed class ConsentGateSilent(string reason, Exception? cause = null)
+    : Exception(reason, cause);
 
 /// <summary>The release keys, built in exactly one place.</summary>
 public static class ConsentKey

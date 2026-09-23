@@ -44,13 +44,13 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
         await context.Requests
             .Where(row => row.RequestedBy == subject.Value)
             .ExecuteUpdateAsync(
-                setzen => setzen.SetProperty(row => row.RequestedBy, (Guid?)null),
+                setters => setters.SetProperty(row => row.RequestedBy, (Guid?)null),
                 cancellationToken);
 
-        var meine = context.Cases.Where(row => row.SubjectId == subject.Value);
+        var theirs = context.Cases.Where(row => row.SubjectId == subject.Value);
 
-        var behalten = keepPaid
-            ? await meine.CountAsync(Bezahlt(), cancellationToken)
+        var kept = keepPaid
+            ? await theirs.CountAsync(Paid(), cancellationToken)
             : 0;
 
         // Written out rather than as a ternary in the expression: this is the
@@ -58,24 +58,24 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
         // should see what it does — not have to look up operator precedence.
         if (keepPaid)
         {
-            await meine
+            await theirs
                 .Where(row => !(Completed.Contains(row.Status)
                                   && row.OfferFeeCents != null))
                 .ExecuteDeleteAsync(cancellationToken);
         }
         else
         {
-            await meine.ExecuteDeleteAsync(cancellationToken);
+            await theirs.ExecuteDeleteAsync(cancellationToken);
         }
 
-        // Ein ausstehender Vermerk an ein Konto, das es nicht mehr gibt.
+        // A pending note to an account that no longer exists.
         await context.Set<OutboxRow>()
             .Where(row => row.UserId == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
         // Suspended is not skipped: the origin should learn what stayed
         // instead of guessing (ADR-0027 §3.4).
-        return behalten;
+        return kept;
     }
 
     /// <summary>A completed deal <em>with</em> a fee.</summary>
@@ -83,6 +83,6 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
     /// Without a fee no trade has come into being that anything could hang on —
     /// and a conversation is no contract.
     /// </remarks>
-    private static System.Linq.Expressions.Expression<Func<CaseRow, bool>> Bezahlt() =>
+    private static System.Linq.Expressions.Expression<Func<CaseRow, bool>> Paid() =>
         row => Completed.Contains(row.Status) && row.OfferFeeCents != null;
 }

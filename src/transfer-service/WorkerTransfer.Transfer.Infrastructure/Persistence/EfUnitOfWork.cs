@@ -3,7 +3,7 @@ using WorkerTransfer.Transfer.Application.Ports;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
-/// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
+/// <summary>A database transaction around a command.</summary>
 public sealed class EfUnitOfWork(TransferDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />

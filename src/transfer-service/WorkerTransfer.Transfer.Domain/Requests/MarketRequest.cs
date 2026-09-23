@@ -65,18 +65,18 @@ public sealed class MarketRequest
         Guid id,
         SubjectId subject,
         TenantId company,
-        SubjectId? frager,
+        SubjectId? requestedBy,
         RequestState state,
         DateTimeOffset createdAt,
-        DateTimeOffset? beantwortetAm)
+        DateTimeOffset? answeredAt)
     {
         Id = id;
         Subject = subject;
         Company = company;
-        Frager = frager;
+        RequestedBy = requestedBy;
         State = state;
         CreatedAt = createdAt;
-        BeantwortetAm = beantwortetAm;
+        AnsweredAt = answeredAt;
     }
 
     /// <summary>Which request.</summary>
@@ -96,7 +96,7 @@ public sealed class MarketRequest
     /// company, the person's name falls away. It does <strong>not</strong> mean
     /// "nobody asked".
     /// </remarks>
-    public SubjectId? Frager { get; }
+    public SubjectId? RequestedBy { get; }
 
     /// <summary>Where it stands.</summary>
     public RequestState State { get; private set; }
@@ -105,45 +105,45 @@ public sealed class MarketRequest
     public DateTimeOffset CreatedAt { get; }
 
     /// <summary><c>null</c> for as long as it is unanswered.</summary>
-    public DateTimeOffset? BeantwortetAm { get; private set; }
+    public DateTimeOffset? AnsweredAt { get; private set; }
 
     /// <summary>A company asks.</summary>
-    public static MarketRequest Oeffne(
-        SubjectId subject, TenantId company, SubjectId frager, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(), subject, company, frager, RequestState.Pending, now, null);
+    public static MarketRequest Open(
+        SubjectId subject, TenantId company, SubjectId requestedBy, DateTimeOffset now) =>
+        new(Guid.CreateVersion7(), subject, company, requestedBy, RequestState.Pending, now, null);
 
     /// <summary>The request as a row holds it.</summary>
     public static MarketRequest Restore(
         Guid id,
         SubjectId subject,
         TenantId company,
-        SubjectId? frager,
+        SubjectId? requestedBy,
         RequestState state,
         DateTimeOffset createdAt,
-        DateTimeOffset? beantwortetAm) =>
-        new(id, subject, company, frager, state, createdAt, beantwortetAm);
+        DateTimeOffset? answeredAt) =>
+        new(id, subject, company, requestedBy, state, createdAt, answeredAt);
 
     /// <summary>The person releases.</summary>
     /// <exception cref="NotTheOneAsked">Somebody else tried to answer.</exception>
     /// <exception cref="AlreadyAnswered">It is already answered.</exception>
-    public void Erteile(SubjectId durch, DateTimeOffset now)
+    public void Grant(SubjectId actor, DateTimeOffset now)
     {
-        Beantwortbar(durch);
+        EnsureAnswerable(actor);
         State = RequestState.Granted;
-        BeantwortetAm = now;
+        AnsweredAt = now;
     }
 
     /// <summary>The person refuses.</summary>
     /// <exception cref="NotTheOneAsked">Somebody else tried to answer.</exception>
     /// <exception cref="AlreadyAnswered">It is already answered.</exception>
-    public void Lehne_ab(SubjectId durch, DateTimeOffset now)
+    public void Decline(SubjectId actor, DateTimeOffset now)
     {
-        Beantwortbar(durch);
+        EnsureAnswerable(actor);
         State = RequestState.Declined;
-        BeantwortetAm = now;
+        AnsweredAt = now;
     }
 
-    private void Beantwortbar(SubjectId principal)
+    private void EnsureAnswerable(SubjectId principal)
     {
         if (principal != Subject)
         {
