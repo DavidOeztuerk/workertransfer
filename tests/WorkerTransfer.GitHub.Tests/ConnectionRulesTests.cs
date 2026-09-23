@@ -22,26 +22,26 @@ public class ConnectionRulesTests
         Connection.Open(new SubjectId(Guid.CreateVersion7()), "anna-dev");
 
     private static Repository Evidence(string name) =>
-        new(name, "Ein Repository", "Go", 0, $"https://github.com/anna/{name}", Now,
+        new(name, "A repository", "Go", 0, $"https://github.com/anna/{name}", Now,
             ["Go"], ["cli"]);
 
-    /// <summary>Ohne Nachweis kein Abzug.</summary>
+    /// <summary>No proof, no snapshot.</summary>
     [Fact]
-    public void Eine_unbewiesene_Verbindung_nimmt_keinen_Abzug_an()
+    public void An_unproven_connection_takes_no_snapshot()
     {
         var connection = Opened();
 
         var attempt = () => connection.StoreSnapshot(
-            new Snapshot([Evidence("fremde-arbeit")], true), Now);
+            new Snapshot([Evidence("someone-elses-work")], true), Now);
 
         attempt.Should().Throw<NotVerified>();
         connection.Repositories.Should().BeEmpty();
         connection.FetchedAt.Should().BeNull();
     }
 
-    /// <summary>Ein zweiter Nachweis ist keiner.</summary>
+    /// <summary>A second proof is none.</summary>
     [Fact]
-    public void Zweimal_nachweisen_geht_nicht()
+    public void Proving_twice_does_not_work()
     {
         var connection = Opened();
         connection.MarkVerified(Now);

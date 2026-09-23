@@ -3,7 +3,7 @@ using WorkerTransfer.GitHub.Application.Ports;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
-/// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
+/// <summary>A database transaction around a command.</summary>
 public sealed class EfUnitOfWork(GitHubDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />

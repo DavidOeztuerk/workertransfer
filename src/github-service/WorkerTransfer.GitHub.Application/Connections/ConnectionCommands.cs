@@ -14,7 +14,7 @@ public abstract record ConnectionResult
     }
 
     /// <summary>It worked.</summary>
-    public sealed record Erledigt(Connection Connection) : ConnectionResult;
+    public sealed record Done(Connection Connection) : ConnectionResult;
 
     /// <summary>
     /// No connection — or not released. From outside the same thing.
@@ -25,10 +25,10 @@ public abstract record ConnectionResult
     /// <remarks>
     /// 422 and not 404: the request was fine, the proof was missing.
     /// </remarks>
-    public sealed record NichtBewiesen : ConnectionResult;
+    public sealed record NotProven : ConnectionResult;
 
     /// <summary>Something about the input is wrong.</summary>
-    public sealed record Eingabe(string Grund) : ConnectionResult;
+    public sealed record InvalidInput(string Reason) : ConnectionResult;
 }
 
 /// <summary>Name the user name and get the one-time string.</summary>
@@ -76,7 +76,7 @@ public sealed record SignInStart(Uri? Url);
 /// What GitHub handed back unchanged. Has to match the connection's one-time
 /// string — otherwise the answer belongs to a different request.
 /// </param>
-public sealed record CompleteSignInCommand(SubjectId Subject, string Code, string Zustand)
+public sealed record CompleteSignInCommand(SubjectId Subject, string Code, string State)
     : ICommandMessage<ConnectionResult>;
 
 /// <summary>Fetch the snapshot again.</summary>
@@ -96,7 +96,7 @@ public sealed class ConnectionCommands(
     IConnectionStore store,
     IGitHub github,
     IGitHubSignIn signIn,
-    IConsentGate tor,
+    IConsentGate gate,
     TimeProvider clock) :
     IRequestHandler<ConnectCommand, ConnectionResult>,
     IRequestHandler<ProveCommand, ConnectionResult>,
@@ -134,12 +134,12 @@ public sealed class ConnectionCommands(
         }
         catch (LoginError error)
         {
-            return new ConnectionResult.Eingabe(error.Message);
+            return new ConnectionResult.InvalidInput(error.Message);
         }
 
         await store.SaveAsync(connection, cancellationToken);
 
-        return new ConnectionResult.Erledigt(connection);
+        return new ConnectionResult.Done(connection);
     }
 
     /// <inheritdoc />
@@ -194,21 +194,21 @@ public sealed class ConnectionCommands(
         // without the check somebody could slip a signed-in person a foreign
         // code and hang a foreign account on them.
         if (!string.Equals(
-                request.Zustand, connection.Nonce, StringComparison.Ordinal))
+                request.State, connection.Nonce, StringComparison.Ordinal))
         {
-            return new ConnectionResult.NichtBewiesen();
+            return new ConnectionResult.NotProven();
         }
 
         if (connection.IsVerified)
         {
-            return new ConnectionResult.Erledigt(connection);
+            return new ConnectionResult.Done(connection);
         }
 
-        var angemeldet = await signIn.LoginNameAsync(request.Code, cancellationToken);
+        var signedIn = await signIn.LoginNameAsync(request.Code, cancellationToken);
 
-        if (angemeldet is null)
+        if (signedIn is null)
         {
-            return new ConnectionResult.NichtBewiesen();
+            return new ConnectionResult.NotProven();
         }
 
         if (connection.Login is null)
@@ -217,25 +217,25 @@ public sealed class ConnectionCommands(
             // account that consented. The reported name IS the proof here.
             try
             {
-                connection.NameOnce(angemeldet);
+                connection.NameOnce(signedIn);
             }
             catch (LoginError error)
             {
                 // GitHub reported something that cannot be a user name.
-                return new ConnectionResult.Eingabe(error.Message);
+                return new ConnectionResult.InvalidInput(error.Message);
             }
         }
-        else if (!string.Equals(angemeldet, connection.Login, StringComparison.OrdinalIgnoreCase))
+        else if (!string.Equals(signedIn, connection.Login, StringComparison.OrdinalIgnoreCase))
         {
             // NAMED MEANS COMPARED. Whoever entered `torvalds` and authorised
             // themselves has proved nothing about `torvalds`.
-            return new ConnectionResult.NichtBewiesen();
+            return new ConnectionResult.NotProven();
         }
 
         connection.MarkVerified(clock.GetUtcNow());
         await store.SaveAsync(connection, cancellationToken);
 
-        return new ConnectionResult.Erledigt(connection);
+        return new ConnectionResult.Done(connection);
     }
 
     /// <inheritdoc />
@@ -258,7 +258,7 @@ public sealed class ConnectionCommands(
             // carries none yet — then there is nothing to check here.
             if (connection.Login is not { } login)
             {
-                return new ConnectionResult.Eingabe("no account named yet");
+                return new ConnectionResult.InvalidInput("no account named yet");
             }
 
             // GitHubSilent deliberately flies through: the endpoint turns
@@ -269,7 +269,7 @@ public sealed class ConnectionCommands(
 
             if (!found)
             {
-                return new ConnectionResult.NichtBewiesen();
+                return new ConnectionResult.NotProven();
             }
 
             connection.MarkVerified(clock.GetUtcNow());
@@ -278,9 +278,9 @@ public sealed class ConnectionCommands(
         // Together with the proof, because a proved connection without content
         // does nothing for anybody — and a second button "now load it too"
         // would only be a chance not to press it.
-        await Hole(connection, cancellationToken);
+        await FetchSnapshot(connection, cancellationToken);
 
-        return new ConnectionResult.Erledigt(connection);
+        return new ConnectionResult.Done(connection);
     }
 
     /// <inheritdoc />
@@ -296,9 +296,9 @@ public sealed class ConnectionCommands(
             return new ConnectionResult.None();
         }
 
-        await Hole(connection, cancellationToken);
+        await FetchSnapshot(connection, cancellationToken);
 
-        return new ConnectionResult.Erledigt(connection);
+        return new ConnectionResult.Done(connection);
     }
 
     /// <inheritdoc />
@@ -339,12 +339,12 @@ public sealed class ConnectionCommands(
 
         // ConsentGateSilent flies through — the endpoint turns it into 503.
         // Going to false here would mean asserting the person did not consent.
-        return await tor.MayBeShownAsync(request.Subject, cancellationToken)
+        return await gate.MayBeShownAsync(request.Subject, cancellationToken)
             ? connection
             : null;
     }
 
-    private async Task Hole(Connection connection, CancellationToken cancellationToken)
+    private async Task FetchSnapshot(Connection connection, CancellationToken cancellationToken)
     {
         // Verified means named — the proof either writes the name in or
         // compares it. The check stands here all the same, because a request

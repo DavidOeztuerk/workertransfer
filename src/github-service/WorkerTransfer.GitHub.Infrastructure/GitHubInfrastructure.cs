@@ -21,11 +21,11 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.GitHub.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Was hier <em>nicht</em> steht: kein Hintergrunddienst, keine Schleife, kein
-/// Zeitgeber. GitHub wird gefragt, wenn ein Mensch es verlangt — nie von allein
-/// (ADR-0004). Und keine Outbox: dieser Dienst verschickt nichts.
+/// What does <em>not</em> stand here: no background service, no loop, no timer.
+/// GitHub is asked when a human being demands it — never of its own accord
+/// (ADR-0004). And no outbox: this service sends nothing.
 /// </remarks>
 public static class GitHubInfrastructure
 {
@@ -66,8 +66,8 @@ public static class GitHubInfrastructure
         services.AddScoped<IConsentGate, HttpConsentGate>();
         services.AddScoped<ICallerToken, HttpCallerToken>();
         services.AddScoped<IGitHub, HttpGitHub>();
-        // Ohne Zugangsdaten meldet sie sich als „nicht eingerichtet", und der
-        // The gist stays the path. It is registered all the same — a service
+        // Without credentials it reports itself as "not configured", and the
+        // gist stays the path. It is registered all the same — a service
         // whose dependencies differ by configuration falls over at the first
         // call instead of at startup.
         services.AddScoped<IGitHubSignIn, HttpGitHubSignIn>();
@@ -75,7 +75,7 @@ public static class GitHubInfrastructure
         services.AddCQRS(typeof(ConnectCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
@@ -90,7 +90,7 @@ public static class GitHubInfrastructure
     /// the configuration, is therefore the same for every service and stands in
     /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
@@ -104,10 +104,10 @@ public static class GitHubInfrastructure
             provider.GetServices<IProviderSource>()));
 
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        // No further type stands between the question and the ledger — the
+        // precondition ADR-0013 fails on in practice. A cache in front of it is
+        // noticed by nobody, because everything keeps working, only with the
+        // state from a moment ago.
         services.AddSingleton<ISecurityCheck>(provider =>
             new RevocationCheck<IConsentGate>(
                 provider, typeof(HttpConsentGate)));

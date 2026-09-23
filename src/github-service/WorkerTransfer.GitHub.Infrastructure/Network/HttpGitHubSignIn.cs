@@ -12,6 +12,16 @@ namespace WorkerTransfer.GitHub.Infrastructure.Network;
 /// <strong>Empty means off</strong>, and then the gist stays the path. The same
 /// stance as with the drafting help: a default that contains a secret IS the
 /// secret — and it would then sit in version control.
+/// <para>
+/// <c>Kennung</c>, <c>Geheimnis</c>, <c>Rueckadresse</c> and
+/// <c>Zeitueberschreitung</c> ARE the environment keys
+/// (<c>GitHub__OAuth__Kennung</c> and so on), so they stay German until the keys
+/// are renamed everywhere at once — in compose, in the chart and in
+/// <c>.env.example</c>. <c>Rueckadresse</c> had been renamed to
+/// <c>RedirectUrl</c> on its own: compose still set
+/// <c>GitHub__OAuth__Rueckadresse</c>, the property stayed empty, and the
+/// sign-in counted as not configured.
+/// </para>
 /// </remarks>
 public sealed class GitHubSignInSettings
 {
@@ -21,11 +31,11 @@ public sealed class GitHubSignInSettings
     /// <summary>The OAuth application's id. Empty means: there is none.</summary>
     public string Kennung { get; set; } = string.Empty;
 
-    /// <summary>Das Geheimnis dazu.</summary>
+    /// <summary>The secret that goes with it.</summary>
     public string Geheimnis { get; set; } = string.Empty;
 
     /// <summary>Where GitHub sends the browser back to.</summary>
-    public string RedirectUrl { get; set; } = string.Empty;
+    public string Rueckadresse { get; set; } = string.Empty;
 
     /// <summary>Where GitHub's sign-in lies. Switchable for probes.</summary>
     public string AuthorizeUrl { get; set; } = "https://github.com";
@@ -39,7 +49,7 @@ internal sealed record ExchangeResponse(
     [property: JsonPropertyName("access_token")] string? AccessToken,
     [property: JsonPropertyName("error")] string? Error);
 
-/// <summary>Was <c>GET /user</c> davon hergibt, was hier gebraucht wird.</summary>
+/// <summary>What <c>GET /user</c> yields of what is needed here.</summary>
 internal sealed record AccountEntry(
     [property: JsonPropertyName("login")] string? Login);
 
@@ -49,8 +59,8 @@ public sealed class HttpGitHubSignIn(
     IOptions<GitHubSignInSettings> signIn,
     IOptions<GitHubSettings> api) : IGitHubSignIn
 {
-    /// <summary>Der Name, unter dem der Client registriert ist.</summary>
-    public const string Klient = "github-oauth";
+    /// <summary>The name the client is registered under.</summary>
+    public const string ClientName = "github-oauth";
 
     private readonly GitHubSignInSettings _signIn = signIn.Value;
     private readonly GitHubSettings _api = api.Value;
@@ -59,7 +69,7 @@ public sealed class HttpGitHubSignIn(
     public bool IsConfigured =>
         _signIn.Kennung.Length > 0
         && _signIn.Geheimnis.Length > 0
-        && _signIn.RedirectUrl.Length > 0;
+        && _signIn.Rueckadresse.Length > 0;
 
     /// <inheritdoc />
     public Uri AuthorizeUrl(string state)
@@ -68,14 +78,14 @@ public sealed class HttpGitHubSignIn(
         // name without any right; asking for a `repo` right in order to read
         // public repositories would be a power of attorney for something that
         // is public anyway.
-        var abfrage =
+        var query =
             $"client_id={Uri.EscapeDataString(_signIn.Kennung)}"
-            + $"&redirect_uri={Uri.EscapeDataString(_signIn.RedirectUrl)}"
+            + $"&redirect_uri={Uri.EscapeDataString(_signIn.Rueckadresse)}"
             + $"&state={Uri.EscapeDataString(state)}"
             + "&scope=";
 
         return new Uri(
-            new Uri(_signIn.AuthorizeUrl), $"/login/oauth/authorize?{abfrage}");
+            new Uri(_signIn.AuthorizeUrl), $"/login/oauth/authorize?{query}");
     }
 
     /// <inheritdoc />
@@ -92,10 +102,10 @@ public sealed class HttpGitHubSignIn(
         return token is null ? null : await NamesAsync(token, cancellationToken);
     }
 
-    /// <summary>Der Einmalcode wird gegen ein Zugriffstoken getauscht.</summary>
+    /// <summary>The one-time code is exchanged for an access token.</summary>
     private async Task<string?> ExchangeAsync(string code, CancellationToken cancellationToken)
     {
-        using var client = factory.CreateClient(Klient);
+        using var client = factory.CreateClient(ClientName);
         client.Timeout = _signIn.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
@@ -107,7 +117,7 @@ public sealed class HttpGitHubSignIn(
                 client_id = _signIn.Kennung,
                 client_secret = _signIn.Geheimnis,
                 code,
-                redirect_uri = _signIn.RedirectUrl
+                redirect_uri = _signIn.Rueckadresse
             })
         };
 
@@ -116,7 +126,7 @@ public sealed class HttpGitHubSignIn(
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.UserAgent.ParseAdd(_api.UserAgent);
 
-        var response = await SendeAsync(client, request, cancellationToken);
+        var response = await SendAsync(client, request, cancellationToken);
 
         using (response)
         {
@@ -137,7 +147,7 @@ public sealed class HttpGitHubSignIn(
     /// <summary>Ask once with the token whom it belongs to — and forget it.</summary>
     private async Task<string?> NamesAsync(string token, CancellationToken cancellationToken)
     {
-        using var client = factory.CreateClient(Klient);
+        using var client = factory.CreateClient(ClientName);
         client.Timeout = _signIn.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
@@ -148,7 +158,7 @@ public sealed class HttpGitHubSignIn(
         request.Headers.UserAgent.ParseAdd(_api.UserAgent);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var response = await SendeAsync(client, request, cancellationToken);
+        var response = await SendAsync(client, request, cancellationToken);
 
         using (response)
         {
@@ -157,14 +167,14 @@ public sealed class HttpGitHubSignIn(
                 throw new GitHubSilent($"github returned {(int)response.StatusCode}");
             }
 
-            var konto = JsonSerializer.Deserialize<AccountEntry>(
+            var account = JsonSerializer.Deserialize<AccountEntry>(
                 await response.Content.ReadAsStringAsync(cancellationToken));
 
-            return konto?.Login is { Length: > 0 } name ? name : null;
+            return account?.Login is { Length: > 0 } name ? name : null;
         }
     }
 
-    private static async Task<HttpResponseMessage> SendeAsync(
+    private static async Task<HttpResponseMessage> SendAsync(
         HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
@@ -173,7 +183,7 @@ public sealed class HttpGitHubSignIn(
         }
         catch (HttpRequestException error)
         {
-            // Die Art, nie der Inhalt.
+            // The kind, never the content.
             throw new GitHubSilent($"github is unreachable ({error.GetType().Name})", error);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)

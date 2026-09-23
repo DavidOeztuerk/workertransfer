@@ -44,7 +44,7 @@ public class Adr0022Tests
             .SelectMany(type => type.GetMembers(
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static |
                     BindingFlags.DeclaredOnly)
-                .Select(glied => $"{type.Name}.{glied.Name}")
+                .Select(member => $"{type.Name}.{member.Name}")
                 .Append(type.Name))
             .Distinct()
             .ToList();

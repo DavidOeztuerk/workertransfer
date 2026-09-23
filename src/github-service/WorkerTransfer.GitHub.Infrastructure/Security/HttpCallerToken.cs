@@ -3,7 +3,7 @@ using WorkerTransfer.GitHub.Application.Ports;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Security;
 
-/// <summary>Liest das Token aus der laufenden ResumeRequest.</summary>
+/// <summary>Reads the token out of the running request.</summary>
 /// <remarks>
 /// Header first, then cookie — the same order in which the services verify
 /// one. A browser sees the token only as an <c>httpOnly</c> cookie; a
@@ -30,9 +30,9 @@ public sealed class HttpCallerToken(IHttpContextAccessor accessor) : ICallerToke
                 return header["Bearer ".Length..];
             }
 
-            return request.Cookies.TryGetValue("access", out var ausCookie)
-                   && !string.IsNullOrEmpty(ausCookie)
-                ? ausCookie
+            return request.Cookies.TryGetValue("access", out var fromCookie)
+                   && !string.IsNullOrEmpty(fromCookie)
+                ? fromCookie
                 : null;
         }
     }

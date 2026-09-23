@@ -17,19 +17,19 @@ namespace WorkerTransfer.GitHub.Tests;
 [Collection(PostgresCollection.Name)]
 public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string ErasureSecret = "loesch-geheimnis";
+    private const string ErasureSecret = "erasure-secret";
 
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeGitHub _github = new();
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", ErasureSecret);
@@ -37,7 +37,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             host.ConfigureTestServices(services =>
             {
                 services.Replace(ServiceDescriptor.Scoped<IGitHub>(_ => _github));
-                services.Replace(ServiceDescriptor.Scoped<IConsentGate, Probeledger>());
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate, ProbeLedger>());
             });
         });
 
@@ -46,7 +46,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
@@ -90,15 +90,15 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         (await context.Connections.AnyAsync(row => row.Id == bea)).Should().BeTrue();
     }
 
-    /// <summary>Ohne das Geheimnis passiert nichts.</summary>
+    /// <summary>Without the secret nothing happens.</summary>
     [Fact]
     public async Task Without_the_right_secret_nothing_is_erased()
     {
         var anna = Guid.CreateVersion7();
         await Connect(anna, "anna-dev");
 
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "guessed");
 
         var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
@@ -108,7 +108,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeTrue();
     }
 
-    /// <summary>Ein zweiter Aufruf ist kein Fehlschlag.</summary>
+    /// <summary>A second call is not a failure.</summary>
     [Fact]
     public async Task Erasing_a_second_time_is_2xx_again()
     {
@@ -120,14 +120,14 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
     private Task<HttpResponseMessage> Erase(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Erasure-Secret", ErasureSecret);
         return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
     private Task<HttpResponseMessage> Connect(Guid subject, string login)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
 

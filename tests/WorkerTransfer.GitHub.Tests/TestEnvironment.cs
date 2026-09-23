@@ -48,7 +48,6 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
     public const string Name = "postgres";
 }
 
-/// <summary>A GitHub the test stocks.</summary>
 /// <summary>GitHub's sign-in, as a fake.</summary>
 /// <remarks>
 /// It replaces the whole return: what a browser would do at GitHub is a mapping
@@ -83,12 +82,13 @@ public sealed class ProbeSignIn : IGitHubSignIn
             : Task.FromResult(Codes.GetValueOrDefault(code));
 }
 
+/// <summary>A GitHub the test stocks.</summary>
 public sealed class ProbeGitHub : IGitHub
 {
-    /// <summary>Welche Gist-Beschreibungen es je Konto gibt.</summary>
+    /// <summary>Which gist descriptions exist per account.</summary>
     public Dictionary<string, List<string>> Gists { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Welche Repositories es je Konto gibt.</summary>
+    /// <summary>Which repositories exist per account.</summary>
     public Dictionary<string, List<Repository>> Repos { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -116,10 +116,10 @@ public sealed class ProbeGitHub : IGitHub
     {
         Silence(login);
 
-        var gesucht = Connection.GistDescription(nonce);
+        var wanted = Connection.GistDescription(nonce);
 
         return Task.FromResult(
-            Gists.TryGetValue(login, out var existing) && existing.Contains(gesucht));
+            Gists.TryGetValue(login, out var existing) && existing.Contains(wanted));
     }
 
     /// <inheritdoc />
@@ -142,18 +142,18 @@ public sealed class ProbeGitHub : IGitHub
 
         if (IsSilent)
         {
-            throw new GitHubSilent("Probe: GitHub schweigt.");
+            throw new GitHubSilent("Probe: GitHub is silent.");
         }
     }
 }
 
-/// <summary>Ein Ledger, der antwortet, was der Test bestimmt.</summary>
-public sealed class Probeledger : IConsentGate
+/// <summary>A ledger that answers what the test decides.</summary>
+public sealed class ProbeLedger : IConsentGate
 {
-    /// <summary>Wessen Connection freigegeben ist.</summary>
-    public HashSet<Guid> Frei { get; } = [];
+    /// <summary>Whose connection is released.</summary>
+    public HashSet<Guid> Released { get; } = [];
 
-    /// <summary>Wenn gesetzt, schweigt der Ledger.</summary>
+    /// <summary>When set, the ledger stays silent.</summary>
     public bool IsSilent { get; set; }
 
     /// <inheritdoc />
@@ -162,10 +162,10 @@ public sealed class Probeledger : IConsentGate
     {
         if (IsSilent)
         {
-            throw new ConsentGateSilent("Probe: der Ledger schweigt.");
+            throw new ConsentGateSilent("Probe: the ledger is silent.");
         }
 
-        return Task.FromResult(Frei.Contains(subject.Value));
+        return Task.FromResult(Released.Contains(subject.Value));
     }
 }
 

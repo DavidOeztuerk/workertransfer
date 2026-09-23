@@ -37,11 +37,11 @@ public static class ConnectionEndpoints
         // status code. Neither GitHub nor the ledger may become an assertion
         // about the person: "not proved", because we could not ask, would be
         // one.
-        github.AddEndpointFilter(async (call, weiter) =>
+        github.AddEndpointFilter(async (call, next) =>
         {
             try
             {
-                return await weiter(call);
+                return await next(call);
             }
             catch (GitHubSilent)
             {
@@ -61,10 +61,10 @@ public static class ConnectionEndpoints
             }
         });
 
-        // Den Benutzernamen nennen und die Einmalzeichenfolge bekommen. Hier
-        // wird NICHT bei GitHub angefragt: solange nichts bewiesen ist, gibt es
-        // nichts zu holen — und ein Abruf verriete nur, dass jemand nach diesem
-        // Konto gefragt hat.
+        // Name the user name and get the one-time string. GitHub is NOT asked
+        // here: for as long as nothing is proved there is nothing to fetch —
+        // and a fetch would only tell GitHub that somebody asked about this
+        // account.
         github.MapPost("/me", async (
             ConnectV1 body,
             IMediator mediator,
@@ -83,7 +83,7 @@ public static class ConnectionEndpoints
             var result = await mediator.Send(
                 new ConnectCommand(actor.Subject, body.Login), cancellationToken);
 
-            await Beantworte(context, result, eigen: true, cancellationToken);
+            await Answer(context, result, own: true, cancellationToken);
         });
 
         github.MapPost("/me/verify", async (
@@ -101,7 +101,7 @@ public static class ConnectionEndpoints
             var result = await mediator.Send(
                 new ProveCommand(actor.Subject), cancellationToken);
 
-            await Beantworte(context, result, eigen: true, cancellationToken);
+            await Answer(context, result, own: true, cancellationToken);
         });
 
         // THE PATH OVER GITHUB'S OWN SIGN-IN — it replaces the gist, not the
@@ -119,11 +119,11 @@ public static class ConnectionEndpoints
                 return;
             }
 
-            var beginn = await mediator.Send(
+            var start = await mediator.Send(
                 new StartSignInCommand(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new SignInStartV1(beginn.Url?.ToString()), cancellationToken);
+                new SignInStartV1(start.Url?.ToString()), cancellationToken);
         });
 
         // WITHOUT `/me`, BECAUSE NOTHING PERSONAL STANDS IN IT: the question is
@@ -170,7 +170,7 @@ public static class ConnectionEndpoints
                     actor.Subject, body.Code, body.State),
                 cancellationToken);
 
-            await Beantworte(context, result, eigen: true, cancellationToken);
+            await Answer(context, result, own: true, cancellationToken);
         });
 
         github.MapPost("/me/refresh", async (
@@ -188,7 +188,7 @@ public static class ConnectionEndpoints
             var result = await mediator.Send(
                 new RefreshCommand(actor.Subject), cancellationToken);
 
-            await Beantworte(context, result, eigen: true, cancellationToken);
+            await Answer(context, result, own: true, cancellationToken);
         });
 
         // The unproved connection too — otherwise the person would see nothing
@@ -210,7 +210,7 @@ public static class ConnectionEndpoints
                 new MyConnectionQuery(actor.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                connection is null ? null : Response(connection, eigen: true), cancellationToken);
+                connection is null ? null : Response(connection, own: true), cancellationToken);
         });
 
         // Disconnecting means erasing — the snapshot goes with it.
@@ -249,9 +249,9 @@ public static class ConnectionEndpoints
 
             if (connection is null)
             {
-                // Nicht vorhanden, nicht bewiesen, nicht freigegeben —
-                // dieselbe Antwort. Eine unbewiesene Connection ist eine
-                // Behauptung, und Behauptungen zeigt dieser Dienst nicht.
+                // Not present, not proved, not released — the same answer. An
+                // unproved connection is an assertion, and this service does
+                // not show assertions.
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "No such connection");
@@ -259,23 +259,23 @@ public static class ConnectionEndpoints
             }
 
             await context.Response.WriteAsJsonAsync(
-                Response(connection, eigen: false), cancellationToken);
+                Response(connection, own: false), cancellationToken);
         });
 
         return app;
     }
 
-    private static async Task Beantworte(
+    private static async Task Answer(
         HttpContext context,
         ConnectionResult result,
-        bool eigen,
+        bool own,
         CancellationToken cancellationToken)
     {
         switch (result)
         {
-            case ConnectionResult.Erledigt erledigt:
+            case ConnectionResult.Done done:
                 await context.Response.WriteAsJsonAsync(
-                    Response(erledigt.Connection, eigen), cancellationToken);
+                    Response(done.Connection, own), cancellationToken);
                 return;
 
             case ConnectionResult.None:
@@ -284,7 +284,7 @@ public static class ConnectionEndpoints
                     "Request failed", "No such connection");
                 return;
 
-            case ConnectionResult.NichtBewiesen:
+            case ConnectionResult.NotProven:
                 // 422, not 404: the request was fine, the proof was missing.
                 //
                 // The message no longer names the PATH. It used to read "no
@@ -298,14 +298,14 @@ public static class ConnectionEndpoints
                     "Request failed", "the account was not proven");
                 return;
 
-            case ConnectionResult.Eingabe eingabe:
+            case ConnectionResult.InvalidInput invalid:
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", eingabe.Grund);
+                    "Request failed", invalid.Reason);
                 return;
 
             default:
-                throw new InvalidOperationException($"Unbehandeltes Ergebnis: {result}");
+                throw new InvalidOperationException($"Unhandled result: {result}");
         }
     }
 
@@ -313,14 +313,14 @@ public static class ConnectionEndpoints
         ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status401Unauthorized, "Request failed", "not authenticated");
 
-    private static ConnectionV1 Response(Connection connection, bool eigen) =>
+    private static ConnectionV1 Response(Connection connection, bool own) =>
         new(connection.Subject.Value,
             connection.Login,
             connection.IsVerified,
             // Only in one's own view, and only for as long as it is not proved:
             // the one-time string is of use only to the person creating the
             // gist.
-            eigen && !connection.IsVerified
+            own && !connection.IsVerified
                 ? Connection.GistDescription(connection.Nonce)
                 : null,
             connection.FetchedAt,

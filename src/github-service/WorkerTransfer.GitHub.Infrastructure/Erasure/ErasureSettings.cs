@@ -8,9 +8,14 @@ namespace WorkerTransfer.GitHub.Infrastructure.Erasure;
 /// </remarks>
 public sealed class ErasureSettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "Erasure";
 
-    /// <summary>Das gemeinsame Geheimnis.</summary>
+    /// <summary>The shared secret from <c>X-Erasure-Secret</c>.</summary>
+    /// <remarks>
+    /// The property name IS the environment key (<c>Erasure__Geheimnis</c>), so
+    /// it stays German until the keys are renamed everywhere at once — in
+    /// compose, in the chart and in <c>.env.example</c>.
+    /// </remarks>
     public string Geheimnis { get; set; } = string.Empty;
 }

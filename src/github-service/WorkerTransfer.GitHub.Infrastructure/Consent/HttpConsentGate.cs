@@ -8,20 +8,26 @@ using WorkerTransfer.GitHub.Application.Ports;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Consent;
 
-/// <summary>Wo der Consent-Ledger antwortet.</summary>
+/// <summary>Where the consent ledger answers.</summary>
+/// <remarks>
+/// The property names ARE the environment keys (<c>Consent__Adresse</c>,
+/// <c>Consent__Zeitueberschreitung</c>), so they stay German until the keys are
+/// renamed everywhere at once — in compose, in the chart and in
+/// <c>.env.example</c>.
+/// </remarks>
 public sealed class ConsentSettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "Consent";
 
-    /// <summary>Die Basisadresse des Ledgers.</summary>
+    /// <summary>The ledger's base address.</summary>
     public string Adresse { get; set; } = string.Empty;
 
-    /// <summary>Wie lange eine Frage dauern darf.</summary>
+    /// <summary>How long a question may take.</summary>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 }
 
-/// <summary>Fragt den Ledger. Schreibt nie in ihn.</summary>
+/// <summary>Asks the ledger. Never writes into it.</summary>
 /// <remarks>
 /// Synchronously and without a cache (ADR-0013). Every call travels with
 /// <em>the caller's</em> token, so the ledger's log records who really asked.
@@ -33,7 +39,7 @@ public sealed class HttpConsentGate(
     ILogger<HttpConsentGate> log) : IConsentGate
 {
     /// <summary>The name the client is registered under.</summary>
-    public const string Klient = "consent";
+    public const string ClientName = "consent";
 
     private static readonly JsonSerializerOptions Format = new(JsonSerializerDefaults.Web)
     {
@@ -48,10 +54,10 @@ public sealed class HttpConsentGate(
     {
         if (string.IsNullOrEmpty(_settings.Adresse))
         {
-            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse is not configured.");
         }
 
-        using var client = factory.CreateClient(Klient);
+        using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
@@ -75,33 +81,33 @@ public sealed class HttpConsentGate(
         }
         catch (HttpRequestException error)
         {
-            log.LogWarning("Consent-Ledger nicht erreichbar ({Art})", error.GetType().Name);
-            throw new ConsentGateSilent("consent-service ist nicht erreichbar.", error);
+            log.LogWarning("Consent ledger unreachable ({Kind})", error.GetType().Name);
+            throw new ConsentGateSilent("consent-service is unreachable.", error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            log.LogWarning("Consent-Ledger antwortete nicht rechtzeitig");
-            throw new ConsentGateSilent("consent-service antwortete nicht rechtzeitig.", error);
+            log.LogWarning("Consent ledger did not answer in time");
+            throw new ConsentGateSilent("consent-service did not answer in time.", error);
         }
 
         using (response)
         {
             if (!response.IsSuccessStatusCode)
             {
-                // 401 und 403 eingeschlossen: unser Token taugt nicht — ein
-                // A system problem, no statement about the consent.
+                // 401 and 403 included: our token is no good — a system
+                // problem, no statement about the consent.
                 log.LogWarning(
-                    "Consent-Ledger antwortete mit {Code}", (int)response.StatusCode);
+                    "Consent ledger answered with {Code}", (int)response.StatusCode);
 
                 throw new ConsentGateSilent(
-                    $"consent-service antwortete mit {(int)response.StatusCode}.");
+                    $"consent-service answered with {(int)response.StatusCode}.");
             }
 
             try
             {
                 var read = await response.Content
                     .ReadFromJsonAsync<ConsentResponseV1>(Format, cancellationToken)
-                    ?? throw new ConsentGateSilent("consent-service sandte nichts.");
+                    ?? throw new ConsentGateSilent("consent-service sent nothing.");
 
                 // Granted and not deleted. Everything else is a no.
                 return read.Granted && !read.Deleted;
@@ -109,7 +115,7 @@ public sealed class HttpConsentGate(
             catch (JsonException error)
             {
                 throw new ConsentGateSilent(
-                    "consent-service sandte eine unbrauchbare Antwort.", error);
+                    "consent-service sent an unusable answer.", error);
             }
         }
     }

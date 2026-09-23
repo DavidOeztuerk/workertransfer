@@ -18,7 +18,7 @@ public static class GitHubDbContextFactory
             new DbContextOptionsBuilder<GitHubDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Job, an der die Nachverfolgung ausgeschaltet wird.
+    /// The one place where tracking is switched off.
     /// </summary>
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
@@ -50,6 +50,6 @@ public sealed class GitHubDesignTimeFactory : IDesignTimeDbContextFactory<GitHub
         new((DbContextOptions<GitHubDbContext>)GitHubDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<GitHubDbContext>(),
-                "Host=entwurfszeit;Database=github")
+                "Host=design-time;Database=github")
             .Options);
 }

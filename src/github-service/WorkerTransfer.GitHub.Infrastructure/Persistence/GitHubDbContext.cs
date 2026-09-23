@@ -25,10 +25,10 @@ public sealed class ConnectionRow
 
     public DateTime? FetchedAt { get; set; }
 
-    /// <summary>Der Abzug, als jsonb.</summary>
+    /// <summary>The snapshot, as jsonb.</summary>
     public string Repositories { get; set; } = "[]";
 
-    /// <summary>Konnten fuer jedes Repository die Sprachen geholt werden?</summary>
+    /// <summary>Could the languages be fetched for every repository?</summary>
     public bool LanguagesComplete { get; set; } = true;
 
     public DateTime CreatedAt { get; set; }
@@ -71,12 +71,12 @@ public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
             entity.Property(row => row.FetchedAt).HasColumnName("fetched_at");
             entity.Property(row => row.Repositories)
                 .HasColumnName("repositories").HasColumnType("jsonb").IsRequired();
-            // Vorgabe `true`: bestehende Zeilen stammen aus einer Zeit, in der
-            // ohne Token gar keine Sprachen geholt wurden. `false` zu setzen
-            // waere ehrlicher fuer die Vergangenheit und laestiger fuer die
-            // Gegenwart — der naechste Abruf schreibt ohnehin den wahren Value,
-            // und bis dahin behauptet die Zeile nichts, was sie nicht belegen
-            // koennte: sie zeigt schlicht, was sie hat.
+            // Default `true`: existing rows stem from a time in which no
+            // languages were fetched at all without a token. Setting `false`
+            // would be more honest about the past and more tiresome for the
+            // present — the next fetch writes the true value anyway, and until
+            // then the row asserts nothing it could not back up: it simply
+            // shows what it has.
             entity.Property(row => row.LanguagesComplete)
                 .HasColumnName("languages_complete").HasDefaultValue(true).IsRequired();
             entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();

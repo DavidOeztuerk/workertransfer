@@ -89,18 +89,18 @@ public sealed class EfConnectionStore(GitHubDbContext context) : IConnectionStor
 
     private static Connection ToAggregate(ConnectionRow row)
     {
-        var abgelegt = JsonSerializer.Deserialize<List<RepositoryDocument>>(row.Repositories) ?? [];
+        var stored = JsonSerializer.Deserialize<List<RepositoryDocument>>(row.Repositories) ?? [];
 
         return Connection.Restore(
             new SubjectId(row.Id),
             row.Login,
             row.Challenge,
-            row.VerifiedAt is { } bewiesen
-                ? new DateTimeOffset(bewiesen, TimeSpan.Zero)
+            row.VerifiedAt is { } verifiedAt
+                ? new DateTimeOffset(verifiedAt, TimeSpan.Zero)
                 : null,
-            row.FetchedAt is { } geholt ? new DateTimeOffset(geholt, TimeSpan.Zero) : null,
+            row.FetchedAt is { } fetchedAt ? new DateTimeOffset(fetchedAt, TimeSpan.Zero) : null,
             [
-                .. abgelegt.Select(entry => new Repository(
+                .. stored.Select(entry => new Repository(
                     entry.Name, entry.Description, entry.Language,
                     entry.Stars, entry.Url, entry.PushedAt,
                     entry.Languages ?? [], entry.Topics ?? []))

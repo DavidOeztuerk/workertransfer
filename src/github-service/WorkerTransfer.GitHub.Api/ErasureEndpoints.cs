@@ -7,10 +7,10 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.GitHub.Api;
 
-/// <summary><c>POST /erasure</c> — der Eingang der Kaskade in diesen Dienst.</summary>
+/// <summary><c>POST /erasure</c> — where the cascade enters this service.</summary>
 public static class ErasureEndpoints
 {
-    /// <summary>Der Header, den der Ursprung vorlegt.</summary>
+    /// <summary>The header the origin presents.</summary>
     private const string SecretHeader = "X-Erasure-Secret";
 
     /// <summary>Maps the one endpoint the erasure cascade calls.</summary>
@@ -36,16 +36,16 @@ public static class ErasureEndpoints
                 return;
             }
 
-            var behalten = await mediator.Send(
+            var kept = await mediator.Send(
                 new ErasePersonCommand(new Noelia.Core.Identity.SubjectId(body.UserId)),
                 cancellationToken);
 
-            // Eine Zahl, kein Merker — hier immer 0, weil es nichts gibt, was
-            // would stay. The shape is the same as everywhere all the same:
+            // A number, not a flag — always 0 here, because there is nothing
+            // that would stay. The shape is the same as everywhere all the same:
             // the origin should be able to read the answer without knowing
             // which service just answered.
             await context.Response.WriteAsJsonAsync(
-                new ErasureReceiptV1(behalten), cancellationToken);
+                new ErasureReceiptV1(kept), cancellationToken);
         });
 
         return app;

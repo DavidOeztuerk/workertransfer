@@ -14,26 +14,26 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.GitHub.Tests;
 
-/// <summary>Beanspruchen, beweisen, zeigen, trennen.</summary>
+/// <summary>Claim, prove, show, disconnect.</summary>
 [Collection(PostgresCollection.Name)]
 public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeGitHub _github = new();
     private readonly ProbeSignIn _signIn = new();
-    private readonly Probeledger _ledger = new();
+    private readonly ProbeLedger _ledger = new();
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:github", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
+            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
@@ -48,13 +48,13 @@ public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid subject)
+    private HttpClient AsPerson(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
@@ -63,503 +63,503 @@ public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
     private static async Task<JsonElement> Json(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
 
-    /// <summary>Der <c>state</c> aus der Anmeldeadresse.</summary>
-    private static string Zustand(string address) =>
+    /// <summary>The <c>state</c> out of the sign-in address.</summary>
+    private static string StateOf(string address) =>
         System.Web.HttpUtility.ParseQueryString(new Uri(address).Query)["state"]!;
 
-    private static Task<HttpResponseMessage> Verbinde(HttpClient browser, string login) =>
+    private static Task<HttpResponseMessage> Connect(HttpClient browser, string login) =>
         browser.PostAsJsonAsync("/github/me", new { login });
 
     private static Repository Repo(
-        string name, string? language = "Go", int sterne = 0, int tageAlt = 0) =>
-        new(name, $"Ein Repository namens {name}", language, sterne,
+        string name, string? language = "Go", int stars = 0, int daysOld = 0) =>
+        new(name, $"A repository called {name}", language, stars,
             $"https://github.com/anna/{name}",
-            DateTimeOffset.UnixEpoch.AddDays(1000 - tageAlt),
-            language is null ? [] : [language], ["verteilte-systeme"]);
+            DateTimeOffset.UnixEpoch.AddDays(1000 - daysOld),
+            language is null ? [] : [language], ["distributed-systems"]);
 
-    /// <summary>Wer ein Konto GENANNT hat, muss dasselbe nachweisen.</summary>
+    /// <summary>Whoever NAMED an account has to prove that same one.</summary>
     /// <remarks>
-    /// Der Vergleich gilt weiterhin — nur eben dort, wo es etwas zu vergleichen
-    /// gibt. Wer nichts genannt hat, bekommt den gemeldeten Namen eingetragen
-    /// (siehe <see cref="Signing_in_without_a_naming_writes_in_the_reported_name" />).
+    /// The comparison still holds — only where there is something to compare.
+    /// Whoever named nothing gets the reported name written in
+    /// (see <see cref="Signing_in_without_a_naming_writes_in_the_reported_name" />).
     /// </remarks>
     [Fact]
     public async Task Name_sign_in_see()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        var offen = await Json(await Verbinde(ihr, "anna-dev"));
-        var state = offen.GetProperty("challenge_description").GetString()!
+        var opened = await Json(await Connect(asAnna, "anna-dev"));
+        var state = opened.GetProperty("challenge_description").GetString()!
             .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
 
-        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
-        beginn.GetProperty("url").GetString().Should().Contain(state);
+        var start = await Json(await asAnna.PostAsync("/github/me/oauth/start", null));
+        start.GetProperty("url").GetString().Should().Contain(state);
 
-        // Was der Browser bei GitHub täte, ist hier ein Code, der auf den
-        // Anmeldenamen führt.
-        _signIn.Codes["ein-code"] = "anna-dev";
-        _github.Repos["anna-dev"] = [Repo("werkzeug")];
+        // What the browser would do at GitHub is, here, a code that leads to
+        // the login name.
+        _signIn.Codes["a-code"] = "anna-dev";
+        _github.Repos["anna-dev"] = [Repo("tool")];
 
-        var fertig = await Json(await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "ein-code", state = state }));
+        var done = await Json(await asAnna.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "a-code", state = state }));
 
-        fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
-        fertig.GetProperty("challenge_description").ValueKind
+        done.GetProperty("verified").GetBoolean().Should().BeTrue();
+        done.GetProperty("challenge_description").ValueKind
             .Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>
-    /// <strong>Wer sich als jemand anderes anmeldet, beweist nichts.</strong>
+    /// <strong>Whoever signs in as somebody else proves nothing.</strong>
     /// </summary>
     /// <remarks>
-    /// Der gefährlichste Fall des ganzen Ablaufs: jemand trägt <c>torvalds</c>
-    /// ein und meldet sich mit dem eigenen Konto an. Ohne den Namensvergleich
-    /// stünde danach ein Nachweis für ein fremdes Konto — und dessen Arbeit
-    /// erschiene als seine.
+    /// The most dangerous case of the whole flow: somebody enters
+    /// <c>torvalds</c> and signs in with their own account. Without the name
+    /// comparison a proof for a foreign account would stand afterwards — and
+    /// that account's work would appear as theirs.
     /// </remarks>
     [Fact]
     public async Task Signing_in_with_a_foreign_account_proves_nothing()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        var offen = await Json(await Verbinde(ihr, "torvalds"));
-        var state = offen.GetProperty("challenge_description").GetString()!
+        var opened = await Json(await Connect(asAnna, "torvalds"));
+        var state = opened.GetProperty("challenge_description").GetString()!
             .Replace("workertransfer-verify-", string.Empty, StringComparison.Ordinal);
 
-        _signIn.Codes["mein-code"] = "anna-dev";
+        _signIn.Codes["my-code"] = "anna-dev";
 
-        var response = await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "mein-code", state = state });
+        var response = await asAnna.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "my-code", state = state });
 
-        // 422 und nicht 404: die ResumeRequest war in Ordnung, der Nachweis fehlte.
+        // 422 and not 404: the request was fine, the proof was missing.
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var danach = await Json(await ihr.GetAsync("/github/me"));
-        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+        var afterwards = await Json(await asAnna.GetAsync("/github/me"));
+        afterwards.GetProperty("verified").GetBoolean().Should().BeFalse();
     }
 
-    /// <summary>Ein fremder Zustand beweist nichts.</summary>
+    /// <summary>A foreign state proves nothing.</summary>
     /// <remarks>
-    /// Er ist der Schutz gegen eine untergeschobene Rückkehr: ohne ihn könnte
-    /// jemand einer angemeldeten Person seinen eigenen Code unterschieben und
-    /// ihr damit sein Konto anhängen.
+    /// It is the protection against a planted return: without it somebody
+    /// could slip a signed-in person their own code and thereby hang their
+    /// account on them.
     /// </remarks>
     [Fact]
     public async Task A_foreign_state_proves_nothing()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        await Verbinde(ihr, "anna-dev");
-        _signIn.Codes["ein-code"] = "anna-dev";
+        await Connect(asAnna, "anna-dev");
+        _signIn.Codes["a-code"] = "anna-dev";
 
-        var response = await ihr.PostAsJsonAsync(
+        var response = await asAnna.PostAsJsonAsync(
             "/github/me/oauth/finish",
-            new { code = "ein-code", state = "ein-anderer-zustand" });
+            new { code = "a-code", state = "a-different-state" });
 
-        // 422 und nicht 404: die ResumeRequest war in Ordnung, der Nachweis fehlte.
+        // 422 and not 404: the request was fine, the proof was missing.
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var danach = await Json(await ihr.GetAsync("/github/me"));
-        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+        var afterwards = await Json(await asAnna.GetAsync("/github/me"));
+        afterwards.GetProperty("verified").GetBoolean().Should().BeFalse();
     }
 
-    /// <summary>Ohne Zugangsdaten gibt es keine Adresse — und der Gist bleibt.</summary>
+    /// <summary>Without credentials there is no address — and the gist stays.</summary>
     [Fact]
     public async Task Without_a_configured_sign_in_there_is_no_address()
     {
         _signIn.IsConfigured = false;
 
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        await Verbinde(ihr, "anna-dev");
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        await Connect(asAnna, "anna-dev");
 
-        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+        var start = await Json(await asAnna.PostAsync("/github/me/oauth/start", null));
 
-        beginn.GetProperty("url").ValueKind.Should().Be(JsonValueKind.Null);
+        start.GetProperty("url").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
-    /// <summary>Ohne genanntes Konto führt die Anmeldung trotzdem hin.</summary>
+    /// <summary>Without a named account the sign-in still leads there.</summary>
     /// <remarks>
-    /// Vorher stand hier die umgekehrte Erwartung, und sie war die Anforderung
-    /// des GISTS an einem Ort, an dem der Gist nichts zu suchen hat: er muss
-    /// wissen, in wessen Gists er sucht — die Anmeldung nicht, denn GitHub
-    /// meldet allein das Konto, das zugestimmt hat. Gemessen am 05.09.2026 an
-    /// einem echten Konto: der Namensschritt hat niemanden geschützt, sondern
-    /// die Person ausgesperrt, auf deren Connection noch ein alter Name stand.
+    /// The opposite expectation used to stand here, and it was the GIST's
+    /// requirement in a place where the gist has no business: it has to know
+    /// whose gists it searches — the sign-in does not, because GitHub reports
+    /// only the account that consented. Measured 05.09.2026 against a real
+    /// account: the naming step protected nobody but locked out the person
+    /// whose connection still carried an old name.
     /// </remarks>
     [Fact]
     public async Task Without_a_named_account_the_sign_in_still_leads_there()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
+        var start = await Json(await asAnna.PostAsync("/github/me/oauth/start", null));
 
-        beginn.GetProperty("url").GetString().Should().NotBeNullOrEmpty();
+        start.GetProperty("url").GetString().Should().NotBeNullOrEmpty();
 
-        // Und die Connection, die dabei entsteht, BEHAUPTET NICHTS: kein
-        // Konto, kein Nachweis.
-        var danach = await Json(await ihr.GetAsync("/github/me"));
-        danach.GetProperty("login").ValueKind.Should().Be(JsonValueKind.Null);
-        danach.GetProperty("verified").GetBoolean().Should().BeFalse();
+        // And the connection that comes into being ASSERTS NOTHING: no account,
+        // no proof.
+        var afterwards = await Json(await asAnna.GetAsync("/github/me"));
+        afterwards.GetProperty("login").ValueKind.Should().Be(JsonValueKind.Null);
+        afterwards.GetProperty("verified").GetBoolean().Should().BeFalse();
     }
 
-    /// <summary>Wer nichts genannt hat, bekommt den gemeldeten Namen.</summary>
+    /// <summary>Whoever named nothing gets the reported name.</summary>
     /// <remarks>
-    /// Der Ersatz für den Namensvergleich, und er ist nicht schwächer: GitHub
-    /// meldet ausschliesslich das Konto, das die Zustimmung erteilt hat. Ein
-    /// fremdes lässt sich hier nicht unterschieben, weil es gar nicht erst
-    /// genannt werden kann.
+    /// The replacement for the name comparison, and it is not weaker: GitHub
+    /// reports exclusively the account that gave the consent. A foreign one
+    /// cannot be slipped in here, because it cannot be named in the first
+    /// place.
     /// </remarks>
     [Fact]
     public async Task Signing_in_without_a_naming_writes_in_the_reported_name()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        var beginn = await Json(await ihr.PostAsync("/github/me/oauth/start", null));
-        var state = Zustand(beginn.GetProperty("url").GetString()!);
+        var start = await Json(await asAnna.PostAsync("/github/me/oauth/start", null));
+        var state = StateOf(start.GetProperty("url").GetString()!);
 
-        _signIn.Codes["ein-code"] = "anna-dev";
-        _github.Repos["anna-dev"] = [Repo("werkzeug")];
+        _signIn.Codes["a-code"] = "anna-dev";
+        _github.Repos["anna-dev"] = [Repo("tool")];
 
-        var fertig = await Json(await ihr.PostAsJsonAsync(
-            "/github/me/oauth/finish", new { code = "ein-code", state = state }));
+        var done = await Json(await asAnna.PostAsJsonAsync(
+            "/github/me/oauth/finish", new { code = "a-code", state = state }));
 
-        fertig.GetProperty("login").GetString().Should().Be("anna-dev");
-        fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
+        done.GetProperty("login").GetString().Should().Be("anna-dev");
+        done.GetProperty("verified").GetBoolean().Should().BeTrue();
     }
 
-    /// <summary>Die Auskunft, ob dieser Server die Anmeldung anbietet.</summary>
+    /// <summary>The answer whether this server offers the sign-in.</summary>
     /// <remarks>
-    /// Sie legt nichts an — im Gegensatz zu <c>/me/oauth/start</c>. Genau
-    /// deshalb darf die Oberfläche sie beim Betrachten der Seite stellen,
-    /// ohne für jeden Besuch eine Zeile zu hinterlassen.
+    /// It creates nothing — unlike <c>/me/oauth/start</c>. Exactly that is why
+    /// the interface may ask it when the page is viewed, without leaving a row
+    /// behind for every visit.
     /// </remarks>
     [Fact]
     public async Task The_configuration_can_be_asked_for_and_creates_nothing()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
-        var gefragt = await Json(await ihr.GetAsync("/github/oauth"));
-        gefragt.GetProperty("available").GetBoolean().Should().BeTrue();
+        var asked = await Json(await asAnna.GetAsync("/github/oauth"));
+        asked.GetProperty("available").GetBoolean().Should().BeTrue();
 
-        // Ohne Connection antwortet `/github/me` mit 200 und JSON-`null` —
-        // die Frage ist erlaubt, die Antwort lautet „keine".
-        (await Json(await ihr.GetAsync("/github/me"))).ValueKind
+        // Without a connection `/github/me` answers 200 and JSON `null` — the
+        // question is allowed, the answer is "none".
+        (await Json(await asAnna.GetAsync("/github/me"))).ValueKind
             .Should().Be(JsonValueKind.Null);
 
         _signIn.IsConfigured = false;
 
-        var ohne = await Json(await ihr.GetAsync("/github/oauth"));
-        ohne.GetProperty("available").GetBoolean().Should().BeFalse();
+        var unconfigured = await Json(await asAnna.GetAsync("/github/oauth"));
+        unconfigured.GetProperty("available").GetBoolean().Should().BeFalse();
     }
 
-    /// <summary>Der ganze Weg: nennen, Gist anlegen, beweisen, sehen.</summary>
+    /// <summary>The whole path: name, create the gist, prove, see.</summary>
     [Fact]
     public async Task Name_prove_see()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
+        var asAnna = AsPerson(anna);
 
-        var genannt = await Verbinde(ihr, "anna-dev");
+        var named = await Connect(asAnna, "anna-dev");
 
-        genannt.StatusCode.Should().Be(HttpStatusCode.OK);
+        named.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var offen = await Json(genannt);
-        offen.GetProperty("verified").GetBoolean().Should().BeFalse();
+        var opened = await Json(named);
+        opened.GetProperty("verified").GetBoolean().Should().BeFalse();
 
-        var beschreibung = offen.GetProperty("challenge_description").GetString();
-        beschreibung.Should().StartWith("workertransfer-verify-");
+        var description = opened.GetProperty("challenge_description").GetString();
+        description.Should().StartWith("workertransfer-verify-");
 
-        // Die Person legt den Gist an — das ist der ganze Nachweis.
-        _github.Gists["anna-dev"] = [beschreibung!];
-        _github.Repos["anna-dev"] = [Repo("werkzeug"), Repo("bibliothek")];
+        // The person creates the gist — that is the whole proof.
+        _github.Gists["anna-dev"] = [description!];
+        _github.Repos["anna-dev"] = [Repo("tool"), Repo("library")];
 
-        var bewiesen = await ihr.PostAsync("/github/me/verify", null);
+        var proved = await asAnna.PostAsync("/github/me/verify", null);
 
-        bewiesen.StatusCode.Should().Be(HttpStatusCode.OK);
+        proved.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var fertig = await Json(bewiesen);
-        fertig.GetProperty("verified").GetBoolean().Should().BeTrue();
-        fertig.GetProperty("repositories").GetArrayLength().Should().Be(2);
+        var done = await Json(proved);
+        done.GetProperty("verified").GetBoolean().Should().BeTrue();
+        done.GetProperty("repositories").GetArrayLength().Should().Be(2);
 
-        // Bewiesen heißt: die Einmalzeichenfolge nützt niemandem mehr.
-        fertig.GetProperty("challenge_description").ValueKind
+        // ConnectAndProve means: the one-time string is of use to nobody any more.
+        done.GetProperty("challenge_description").ValueKind
             .Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>
-    /// Beim Nennen wird NICHT bei GitHub angefragt.
+    /// On naming, GitHub is NOT asked.
     /// </summary>
     /// <remarks>
-    /// Solange nichts bewiesen ist, gibt es nichts zu holen — und ein Abruf
-    /// verriete GitHub nur, dass jemand nach diesem Konto gefragt hat.
+    /// For as long as nothing is proved there is nothing to fetch — and a fetch
+    /// would only tell GitHub that somebody asked about this account.
     /// </remarks>
     [Fact]
     public async Task On_naming_GitHub_is_not_asked()
     {
-        await Verbinde(AlsPerson(Guid.CreateVersion7()), "fremdes-konto");
+        await Connect(AsPerson(Guid.CreateVersion7()), "someone-elses-account");
 
         _github.Asked.Should().BeEmpty();
     }
 
-    /// <summary>Ohne Gist kein Nachweis — und das ist 422, nicht 404.</summary>
+    /// <summary>No gist, no proof — and that is 422, not 404.</summary>
     /// <remarks>
-    /// Die ResumeRequest war in Ordnung, der Nachweis fehlte.
+    /// The request was fine, the proof was missing.
     /// </remarks>
     [Fact]
     public async Task Without_a_gist_it_is_422()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        await Verbinde(ihr, "anna-dev");
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        await Connect(asAnna, "anna-dev");
 
-        var attempt = await ihr.PostAsync("/github/me/verify", null);
+        var attempt = await asAnna.PostAsync("/github/me/verify", null);
 
         attempt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>
-    /// Ein anderes Konto zu nennen setzt den Nachweis zurück.
+    /// Naming a different account resets the proof.
     /// </summary>
     /// <remarks>
-    /// Ohne dieses Zurücksetzen könnte jemand ein Konto nachweisen und danach
-    /// den Namen auf ein fremdes ändern: der Nachweis stünde noch, wäre aber
-    /// für ein anderes Konto erbracht worden.
+    /// Without this reset somebody could prove one account and then change the
+    /// name to a foreign one: the proof would still stand, but it would have
+    /// been furnished for a different account.
     /// </remarks>
     [Fact]
     public async Task A_different_account_resets_the_proof()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
-        await Bewiesen(ihr, "anna-dev");
+        var asAnna = AsPerson(anna);
+        await ConnectAndProve(asAnna, "anna-dev");
 
-        var umbenannt = await Json(await Verbinde(ihr, "jemand-anderes"));
+        var renamed = await Json(await Connect(asAnna, "someone-else"));
 
-        umbenannt.GetProperty("verified").GetBoolean().Should().BeFalse();
-        umbenannt.GetProperty("repositories").GetArrayLength().Should().Be(0);
-        umbenannt.GetProperty("challenge_description").ValueKind
+        renamed.GetProperty("verified").GetBoolean().Should().BeFalse();
+        renamed.GetProperty("repositories").GetArrayLength().Should().Be(0);
+        renamed.GetProperty("challenge_description").ValueKind
             .Should().NotBe(JsonValueKind.Null);
     }
 
     /// <summary>
-    /// Eine andere Schreibweise ist kein anderes Konto — der Nachweis gilt
-    /// weiter.
+    /// A different spelling is not a different account — the proof still
+    /// holds.
     /// </summary>
     [Fact]
     public async Task A_different_spelling_is_not_a_different_account()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        await Bewiesen(ihr, "anna-dev");
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        await ConnectAndProve(asAnna, "anna-dev");
 
-        var gleich = await Json(await Verbinde(ihr, "Anna-Dev"));
+        var same = await Json(await Connect(asAnna, "Anna-Dev"));
 
-        gleich.GetProperty("verified").GetBoolean().Should().BeTrue();
-        gleich.GetProperty("login").GetString().Should().Be("Anna-Dev");
+        same.GetProperty("verified").GetBoolean().Should().BeTrue();
+        same.GetProperty("login").GetString().Should().Be("Anna-Dev");
     }
 
     /// <summary>
-    /// Die neue Einmalzeichenfolge ist eine neue — die alte darf nicht
-    /// weitergelten.
+    /// The new one-time string is a new one — the old one must not go on
+    /// holding.
     /// </summary>
     /// <remarks>
-    /// Sonst bewiese ein Gist, der für das alte Konto angelegt wurde, das
-    /// neue mit.
+    /// Otherwise a gist created for the old account would prove the new one
+    /// too.
     /// </remarks>
     [Fact]
     public async Task On_an_account_change_the_old_string_no_longer_holds()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        var alte = (await Json(await Verbinde(ihr, "anna-dev")))
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        var oldString = (await Json(await Connect(asAnna, "anna-dev")))
             .GetProperty("challenge_description").GetString();
 
-        var neue = (await Json(await Verbinde(ihr, "jemand-anderes")))
+        var newString = (await Json(await Connect(asAnna, "someone-else")))
             .GetProperty("challenge_description").GetString();
 
-        neue.Should().NotBe(alte);
+        newString.Should().NotBe(oldString);
 
-        // Ein Gist mit der ALTEN Zeichenfolge beweist das neue Konto nicht.
-        _github.Gists["jemand-anderes"] = [alte!];
+        // A gist with the OLD string does not prove the new account.
+        _github.Gists["someone-else"] = [oldString!];
 
-        (await ihr.PostAsync("/github/me/verify", null))
+        (await asAnna.PostAsync("/github/me/verify", null))
             .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Neueste zuerst — nicht nach Sternen.</summary>
+    /// <summary>Newest first — not by stars.</summary>
     /// <remarks>
-    /// Sterne messen Visibility, nicht Arbeit, und eine Sortierung ist
-    /// bereits eine Wertung (ADR-0022).
+    /// Stars measure visibility, not work, and a sorting is already a judgement
+    /// (ADR-0022).
     /// </remarks>
     [Fact]
     public async Task Sorted_by_date_not_by_stars()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
         _github.Repos["anna-dev"] =
         [
-            Repo("alt-und-beliebt", sterne: 9000, tageAlt: 500),
-            Repo("neu-und-still", sterne: 0, tageAlt: 1)
+            Repo("old-and-popular", stars: 9000, daysOld: 500),
+            Repo("new-and-quiet", stars: 0, daysOld: 1)
         ];
 
-        await Bewiesen(ihr, "anna-dev");
+        await ConnectAndProve(asAnna, "anna-dev");
 
-        var namen = (await Json(await ihr.GetAsync("/github/me")))
+        var names = (await Json(await asAnna.GetAsync("/github/me")))
             .GetProperty("repositories").EnumerateArray()
             .Select(entry => entry.GetProperty("name").GetString())
             .ToList();
 
-        namen.Should().Equal("neu-und-still", "alt-und-beliebt");
+        names.Should().Equal("new-and-quiet", "old-and-popular");
     }
 
     /// <summary>
-    /// Ein Repository ohne Datum steht hinten, nicht vorn.
+    /// A repository without a date stands at the back, not at the front.
     /// </summary>
     [Fact]
     public async Task A_repository_without_a_date_stands_last()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var asAnna = AsPerson(Guid.CreateVersion7());
 
         _github.Repos["anna-dev"] =
         [
-            new Repository("ohne-datum", string.Empty, null, 0, "https://x", null, [], []),
-            Repo("mit-datum", tageAlt: 900)
+            new Repository("without-date", string.Empty, null, 0, "https://x", null, [], []),
+            Repo("with-date", daysOld: 900)
         ];
 
-        await Bewiesen(ihr, "anna-dev");
+        await ConnectAndProve(asAnna, "anna-dev");
 
-        var namen = (await Json(await ihr.GetAsync("/github/me")))
+        var names = (await Json(await asAnna.GetAsync("/github/me")))
             .GetProperty("repositories").EnumerateArray()
             .Select(entry => entry.GetProperty("name").GetString())
             .ToList();
 
-        namen.Should().Equal("mit-datum", "ohne-datum");
+        names.Should().Equal("with-date", "without-date");
     }
 
-    /// <summary>Die eigene Ansicht zeigt auch die unbewiesene Connection.</summary>
+    /// <summary>One's own view shows the unproved connection too.</summary>
     /// <remarks>
-    /// Sonst sähe die Person nach dem ersten Schritt gar nichts und wüsste
-    /// nicht, welche Zeichenfolge sie in den Gist schreiben soll.
+    /// Otherwise the person would see nothing at all after the first step and
+    /// would not know which string to write into the gist.
     /// </remarks>
     [Fact]
     public async Task Ones_own_view_shows_the_unproved_one_too()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        await Verbinde(ihr, "anna-dev");
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        await Connect(asAnna, "anna-dev");
 
-        var meine = await Json(await ihr.GetAsync("/github/me"));
+        var mine = await Json(await asAnna.GetAsync("/github/me"));
 
-        meine.GetProperty("verified").GetBoolean().Should().BeFalse();
-        meine.GetProperty("challenge_description").ValueKind
+        mine.GetProperty("verified").GetBoolean().Should().BeFalse();
+        mine.GetProperty("challenge_description").ValueKind
             .Should().NotBe(JsonValueKind.Null);
     }
 
-    /// <summary>Wer nichts genannt hat, bekommt `null`.</summary>
+    /// <summary>Whoever named nothing gets `null`.</summary>
     [Fact]
     public async Task Without_a_connection_ones_own_view_is_null()
     {
-        var response = await AlsPerson(Guid.CreateVersion7()).GetAsync("/github/me");
+        var response = await AsPerson(Guid.CreateVersion7()).GetAsync("/github/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).Trim().Should().Be("null");
     }
 
     /// <summary>
-    /// Eine unbewiesene Connection ist von außen nicht vorhanden — auch mit
-    /// Release.
+    /// An unproved connection does not exist from outside — with a release
+    /// too.
     /// </summary>
     /// <remarks>
-    /// Sie ist eine Behauptung, und Behauptungen zeigt dieser Dienst nicht.
+    /// It is an assertion, and this service does not show assertions.
     /// </remarks>
     [Fact]
     public async Task An_unproved_connection_does_not_exist_from_outside()
     {
         var anna = Guid.CreateVersion7();
-        await Verbinde(AlsPerson(anna), "anna-dev");
-        _ledger.Frei.Add(anna);
+        await Connect(AsPerson(anna), "anna-dev");
+        _ledger.Released.Add(anna);
 
-        var fremd = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
+        var fromStranger = await AsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
 
-        fremd.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        fromStranger.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Ohne Release sieht ein Fremder nichts — und dasselbe wie bei niemandem.</summary>
+    /// <summary>Without a release a stranger sees nothing — and the same as for nobody.</summary>
     [Fact]
     public async Task Without_a_release_a_stranger_sees_nothing()
     {
         var anna = Guid.CreateVersion7();
-        await Bewiesen(AlsPerson(anna), "anna-dev");
+        await ConnectAndProve(AsPerson(anna), "anna-dev");
 
-        var fremder = AlsPerson(Guid.CreateVersion7());
-        var verborgen = await fremder.GetAsync($"/github/{anna}");
-        var niemand = await fremder.GetAsync($"/github/{Guid.CreateVersion7()}");
+        var stranger = AsPerson(Guid.CreateVersion7());
+        var hidden = await stranger.GetAsync($"/github/{anna}");
+        var nobody = await stranger.GetAsync($"/github/{Guid.CreateVersion7()}");
 
-        verborgen.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        niemand.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await Json(verborgen)).GetProperty("detail").GetString()
-            .Should().Be((await Json(niemand)).GetProperty("detail").GetString());
+        hidden.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        nobody.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await Json(hidden)).GetProperty("detail").GetString()
+            .Should().Be((await Json(nobody)).GetProperty("detail").GetString());
     }
 
-    /// <summary>Mit Release sieht ein Fremder die Belege — aber nie die Zeichenfolge.</summary>
+    /// <summary>With a release a stranger sees the evidence — but never the string.</summary>
     [Fact]
     public async Task With_a_release_a_stranger_sees_the_evidence()
     {
         var anna = Guid.CreateVersion7();
-        _github.Repos["anna-dev"] = [Repo("werkzeug")];
-        await Bewiesen(AlsPerson(anna), "anna-dev");
-        _ledger.Frei.Add(anna);
+        _github.Repos["anna-dev"] = [Repo("tool")];
+        await ConnectAndProve(AsPerson(anna), "anna-dev");
+        _ledger.Released.Add(anna);
 
-        var gesehen = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
+        var seen = await AsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
 
-        gesehen.StatusCode.Should().Be(HttpStatusCode.OK);
+        seen.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await Json(gesehen);
+        var body = await Json(seen);
         body.GetProperty("repositories").GetArrayLength().Should().Be(1);
         body.GetProperty("challenge_description").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
-    /// <summary>Trennen heißt löschen — der Abzug verschwindet mit.</summary>
+    /// <summary>Disconnecting means erasing — the snapshot disappears with it.</summary>
     [Fact]
     public async Task Disconnecting_means_erasing()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
-        _github.Repos["anna-dev"] = [Repo("werkzeug")];
-        await Bewiesen(ihr, "anna-dev");
+        var asAnna = AsPerson(anna);
+        _github.Repos["anna-dev"] = [Repo("tool")];
+        await ConnectAndProve(asAnna, "anna-dev");
 
-        var getrennt = await ihr.DeleteAsync("/github/me");
+        var disconnected = await asAnna.DeleteAsync("/github/me");
 
-        getrennt.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        disconnected.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         await using var context = postgres.Context();
         (await context.Connections.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>
-    /// IsSilent GitHub, wird niemandem der Nachweis abgesprochen.
+    /// If GitHub is silent, nobody is denied their proof.
     /// </summary>
     [Fact]
     public async Task A_silent_GitHub_becomes_503_and_not_422()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
-        await Verbinde(ihr, "anna-dev");
+        var asAnna = AsPerson(Guid.CreateVersion7());
+        await Connect(asAnna, "anna-dev");
         _github.IsSilent = true;
 
-        var attempt = await ihr.PostAsync("/github/me/verify", null);
+        var attempt = await asAnna.PostAsync("/github/me/verify", null);
 
         attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
-    /// <summary>IsSilent der Ledger, wird weder gezeigt noch geleugnet.</summary>
+    /// <summary>If the ledger is silent, nothing is shown and nothing denied.</summary>
     [Fact]
     public async Task A_silent_ledger_becomes_503_and_not_404()
     {
         var anna = Guid.CreateVersion7();
-        await Bewiesen(AlsPerson(anna), "anna-dev");
+        await ConnectAndProve(AsPerson(anna), "anna-dev");
         _ledger.IsSilent = true;
 
-        var attempt = await AlsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
+        var attempt = await AsPerson(Guid.CreateVersion7()).GetAsync($"/github/{anna}");
 
         attempt.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
-    /// <summary>Ein Benutzername, den GitHub nie vergeben würde, wird abgewiesen.</summary>
+    /// <summary>A user name GitHub would never hand out is refused.</summary>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -571,39 +571,39 @@ public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
     [InlineData("anna@dev")]
     public async Task An_impossible_user_name_is_422(string login)
     {
-        var response = await Verbinde(AlsPerson(Guid.CreateVersion7()), login);
+        var response = await Connect(AsPerson(Guid.CreateVersion7()), login);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        _github.Asked.Should().BeEmpty("ein Abruf, der ohnehin nichts findet, entfällt");
+        _github.Asked.Should().BeEmpty("a fetch that finds nothing anyway is dropped");
     }
 
-    /// <summary>Das führende @ ist Gewohnheit, kein Fehler.</summary>
+    /// <summary>The leading @ is habit, not a mistake.</summary>
     [Fact]
     public async Task A_leading_at_sign_is_stripped()
     {
-        var genannt = await Verbinde(AlsPerson(Guid.CreateVersion7()), "@anna-dev");
+        var named = await Connect(AsPerson(Guid.CreateVersion7()), "@anna-dev");
 
-        genannt.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(genannt)).GetProperty("login").GetString().Should().Be("anna-dev");
+        named.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(named)).GetProperty("login").GetString().Should().Be("anna-dev");
     }
 
-    /// <summary>Ohne Anmeldung geht nichts.</summary>
+    /// <summary>Without signing in nothing works.</summary>
     [Fact]
     public async Task Without_a_token_it_is_401()
     {
-        (await _dienst.CreateClient().GetAsync("/github/me"))
+        (await _service.CreateClient().GetAsync("/github/me"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await _dienst.CreateClient().GetAsync($"/github/{Guid.CreateVersion7()}"))
+        (await _service.CreateClient().GetAsync($"/github/{Guid.CreateVersion7()}"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    /// <summary>Nennt ein Konto und beweist es.</summary>
-    private async Task Bewiesen(HttpClient browser, string login)
+    /// <summary>Names an account and proves it.</summary>
+    private async Task ConnectAndProve(HttpClient browser, string login)
     {
-        var beschreibung = (await Json(await Verbinde(browser, login)))
+        var description = (await Json(await Connect(browser, login)))
             .GetProperty("challenge_description").GetString();
 
-        _github.Gists[login] = [beschreibung!];
+        _github.Gists[login] = [description!];
 
         (await browser.PostAsync("/github/me/verify", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);

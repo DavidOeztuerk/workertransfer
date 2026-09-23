@@ -10,13 +10,19 @@ using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Network;
 
-/// <summary>Wohin gefragt wird, und womit.</summary>
+/// <summary>Where to ask, and with what.</summary>
+/// <remarks>
+/// <c>Adresse</c> and <c>Zeitueberschreitung</c> ARE the environment keys
+/// (<c>GitHub__Adresse</c>, <c>GitHub__Zeitueberschreitung</c>), so they stay
+/// German until the keys are renamed everywhere at once — in compose, in the
+/// chart and in <c>.env.example</c>.
+/// </remarks>
 public sealed class GitHubSettings
 {
-    /// <summary>Der Section, an den das gebunden wird.</summary>
+    /// <summary>The section this binds to.</summary>
     public const string Section = "GitHub";
 
-    /// <summary>Die Basisadresse der API.</summary>
+    /// <summary>The base address of the API.</summary>
     public string Adresse { get; set; } = "https://api.github.com";
 
     /// <summary>Optional.</summary>
@@ -47,18 +53,18 @@ public sealed class GitHubSettings
 }
 
 /// <summary>What a gist entry yields of what is needed here.</summary>
-internal sealed record GistEintrag(
+internal sealed record GistEntry(
     [property: JsonPropertyName("description")] string? Description);
 
 /// <summary>What a repository entry yields.</summary>
-internal sealed record RepoEintrag(
+internal sealed record RepoEntry(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("description")] string? Description,
     [property: JsonPropertyName("language")] string? Language,
     [property: JsonPropertyName("stargazers_count")] int StargazersCount,
     [property: JsonPropertyName("html_url")] string? HtmlUrl,
     [property: JsonPropertyName("pushed_at")] DateTimeOffset? PushedAt,
-    /// <summary>Was der Besitzer selbst an das Repository geschrieben hat.</summary>
+    /// <summary>What the owner themselves wrote onto the repository.</summary>
     /// <remarks>
     /// Has travelled along in the listing since 2022 without anything being done
     /// — no second call, no special header. And it is the strongest evidence of
@@ -73,8 +79,8 @@ public sealed class HttpGitHub(
     IOptions<GitHubSettings> settings,
     ILogger<HttpGitHub> log) : IGitHub
 {
-    /// <summary>Der Name, unter dem der Klient registriert ist.</summary>
-    public const string Klient = "github";
+    /// <summary>The name the client is registered under.</summary>
+    public const string ClientName = "github";
 
     /// <summary>The first page only.</summary>
     /// <remarks>
@@ -83,7 +89,7 @@ public sealed class HttpGitHub(
     /// was sorted by. Fetching everything would mean burdening everybody else
     /// with several fetches for the rare cases.
     /// </remarks>
-    public const int JeSeite = 100;
+    public const int PerPage = 100;
 
     private readonly GitHubSettings _settings = settings.Value;
 
@@ -91,13 +97,13 @@ public sealed class HttpGitHub(
     public async Task<bool> HasProofGistAsync(
         string login, string nonce, CancellationToken cancellationToken = default)
     {
-        var gesucht = Connection.GistDescription(nonce);
+        var wanted = Connection.GistDescription(nonce);
 
-        var gists = await GetAsync<List<GistEintrag>>(
-            $"/users/{Uri.EscapeDataString(login)}/gists?per_page={JeSeite}", cancellationToken);
+        var gists = await GetAsync<List<GistEntry>>(
+            $"/users/{Uri.EscapeDataString(login)}/gists?per_page={PerPage}", cancellationToken);
 
         return gists?.Any(entry =>
-            string.Equals(entry.Description, gesucht, StringComparison.Ordinal)) ?? false;
+            string.Equals(entry.Description, wanted, StringComparison.Ordinal)) ?? false;
     }
 
     /// <summary>
@@ -128,9 +134,9 @@ public sealed class HttpGitHub(
     public async Task<Snapshot> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default)
     {
-        var entries = await GetAsync<List<RepoEintrag>>(
+        var entries = await GetAsync<List<RepoEntry>>(
             $"/users/{Uri.EscapeDataString(login)}/repos"
-            + $"?per_page={JeSeite}&sort=pushed&type=owner",
+            + $"?per_page={PerPage}&sort=pushed&type=owner",
             cancellationToken);
 
         if (entries is null)
@@ -141,7 +147,7 @@ public sealed class HttpGitHub(
         // Forks stay out: a copy of somebody else's work is no evidence of
         // one's own, and showing it under "my repositories" would be exactly
         // the silent assertion ADR-0022 excludes.
-        var eigene = entries.Where(entry => !entry.Fork).ToList();
+        var own = entries.Where(entry => !entry.Fork).ToList();
 
         // The listing arrives sorted by `pushed` — when the budget does not
         // stretch to all of them, the most recently worked on get their
@@ -150,9 +156,9 @@ public sealed class HttpGitHub(
             ? LanguagesWithoutToken
             : LanguagesWithToken;
 
-        var evidences = new List<Repository>(eigene.Count);
+        var evidences = new List<Repository>(own.Count);
 
-        foreach (var entry in eigene)
+        foreach (var entry in own)
         {
             var name = entry.Name ?? string.Empty;
 
@@ -169,7 +175,7 @@ public sealed class HttpGitHub(
                 entry.Topics ?? []));
         }
 
-        return new Snapshot(evidences, eigene.Count <= budget);
+        return new Snapshot(evidences, own.Count <= budget);
     }
 
     /// <summary>Which languages occur in a repository.</summary>
@@ -195,16 +201,16 @@ public sealed class HttpGitHub(
             return [];
         }
 
-        var gemeldet = await GetAsync<Dictionary<string, long>>(
+        var reported = await GetAsync<Dictionary<string, long>>(
             $"/repos/{Uri.EscapeDataString(login)}/{Uri.EscapeDataString(repository)}/languages",
             cancellationToken);
 
-        return gemeldet is null ? [] : [.. gemeldet.Keys];
+        return reported is null ? [] : [.. reported.Keys];
     }
 
     private async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
-        using var client = factory.CreateClient(Klient);
+        using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Zeitueberschreitung;
 
         using var request = new HttpRequestMessage(
@@ -213,8 +219,8 @@ public sealed class HttpGitHub(
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
-        // Ohne diesen Header antwortet GitHub auf alles mit 403. Siehe
-        // `GitHubSettings.Benutzerkennung`.
+        // Without this header GitHub answers everything with 403. See
+        // `GitHubSettings.UserAgent`.
         request.Headers.UserAgent.ParseAdd(_settings.UserAgent);
 
         if (_settings.Token is { Length: > 0 } token)
@@ -230,18 +236,18 @@ public sealed class HttpGitHub(
         }
         catch (HttpRequestException error)
         {
-            log.LogWarning("GitHub nicht erreichbar ({Art})", error.GetType().Name);
+            log.LogWarning("GitHub unreachable ({Kind})", error.GetType().Name);
             throw new GitHubSilent("github unreachable", error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            log.LogWarning("GitHub antwortete nicht rechtzeitig");
+            log.LogWarning("GitHub did not answer in time");
             throw new GitHubSilent("github did not answer in time", error);
         }
 
         using (response)
         {
-            // „Gibt es nicht" ist eine Antwort, kein Ausfall.
+            // "Does not exist" is an answer, not an outage.
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return default;
@@ -249,7 +255,7 @@ public sealed class HttpGitHub(
 
             if (!response.IsSuccessStatusCode)
             {
-                log.LogWarning("GitHub antwortete mit {Code}", (int)response.StatusCode);
+                log.LogWarning("GitHub answered with {Code}", (int)response.StatusCode);
                 throw new GitHubSilent($"github returned {(int)response.StatusCode}");
             }
 

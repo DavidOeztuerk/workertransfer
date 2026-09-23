@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.GitHub.Application.Ports;
@@ -11,7 +12,7 @@ namespace WorkerTransfer.GitHub.Tests;
 
 /// <summary>A GitHub made of paper.</summary>
 public sealed class CannedResponse(
-    Func<HttpRequestMessage, (HttpStatusCode Code, string Rumpf)> response)
+    Func<HttpRequestMessage, (HttpStatusCode Code, string Body)> response)
     : HttpMessageHandler
 {
     /// <summary>Which paths were asked for.</summary>
@@ -36,9 +37,9 @@ public sealed class CannedResponse(
 }
 
 /// <summary>A factory that always delivers the same client.</summary>
-public sealed class SingleClientFactory(HttpMessageHandler behandler) : IHttpClientFactory
+public sealed class SingleClientFactory(HttpMessageHandler handler) : IHttpClientFactory
 {
-    public HttpClient CreateClient(string name) => new(behandler, disposeHandler: false);
+    public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
 }
 
 /// <summary>
@@ -62,7 +63,7 @@ public class HttpGitHubTests
     /// code. Since the languages are fetched without a token too, this strikes
     /// every probe that answers blanket.
     /// </remarks>
-    private static CannedResponse NurListe(string list) =>
+    private static CannedResponse ListOnly(string list) =>
         new(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, "{}")
@@ -107,6 +108,58 @@ public class HttpGitHubTests
             request => request.Headers.UserAgent.Count > 0);
     }
 
+    /// <summary>
+    /// <strong>The sign-in keys compose sets are the keys the settings
+    /// read.</strong>
+    /// </summary>
+    /// <remarks>
+    /// A settings property name IS the environment key. <c>Rueckadresse</c> was
+    /// once renamed to <c>RedirectUrl</c> on its own: compose went on setting
+    /// <c>GitHub__OAuth__Rueckadresse</c>, the property stayed empty, and the
+    /// sign-in counted as not configured — over a green build and a green
+    /// suite, because every journey replaces the sign-in with a probe. This
+    /// binds exactly the keys compose names, with a value each, and requires
+    /// the sign-in to count as configured.
+    /// </remarks>
+    [Fact]
+    public void The_sign_in_keys_from_compose_bind()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "WorkerTransfer.slnx")))
+        {
+            root = root.Parent;
+        }
+
+        root.Should().NotBeNull("the repository root has to be found");
+
+        var keys = System.Text.RegularExpressions.Regex
+            .Matches(
+                File.ReadAllText(Path.Combine(root!.FullName, "docker-compose.yml")),
+                @"^\s*GitHub__OAuth__(?<key>\w+):",
+                System.Text.RegularExpressions.RegexOptions.Multiline)
+            .Select(match => match.Groups["key"].Value)
+            .ToList();
+
+        keys.Should().HaveCountGreaterThanOrEqualTo(3, "otherwise this test checks nothing");
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(keys.Select(key =>
+                new KeyValuePair<string, string?>($"{GitHubSignInSettings.Section}:{key}", "set")))
+            .Build();
+
+        var settings = new GitHubSignInSettings();
+        configuration.GetSection(GitHubSignInSettings.Section).Bind(settings);
+
+        var signIn = new HttpGitHubSignIn(
+            new SingleClientFactory(new CannedResponse(_ => (HttpStatusCode.OK, "{}"))),
+            Options.Create(settings),
+            Options.Create(new GitHubSettings()));
+
+        signIn.IsConfigured.Should().BeTrue(
+            "every key compose sets has to land in a property of the same name");
+    }
+
     /// <summary>The topics travel along, because they are a NAMING.</summary>
     /// <remarks>
     /// The strongest evidence of all: a human being wrote "kubernetes" onto the
@@ -117,9 +170,9 @@ public class HttpGitHubTests
     [Fact]
     public async Task Topics_travel_along()
     {
-        var paper = NurListe("""
-            [{"name":"leitwarte","description":"","language":"TypeScript",
-              "stargazers_count":0,"html_url":"https://github.com/anna/leitwarte",
+        var paper = ListOnly("""
+            [{"name":"control-room","description":"","language":"TypeScript",
+              "stargazers_count":0,"html_url":"https://github.com/anna/control-room",
               "pushed_at":"2026-08-01T10:00:00Z","fork":false,
               "topics":["react","kubernetes","observability"]}]
             """);
@@ -166,8 +219,8 @@ public class HttpGitHubTests
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Python":70,"TypeScript":26,"CSS":1}""")
                 : (HttpStatusCode.OK, """
-                    [{"name":"werkzeug","description":"","language":"Python",
-                      "stargazers_count":0,"html_url":"https://github.com/anna/werkzeug",
+                    [{"name":"tool","description":"","language":"Python",
+                      "stargazers_count":0,"html_url":"https://github.com/anna/tool",
                       "pushed_at":null,"fork":false}]
                     """));
 
@@ -196,16 +249,16 @@ public class HttpGitHubTests
     [Fact]
     public async Task More_repositories_than_budget_report_themselves_incomplete()
     {
-        var viele = string.Join(",", Enumerable.Range(0, 11).Select(nummer =>
-            "{\"name\":\"repo" + nummer + "\",\"description\":\"\","
+        var many = string.Join(",", Enumerable.Range(0, 11).Select(number =>
+            "{\"name\":\"repo" + number + "\",\"description\":\"\","
             + "\"language\":\"Go\",\"stargazers_count\":0,"
-            + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
+            + "\"html_url\":\"https://github.com/anna/repo" + number + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
         var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
-                : (HttpStatusCode.OK, $"[{viele}]"));
+                : (HttpStatusCode.OK, $"[{many}]"));
 
         var snapshot = await Build(paper).RepositoriesAsync("anna-dev");
 
@@ -235,20 +288,20 @@ public class HttpGitHubTests
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":120000,"Shell":210,"Dockerfile":90}""")
                 : (HttpStatusCode.OK, """
-                    [{"name":"werkzeug","description":"","language":"Go",
-                      "stargazers_count":0,"html_url":"https://github.com/anna/werkzeug",
+                    [{"name":"tool","description":"","language":"Go",
+                      "stargazers_count":0,"html_url":"https://github.com/anna/tool",
                       "pushed_at":null,"fork":false}]
                     """));
 
-        var entry = (await Build(paper, token: "ein-token")
+        var entry = (await Build(paper, token: "a-token")
             .RepositoriesAsync("anna-dev")).Repositories.Single();
 
         entry.Languages.Should().BeEquivalentTo(["Go", "Shell", "Dockerfile"]);
 
         // The numbers must not have travelled along anywhere — not even as text.
-        var abgelegt = System.Text.Json.JsonSerializer.Serialize(entry);
-        abgelegt.Should().NotContain("120000");
-        abgelegt.Should().NotContain("210");
+        var stored = System.Text.Json.JsonSerializer.Serialize(entry);
+        stored.Should().NotContain("120000");
+        stored.Should().NotContain("210");
     }
 
     /// <summary>Without a token the question is asked, but not arbitrarily often.</summary>
@@ -265,16 +318,16 @@ public class HttpGitHubTests
     [Fact]
     public async Task Without_a_token_the_number_of_language_queries_stays_capped()
     {
-        var viele = string.Join(",", Enumerable.Range(0, 25).Select(nummer =>
-            "{\"name\":\"repo" + nummer + "\",\"description\":\"\","
+        var many = string.Join(",", Enumerable.Range(0, 25).Select(number =>
+            "{\"name\":\"repo" + number + "\",\"description\":\"\","
             + "\"language\":\"Go\",\"stargazers_count\":0,"
-            + "\"html_url\":\"https://github.com/anna/repo" + nummer + "\","
+            + "\"html_url\":\"https://github.com/anna/repo" + number + "\","
             + "\"pushed_at\":null,\"fork\":false}"));
 
         var paper = new CannedResponse(request =>
             request.RequestUri!.AbsolutePath.EndsWith("/languages", StringComparison.Ordinal)
                 ? (HttpStatusCode.OK, """{"Go":1}""")
-                : (HttpStatusCode.OK, $"[{viele}]"));
+                : (HttpStatusCode.OK, $"[{many}]"));
 
         await Build(paper).RepositoriesAsync("anna-dev");
 
@@ -287,31 +340,31 @@ public class HttpGitHubTests
     [Fact]
     public async Task Forks_stay_out()
     {
-        var paper = NurListe("""
+        var paper = ListOnly("""
             [
-              {"name":"eigenes","description":"meins","language":"Go",
-               "stargazers_count":3,"html_url":"https://github.com/anna/eigenes",
+              {"name":"own-work","description":"mine","language":"Go",
+               "stargazers_count":3,"html_url":"https://github.com/anna/own-work",
                "pushed_at":"2026-08-01T10:00:00Z","fork":false},
-              {"name":"kopiert","description":"fremd","language":"Rust",
-               "stargazers_count":9000,"html_url":"https://github.com/anna/kopiert",
+              {"name":"copied","description":"someone-elses","language":"Rust",
+               "stargazers_count":9000,"html_url":"https://github.com/anna/copied",
                "pushed_at":"2026-08-20T10:00:00Z","fork":true}
             ]
             """);
 
         var found = await Build(paper).RepositoriesAsync("anna-dev");
 
-        found.Repositories.Select(entry => entry.Name).Should().Equal("eigenes");
+        found.Repositories.Select(entry => entry.Name).Should().Equal("own-work");
     }
 
-    /// <summary>Jedes Feld kommt von GitHub, keins ist gerechnet.</summary>
+    /// <summary>Every field comes from GitHub, none is computed.</summary>
     [Fact]
     public async Task The_fields_are_copied()
     {
-        var paper = NurListe("""
-            [{"name":"werkzeug","description":"Ein Werkzeug","language":"Go",
-              "stargazers_count":42,"html_url":"https://github.com/anna/werkzeug",
+        var paper = ListOnly("""
+            [{"name":"tool","description":"A tool","language":"Go",
+              "stargazers_count":42,"html_url":"https://github.com/anna/tool",
               "pushed_at":"2026-08-01T10:00:00Z","fork":false,
-              "topics":["cli","verteilte-systeme"]}]
+              "topics":["cli","distributed-systems"]}]
             """);
 
         var entry = (await Build(paper).RepositoriesAsync("anna-dev")).Repositories.Single();
@@ -321,20 +374,20 @@ public class HttpGitHubTests
         // filled lists are therefore never equal. The comparison has to be
         // structural, or it only checks whether it is the same object.
         entry.Should().BeEquivalentTo(new Repository(
-            "werkzeug", "Ein Werkzeug", "Go", 42,
-            "https://github.com/anna/werkzeug",
+            "tool", "A tool", "Go", 42,
+            "https://github.com/anna/tool",
             new DateTimeOffset(2026, 8, 1, 10, 0, 0, TimeSpan.Zero),
             // Without a token the languages are not asked for per repository —
             // sixty requests an hour do not stretch to that.
             [],
-            ["cli", "verteilte-systeme"]));
+            ["cli", "distributed-systems"]));
     }
 
-    /// <summary>Fehlende Felder werden nicht erfunden.</summary>
+    /// <summary>Missing fields are not invented.</summary>
     [Fact]
     public async Task What_is_missing_stays_empty_instead_of_guessed()
     {
-        var paper = NurListe("""
+        var paper = ListOnly("""
             [{"name":"still","description":null,"language":null,
               "stargazers_count":0,"html_url":"https://github.com/anna/still",
               "pushed_at":null,"fork":false}]
@@ -347,17 +400,17 @@ public class HttpGitHubTests
         entry.LastPushedAt.Should().BeNull();
     }
 
-    /// <summary>Der Nachweis hängt an der Beschreibung, nicht am Inhalt.</summary>
+    /// <summary>The proof hangs on the description, not on the content.</summary>
     /// <remarks>
-    /// Die Gist-Liste liefert die Beschreibung mit; ein Inhalt bräuchte einen
-    /// Abruf je Gist. Bei sechzig Requests pro Stunde ohne Token ist das kein
-    /// Detail.
+    /// The gist list delivers the description along with it; a content would
+    /// need one fetch per gist. At sixty requests an hour without a token that
+    /// is no detail.
     /// </remarks>
     [Fact]
     public async Task The_gist_is_found_over_its_description()
     {
-        var paper = NurListe("""
-            [{"description":"irgendwas"},
+        var paper = ListOnly("""
+            [{"description":"something-else"},
              {"description":"workertransfer-verify-abc123"}]
             """);
 
@@ -367,21 +420,21 @@ public class HttpGitHubTests
         (await github.HasProofGistAsync("anna-dev", "xyz789")).Should().BeFalse();
     }
 
-    /// <summary>„Gibt es nicht" ist eine Antwort, kein Ausfall.</summary>
+    /// <summary>"Does not exist" is an answer, not an outage.</summary>
     [Fact]
     public async Task An_unknown_account_is_not_an_outage()
     {
         var paper = new CannedResponse(_ => (HttpStatusCode.NotFound, "{}"));
         var github = Build(paper);
 
-        (await github.RepositoriesAsync("gibt-es-nicht")).Repositories.Should().BeEmpty();
-        (await github.HasProofGistAsync("gibt-es-nicht", "abc")).Should().BeFalse();
+        (await github.RepositoriesAsync("does-not-exist")).Repositories.Should().BeEmpty();
+        (await github.HasProofGistAsync("does-not-exist", "abc")).Should().BeFalse();
     }
 
-    /// <summary>Ein Ratenlimit ist ein Systemzustand, kein Ergebnis.</summary>
+    /// <summary>A rate limit is a system state, not a result.</summary>
     /// <remarks>
-    /// Es auf „nicht bewiesen" abzubilden hieße, jemandem den Nachweis
-    /// abzusprechen, weil wir gerade nicht fragen konnten.
+    /// Mapping it to "not proved" would mean denying somebody their proof
+    /// because we could not ask just now.
     /// </remarks>
     [Fact]
     public async Task A_rate_limit_becomes_GitHubSilent()
@@ -393,21 +446,21 @@ public class HttpGitHubTests
         await attempt.Should().ThrowAsync<GitHubSilent>();
     }
 
-    /// <summary>Ein unbrauchbarer Rumpf ebenso.</summary>
+    /// <summary>An unusable body likewise.</summary>
     [Fact]
     public async Task An_unusable_body_becomes_GitHubSilent()
     {
-        var paper = new CannedResponse(_ => (HttpStatusCode.OK, "kein json"));
+        var paper = new CannedResponse(_ => (HttpStatusCode.OK, "no json"));
 
         var attempt = async () => await Build(paper).RepositoriesAsync("anna-dev");
 
         await attempt.Should().ThrowAsync<GitHubSilent>();
     }
 
-    /// <summary>Asked wird nach eigenen Repositories, nach Datum sortiert.</summary>
+    /// <summary>What is asked for is one's own repositories, sorted by date.</summary>
     /// <remarks>
-    /// <c>type=owner</c> lässt Mitgliedschaften draußen, <c>sort=pushed</c>
-    /// macht die eine Seite zur ehrlichen Auswahl: die zuletzt geänderten.
+    /// <c>type=owner</c> leaves memberships out, <c>sort=pushed</c> makes the
+    /// one page an honest selection: the most recently changed.
     /// </remarks>
     [Fact]
     public async Task What_is_asked_for_is_ones_own_and_most_recently_changed()
@@ -417,6 +470,6 @@ public class HttpGitHubTests
         await Build(paper).RepositoriesAsync("anna-dev");
 
         paper.Paths.Single().Should()
-            .Be($"/users/anna-dev/repos?per_page={HttpGitHub.JeSeite}&sort=pushed&type=owner");
+            .Be($"/users/anna-dev/repos?per_page={HttpGitHub.PerPage}&sort=pushed&type=owner");
     }
 }
