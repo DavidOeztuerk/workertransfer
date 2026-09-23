@@ -26,7 +26,7 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:companies", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("environment", "Development");
@@ -68,17 +68,17 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
 
     private static Task<HttpResponseMessage> Write(
         HttpClient browser,
-        string name = "Muster GmbH",
-        string? website = "https://muster.example",
+        string name = "Example GmbH",
+        string? website = "https://example.test",
         string[]? locations = null,
         string[]? benefits = null) =>
         browser.PutAsJsonAsync("/companies/me/profile", new
         {
             display_name = name,
-            about = "Wir bauen verteilte Systeme.",
+            about = "We build distributed systems.",
             website = website,
             locations = locations ?? ["Berlin"],
-            benefits = benefits ?? ["Homeoffice"]
+            benefits = benefits ?? ["Remote work"]
         });
 
     [Fact]
@@ -89,12 +89,12 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var written = await browser.PutAsJsonAsync("/companies/me/profile", new
         {
-            display_name = "Muster GmbH",
-            about = "Wir bauen verteilte Systeme.",
-            website = "https://muster.example",
+            display_name = "Example GmbH",
+            about = "We build distributed systems.",
+            website = "https://example.test",
             locations = new[] { "Berlin" },
-            benefits = new[] { "Homeoffice" },
-            line1 = "Musterstraße 1",
+            benefits = new[] { "Remote work" },
+            line1 = "Example Street 1",
             postal_code = "10115",
             city = "Berlin",
             country = "DE",
@@ -106,12 +106,12 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
         var publicRead = await Json(
             await _service.CreateClient().GetAsync($"/companies/{company}/profile"));
 
-        publicRead.GetProperty("line1").GetString().Should().Be("Musterstraße 1");
+        publicRead.GetProperty("line1").GetString().Should().Be("Example Street 1");
         publicRead.GetProperty("postal_code").GetString().Should().Be("10115");
         publicRead.GetProperty("city").GetString().Should().Be("Berlin");
         publicRead.GetProperty("country").GetString().Should().Be("DE");
         publicRead.GetProperty("phone").GetString().Should().Be("+493012345");
-        publicRead.GetProperty("display_name").GetString().Should().Be("Muster GmbH");
+        publicRead.GetProperty("display_name").GetString().Should().Be("Example GmbH");
     }
 
     /// <summary>The ordinary path: write once, be publicly readable.</summary>
@@ -148,10 +148,10 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
         var company = Guid.CreateVersion7();
         var browser = AsCompany(company);
 
-        var first = (await Json(await Write(browser, "Alte Marke")))
+        var first = (await Json(await Write(browser, "Old Brand")))
             .GetProperty("slug").GetString();
 
-        var after = (await Json(await Write(browser, "Ganz neue Marke")))
+        var after = (await Json(await Write(browser, "Entirely New Brand")))
             .GetProperty("slug").GetString();
 
         after.Should().Be(first);
@@ -163,7 +163,7 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task A_taken_slug_gets_a_counter()
     {
-        const string name = "Gleichnamig AG";
+        const string name = "Same Name AG";
 
         var one = (await Json(await Write(AsCompany(Guid.CreateVersion7()), name)))
             .GetProperty("slug").GetString();
@@ -183,7 +183,7 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var company = Guid.CreateVersion7();
 
-        var slug = (await Json(await Write(AsCompany(company), "Diskret GmbH")))
+        var slug = (await Json(await Write(AsCompany(company), "Discreet GmbH")))
             .GetProperty("slug").GetString();
 
         slug.Should().NotContain(company.ToString());
@@ -244,7 +244,7 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task An_unknown_slug_is_404()
     {
-        var response = await _service.CreateClient().GetAsync("/companies/by-slug/gibt-es-nicht");
+        var response = await _service.CreateClient().GetAsync("/companies/by-slug/does-not-exist");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -284,17 +284,17 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AsCompany(Guid.CreateVersion7());
 
-        var boese = await Write(browser, website: "javascript:alert(1)");
+        var hostile = await Write(browser, website: "javascript:alert(1)");
 
-        boese.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        hostile.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var fremdesSchema = await Write(browser, website: "ftp://muster.example/datei");
+        var foreignScheme = await Write(browser, website: "ftp://example.test/file");
 
-        fremdesSchema.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        foreignScheme.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
-        var ohneWirt = await Write(browser, website: "https://");
+        var withoutHost = await Write(browser, website: "https://");
 
-        ohneWirt.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        withoutHost.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     /// <summary>Empty and "not given" are the same thing.</summary>
@@ -313,16 +313,16 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>
     /// Deduplicate first, then count — otherwise somebody writing
-    /// "Homeoffice" twenty-one times would be refused, although it collapses
+    /// "Remote work" twenty-one times would be refused, although it collapses
     /// into one entry.
     /// </summary>
     [Fact]
     public async Task Duplicates_do_not_count_against_the_limit()
     {
-        var vieleGleiche = Enumerable.Repeat("Homeoffice", 21).ToArray();
+        var manyIdentical = Enumerable.Repeat("Remote work", 21).ToArray();
 
         var written = await Write(
-            AsCompany(Guid.CreateVersion7()), benefits: vieleGleiche);
+            AsCompany(Guid.CreateVersion7()), benefits: manyIdentical);
 
         written.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(written)).GetProperty("benefits").GetArrayLength().Should().Be(1);
@@ -332,9 +332,9 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task More_than_twenty_entries_are_refused()
     {
-        var vieleVerschiedene = Enumerable.Range(1, 21).Select(n => $"Ort {n}").ToArray();
+        var manyDifferent = Enumerable.Range(1, 21).Select(n => $"Place {n}").ToArray();
 
-        var written = await Write(AsCompany(Guid.CreateVersion7()), locations: vieleVerschiedene);
+        var written = await Write(AsCompany(Guid.CreateVersion7()), locations: manyDifferent);
 
         written.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
@@ -345,22 +345,22 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var company = Guid.CreateVersion7();
         var browser = AsCompany(company);
-        await Write(browser, "Erste Fassung");
+        await Write(browser, "First version");
 
-        var abgewiesen = await browser.PutAsJsonAsync("/companies/me/profile", new
+        var refused = await browser.PutAsJsonAsync("/companies/me/profile", new
         {
-            display_name = "Zweite Fassung",
-            about = "Geändert.",
+            display_name = "Second version",
+            about = "Changed.",
             website = "javascript:alert(1)",
             locations = new[] { "Hamburg" },
             benefits = Array.Empty<string>()
         });
 
-        abgewiesen.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        refused.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 
         var now = await Json(await browser.GetAsync("/companies/me/profile"));
 
-        now.GetProperty("display_name").GetString().Should().Be("Erste Fassung");
+        now.GetProperty("display_name").GetString().Should().Be("First version");
         now.GetProperty("locations").EnumerateArray()
             .Select(entry => entry.GetString()).Should().Equal("Berlin");
     }
@@ -385,12 +385,12 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var one = Guid.CreateVersion7();
         var other = Guid.CreateVersion7();
-        await Write(AsCompany(one), "Die Eine");
+        await Write(AsCompany(one), "The One");
 
         var attempt = await AsCompany(other).PutAsJsonAsync("/companies/me/profile", new
         {
             tenant_id = one,
-            display_name = "Die Andere",
+            display_name = "The Other",
             about = string.Empty,
             website = (string?)null,
             locations = Array.Empty<string>(),
@@ -400,10 +400,10 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
         attempt.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(attempt)).GetProperty("tenant_id").GetGuid().Should().Be(other);
 
-        var unberuehrt = await Json(
+        var untouched = await Json(
             await _service.CreateClient().GetAsync($"/companies/{one}/profile"));
 
-        unberuehrt.GetProperty("display_name").GetString().Should().Be("Die Eine");
+        untouched.GetProperty("display_name").GetString().Should().Be("The One");
     }
 
     /// <summary>Two saves create no second row.</summary>

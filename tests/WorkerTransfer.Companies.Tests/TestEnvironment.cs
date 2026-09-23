@@ -127,7 +127,7 @@ public sealed class RoleProbe : ICompanyRoles
         Last = (subject, company);
 
         return Silent
-            ? throw new RoleLookupSilent("Die Probe schweigt.")
+            ? throw new RoleLookupSilent("The probe is silent.")
             : Task.FromResult(Answer);
     }
 }

@@ -19,12 +19,12 @@ public class ProfileRulesTests
     private static EmployerProfile Profile() =>
         EmployerProfile.Create(
             new TenantId(Guid.CreateVersion7()),
-            "muster",
-            "Erste Fassung",
-            "Über uns.",
-            "https://muster.example",
+            "example",
+            "First version",
+            "About us.",
+            "https://example.test",
             ["Berlin"],
-            ["Homeoffice"],
+            ["Remote work"],
             DateTimeOffset.UnixEpoch);
 
     /// <summary>
@@ -36,16 +36,16 @@ public class ProfileRulesTests
         var profile = Profile();
 
         var attempt = () => profile.Change(
-            "Zweite Fassung", "Ganz anders.", "ftp://muster.example",
-            ["Hamburg"], ["Dienstrad"], DateTimeOffset.UnixEpoch.AddDays(1));
+            "Second version", "Entirely different.", "ftp://example.test",
+            ["Hamburg"], ["Company bike"], DateTimeOffset.UnixEpoch.AddDays(1));
 
         attempt.Should().Throw<LinkError>();
 
-        profile.DisplayName.Should().Be("Erste Fassung");
-        profile.About.Should().Be("Über uns.");
-        profile.Website.Should().Be("https://muster.example");
+        profile.DisplayName.Should().Be("First version");
+        profile.About.Should().Be("About us.");
+        profile.Website.Should().Be("https://example.test");
         profile.Locations.Should().Equal("Berlin");
-        profile.Benefits.Should().Equal("Homeoffice");
+        profile.Benefits.Should().Equal("Remote work");
         profile.ChangedAt.Should().Be(DateTimeOffset.UnixEpoch);
     }
 
@@ -79,12 +79,12 @@ public class ProfileRulesTests
     /// <summary>A slug never ends on a hyphen.</summary>
     /// <remarks>
     /// The counter appends <c>-2</c>; a slug that already ends on a hyphen
-    /// would yield <c>marke--2</c>.
+    /// would yield <c>brand--2</c>.
     /// </remarks>
     [Fact]
     public void A_truncated_slug_does_not_end_on_a_hyphen()
     {
-        var veryLong = string.Join(" ", Enumerable.Repeat("wort", 40));
+        var veryLong = string.Join(" ", Enumerable.Repeat("word", 40));
 
         var slug = Slug.From(veryLong);
 

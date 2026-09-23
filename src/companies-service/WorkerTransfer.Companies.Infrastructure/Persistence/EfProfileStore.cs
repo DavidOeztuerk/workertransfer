@@ -97,8 +97,8 @@ public sealed class EfProfileStore(CompaniesDbContext context) : IProfileStore
         var row = new ProfileRow
         {
             Id = profile.Company.Value,
-            // Das Kürzel steht nur hier und nicht in `Transfer`: es wird
-            // einmal assigned und danach nie wieder geschrieben.
+            // The slug is set only here and not in `Transfer`: it is assigned
+            // once and never written again.
             Slug = profile.Slug,
             CreatedAt = profile.CreatedAt.UtcDateTime
         };

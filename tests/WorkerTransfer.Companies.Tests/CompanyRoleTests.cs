@@ -37,7 +37,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:companies", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("environment", "Development");
@@ -66,10 +66,10 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         browser.PutAsJsonAsync("/companies/me/profile", new
         {
             display_name = name,
-            about = "Wir bauen Gelaender.",
-            website = "https://muster.example",
+            about = "We build railings.",
+            website = "https://example.test",
             locations = new[] { "Berlin" },
-            benefits = new[] { "Werkzeug gestellt" }
+            benefits = new[] { "Tools provided" }
         });
 
     /// <summary>A <c>member</c> does not write the shop window.</summary>
@@ -79,14 +79,14 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var browser = AsCompany(Guid.CreateVersion7());
 
         _roles.Answer = CompanyRole.Mitglied;
-        var asMember = await Write(browser, "Muster GmbH");
+        var asMember = await Write(browser, "Example GmbH");
 
         asMember.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // The counter-probe in the same suite: an endpoint that always gives
         // 403 would look exactly the same from here.
         _roles.Answer = CompanyRole.Admin;
-        var asAdmin = await Write(browser, "Muster GmbH");
+        var asAdmin = await Write(browser, "Example GmbH");
 
         asAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -101,7 +101,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var company = Guid.CreateVersion7();
 
         _roles.Answer = CompanyRole.Admin;
-        (await Write(AsCompany(company), "Muster GmbH"))
+        (await Write(AsCompany(company), "Example GmbH"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         _roles.Answer = CompanyRole.Mitglied;
@@ -110,7 +110,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         read.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = JsonDocument.Parse(await read.Content.ReadAsStringAsync()).RootElement;
-        body.GetProperty("display_name").GetString().Should().Be("Muster GmbH");
+        body.GetProperty("display_name").GetString().Should().Be("Example GmbH");
     }
 
     /// <summary>
@@ -123,7 +123,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var company = Guid.CreateVersion7();
         var subject = Guid.CreateVersion7();
 
-        await Write(AsCompany(company, subject), "Muster GmbH");
+        await Write(AsCompany(company, subject), "Example GmbH");
 
         _roles.Last.Should().Be((subject, company));
     }
@@ -134,7 +134,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
     {
         _roles.Silent = true;
 
-        var response = await Write(AsCompany(Guid.CreateVersion7()), "Muster GmbH");
+        var response = await Write(AsCompany(Guid.CreateVersion7()), "Example GmbH");
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
@@ -146,13 +146,13 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Without_a_token_and_without_a_company_it_stays_as_it_was()
     {
-        var without = await Write(_service.CreateClient(), "Muster GmbH");
+        var without = await Write(_service.CreateClient(), "Example GmbH");
         without.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var person = _service.CreateClient();
         person.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer", TokenShape.Person(Guid.CreateVersion7()));
 
-        (await Write(person, "Muster GmbH")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await Write(person, "Example GmbH")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

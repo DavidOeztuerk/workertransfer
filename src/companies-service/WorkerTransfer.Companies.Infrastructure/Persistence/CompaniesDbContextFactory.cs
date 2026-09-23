@@ -14,7 +14,7 @@ public static class CompaniesDbContextFactory
     public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Options über einer DataSource, die dem Aufrufer gehört.</summary>
+    /// <summary>Options over a DataSource that belongs to the caller.</summary>
     public static DbContextOptionsBuilder<CompaniesDbContext> Options(
         NpgsqlDataSource dataSource) =>
         (DbContextOptionsBuilder<CompaniesDbContext>)Configure(
