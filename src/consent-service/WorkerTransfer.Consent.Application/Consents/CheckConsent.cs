@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>May this capability be exercised for this person?</summary>
 /// <remarks>
@@ -20,7 +20,7 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// </para>
 /// </remarks>
 public sealed record CheckConsentQuery(Guid Subject, string Capability)
-    : IQuery<AuditResult>;
+    : IQueryMessage<AuditResult>;
 
 /// <summary>Reads the newest fact and reduces it.</summary>
 public sealed class CheckConsentHandler(IConsentLedger ledger)

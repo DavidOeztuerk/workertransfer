@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Einwilligung;
+using WorkerTransfer.Consent.Application.Consents;
 using WorkerTransfer.Consent.Domain.Ledger;
 using WorkerTransfer.Contracts.Consent;
 using WorkerTransfer.ServiceDefaults;

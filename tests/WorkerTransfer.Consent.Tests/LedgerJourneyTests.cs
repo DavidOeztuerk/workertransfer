@@ -13,7 +13,7 @@ namespace WorkerTransfer.Consent.Tests;
 [Collection(PostgresCollection.Name)]
 public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Secret = "loesch-geheimnis-fuer-den-test";
+    private const string Secret = "erasure-secret-for-the-test";
 
     private WebApplicationFactory<Program> _service = null!;
 
@@ -24,7 +24,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:consent", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", Secret);
@@ -77,7 +77,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
         (await Json(await Check(browser, anna, "profile.visibility:public")))
             .GetProperty("granted").GetBoolean().Should().BeTrue();
 
-        (await Revoke(browser, anna, "profile.visibility:public", "erstmal nicht"))
+        (await Revoke(browser, anna, "profile.visibility:public", "not for now"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(await Check(browser, anna, "profile.visibility:public")))
             .GetProperty("granted").GetBoolean().Should().BeFalse();
@@ -155,7 +155,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var browser = As(anna);
-        const string reason = "mein Arbeitgeber soll das nicht sehen";
+        const string reason = "my employer must not see this";
 
         await Grant(browser, anna, "profile.visibility:public");
         await Revoke(browser, anna, "profile.visibility:public", reason);
@@ -163,7 +163,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
         var foreign = await Check(As(Guid.CreateVersion7()), anna, "profile.visibility:public");
         var body = await foreign.Content.ReadAsStringAsync();
 
-        body.Should().NotContain("Arbeitgeber");
+        body.Should().NotContain("employer");
         body.Should().NotContain("reason");
     }
 
@@ -177,7 +177,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var browser = As(anna);
-        const string reason = "mein Arbeitgeber soll das nicht sehen";
+        const string reason = "my employer must not see this";
 
         await Grant(browser, anna, "profile.visibility:public");
         await Revoke(browser, anna, "profile.visibility:public", reason);
@@ -213,7 +213,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
 
         await Grant(browser, anna, "profile.visibility:public");
         await Grant(browser, anna, "portfolio.visibility:public");
-        await Revoke(browser, anna, "portfolio.visibility:public", "doch nicht");
+        await Revoke(browser, anna, "portfolio.visibility:public", "changed my mind");
 
         var mine = await Json(await browser.GetAsync("/consent/me"));
 
@@ -259,7 +259,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var browser = As(anna);
-        const string reason = "mein Arbeitgeber soll das nicht sehen";
+        const string reason = "my employer must not see this";
 
         await Grant(browser, anna, "profile.visibility:public");
         await Revoke(browser, anna, "profile.visibility:public", reason);
@@ -269,7 +269,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
             pairs = new[] { new { subject_id = anna, capability = "profile.visibility:public" } }
         });
 
-        (await response.Content.ReadAsStringAsync()).Should().NotContain("Arbeitgeber");
+        (await response.Content.ReadAsStringAsync()).Should().NotContain("employer");
     }
 
     /// <summary>
@@ -335,7 +335,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
             await Grant(browser, anna, skill);
         }
 
-        await Revoke(browser, anna, all[1], "doch nicht");
+        await Revoke(browser, anna, all[1], "changed my mind");
 
         var list = (await Json(await browser.GetAsync("/consent/me")))
             .EnumerateArray()
@@ -381,7 +381,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     /// is refused.
     /// </remarks>
     [Theory]
-    [InlineData("KEIN TOKEN")]
+    [InlineData("NOT A TOKEN")]
     [InlineData("Profile.Visibility")]
     [InlineData("1profile.visibility")]
     [InlineData("")]

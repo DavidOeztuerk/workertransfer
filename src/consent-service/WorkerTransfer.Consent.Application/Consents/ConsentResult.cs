@@ -1,6 +1,6 @@
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>What recording a fact produced.</summary>
 /// <remarks>

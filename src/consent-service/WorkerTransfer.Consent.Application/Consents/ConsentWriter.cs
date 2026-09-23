@@ -3,7 +3,7 @@ using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>The one way a fact and its audit row come into being.</summary>
 /// <remarks>

@@ -1,8 +1,8 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>Take a permission back.</summary>
 /// <param name="Actor">Who is asking. Must be the subject.</param>
@@ -18,7 +18,7 @@ public sealed record RevokeConsentCommand(
     TenantId? Company,
     Guid Subject,
     string Capability,
-    string Reason) : ICommand<ConsentResult>;
+    string Reason) : ICommandMessage<ConsentResult>;
 
 /// <summary>Records the withdrawal.</summary>
 public sealed class RevokeConsentHandler(ConsentWriter writer)

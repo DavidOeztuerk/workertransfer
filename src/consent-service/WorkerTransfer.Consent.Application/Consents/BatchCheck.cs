@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>Several "may I?" in one round trip.</summary>
 /// <remarks>
@@ -17,7 +17,7 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// </para>
 /// </remarks>
 public sealed record BatchCheckQuery(IReadOnlyList<CheckConsentQuery> Pairs)
-    : IQuery<BatchCheckResult>;
+    : IQueryMessage<BatchCheckResult>;
 
 /// <summary>Reads every pair in one query, answers in the order asked.</summary>
 public sealed class BatchCheckHandler(IConsentLedger ledger)

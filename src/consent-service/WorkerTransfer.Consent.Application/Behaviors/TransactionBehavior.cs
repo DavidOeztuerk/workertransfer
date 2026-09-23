@@ -1,5 +1,5 @@
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Application.Ports;
 
 namespace WorkerTransfer.Consent.Application.Behaviors;
@@ -8,7 +8,7 @@ namespace WorkerTransfer.Consent.Application.Behaviors;
 /// <remarks>
 /// Here rather than in each handler, because the handler that forgets it is the
 /// one nobody notices: everything it writes still lands, just not together.
-/// Queries pass straight through — see <see cref="IQuery{TResponse}"/>.
+/// Queries pass straight through — see <see cref="IQueryMessage{TResponse}"/>.
 /// </remarks>
 public sealed class TransactionBehavior<TRequest, TResponse>(IUnitOfWork unitOfWork)
     : IPipelineBehavior<TRequest, TResponse>
@@ -22,7 +22,7 @@ public sealed class TransactionBehavior<TRequest, TResponse>(IUnitOfWork unitOfW
     {
         ArgumentNullException.ThrowIfNull(next);
 
-        return request is ICommand
+        return request is ICommandMessage
             ? unitOfWork.InTransactionAsync(next.Invoke, cancellationToken)
             : next(cancellationToken);
     }

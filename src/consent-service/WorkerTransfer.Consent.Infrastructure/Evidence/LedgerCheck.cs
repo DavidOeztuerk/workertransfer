@@ -6,7 +6,7 @@ using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults.Checks;
 
-namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
+namespace WorkerTransfer.Consent.Infrastructure.Evidence;
 
 /// <summary>The ledger holds a consent of the person, not of the tenant.</summary>
 /// <remarks>

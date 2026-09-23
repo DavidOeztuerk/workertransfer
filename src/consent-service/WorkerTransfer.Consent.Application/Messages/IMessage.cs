@@ -1,12 +1,12 @@
 using MediatR;
 
-namespace WorkerTransfer.Consent.Application.Nachrichten;
+namespace WorkerTransfer.Consent.Application.Messages;
 
 /// <summary>Marks a message that changes something.</summary>
 /// <remarks>
 /// Non-generic on purpose: the transaction behaviour is generic over the
 /// request and the response and cannot ask whether a type implements
-/// <c>IBefehl&lt;TAntwort&gt;</c> without reflecting over its interfaces on
+/// <c>ICommandMessage&lt;TResponse&gt;</c> without reflecting over its interfaces on
 /// every single dispatch.
 /// <para>
 /// Deliberately not Noelia's <c>ICommand&lt;T&gt;</c>, which answers in an
@@ -16,11 +16,11 @@ namespace WorkerTransfer.Consent.Application.Nachrichten;
 /// them.
 /// </para>
 /// </remarks>
-public interface ICommand;
+public interface ICommandMessage;
 
 /// <summary>A message that changes something and answers with <typeparamref name="TResponse"/>.</summary>
 /// <typeparam name="TResponse">What the handler answers.</typeparam>
-public interface ICommand<out TResponse> : IRequest<TResponse>, ICommand;
+public interface ICommandMessage<out TResponse> : IRequest<TResponse>, ICommandMessage;
 
 /// <summary>A message that only reads.</summary>
 /// <remarks>
@@ -38,4 +38,4 @@ public interface ICommand<out TResponse> : IRequest<TResponse>, ICommand;
 /// </para>
 /// </remarks>
 /// <typeparam name="TResponse">What the handler answers.</typeparam>
-public interface IQuery<out TResponse> : IRequest<TResponse>;
+public interface IQueryMessage<out TResponse> : IRequest<TResponse>;

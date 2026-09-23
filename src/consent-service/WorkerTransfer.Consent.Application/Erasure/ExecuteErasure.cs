@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
@@ -9,7 +9,7 @@ namespace WorkerTransfer.Consent.Application.Erasure;
 
 /// <summary>Delete everything this service holds about one person.</summary>
 /// <param name="Subject">The person, as the cascade named them.</param>
-public sealed record ExecuteErasureCommand(Guid Subject) : ICommand<ErasureReceipt>;
+public sealed record ExecuteErasureCommand(Guid Subject) : ICommandMessage<ErasureReceipt>;
 
 /// <summary>The receipt.</summary>
 /// <param name="Retained">

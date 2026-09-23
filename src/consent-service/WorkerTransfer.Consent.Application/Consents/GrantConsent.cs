@@ -1,8 +1,8 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>Give a permission.</summary>
 /// <param name="Actor">Who is asking. Must be the subject.</param>
@@ -19,7 +19,7 @@ public sealed record GrantConsentCommand(
     TenantId? Company,
     Guid Subject,
     string Capability,
-    string? Reason) : ICommand<ConsentResult>;
+    string? Reason) : ICommandMessage<ConsentResult>;
 
 /// <summary>Records the grant.</summary>
 public sealed class GrantConsentHandler(ConsentWriter writer)

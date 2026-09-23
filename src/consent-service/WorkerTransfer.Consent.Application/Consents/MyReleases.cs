@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>What currently holds — for the person themselves, and only them.</summary>
 /// <param name="Subject">Taken from the token, never from the request.</param>
@@ -20,7 +20,7 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// </para>
 /// </remarks>
 public sealed record MyReleasesQuery(SubjectId Subject)
-    : IQuery<IReadOnlyList<Release>>;
+    : IQueryMessage<IReadOnlyList<Release>>;
 
 /// <summary>One permission that holds right now.</summary>
 /// <param name="Capability">Which permission.</param>

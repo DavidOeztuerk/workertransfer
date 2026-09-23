@@ -19,7 +19,7 @@ namespace WorkerTransfer.Consent.Tests;
 [Collection(PostgresCollection.Name)]
 public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Secret = "loesch-geheimnis-fuer-den-test";
+    private const string Secret = "erasure-secret-for-the-test";
 
     private WebApplicationFactory<Program> _service = null!;
 
@@ -41,7 +41,7 @@ public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:consent", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Geheimnis", secret);
@@ -88,7 +88,7 @@ public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
         {
             subject_id = anna,
             capability = "portfolio.visibility:public",
-            reason = "mein Arbeitgeber soll das nicht sehen"
+            reason = "my employer must not see this"
         });
 
         return anna;
@@ -100,8 +100,8 @@ public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT action::text, reason FROM consent_events WHERE subject_id = @wer ORDER BY id";
-        command.Parameters.AddWithValue("wer", subject);
+            "SELECT action::text, reason FROM consent_events WHERE subject_id = @subject ORDER BY id";
+        command.Parameters.AddWithValue("subject", subject);
 
         var rows = new List<(string, string?)>();
         await using var reader = await command.ExecuteReaderAsync();
@@ -124,14 +124,14 @@ public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
         using var without = Service(string.Empty);
 
         var response = await without.CreateClient().SendAsync(
-            ErasureRequest(Guid.CreateVersion7(), "irgendwas"));
+            ErasureRequest(Guid.CreateVersion7(), "anything"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Theory]
     [InlineData(null)]
-    [InlineData("falsch")]
+    [InlineData("wrong")]
     public async Task Without_the_right_secret_nothing_is_erased(string? presented)
     {
         var anna = await PersonWithReleases();

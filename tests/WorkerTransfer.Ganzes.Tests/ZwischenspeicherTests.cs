@@ -44,7 +44,7 @@ public class ZwischenspeicherTests
     public static TheoryData<string, Type> Dienste => new()
     {
         { "identity", typeof(Identity.Application.Anmelden.SessionStateQuery) },
-        { "consent", typeof(Consent.Application.Einwilligung.CheckConsentQuery) },
+        { "consent", typeof(Consent.Application.Consents.CheckConsentQuery) },
         { "profile", typeof(Profile.Application.Profile.InternalProfileSearchQuery) },
         { "resume", typeof(Resume.Application.Anfragen.MyRequestsQuery) },
         { "portfolio", typeof(Portfolio.Application.Portfolios.MyPortfolioQuery) },

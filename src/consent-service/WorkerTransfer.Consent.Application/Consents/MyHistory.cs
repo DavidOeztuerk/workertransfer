@@ -1,9 +1,9 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Consent.Application.Nachrichten;
+using WorkerTransfer.Consent.Application.Messages;
 using WorkerTransfer.Consent.Domain.Ledger;
 
-namespace WorkerTransfer.Consent.Application.Einwilligung;
+namespace WorkerTransfer.Consent.Application.Consents;
 
 /// <summary>Every event of one's own history, oldest first.</summary>
 /// <param name="Subject">Taken from the token, never from the request.</param>
@@ -18,7 +18,7 @@ namespace WorkerTransfer.Consent.Application.Einwilligung;
 /// </para>
 /// </remarks>
 public sealed record MyHistoryQuery(SubjectId Subject)
-    : IQuery<IReadOnlyList<ConsentEvent>>;
+    : IQueryMessage<IReadOnlyList<ConsentEvent>>;
 
 /// <summary>Reads the whole stream, unreduced.</summary>
 public sealed class MyHistoryHandler(IConsentLedger ledger)

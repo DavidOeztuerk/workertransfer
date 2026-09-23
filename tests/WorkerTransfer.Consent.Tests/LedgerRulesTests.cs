@@ -43,7 +43,7 @@ public class LedgerRulesTests
     /// </remarks>
     [Fact]
     public void An_unknown_but_well_formed_capability_is_accepted() =>
-        Capability.TryParse("gibtesnochnicht.visibility:public", out _).Should().BeTrue();
+        Capability.TryParse("doesnotexistyet.visibility:public", out _).Should().BeTrue();
 
     [Fact]
     public void A_reason_must_not_be_empty()
@@ -121,7 +121,7 @@ public class LedgerRulesTests
     {
         var granted = ConsentEvent.Grant(Anna, Visibility, Now, Anna);
         var revoked = ConsentEvent.Revoke(
-            Anna, Visibility, Now.AddMinutes(1), WithdrawalReason.Parse("Ich mag nicht mehr."),
+            Anna, Visibility, Now.AddMinutes(1), WithdrawalReason.Parse("I no longer want this."),
             Anna);
 
         Projection.State([granted, revoked]).Granted.Should().BeFalse();
@@ -133,7 +133,7 @@ public class LedgerRulesTests
     public void After_a_revocation_it_may_be_granted_again()
     {
         var revoked = ConsentEvent.Revoke(
-            Anna, Visibility, Now, WithdrawalReason.Parse("Erst mal nicht."), Anna);
+            Anna, Visibility, Now, WithdrawalReason.Parse("Not for now."), Anna);
         var again = ConsentEvent.Grant(Anna, Visibility, Now.AddDays(30), Anna);
 
         Projection.State([revoked, again]).Should().Be(new ConsentState(true));
@@ -156,7 +156,7 @@ public class LedgerRulesTests
             largerId, Anna, Visibility, ConsentAction.Grant, Now, Anna, null, null);
         var revoked = ConsentEvent.Restore(
             smallerId, Anna, Visibility, ConsentAction.Revoke, Now, Anna,
-            WithdrawalReason.Parse("Doch nicht."), null);
+            WithdrawalReason.Parse("Changed my mind."), null);
 
         Projection.State([granted, revoked]).Granted.Should().BeTrue();
         Projection.State([revoked, granted]).Granted.Should().BeTrue();
@@ -166,10 +166,10 @@ public class LedgerRulesTests
     public void A_revocation_carries_its_reason_into_the_state()
     {
         var revoked = ConsentEvent.Revoke(
-            Anna, Visibility, Now, WithdrawalReason.Parse("Neue Stelle."), Anna);
+            Anna, Visibility, Now, WithdrawalReason.Parse("New job."), Anna);
 
         Projection.State([revoked]).Should()
-            .Be(new ConsentState(false, false, "Neue Stelle."));
+            .Be(new ConsentState(false, false, "New job."));
     }
 
     [Fact]

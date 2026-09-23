@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Consent.Application.Behaviors;
-using WorkerTransfer.Consent.Application.Einwilligung;
+using WorkerTransfer.Consent.Application.Consents;
 using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
@@ -14,7 +14,7 @@ using WorkerTransfer.Consent.Infrastructure.Erasure;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Consent.Infrastructure.Nachweis;
+using WorkerTransfer.Consent.Infrastructure.Evidence;
 using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Contracts.Consent;
 using Noelia.Abstractions.Security.Checks;
@@ -72,7 +72,7 @@ public static class ConsentInfrastructure
         services.AddCQRS(typeof(GrantConsentCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
@@ -88,7 +88,7 @@ public static class ConsentInfrastructure
     /// and stands in <c>AddEvidence</c>. It is the one a new service cannot
     /// forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
