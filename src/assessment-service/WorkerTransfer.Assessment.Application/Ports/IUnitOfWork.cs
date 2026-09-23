@@ -1,10 +1,10 @@
 namespace WorkerTransfer.Assessment.Application.Ports;
 
-/// <summary>Eine Klammer um einen Befehl.</summary>
+/// <summary>A transaction around a command.</summary>
 public interface IUnitOfWork
 {
-    /// <summary>Führt die Arbeit aus und schreibt sie gemeinsam fest.</summary>
+    /// <summary>Runs the work and commits it as one.</summary>
     Task<T> InTransactionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default);
 }

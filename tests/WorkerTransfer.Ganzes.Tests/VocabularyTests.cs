@@ -61,7 +61,7 @@ public class VocabularyTests
          typeof(Scout.Contracts.HakenV1)),
         ("advisor", typeof(Advisor.Domain.Gespraeche.UebergangNichtErlaubt),
          typeof(Advisor.Contracts.MandateV1)),
-        ("assessment", typeof(Assessment.Domain.Vorgaenge.Eingabefehler),
+        ("assessment", typeof(Assessment.Domain.Cases.InputError),
          typeof(Assessment.Contracts.SetTaskV1))
     ];
 
