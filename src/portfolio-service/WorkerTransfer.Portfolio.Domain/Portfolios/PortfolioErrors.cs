@@ -23,8 +23,8 @@ public sealed class LinkError(string reason) : InputError(reason);
 public sealed class YearError(string reason) : InputError(reason);
 
 /// <summary>The attachment name is not one.</summary>
-public sealed class AttachmentError() : InputError("Das ist kein gültiger Anhangname.");
+public sealed class AttachmentError() : InputError("That is not a valid attachment name.");
 
 /// <summary>Too many entries.</summary>
 public sealed class TooManyEntries(int atMost)
-    : InputError($"Höchstens {atMost} Einträge sind erlaubt.");
+    : InputError($"At most {atMost} entries are allowed.");

@@ -28,6 +28,11 @@ public sealed class ConsentSettings
     /// this line the default of <c>HttpClient</c> applies: ONE HUNDRED seconds.
     /// That is no time limit, that is a hanging call with an end some time —
     /// and it hangs the caller with it.
+    ///
+    /// The property name IS the environment key
+    /// (<c>Consent__Zeitueberschreitung</c>), so it stays German until the keys
+    /// are renamed everywhere at once — in compose, in the chart and in
+    /// <c>.env.example</c>.
     /// </remarks>
     public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
 }
@@ -57,7 +62,7 @@ public sealed class HttpConsentGate(
         {
             // No ledger configured does not mean "everything is free". It
             // means this service cannot answer the question.
-            throw new ConsentGateSilent("Consent:Adresse ist nicht gesetzt.");
+            throw new ConsentGateSilent("Consent:Adresse is not set.");
         }
 
         using var client = factory.CreateClient(nameof(HttpConsentGate));
@@ -87,7 +92,7 @@ public sealed class HttpConsentGate(
             // The kind, never the content — and expressly not a `false`: "I do
             // not know" is something different from "no".
             throw new ConsentGateSilent(
-                $"Der Consent-Ledger antwortet nicht ({error.GetType().Name}).");
+                $"The consent ledger does not answer ({error.GetType().Name}).");
         }
 
         using (response)
@@ -95,7 +100,7 @@ public sealed class HttpConsentGate(
             if (!response.IsSuccessStatusCode)
             {
                 throw new ConsentGateSilent(
-                    $"Der Consent-Ledger antwortet mit {(int)response.StatusCode}.");
+                    $"The consent ledger answered with {(int)response.StatusCode}.");
             }
 
             using var read = JsonDocument.Parse(

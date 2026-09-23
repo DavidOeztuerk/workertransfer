@@ -122,10 +122,10 @@ public sealed partial record Entry
         string? attachment = null,
         IEnumerable<string>? technologies = null) =>
         new(
-            Text("Der Titel", title, required: true, MaxTitleLength),
-            Text("Die Zusammenfassung", summary, required: false, MaxSummaryLength),
+            Text("The title", title, required: true, MaxTitleLength),
+            Text("The summary", summary, required: false, MaxSummaryLength),
             Checked(link),
-            Text("Die Rolle", role, required: false, MaxRoleLength),
+            Text("The role", role, required: false, MaxRoleLength),
             YearNumber(year, now),
             AttachmentName(attachment),
             Canonicalised(technologies ?? []));
@@ -143,7 +143,7 @@ public sealed partial record Entry
         foreach (var single in raw)
         {
             var checkedValue = Text(
-                "Die Technologie", single, required: false, SkillLimits.MaxLength);
+                "A technology", single, required: false, SkillLimits.MaxLength);
 
             if (checkedValue.Length == 0)
             {
@@ -160,8 +160,8 @@ public sealed partial record Entry
 
         return values.Count > MaxTechnologies
             ? throw new TextError(
-                "Die Technologien",
-                $"sind mehr als {MaxTechnologies}")
+                "The technologies",
+                $"are more than {MaxTechnologies}")
             : values;
     }
 
@@ -171,11 +171,11 @@ public sealed partial record Entry
 
         if (required && trimmed.Length == 0)
         {
-            throw new TextError(field, "darf nicht leer sein");
+            throw new TextError(field, "must not be empty");
         }
 
         return trimmed.Length > limit
-            ? throw new TextError(field, $"ist länger als {limit} Zeichen")
+            ? throw new TextError(field, $"is longer than {limit} characters")
             : trimmed;
     }
 
@@ -192,21 +192,21 @@ public sealed partial record Entry
 
         if (trimmed.Length > MaxLinkLength)
         {
-            throw new LinkError($"Der Link ist länger als {MaxLinkLength} Zeichen.");
+            throw new LinkError($"The link is longer than {MaxLinkLength} characters.");
         }
 
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var parsed))
         {
-            throw new LinkError("Das ist keine vollständige Adresse.");
+            throw new LinkError("That is not a complete address.");
         }
 
         if (!AllowedSchemes.Contains(parsed.Scheme))
         {
-            throw new LinkError("Nur http- und https-Links sind erlaubt.");
+            throw new LinkError("Only http and https links are allowed.");
         }
 
         return string.IsNullOrEmpty(parsed.Host)
-            ? throw new LinkError("Dem Link fehlt der Rechnername.")
+            ? throw new LinkError("The link is missing a host name.")
             : trimmed;
     }
 
@@ -221,7 +221,7 @@ public sealed partial record Entry
         // into the future is a typo, not a plan.
         return value < EarliestYear || value > now.Year + 1
             ? throw new YearError(
-                $"Ein Jahr muss zwischen {EarliestYear} und {now.Year + 1} liegen.")
+                $"A year must lie between {EarliestYear} and {now.Year + 1}.")
             : value;
     }
 

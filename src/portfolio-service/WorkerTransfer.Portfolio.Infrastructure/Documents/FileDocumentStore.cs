@@ -12,7 +12,11 @@ public sealed class DocumentStoreSettings
 
     /// <summary>The directory everything lies under.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Storage__Wurzel</c>).
+    /// The property name IS the environment key (<c>Storage__Wurzel</c>), so
+    /// it stays German until the keys are renamed everywhere at once — in
+    /// compose, in the chart and in <c>.env.example</c>. Renaming it alone
+    /// leaves the value unbound — measured 22.09.2026, attachment uploads then
+    /// answered 500.
     /// </remarks>
     public string Wurzel { get; set; } = "/var/lib/workertransfer/portfolio";
 

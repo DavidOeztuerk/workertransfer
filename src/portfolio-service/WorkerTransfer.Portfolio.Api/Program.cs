@@ -18,7 +18,7 @@ builder.Services.AddWorkerTransferDefaults(
 builder.Services.AddPortfolioInfrastructure(
     builder.Configuration,
     builder.Configuration.GetConnectionString("portfolio")
-    ?? throw new InvalidOperationException("ConnectionStrings:portfolio ist nicht gesetzt."));
+    ?? throw new InvalidOperationException("ConnectionStrings:portfolio is not set."));
 
 var app = builder.Build();
 
