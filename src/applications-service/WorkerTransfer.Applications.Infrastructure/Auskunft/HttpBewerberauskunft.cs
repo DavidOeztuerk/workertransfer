@@ -21,8 +21,14 @@ public sealed class LookupSettings
     /// <summary>profile-service — Überschrift, Text, Fähigkeiten.</summary>
     public string Profile { get; set; } = string.Empty;
 
-    /// <summary>resume-service — der Werdegang.</summary>
-    public string CurriculumVitae { get; set; } = string.Empty;
+    /// <summary>resume-service — the career history.</summary>
+    /// <remarks>
+    /// The property name IS the environment key (<c>Auskunft__Resume</c>). It was
+    /// renamed to <c>CurriculumVitae</c> once, on its own: compose kept setting
+    /// <c>Auskunft__Resume</c>, the address stayed empty, and every suite stayed
+    /// green because none of them reads compose. <c>ComposeKeyTests</c> does.
+    /// </remarks>
+    public string Resume { get; set; } = string.Empty;
 
     /// <summary>companies-service — der Name des Unternehmens.</summary>
     public string Companies { get; set; } = string.Empty;
@@ -110,7 +116,7 @@ public sealed class HttpApplicantLookup(
         var profile = await LiesAsync<ProfileResponse>(
             _einstellungen.Profile, "/profiles/me", cancellationToken);
         var resume = await LiesAsync<ResumeResponse>(
-            _einstellungen.CurriculumVitae, "/resumes/me", cancellationToken);
+            _einstellungen.Resume, "/resumes/me", cancellationToken);
 
         return new Eigenbild(
             Klarname(session?.User),
