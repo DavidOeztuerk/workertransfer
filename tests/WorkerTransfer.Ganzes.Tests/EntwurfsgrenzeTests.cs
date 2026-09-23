@@ -43,14 +43,14 @@ public class EntwurfsgrenzeTests
     /// </summary>
     /// <remarks>
     /// No name, no email address, no <c>SubjectId</c>, no employer, no resume,
-    /// no application, no market status. <c>Wunsch</c> is the only line the
+    /// no application, no market status. <c>Wish</c> is the only line the
     /// caller contributes at that moment.
     /// </remarks>
     [Fact]
     public void The_profile_context_carries_exactly_four_fields()
     {
         Felder(typeof(DraftSituation)).Should().BeEquivalentTo(
-            ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
+            ["Headline", "Text", "Skills", "Wish", "Prompt"],
             "ADR-0024 §3 nennt diese Menge, und wer sie erweitert, "
             + "schickt etwas Neues über eine Person hinaus");
     }

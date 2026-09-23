@@ -1,156 +1,215 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.Profile.Domain.Audit;
 using WorkerTransfer.Profile.Domain.Profile;
-using WorkerTransfer.Profile.Domain.Pruefspur;
 
 namespace WorkerTransfer.Profile.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile <c>profiles</c>, wie sie in der Datenbank steht.</summary>
+/// <summary>A row of <c>profiles</c>, as it stands in the database.</summary>
 /// <remarks>
-/// Nicht das Aggregat. <see cref="EfProfilspeicher"/> baut daraus ein
-/// <see cref="Domain.PersonProfile.Profil"/>, damit nichts, was am Aggregat geschieht,
-/// von selbst in der Tabelle landet.
+/// Not the aggregate. <see cref="EfProfileStore"/> builds a
+/// <see cref="PersonProfile"/> from it, so that nothing that happens to the
+/// aggregate lands in the table by itself.
 /// <para>
-/// <b>None Spalte für Sichtbarkeit</b> (ADR-0020). Wer hier eine anlegt, hat
-/// eine zweite Wahrheit angelegt — und die eine, die man vergisst
-/// mitzuändern.
+/// <b>No column for visibility</b> (ADR-0020). Whoever adds one here has added
+/// a second truth — and the one somebody forgets to change along.
 /// </para>
 /// </remarks>
 public sealed class ProfileRow
 {
-    /// <summary>Zugleich die Kennung der Person: ein PersonProfile je Mensch.</summary>
+    /// <summary>At the same time the person's id: one profile per human being.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Die Spalte <c>headline</c>.</summary>
-    public string Ueberschrift { get; set; } = string.Empty;
+    /// <summary>The column <c>headline</c>.</summary>
+    public string Headline { get; set; } = string.Empty;
 
-    /// <summary>Die Spalte <c>bio</c>.</summary>
+    /// <summary>The column <c>bio</c>.</summary>
     public string Text { get; set; } = string.Empty;
 
-    /// <summary>Die Spalte <c>location</c>.</summary>
-    public string Ort { get; set; } = string.Empty;
+    /// <summary>The column <c>location</c>.</summary>
+    public string Location { get; set; } = string.Empty;
 
-    /// <summary>Die Spalte <c>remote_ok</c>.</summary>
-    public bool RemoteMoeglich { get; set; }
-
-    /// <summary>
-    /// Die Spalte <c>skills</c> als <c>text[]</c>.
-    /// </summary>
-    /// <remarks>
-    /// Ein echtes Feld und kein JSON-Dokument: Postgres kann darüber suchen und
-    /// indizieren, ohne dass jemand eine zweite, kleingeschriebene Kopie
-    /// derselben Wörter pflegt.
-    /// </remarks>
-    public string[] Faehigkeiten { get; set; } = [];
+    /// <summary>The column <c>remote_ok</c>.</summary>
+    public bool RemoteOk { get; set; }
 
     /// <summary>
-    /// Die Spalte <c>commute_km</c> — eine Stufe, <c>null</c> für „nichts gesagt".
+    /// The column <c>skills</c> as <c>text[]</c>.
     /// </summary>
     /// <remarks>
-    /// <strong>Als Text und nicht als Zahl</strong>, obwohl der Name eine Zahl
-    /// nahelegt. Eine Zahl in der Spalte wäre die Einladung, sie zu vergleichen
-    /// („WHERE commute_km >= 37") und irgendwann danach zu sortieren — genau
-    /// das, was ADR-0041 nicht will. Die Stufe ist eine Aussage, kein Messwert.
+    /// A real field and no JSON document: Postgres can search and index over it
+    /// without anybody keeping a second, lower-cased copy of the same words.
     /// </remarks>
-    public Pendelbereitschaft? Pendelbereitschaft { get; set; }
+    public string[] Skills { get; set; } = [];
 
-    /// <summary>Die Spalte <c>relocation</c>, <c>null</c> für „nichts gesagt".</summary>
-    public Umzugsbereitschaft? Umzugsbereitschaft { get; set; }
+    /// <summary>
+    /// The column <c>commute_km</c> — a stage, <c>null</c> for "said nothing".
+    /// </summary>
+    /// <remarks>
+    /// <strong>As text and not as a number</strong>, although the name suggests
+    /// a number. A number in the column would be the invitation to compare it
+    /// ("WHERE commute_km >= 37") and some day to sort by it — exactly what
+    /// ADR-0041 does not want. The stage is a statement, not a measurement.
+    /// </remarks>
+    public CommuteReadiness? Commute { get; set; }
 
-    /// <summary>Die Spalte <c>created_at</c>.</summary>
-    public DateTimeOffset AngelegtAm { get; set; }
+    /// <summary>The column <c>relocation</c>, <c>null</c> for "said nothing".</summary>
+    public RelocationReadiness? Relocation { get; set; }
 
-    /// <summary>Die Spalte <c>updated_at</c>. Zugleich die halbe Sortierung.</summary>
-    public DateTimeOffset GeaendertAm { get; set; }
+    /// <summary>The column <c>created_at</c>.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The column <c>updated_at</c>. At the same time half the ordering.</summary>
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>Eine Zeile <c>audit_events</c>.</summary>
+/// <summary>A row of <c>audit_events</c>.</summary>
 /// <remarks>
-/// Die Spur wird nur angehängt, also gibt es kein Aggregat, das daraus wieder
-/// entstünde. <c>action</c> ist die Aufzählung <c>pruef_handlung</c>, gespeichert
-/// als die Bezeichnung, die Npgsql daraus macht.
+/// The trail is only appended to, so there is no aggregate that would arise
+/// from it again. <c>action</c> is the enum <c>audit_action</c>, stored as the
+/// label Npgsql makes of it.
 /// </remarks>
 public sealed class AuditRow
 {
-    /// <summary>Die Kennung der Zeile.</summary>
+    /// <summary>The row's id.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Wer gehandelt hat, oder <c>null</c> bei der Löschkaskade.</summary>
-    public Guid? AkteurId { get; set; }
+    /// <summary>Who acted, or <c>null</c> for the erasure cascade.</summary>
+    public Guid? ActorId { get; set; }
 
-    /// <summary>Für welches Unternehmen, oder <c>null</c>.</summary>
-    public Guid? FirmaId { get; set; }
+    /// <summary>For which company, or <c>null</c>.</summary>
+    public Guid? TenantId { get; set; }
 
-    /// <summary>Was geschehen ist.</summary>
-    public AuditAction Handlung { get; set; }
+    /// <summary>What happened.</summary>
+    public AuditAction Action { get; set; }
 
-    /// <summary>An wem.</summary>
-    public Guid? BetroffenId { get; set; }
+    /// <summary>On whom.</summary>
+    public Guid? TargetId { get; set; }
 
-    /// <summary>Die ResumeRequest, über Dienstgrenzen hinweg.</summary>
-    public string? Korrelation { get; set; }
+    /// <summary>The correlation id, across service boundaries.</summary>
+    public string? CorrelationId { get; set; }
 
-    /// <summary>Wann.</summary>
-    public DateTimeOffset GeschehenAm { get; set; }
+    /// <summary>When.</summary>
+    public DateTimeOffset OccurredAt { get; set; }
 
-    /// <summary>Technisches Beiwerk als JSON, nur von der Liste.</summary>
-    public string Daten { get; set; } = "{}";
+    /// <summary>Technical extras as JSON, only from the list.</summary>
+    public string Metadata { get; set; } = "{}";
 }
 
-/// <summary>Die Tabellen dieses Dienstes — und sie gehören ihm allein.</summary>
+/// <summary>This service's tables — and they belong to it alone.</summary>
 /// <remarks>
-/// Kein <c>ExcludeFromMigrations</c> irgendwo: anders als bei identity legt
-/// hier keine fremde Werkzeugkette die Tabellen an. Das Schema entsteht aus
-/// diesen Migrationen, und der Testcontainer bekommt es über
-/// <c>Database.MigrateAsync()</c> — dieselbe Quelle wie der Betrieb.
+/// No <c>ExcludeFromMigrations</c> anywhere: unlike in identity, no foreign tool
+/// chain creates the tables here. The schema arises from these migrations, and
+/// the test container gets it through <c>Database.MigrateAsync()</c> — the same
+/// source as operation.
 /// <para>
-/// Die Verfolgung ist für den ganzen Kontext aus. Je Abfrage wäre sie Disziplin,
-/// und die nächste Abfrage, die jemand hinzufügt, vergisst sie —
-/// <see cref="EfProfilspeicher"/> schickt gespeicherte Werte durch die Domäne
-/// zurück, die sie normalisiert, und eine verfolgte Zeile stünde danach als
-/// geändert da.
+/// Tracking is off for the whole context. Per query it would be discipline,
+/// and the next query somebody adds forgets it — <see cref="EfProfileStore"/>
+/// sends stored values back through the domain, which normalises them, and a
+/// tracked row would afterwards stand there as changed.
 /// </para>
 /// </remarks>
 public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options) : DbContext(options)
 {
-    /// <summary>Die PersonProfile.</summary>
-    public DbSet<ProfileRow> PersonProfile => Set<ProfileRow>();
+    /// <summary>The profiles.</summary>
+    public DbSet<ProfileRow> Profiles => Set<ProfileRow>();
 
-    /// <summary>Die Prüfspur.</summary>
-    public DbSet<AuditRow> Pruefeintraege => Set<AuditRow>();
+    /// <summary>The audit trail.</summary>
+    public DbSet<AuditRow> AuditEntries => Set<AuditRow>();
 
-    /// <summary>Die Namen der Postgres-Aufzählungen dieses Dienstes.</summary>
+    /// <summary>The names of this service's Postgres enums.</summary>
     /// <remarks>
-    /// Als Konstante und nicht als Zeichenkette an der Aufrufstelle: der Name
-    /// steht in der Datenbank und in der SchemaMigration, und zwei Spellings
-    /// desselben Namens fallen erst beim ersten Einfügen auf.
+    /// As a constant and not as a string at the call site: the name stands in
+    /// the database and in the migration, and two spellings of the same name
+    /// stand out only at the first insert.
     /// </remarks>
-    public static class Enumnamen
+    public static class EnumNames
     {
-        /// <summary>Hinter <c>audit_events.action</c>.</summary>
+        /// <summary>Behind <c>audit_events.action</c>.</summary>
         public const string AuditAction = "audit_action";
     }
+
+    /// <summary>
+    /// The commute stage as it is STORED — the German member names of old.
+    /// </summary>
+    /// <remarks>
+    /// <para><strong>Not <c>HasConversion&lt;string&gt;()</c>, and that is the
+    /// point of these four converters.</strong> That overload stores the C#
+    /// member name, and the members were called <c>Bis10</c> … <c>Egal</c>,
+    /// <c>Ja</c>/<c>Nein</c>/<c>Offen</c> until the code became English. Renaming
+    /// them under the old conversion would have changed every value written
+    /// from then on — without a migration, without a build error — and every
+    /// existing row would have failed to read.</para>
+    ///
+    /// <para>So the stored strings are spelt out here and stay what they were.
+    /// A new member needs a line in both directions, and the switch throws
+    /// rather than guessing at a value it does not know.</para>
+    /// </remarks>
+    private static readonly ValueConverter<CommuteReadiness, string> CommuteConverter = new(
+        value => StoredCommute(value),
+        text => ReadCommute(text));
+
+    /// <summary>The relocation choice as it is STORED; see <see cref="CommuteConverter"/>.</summary>
+    private static readonly ValueConverter<RelocationReadiness, string> RelocationConverter = new(
+        value => StoredRelocation(value),
+        text => ReadRelocation(text));
+
+    private static string StoredCommute(CommuteReadiness value) => value switch
+    {
+        CommuteReadiness.UpTo10 => "Bis10",
+        CommuteReadiness.UpTo25 => "Bis25",
+        CommuteReadiness.UpTo50 => "Bis50",
+        CommuteReadiness.UpTo100 => "Bis100",
+        CommuteReadiness.AnyDistance => "Egal",
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+    };
+
+    private static CommuteReadiness ReadCommute(string text) => text switch
+    {
+        "Bis10" => CommuteReadiness.UpTo10,
+        "Bis25" => CommuteReadiness.UpTo25,
+        "Bis50" => CommuteReadiness.UpTo50,
+        "Bis100" => CommuteReadiness.UpTo100,
+        "Egal" => CommuteReadiness.AnyDistance,
+        _ => throw new InvalidOperationException("unknown stored commute stage")
+    };
+
+    private static string StoredRelocation(RelocationReadiness value) => value switch
+    {
+        RelocationReadiness.Yes => "Ja",
+        RelocationReadiness.No => "Nein",
+        RelocationReadiness.Open => "Offen",
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+    };
+
+    private static RelocationReadiness ReadRelocation(string text) => text switch
+    {
+        "Ja" => RelocationReadiness.Yes,
+        "Nein" => RelocationReadiness.No,
+        "Offen" => RelocationReadiness.Open,
+        _ => throw new InvalidOperationException("unknown stored relocation choice")
+    };
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        // `name:` ausgeschrieben, und das ist keine Zierde: die generische
-        // Überladung nimmt ihr ERSTES Argument als SCHEMA, nicht als Typnamen.
-        // Positionell geschrieben legte diese Zeile ein Schema `pruef_handlung`
-        // an und darin einen Typ `pruefhandlung` — eine Waise, die niemand
-        // benutzt, denn die SchemaMigration hatte den echten Typ längst als
-        // `public.pruef_handlung` angelegt. Gemessen an der laufenden Datenbank:
+        // `name:` written out, and that is no ornament: the generic overload
+        // takes its FIRST argument as the SCHEMA, not as the type name. Written
+        // positionally this line created a schema named after the enum and in
+        // it a second type — an orphan nobody uses, because the migration had
+        // long created the real type in `public`. Measured at the running
+        // database (under the enum's former name):
         //
         //   nspname        | typname
-        //   public         | pruef_handlung     <- die benutzte
-        //   pruef_handlung | pruefhandlung      <- die Waise
+        //   public         | pruef_handlung     <- the one in use
+        //   pruef_handlung | pruefhandlung      <- the orphan
         //
-        // Folgenlos im Betrieb, aber sie entsteht bei JEDER SchemaMigration in JEDER
-        // EnvironmentFile neu. resume-service schreibt es seit jeher benannt; nur
-        // dieser Dienst tat es nicht.
-        modelBuilder.HasPostgresEnum<AuditAction>(name: Enumnamen.AuditAction);
+        // Without consequence in operation, but it arose anew at EVERY
+        // migration in EVERY environment. resume-service has always written it
+        // named; only this service did not.
+        modelBuilder.HasPostgresEnum<AuditAction>(name: EnumNames.AuditAction);
 
         modelBuilder.Entity<ProfileRow>(row =>
         {
@@ -158,26 +217,27 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
             row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
             row.HasKey(column => column.Id);
             row.Property(column => column.Id).HasColumnName("id");
-            row.Property(column => column.Ueberschrift).HasColumnName("headline");
+            row.Property(column => column.Headline).HasColumnName("headline");
             row.Property(column => column.Text).HasColumnName("bio");
-            row.Property(column => column.Ort).HasColumnName("location");
-            row.Property(column => column.RemoteMoeglich).HasColumnName("remote_ok");
-            row.Property(column => column.Faehigkeiten).HasColumnName("skills");
-            // Als Zeichenkette und nicht als Postgres-Aufzaehlung: die beiden
-            // sind freiwillig und nullbar, und eine Aufzaehlung braechte je
-            // Erweiterung eine Typwanderung — fuer eine Angabe, die niemand
-            // abfragt, sondern die zur Suchzeit in ein Haekchen wandert.
-            row.Property(column => column.Pendelbereitschaft)
-                .HasColumnName("commute_km").HasMaxLength(16).HasConversion<string>();
-            row.Property(column => column.Umzugsbereitschaft)
-                .HasColumnName("relocation").HasMaxLength(16).HasConversion<string>();
-            row.Property(column => column.AngelegtAm).HasColumnName("created_at");
-            row.Property(column => column.GeaendertAm).HasColumnName("updated_at");
+            row.Property(column => column.Location).HasColumnName("location");
+            row.Property(column => column.RemoteOk).HasColumnName("remote_ok");
+            row.Property(column => column.Skills).HasColumnName("skills");
+            // As a string and not as a Postgres enum: both are voluntary and
+            // nullable, and an enum would need a type migration per extension —
+            // for a statement nobody queries, which turns into a tick at search
+            // time. The converters keep the stored strings (see above).
+            row.Property(column => column.Commute)
+                .HasColumnName("commute_km").HasMaxLength(16).HasConversion(CommuteConverter);
+            row.Property(column => column.Relocation)
+                .HasColumnName("relocation").HasMaxLength(16).HasConversion(RelocationConverter);
+            row.Property(column => column.CreatedAt).HasColumnName("created_at");
+            row.Property(column => column.UpdatedAt).HasColumnName("updated_at");
 
-            // Genau die Sortierung der Seite, in genau der Richtung. Ohne ihn
-            // liest jede Seite die ganze Tabelle — und die Sortierung ist
-            // zusammengesetzt, ein Index auf updated_at allein hülfe nicht.
-            row.HasIndex(column => new { column.GeaendertAm, column.Id })
+            // Exactly the page's ordering, in exactly its direction. Without it
+            // every page reads the whole table — and the ordering is composite,
+            // an index on updated_at alone would not help. The index name is
+            // schema and stays as the migration created it.
+            row.HasIndex(column => new { column.UpdatedAt, column.Id })
                 .IsDescending(true, true)
                 .HasDatabaseName("ix_profiles_seite");
         });
@@ -187,18 +247,18 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
             row.ToTable("audit_events");
             row.HasKey(column => column.Id);
             row.Property(column => column.Id).HasColumnName("id");
-            row.Property(column => column.AkteurId).HasColumnName("actor_id");
-            row.Property(column => column.FirmaId).HasColumnName("tenant_id");
-            row.Property(column => column.Handlung).HasColumnName("action");
-            row.Property(column => column.BetroffenId).HasColumnName("target_id");
-            row.Property(column => column.Korrelation).HasColumnName("correlation_id");
-            row.Property(column => column.GeschehenAm).HasColumnName("occurred_at");
-            row.Property(column => column.Daten).HasColumnName("metadata").HasColumnType("jsonb");
+            row.Property(column => column.ActorId).HasColumnName("actor_id");
+            row.Property(column => column.TenantId).HasColumnName("tenant_id");
+            row.Property(column => column.Action).HasColumnName("action");
+            row.Property(column => column.TargetId).HasColumnName("target_id");
+            row.Property(column => column.CorrelationId).HasColumnName("correlation_id");
+            row.Property(column => column.OccurredAt).HasColumnName("occurred_at");
+            row.Property(column => column.Metadata).HasColumnName("metadata").HasColumnType("jsonb");
 
-            // Ausdrücklich KEIN Fremdschlüssel auf profiles: die Löschung
-            // entfernt die Profilzeile und behält die Spur. Ein Fremdschlüssel
-            // hieße hier entweder Kaskade — dann verschwände der Beweis, dass
-            // gelöscht wurde — oder Verbot, dann ginge die Löschung nicht.
+            // Expressly NO foreign key to profiles: the erasure removes the
+            // profile row and keeps the trail. A foreign key here would mean
+            // either cascade — then the proof that something was deleted would
+            // disappear — or prohibition, then the erasure would not go through.
         });
 
         base.OnModelCreating(modelBuilder);

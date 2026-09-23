@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.Profile.Application.Ports;
-using WorkerTransfer.Profile.Infrastructure.Einwilligung;
+using WorkerTransfer.Profile.Infrastructure.Consent;
 using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Ganzes.Tests;
@@ -120,11 +120,11 @@ public class CheckTests
     {
         var finding = await new SeamCheck(
             typeof(DraftSituation),
-            ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
+            ["Headline", "Text", "Skills", "Wish", "Prompt"],
             "für einen Profiltext").RunAsync();
 
         finding.Status.Should().Be(SecurityCheckStatus.Pass);
-        finding.Summary.Should().Contain("Wunsch").And.Contain("Prompt");
+        finding.Summary.Should().Contain("Wish").And.Contain("Prompt");
     }
 
     /// <summary>One field more than agreed: red.</summary>
@@ -133,11 +133,11 @@ public class CheckTests
     {
         var finding = await new SeamCheck(
             typeof(DraftSituation),
-            ["Ueberschrift", "Text", "Faehigkeiten", "Prompt"],
+            ["Headline", "Text", "Skills", "Prompt"],
             "für einen Profiltext").RunAsync();
 
         finding.Status.Should().Be(SecurityCheckStatus.Fail);
-        finding.Summary.Should().Contain("zusätzlich Wunsch");
+        finding.Summary.Should().Contain("zusätzlich Wish");
     }
 
     // --------------------------------------------------------- wt.ki.anbieter

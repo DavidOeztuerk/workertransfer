@@ -419,7 +419,7 @@ public class StellenreiseTests(Postgres postgres) : IAsyncLifetime
     {
         Domain.Jobs.SkillList.MaxLength
             .Should().BeLessThanOrEqualTo(
-                Profile.Domain.Faehigkeiten.SkillList.MaxLength);
+                Profile.Domain.Skills.SkillList.MaxLength);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using WorkerTransfer.Profile.Domain.Pruefspur;
+using WorkerTransfer.Profile.Domain.Audit;
 
 #nullable disable
 
