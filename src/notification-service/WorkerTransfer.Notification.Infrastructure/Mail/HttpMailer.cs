@@ -7,12 +7,18 @@ using WorkerTransfer.Notification.Application.Ports;
 namespace WorkerTransfer.Notification.Infrastructure.Mail;
 
 /// <summary>Where identity-service answers, and what identifies us as us.</summary>
+/// <remarks>
+/// The property names ARE the environment keys (<c>Identity__Adresse</c>,
+/// <c>Identity__Geheimnis</c>, <c>Identity__Zeitueberschreitung</c>), so they
+/// stay German until the keys are renamed everywhere at once — in compose, in
+/// the chart and in <c>.env.example</c>.
+/// </remarks>
 public sealed class MailSettings
 {
     /// <summary>The configuration section this binds to.</summary>
     public const string Section = "Identity";
 
-    /// <summary>The base address of identity-service. The property name IS the environment key.</summary>
+    /// <summary>The base address of identity-service.</summary>
     public string Adresse { get; set; } = string.Empty;
 
     /// <summary>The shared secret. Expressly not the erasure's.</summary>
@@ -83,7 +89,7 @@ public sealed class HttpMailer(
                 // What is logged is the kind of failure, never the recipient:
                 // a log is also a place where something ends up.
                 log.LogWarning(
-                    "identity-service antwortete mit {Code}", (int)response.StatusCode);
+                    "identity-service answered with {Code}", (int)response.StatusCode);
             }
         }
         catch (Exception error) when (error is not OperationCanceledException)
@@ -92,7 +98,7 @@ public sealed class HttpMailer(
             // the throttle is already set, this message is lost, and that is
             // the right direction.
             log.LogWarning(
-                "Benachrichtigung konnte nicht angestoßen werden ({Art})", error.GetType().Name);
+                "The notification could not be triggered ({Kind})", error.GetType().Name);
         }
     }
 }

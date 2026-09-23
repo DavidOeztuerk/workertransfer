@@ -14,34 +14,34 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Tests;
 
-/// <summary>Melden, lesen, abbestellen — und was nie hinausgeht.</summary>
+/// <summary>Notify, read, unsubscribe — and what never goes out.</summary>
 [Collection(PostgresCollection.Name)]
 public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Meldegeheimnis = "melde-geheimnis";
+    private const string NotifySecret = "notify-secret";
 
-    private WebApplicationFactory<Program> _dienst = null!;
-    private readonly ProbeMailer _postbote = new();
-    private readonly ProbeClock _uhr = new(new DateTimeOffset(2026, 8, 27, 9, 0, 0, TimeSpan.Zero));
+    private WebApplicationFactory<Program> _service = null!;
+    private readonly ProbeMailer _mailer = new();
+    private readonly ProbeClock _clock = new(new DateTimeOffset(2026, 8, 27, 9, 0, 0, TimeSpan.Zero));
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
-            host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
-            host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
+            host.UseSetting("Identity:Geheimnis", NotifySecret);
+            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
-                services.Replace(ServiceDescriptor.Scoped<IMailer>(_ => _postbote));
-                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
+                services.Replace(ServiceDescriptor.Scoped<IMailer>(_ => _mailer));
+                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_clock));
             });
         });
 
@@ -50,22 +50,22 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
-    private HttpClient AlsPerson(Guid subject)
+    private HttpClient AsPerson(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
     }
 
-    private Task<HttpResponseMessage> Melde(
-        Guid subject, string kind = "market_request", string secret = Meldegeheimnis)
+    private Task<HttpResponseMessage> Notify(
+        Guid subject, string kind = "market_request", string secret = NotifySecret)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
         return browser.PostAsJsonAsync("/internal/notifications", new { user_id = subject, kind = kind });
     }
@@ -79,12 +79,12 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        var gemeldet = await Melde(anna);
+        var notified = await Notify(anna);
 
-        gemeldet.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        _postbote.Gebeten.Should().Equal(anna);
+        notified.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        _mailer.Requested.Should().Equal(anna);
 
-        var inbox = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
+        var inbox = await Json(await AsPerson(anna).GetAsync("/notifications/me"));
 
         inbox.GetArrayLength().Should().Be(1);
 
@@ -106,41 +106,41 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna, "market_request");
-        await Melde(anna, "resume_request");
-        await Melde(anna, "transfer_update");
+        await Notify(anna, "market_request");
+        await Notify(anna, "resume_request");
+        await Notify(anna, "transfer_update");
 
-        _postbote.Gebeten.Should().Equal(anna);
+        _mailer.Requested.Should().Equal(anna);
 
-        var inbox = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
+        var inbox = await Json(await AsPerson(anna).GetAsync("/notifications/me"));
 
         inbox.GetArrayLength().Should().Be(3);
     }
 
-    /// <summary>Nach der Drosselstunde geht wieder Post hinaus.</summary>
+    /// <summary>After the throttle hour mail goes out again.</summary>
     [Fact]
     public async Task After_an_hour_mail_goes_out_again()
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna);
-        _uhr.Weiter(NotificationPreference.Throttle);
-        await Melde(anna);
+        await Notify(anna);
+        _clock.Advance(NotificationPreference.Throttle);
+        await Notify(anna);
 
-        _postbote.Gebeten.Should().Equal(anna, anna);
+        _mailer.Requested.Should().Equal(anna, anna);
     }
 
-    /// <summary>Kurz davor noch nicht.</summary>
+    /// <summary>Shortly before, not yet.</summary>
     [Fact]
     public async Task Just_before_the_hour_not_yet()
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna);
-        _uhr.Weiter(NotificationPreference.Throttle - TimeSpan.FromMinutes(1));
-        await Melde(anna);
+        await Notify(anna);
+        _clock.Advance(NotificationPreference.Throttle - TimeSpan.FromMinutes(1));
+        await Notify(anna);
 
-        _postbote.Gebeten.Should().Equal(anna);
+        _mailer.Requested.Should().Equal(anna);
     }
 
     /// <summary>The throttle applies per person, not to everybody together.</summary>
@@ -150,10 +150,10 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
 
-        await Melde(anna);
-        await Melde(bea);
+        await Notify(anna);
+        await Notify(bea);
 
-        _postbote.Gebeten.Should().Equal(anna, bea);
+        _mailer.Requested.Should().Equal(anna, bea);
     }
 
     /// <summary>Whoever has set nothing has everything on.</summary>
@@ -165,7 +165,7 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task By_default_everything_is_on()
     {
         var preferences = await Json(
-            await AlsPerson(Guid.CreateVersion7()).GetAsync("/me/notification-preferences"));
+            await AsPerson(Guid.CreateVersion7()).GetAsync("/me/notification-preferences"));
 
         foreach (var field in new[]
                  {
@@ -182,9 +182,9 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Switched_off_means_no_mail_but_the_entry_stays()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
+        var hers = AsPerson(anna);
 
-        await ihr.PutAsJsonAsync("/me/notification-preferences", new
+        await hers.PutAsJsonAsync("/me/notification-preferences", new
         {
             resume_request = true,
             market_request = false,
@@ -192,11 +192,11 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             transfer_update = true
         });
 
-        await Melde(anna, "market_request");
+        await Notify(anna, "market_request");
 
-        _postbote.Gebeten.Should().BeEmpty();
+        _mailer.Requested.Should().BeEmpty();
 
-        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
+        var inbox = await Json(await hers.GetAsync("/notifications/me"));
 
         inbox.GetArrayLength().Should().Be(1);
     }
@@ -210,7 +210,7 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        await AlsPerson(anna).PutAsJsonAsync("/me/notification-preferences", new
+        await AsPerson(anna).PutAsJsonAsync("/me/notification-preferences", new
         {
             resume_request = true,
             market_request = false,
@@ -218,19 +218,19 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             transfer_update = true
         });
 
-        await Melde(anna, "market_request");
-        await Melde(anna, "resume_request");
+        await Notify(anna, "market_request");
+        await Notify(anna, "resume_request");
 
-        _postbote.Gebeten.Should().Equal(anna);
+        _mailer.Requested.Should().Equal(anna);
     }
 
     /// <summary>The settings come back as they were written.</summary>
     [Fact]
     public async Task The_settings_come_back_as_written()
     {
-        var ihr = AlsPerson(Guid.CreateVersion7());
+        var hers = AsPerson(Guid.CreateVersion7());
 
-        var geschrieben = await ihr.PutAsJsonAsync("/me/notification-preferences", new
+        var written = await hers.PutAsJsonAsync("/me/notification-preferences", new
         {
             resume_request = false,
             market_request = false,
@@ -238,9 +238,9 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             transfer_update = false
         });
 
-        geschrieben.StatusCode.Should().Be(HttpStatusCode.OK);
+        written.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var read = await Json(await ihr.GetAsync("/me/notification-preferences"));
+        var read = await Json(await hers.GetAsync("/me/notification-preferences"));
 
         read.GetProperty("resume_request").GetBoolean().Should().BeFalse();
         read.GetProperty("application_update").GetBoolean().Should().BeTrue();
@@ -248,16 +248,16 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Wer die Art abbestellt hat, bekommt keine Mail — der Eintrag im
-    /// Inbox bleibt trotzdem.
+    /// Whoever unsubscribed from the kind gets no mail — the entry in the
+    /// inbox stays all the same.
     /// </summary>
     [Fact]
     public async Task ApplicationReceived_switched_off_means_no_mail()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
+        var hers = AsPerson(anna);
 
-        await ihr.PutAsJsonAsync("/me/notification-preferences", new
+        await hers.PutAsJsonAsync("/me/notification-preferences", new
         {
             resume_request = true,
             market_request = true,
@@ -266,11 +266,11 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             application_received = false
         });
 
-        await Melde(anna, "application_received");
+        await Notify(anna, "application_received");
 
-        _postbote.Gebeten.Should().BeEmpty();
+        _mailer.Requested.Should().BeEmpty();
 
-        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
+        var inbox = await Json(await hers.GetAsync("/notifications/me"));
         inbox.GetArrayLength().Should().Be(1);
         inbox[0].GetProperty("kind").GetString().Should().Be("application_received");
     }
@@ -280,22 +280,22 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task Read_all_sets_the_moment_once()
     {
         var anna = Guid.CreateVersion7();
-        var ihr = AlsPerson(anna);
-        await Melde(anna, "market_request");
-        await Melde(anna, "resume_request");
+        var hers = AsPerson(anna);
+        await Notify(anna, "market_request");
+        await Notify(anna, "resume_request");
 
-        var read = await Json(await ihr.PostAsync("/notifications/me/read", null));
+        var read = await Json(await hers.PostAsync("/notifications/me/read", null));
 
         read.GetProperty("read").GetInt32().Should().Be(2);
 
-        var inbox = await Json(await ihr.GetAsync("/notifications/me"));
+        var inbox = await Json(await hers.GetAsync("/notifications/me"));
 
         inbox.EnumerateArray().Should().OnlyContain(
             entry => entry.GetProperty("read_at").ValueKind != JsonValueKind.Null);
 
-        var nochmal = await Json(await ihr.PostAsync("/notifications/me/read", null));
+        var again = await Json(await hers.PostAsync("/notifications/me/read", null));
 
-        nochmal.GetProperty("read").GetInt32().Should().Be(0);
+        again.GetProperty("read").GetInt32().Should().Be(0);
     }
 
     /// <summary>The inbox shows only one's own entries.</summary>
@@ -304,12 +304,12 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
-        await Melde(anna);
-        await Melde(bea);
+        await Notify(anna);
+        await Notify(bea);
 
-        var ihres = await Json(await AlsPerson(anna).GetAsync("/notifications/me"));
+        var ownInbox = await Json(await AsPerson(anna).GetAsync("/notifications/me"));
 
-        ihres.GetArrayLength().Should().Be(1);
+        ownInbox.GetArrayLength().Should().Be(1);
     }
 
     /// <summary>
@@ -323,12 +323,12 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        var response = await Melde(anna, secret: "geraten");
+        var response = await Notify(anna, secret: "guessed");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        _postbote.Gebeten.Should().BeEmpty();
+        _mailer.Requested.Should().BeEmpty();
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
     }
 
@@ -343,14 +343,14 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Even_for_an_unknown_id_it_is_202()
     {
-        var response = await Melde(Guid.CreateVersion7());
+        var response = await Notify(Guid.CreateVersion7());
 
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     /// <summary>
-    /// Abbestellt und gedrosselt antworten wie zugestellt: 202 und ein leerer
-    /// Rumpf.
+    /// Unsubscribed and throttled answer like delivered: 202 and an empty
+    /// body.
     /// </summary>
     [Fact]
     public async Task Switched_off_and_delivered_answer_the_same()
@@ -358,7 +358,7 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
 
-        await AlsPerson(bea).PutAsJsonAsync("/me/notification-preferences", new
+        await AsPerson(bea).PutAsJsonAsync("/me/notification-preferences", new
         {
             resume_request = false,
             market_request = false,
@@ -366,30 +366,30 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             transfer_update = false
         });
 
-        var zugestellt = await Melde(anna);
-        var abbestellt = await Melde(bea);
+        var delivered = await Notify(anna);
+        var unsubscribed = await Notify(bea);
 
-        zugestellt.StatusCode.Should().Be(abbestellt.StatusCode);
-        (await zugestellt.Content.ReadAsStringAsync())
-            .Should().Be(await abbestellt.Content.ReadAsStringAsync());
+        delivered.StatusCode.Should().Be(unsubscribed.StatusCode);
+        (await delivered.Content.ReadAsStringAsync())
+            .Should().Be(await unsubscribed.Content.ReadAsStringAsync());
     }
 
-    /// <summary>Eine Art, die es nicht gibt, ist ein Fehler des Aufrufers.</summary>
+    /// <summary>A kind that does not exist is the caller's fault.</summary>
     [Fact]
     public async Task An_invented_kind_is_422()
     {
-        var response = await Melde(Guid.CreateVersion7(), "irgendwas");
+        var response = await Notify(Guid.CreateVersion7(), "anything");
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    /// <summary>Ohne Anmeldung gibt es kein Inbox.</summary>
+    /// <summary>Without a sign-in there is no inbox.</summary>
     [Fact]
     public async Task Without_a_token_it_is_401()
     {
-        (await _dienst.CreateClient().GetAsync("/notifications/me"))
+        (await _service.CreateClient().GetAsync("/notifications/me"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await _dienst.CreateClient().GetAsync("/me/notification-preferences"))
+        (await _service.CreateClient().GetAsync("/me/notification-preferences"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

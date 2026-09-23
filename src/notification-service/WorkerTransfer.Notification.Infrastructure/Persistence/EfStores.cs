@@ -142,7 +142,7 @@ public sealed class EfInboxStore(NotificationDbContext context) : IInboxStore
             new SubjectId(row.UserId),
             NotificationKinds.Read(row.Kind)
             ?? throw new InvalidOperationException(
-                $"Unbekannte Benachrichtigungsart in der Datenbank: {row.Kind}"),
+                $"Unknown notification kind in the database: {row.Kind}"),
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
             row.ReadAt is { } read ? new DateTimeOffset(read, TimeSpan.Zero) : null);
 }

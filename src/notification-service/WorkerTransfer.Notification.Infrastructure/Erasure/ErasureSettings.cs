@@ -11,6 +11,11 @@ public sealed class ErasureSettings
     /// <summary>The configuration section this binds to.</summary>
     public const string Section = "Erasure";
 
-    /// <summary>The shared secret. The property name IS the environment key.</summary>
+    /// <summary>The shared secret.</summary>
+    /// <remarks>
+    /// The property name IS the environment key (<c>Erasure__Geheimnis</c>), so
+    /// it stays German until the keys are renamed everywhere at once — in
+    /// compose, in the chart and in <c>.env.example</c>.
+    /// </remarks>
     public string Geheimnis { get; set; } = string.Empty;
 }

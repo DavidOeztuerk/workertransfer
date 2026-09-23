@@ -31,30 +31,30 @@ namespace WorkerTransfer.Notification.Tests;
 [Collection(PostgresCollection.Name)]
 public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Meldegeheimnis = "melde-geheimnis";
+    private const string NotifySecret = "notify-secret";
 
-    private WebApplicationFactory<Program> _dienst = null!;
-    private readonly ProbeMailer _postbote = new();
-    private readonly ProbeClock _uhr = new(new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.Zero));
+    private WebApplicationFactory<Program> _service = null!;
+    private readonly ProbeMailer _mailer = new();
+    private readonly ProbeClock _clock = new(new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.Zero));
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
-            host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
-            host.UseSetting("Erasure:Geheimnis", "loesch-geheimnis");
+            host.UseSetting("Identity:Geheimnis", NotifySecret);
+            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
-                services.Replace(ServiceDescriptor.Scoped<IMailer>(_ => _postbote));
-                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_uhr));
+                services.Replace(ServiceDescriptor.Scoped<IMailer>(_ => _mailer));
+                services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_clock));
             });
         });
 
@@ -63,7 +63,7 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
@@ -73,7 +73,7 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        (await Melde(anna)).StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await Notify(anna)).StatusCode.Should().Be(HttpStatusCode.Accepted);
 
         var inbox = await Inbox(anna);
 
@@ -92,14 +92,14 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        for (var lauf = 0; lauf < 10; lauf++)
+        for (var round = 0; round < 10; round++)
         {
-            await Melde(anna);
-            _uhr.Weiter(TimeSpan.FromMinutes(30));
+            await Notify(anna);
+            _clock.Advance(TimeSpan.FromMinutes(30));
         }
 
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
-        _postbote.Gebeten.Should().Equal(anna);
+        _mailer.Requested.Should().Equal(anna);
     }
 
     /// <summary>The next day again — otherwise it would be no disclosure any more.</summary>
@@ -108,9 +108,9 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna);
-        _uhr.Weiter(TimeSpan.FromDays(1));
-        await Melde(anna);
+        await Notify(anna);
+        _clock.Advance(TimeSpan.FromDays(1));
+        await Notify(anna);
 
         (await Inbox(anna)).GetArrayLength().Should().Be(2);
     }
@@ -125,9 +125,9 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna);
-        _uhr.Weiter(TimeSpan.FromDays(1) - TimeSpan.FromMinutes(1));
-        await Melde(anna);
+        await Notify(anna);
+        _clock.Advance(TimeSpan.FromDays(1) - TimeSpan.FromMinutes(1));
+        await Notify(anna);
 
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
@@ -143,9 +143,9 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        await Melde(anna);
-        await Melde(anna, "market_request");
-        await Melde(anna);
+        await Notify(anna);
+        await Notify(anna, "market_request");
+        await Notify(anna);
 
         var kinds = (await Inbox(anna)).EnumerateArray()
             .Select(entry => entry.GetProperty("kind").GetString())
@@ -161,8 +161,8 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
 
-        await Melde(anna);
-        await Melde(bea);
+        await Notify(anna);
+        await Notify(bea);
 
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
         (await Inbox(bea)).GetArrayLength().Should().Be(1);
@@ -180,13 +180,13 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        var vorher = await Json(
-            await AlsPerson(anna).GetAsync(new Uri("/me/notification-preferences", UriKind.Relative)));
+        var before = await Json(
+            await AsPerson(anna).GetAsync(new Uri("/me/notification-preferences", UriKind.Relative)));
 
-        vorher.GetProperty("profile_discovered").GetBoolean().Should().BeTrue(
-            "eine neue Art darf nicht stillschweigend ausbleiben");
+        before.GetProperty("profile_discovered").GetBoolean().Should().BeTrue(
+            "a new kind must not stay away silently");
 
-        var abbestellt = await AlsPerson(anna).PutAsJsonAsync(
+        var unsubscribed = await AsPerson(anna).PutAsJsonAsync(
             new Uri("/me/notification-preferences", UriKind.Relative),
             new
             {
@@ -198,13 +198,13 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
                 profile_discovered = false
             });
 
-        abbestellt.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(abbestellt)).GetProperty("profile_discovered").GetBoolean()
+        unsubscribed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(unsubscribed)).GetProperty("profile_discovered").GetBoolean()
             .Should().BeFalse();
 
-        await Melde(anna);
+        await Notify(anna);
 
-        _postbote.Gebeten.Should().BeEmpty("abbestellt heisst abbestellt");
+        _mailer.Requested.Should().BeEmpty("unsubscribed means unsubscribed");
 
         // The ENTRY comes into being all the same: it lies behind the sign-in,
         // and leaving it out would mean concealing from somebody that something
@@ -241,31 +241,31 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
                      .Where(kind => kind != NotificationKind.ProfileDiscovered))
         {
             NotificationKinds.DailyCap(kind).Should().BeNull(
-                $"{NotificationKinds.Word(kind)} darf so oft kommen, wie es passiert");
+                $"{NotificationKinds.Word(kind)} may come as often as it happens");
         }
     }
 
     // ---------------------------------------------------------------------
 
-    private HttpClient AlsPerson(Guid subject)
+    private HttpClient AsPerson(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
         return browser;
     }
 
-    private Task<HttpResponseMessage> Melde(Guid subject, string kind = "profile_discovered")
+    private Task<HttpResponseMessage> Notify(Guid subject, string kind = "profile_discovered")
     {
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
 
         return browser.PostAsJsonAsync(
             new Uri("/internal/notifications", UriKind.Relative), new { user_id = subject, kind = kind });
     }
 
     private async Task<JsonElement> Inbox(Guid subject) =>
-        await Json(await AlsPerson(subject).GetAsync(new Uri("/notifications/me", UriKind.Relative)));
+        await Json(await AsPerson(subject).GetAsync(new Uri("/notifications/me", UriKind.Relative)));
 
     private static async Task<JsonElement> Json(HttpResponseMessage response) =>
         JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;

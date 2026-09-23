@@ -36,7 +36,7 @@ public sealed class Postgres : IAsyncLifetime
     public async Task DisposeAsync() => await _container.DisposeAsync();
 
     /// <summary>A context of its own, for looking into the database.</summary>
-    public NotificationDbContext Kontext() =>
+    public NotificationDbContext Context() =>
         new(NotificationDbContextFactory
             .Options(NotificationDbContextFactory.DataSource(ConnectionString)).Options);
 }
@@ -55,12 +55,12 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
 public sealed class ProbeMailer : IMailer
 {
     /// <summary>Who mail was asked for, in the order of the calls.</summary>
-    public List<Guid> Gebeten { get; } = [];
+    public List<Guid> Requested { get; } = [];
 
     /// <inheritdoc />
     public Task SendAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
-        Gebeten.Add(subject.Value);
+        Requested.Add(subject.Value);
         return Task.CompletedTask;
     }
 }
@@ -68,12 +68,12 @@ public sealed class ProbeMailer : IMailer
 /// <summary>A clock the test sets.</summary>
 public sealed class ProbeClock(DateTimeOffset start) : TimeProvider
 {
-    private DateTimeOffset _jetzt = start;
+    private DateTimeOffset _now = start;
 
-    public override DateTimeOffset GetUtcNow() => _jetzt;
+    public override DateTimeOffset GetUtcNow() => _now;
 
     /// <summary>Lets time pass.</summary>
-    public void Weiter(TimeSpan spanne) => _jetzt += spanne;
+    public void Advance(TimeSpan span) => _now += span;
 }
 
 /// <summary>The token shape this service verifies.</summary>

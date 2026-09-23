@@ -17,24 +17,24 @@ namespace WorkerTransfer.Notification.Tests;
 [Collection(PostgresCollection.Name)]
 public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Loeschgeheimnis = "loesch-geheimnis";
-    private const string Meldegeheimnis = "melde-geheimnis";
+    private const string ErasureSecret = "erasure-secret";
+    private const string NotifySecret = "notify-secret";
 
-    private WebApplicationFactory<Program> _dienst = null!;
+    private WebApplicationFactory<Program> _service = null!;
 
     public Task InitializeAsync()
     {
-        _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-hauptschluessel-fuer-die-reihe");
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:Adresse", "http://identity.test");
-            host.UseSetting("Identity:Geheimnis", Meldegeheimnis);
-            host.UseSetting("Erasure:Geheimnis", Loeschgeheimnis);
+            host.UseSetting("Identity:Geheimnis", NotifySecret);
+            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Scoped<IMailer, ProbeMailer>()));
@@ -45,7 +45,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
     public Task DisposeAsync()
     {
-        _dienst.Dispose();
+        _service.Dispose();
         return Task.CompletedTask;
     }
 
@@ -60,25 +60,25 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task The_erasure_takes_inbox_and_settings_with_it()
     {
         var anna = Guid.CreateVersion7();
-        await Melde(anna);
+        await Notify(anna);
         await Preferences(anna);
 
-        await using (var vorher = postgres.Kontext())
+        await using (var before = postgres.Context())
         {
-            (await vorher.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
-            (await vorher.Preferences.AnyAsync(row => row.Id == anna)).Should().BeTrue();
+            (await before.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
+            (await before.Preferences.AnyAsync(row => row.Id == anna)).Should().BeTrue();
         }
 
-        var response = await Loesche(anna);
+        var response = await Erase(anna);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var quittung = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        quittung.GetProperty("retained").GetInt32().Should().Be(0);
+        var receipt = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        receipt.GetProperty("retained").GetInt32().Should().Be(0);
 
-        await using var nachher = postgres.Kontext();
-        (await nachher.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
-        (await nachher.Preferences.AnyAsync(row => row.Id == anna)).Should().BeFalse();
+        await using var after = postgres.Context();
+        (await after.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeFalse();
+        (await after.Preferences.AnyAsync(row => row.Id == anna)).Should().BeFalse();
     }
 
     /// <summary>Erasing one human being touches nobody else.</summary>
@@ -87,12 +87,12 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
         var bea = Guid.CreateVersion7();
-        await Melde(anna);
-        await Melde(bea);
+        await Notify(anna);
+        await Notify(bea);
 
-        await Loesche(anna);
+        await Erase(anna);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.InboxEntries.AnyAsync(row => row.UserId == bea)).Should().BeTrue();
     }
 
@@ -101,16 +101,16 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task Without_the_right_secret_nothing_is_erased()
     {
         var anna = Guid.CreateVersion7();
-        await Melde(anna);
+        await Notify(anna);
 
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "geraten");
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", "guessed");
 
         var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
@@ -125,16 +125,16 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     public async Task The_notify_secret_does_not_open_the_erasure()
     {
         var anna = Guid.CreateVersion7();
-        await Melde(anna);
+        await Notify(anna);
 
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Meldegeheimnis);
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", NotifySecret);
 
         var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        await using var context = postgres.Kontext();
+        await using var context = postgres.Context();
         (await context.InboxEntries.AnyAsync(row => row.UserId == anna)).Should().BeTrue();
     }
 
@@ -144,14 +144,14 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Loesche(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(anna)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private Task<HttpResponseMessage> Loesche(Guid subject)
+    private Task<HttpResponseMessage> Erase(Guid subject)
     {
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", Loeschgeheimnis);
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", ErasureSecret);
         return browser.PostAsJsonAsync("/erasure", new { user_id = subject });
     }
 
@@ -161,17 +161,17 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// reported itself three lines later as "no entry" — a cause that looks
     /// like an effect.
     /// </remarks>
-    private async Task<HttpResponseMessage> Melde(Guid subject)
+    private async Task<HttpResponseMessage> Notify(Guid subject)
     {
-        var browser = _dienst.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", Meldegeheimnis);
+        var browser = _service.CreateClient();
+        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
 
         var response = await browser.PostAsJsonAsync(
             "/internal/notifications", new { user_id = subject, kind = "market_request" });
 
         response.IsSuccessStatusCode.Should().BeTrue(
-            "das Befuellen muss gelingen, sonst prueft der Test etwas anderes — "
-            + $"bekam {(int)response.StatusCode}: "
+            "the fill must succeed, otherwise the test checks something else — "
+            + $"got {(int)response.StatusCode}: "
             + await response.Content.ReadAsStringAsync());
 
         return response;
@@ -179,7 +179,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
     private Task<HttpResponseMessage> Preferences(Guid subject)
     {
-        var browser = _dienst.CreateClient();
+        var browser = _service.CreateClient();
         browser.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TokenShape.Person(subject));
 
