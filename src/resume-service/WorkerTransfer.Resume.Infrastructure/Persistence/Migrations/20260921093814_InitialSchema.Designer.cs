@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using WorkerTransfer.Resume.Domain.Anfragen;
-using WorkerTransfer.Resume.Domain.Pruefspur;
+using WorkerTransfer.Resume.Domain.Requests;
+using WorkerTransfer.Resume.Domain.Audit;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 
 #nullable disable

@@ -82,7 +82,7 @@ public class DrahtvertragTests
         { "jobs.contracts", typeof(Jobs.Contracts.JobV1) },
         { "notification.contracts", typeof(Notification.Contracts.NotifyV1) },
         { "portfolio.contracts", typeof(Portfolio.Contracts.EntryV1) },
-        { "resume.contracts", typeof(Resume.Contracts.StationV1) },
+        { "resume.contracts", typeof(Resume.Contracts.PositionV1) },
         { "transfer.contracts", typeof(Transfer.Contracts.MarketStatusV1) },
 
         // The scout's contracts layer AND profile-service's: the two share a

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Infrastructure.Mail;
 using AnwendungenPost = WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
-using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Benachrichtigung;
+using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Notification;
 using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
 using WechselPost = WorkerTransfer.Transfer.Infrastructure.Notification;
 
@@ -73,7 +73,7 @@ public class BenachrichtigungsdrahtTests
     [Fact]
     public Task Resume_sends_an_id_that_arrives() =>
         Check(async (fabrik, einstellungen) =>
-            await new LebenslaufPost.HttpBenachrichtigung(
+            await new LebenslaufPost.HttpNotifier(
                 fabrik,
                 Options.Create(new LebenslaufPost.NotificationSettings
                 {

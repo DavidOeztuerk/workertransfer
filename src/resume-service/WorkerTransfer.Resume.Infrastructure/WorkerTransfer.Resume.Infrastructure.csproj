@@ -14,10 +14,10 @@
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
     <!--
-      Die Vertraege stehen an der Grenze, und `wt.ki.keine-zahl` sieht sie sich
-      an: eine Zahl ueber einen Menschen entstuende in der Domaene und ginge
-      HIER hinaus (ADR-0022 §1). Beide Flaechen oder keine — eine halbe Absuche
-      meldet gruen ueber der Haelfte, die sie nicht gelesen hat.
+      The contracts stand at the boundary, and `wt.ki.keine-zahl` looks at
+      them: a number about a human being would come into being in the domain and
+      go out HERE (ADR-0022 §1). Both surfaces or none — half a search reports
+      green over the half it did not read.
     -->
     <ProjectReference Include="..\WorkerTransfer.Resume.Contracts\WorkerTransfer.Resume.Contracts.csproj" />
   </ItemGroup>
@@ -30,7 +30,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <!-- Der Texterkenner. Im Prozess, ohne Fremdpakete, ohne Netz (ADR-0043). -->
+    <!-- The text recogniser. In the process, without third-party packages, without a network (ADR-0043). -->
     <PackageReference Include="PdfPig" />
   </ItemGroup>
 

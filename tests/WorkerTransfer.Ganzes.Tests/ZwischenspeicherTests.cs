@@ -46,7 +46,7 @@ public class ZwischenspeicherTests
         { "identity", typeof(Identity.Application.SignIn.SessionStateQuery) },
         { "consent", typeof(Consent.Application.Consents.CheckConsentQuery) },
         { "profile", typeof(Profile.Application.Profile.InternalProfileSearchQuery) },
-        { "resume", typeof(Resume.Application.Anfragen.MyRequestsQuery) },
+        { "resume", typeof(Resume.Application.Requests.MyRequestsQuery) },
         { "portfolio", typeof(Portfolio.Application.Portfolios.MyPortfolioQuery) },
         { "jobs", typeof(Jobs.Application.Jobs.MyJobsQuery) },
         { "applications", typeof(Applications.Application.Applications.MyApplicationsQuery) },
