@@ -28,7 +28,7 @@
 # niemand fragte. Verstecken ist keine Zugriffskontrolle.
 #
 # `firma` heisst deshalb ab jetzt genauer: fuer eine Firma handelnd ALS ADMIN.
-# Die Konten sind in `scripts/routenkarte.sh` so gebaut: wer gruendet, ist
+# Die Konten sind in `scripts/route-map.sh` so gebaut: wer gruendet, ist
 # Administrator (ADR-0019); das Mitglied kommt ueber eine Einladung mit
 # `role: "member"` herein.
 #
@@ -87,7 +87,7 @@
 # ---------------------------------------------------------------------------
 # WER SIE FAEHRT
 #
-#   scripts/routenkarte.sh            gegen den laufenden Stapel (make up)
+#   scripts/route-map.sh              gegen den laufenden Stapel (make up)
 #   RoutenkarteTests (Gateway.Tests)  ohne Stapel: jede Route hat einen Eintrag
 #
 # Der zweite ist der, der eine NEUE Route rotlaufen laesst. Ohne ihn waere die
@@ -163,7 +163,7 @@ gruppen:
       Eine Zeile, die von Resten eines frueheren Laufs abhaengt, ist genau die
       Abhakliste, gegen die diese Karte gebaut ist — nur diesmal in ihr selbst.
       Behoben wurde deshalb nicht die Zahl, sondern der PRUEFSTAND:
-      `scripts/routenkarte.sh` gibt jetzt auch der Person eine eigene Domaene je
+      `scripts/route-map.sh` gibt jetzt auch der Person eine eigene Domaene je
       Lauf. Seitdem stehen beide Werte durch Konstruktion fest.
     eintraege:
       - { methode: GET, pfad: '/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }

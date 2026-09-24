@@ -625,7 +625,7 @@ public class ScoutJourneyTests(Postgres postgres) : IAsyncLifetime
     /// <para>The seam check names the approach context's fields as STRINGS in
     /// the composition root, and the vocabulary check reads this service's names
     /// by syllable. A rename the build accepts can turn either red — and before
-    /// this test only <c>make nachweis-pruefen</c> against the running stack
+    /// this test only <c>make evidence-check</c> against the running stack
     /// would have said so. Here the checks run as the service registered them.</para>
     /// </remarks>
     [Theory]

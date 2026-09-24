@@ -9,7 +9,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// </summary>
 /// <remarks>
 /// <c>docs/routenkarte.yml</c> records for every endpoint what it answers in
-/// the four capacities. It is driven by <c>scripts/routenkarte.sh</c> against
+/// the four capacities. It is driven by <c>scripts/route-map.sh</c> against
 /// the running stack — that is the check of the <em>answers</em>.
 /// <para>
 /// This suite checks something else and needs no stack for it: <strong>that the
@@ -25,7 +25,7 @@ public sealed class RouteMapTests
     /// <remarks>
     /// <strong>The aliases are the file's keys, and the file is not ours to
     /// rename.</strong> <c>docs/routenkarte.yml</c> is a German document, and
-    /// <c>scripts/routenkarte.sh</c> reads the same keys (<c>pfad</c>,
+    /// <c>scripts/route-map.sh</c> reads the same keys (<c>pfad</c>,
     /// <c>ohne</c>, <c>firma</c>…). The classes are English; the keys stay what
     /// the document and the script say. Without an alias YAML would look for
     /// <c>path</c>, find nothing, and fill every column with <c>0</c> — which
@@ -65,7 +65,7 @@ public sealed class RouteMapTests
         public int Admin { get; init; }
 
         /// <summary>
-        /// The body <c>scripts/routenkarte.sh</c> sends along.
+        /// The body <c>scripts/route-map.sh</c> sends along.
         /// </summary>
         /// <remarks>
         /// Set almost nowhere: most endpoints do not look into it at all, and

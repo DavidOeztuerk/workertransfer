@@ -25,7 +25,7 @@ public readonly record struct PlacePoint(double Latitude, double Longitude);
 /// <strong>The coverage is complete all the same</strong>, because the data are
 /// small enough to ship: <c>PostalCodes.txt</c> holds every postcode and
 /// every place of any note in DE, AT and CH (GeoNames, CC BY 4.0 — see
-/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-tabelle.py</c>; whoever wants
+/// <c>NOTICE.md</c>). Produced by <c>scripts/postal-codes.py</c>; whoever wants
 /// to refresh it calls the script.
 /// </para>
 ///

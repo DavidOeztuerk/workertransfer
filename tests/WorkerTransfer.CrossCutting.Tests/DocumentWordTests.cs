@@ -12,11 +12,11 @@ namespace WorkerTransfer.CrossCutting.Tests;
 /// <em>signed</em> document and that somebody passes around. They live in the
 /// generator, and that is a script — but they have to be checked <em>before</em>
 /// a stack runs, because otherwise nobody checks them until somebody calls
-/// <c>make nachweis</c>. One source, two readers: the script uses the
+/// <c>make evidence</c>. One source, two readers: the script uses the
 /// constants, this test reads them.</para>
 ///
 /// <para><strong>And why not only against the generated document.</strong>
-/// <c>scripts/nachweis_worte.py</c> checks what actually came out, including
+/// <c>scripts/evidence_words.py</c> checks what actually came out, including
 /// the reservations derived from the reading — that is the sharper half and it
 /// needs the stack. This one is the half that always runs. Two halves, because
 /// either one alone leaves a gap.</para>
@@ -156,7 +156,7 @@ public class DocumentWordTests
     {
         var hit = Regex.Match(
             Source(),
-            "VORBEHALT = \\((?<sentence>.*?)\\)\\n",
+            "DISCLAIMER = \\((?<sentence>.*?)\\)\\n",
             RegexOptions.Singleline,
             TimeSpan.FromSeconds(5));
 
@@ -186,7 +186,7 @@ public class DocumentWordTests
         while (directory is not null)
         {
             var file = Path.Combine(
-                directory.FullName, "scripts", "nachweis_dokumente.py");
+                directory.FullName, "scripts", "evidence_documents.py");
 
             if (File.Exists(file))
             {
@@ -197,7 +197,7 @@ public class DocumentWordTests
         }
 
         throw new FileNotFoundException(
-            "scripts/nachweis_dokumente.py not found — without it this suite "
+            "scripts/evidence_documents.py not found — without it this suite "
             + "checks nothing.");
     }
 }

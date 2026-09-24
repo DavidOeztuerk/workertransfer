@@ -9,19 +9,19 @@ coverage.xml
 htmlcov/
 
 node_modules/
-# Turbos Bauzwischenspeicher. Turbo selbst ist mit dem pnpm-Workspace
-# gegangen (keine turbo.json, keine Wurzel-package.json) — die Regel bleibt
-# trotzdem: 531 Dateien und 1,2 MB .tar.zst lagen verfolgt im Repository,
-# weil nie eine da war. Ein Zwischenspeicher gehoert nie ins Repository,
-# auch nicht der eines Werkzeugs, das wir gerade nicht benutzen.
+# Turbo's build cache. Turbo itself went with the pnpm workspace (no
+# turbo.json, no root package.json) — the rule stays anyway: 531 files and
+# 1.2 MB of .tar.zst lay tracked in the repository because there never was one.
+# A cache never belongs in the repository, not even that of a tool we do not
+# use right now.
 .turbo/
-# Playwright-Artefakte: Traces und Screenshots eines Laufs, keine Quellen.
+# Playwright artefacts: traces and screenshots of a run, no sources.
 test-results/
 playwright-report/
-# Und dieselben Bilder im Wurzelverzeichnis: die Regel darueber greift nur
-# innerhalb von test-results/, ein Screenshot landet aber neben den Quellen,
-# wenn der Pfad beim Aufnehmen fehlt. Genau so lagen breit-1440.png,
-# zahnrad.png und login-before.png im Repository.
+# And the same images in the root directory: the rule above only applies
+# inside test-results/, but a screenshot lands beside the sources when the path
+# is missing at capture time. That is exactly how breit-1440.png, zahnrad.png
+# and login-before.png came to lie in the repository.
 /*.png
 
 dist/
@@ -33,14 +33,14 @@ build/
 Kon2.txt
 var/
 
-# Browser-Debug-Ausgabe des Playwright-MCP (Seitenabzüge, Konsolenprotokolle).
-# Erzeugt beim Nachsehen im Browser, gehört nicht ins Repository — 18 Dateien
-# waren versehentlich verfolgt.
+# Browser debug output of the Playwright MCP (page snapshots, console logs).
+# Produced while looking around in the browser, does not belong in the
+# repository — 18 files had been tracked by accident.
 .playwright-mcp/
 
-# Screenshot-Aufnahmen für den Vorher/Nachher-Vergleich im PR. Bilder, keine
-# Quellen — und plattformabhängig, deshalb bewusst keine Referenzbilder im
-# Repository (Schriftglättung darwin vs. linux erzeugt Fehlalarme).
+# Screenshots for the before/after comparison in a PR. Images, no sources —
+# and platform-dependent, so deliberately no reference images in the
+# repository (font smoothing darwin vs. linux produces false alarms).
 .screenshots/
 
 # .NET
@@ -48,22 +48,30 @@ var/
 **/obj*
 **/TestResults/
 
-# Das Gespraechsprotokoll, das beim Umstieg auf Girder 4 als Vorlage diente.
-# Gehoert nicht ins Projekt.
+# The conversation transcript that served as a template for the move to
+# Girder 4. Does not belong in the project.
 kon.txt
 
-# Der Signaturschluessel des Nachweises (ADR-0044) und die erzeugten Dokumente.
-# Der private Schluessel in git waere kein privater Schluessel mehr; die
-# Dokumente sind eine MOMENTAUFNAHME eines Stapels und gehoeren dorthin, wo
-# jemand sie braucht — nicht in den Baum, wo sie am naechsten Tag falsch sind.
+# The signing key of the evidence (ADR-0044) and the generated documents.
+# A private key in git would be no private key any more; the documents are a
+# SNAPSHOT of a stack and belong where somebody needs them — not in the tree,
+# where they are wrong the next day. `scripts/evidence.sh` writes the key to
+# .evidence/ and the documents to evidence/.
 #
-# MIT FUEHRENDEM SCHRAEGSTRICH, und das ist gemessen: ohne ihn gilt das Muster
-# in JEDEM Verzeichnis, und `git` vergleicht auf einem Dateisystem, das
-# Gross- und Kleinschreibung nicht unterscheidet (macOS, core.ignorecase=true),
-# ebenfalls ohne Ruecksicht darauf. `nachweis/` verschluckte damit
-# `src/*/…Infrastructure/Nachweis/` — zwei Quelldateien fehlten im Commit, der
-# Baum baute lokal weiter, und CI fiel mit „namespace 'Nachweis' does not
-# exist". Wieder eine Stelle, an der zwei Seiten dieselbe Sache verschieden
-# buchstabierten.
+# WITH A LEADING SLASH, and that was measured: without it the pattern applies
+# in EVERY directory, and `git` compares on a file system that does not tell
+# upper from lower case (macOS, core.ignorecase=true) without regard to case as
+# well. `nachweis/` swallowed `src/*/…Infrastructure/Nachweis/` that way — two
+# source files were missing from the commit, the tree went on building locally,
+# and CI fell with "namespace 'Nachweis' does not exist". Once more a place where
+# two sides spelled the same thing differently. The same holds for `evidence/`
+# and every `…/Evidence/` folder today.
+/.evidence/
+/evidence/
+# The same two places under their names before the English rename (25.09.2026).
+# NOT an alias: a clone that ran `make nachweis` still holds its PRIVATE signing
+# key in .nachweis/schluessel.pem, and without these lines that key would turn
+# up as an untracked file one `git add -A` away from the repository. Move it
+# (`mv .nachweis/schluessel.pem .evidence/key.pem`) and these lines can go.
 /.nachweis/
 /nachweis/

@@ -12,7 +12,7 @@ Programmbibliotheken, die stehen in `Directory.Packages.props` und
   `download.geonames.org/export/dump/{DE,AT,CH}.zip` (Einwohnerzahlen, nur zum
   Auflösen gleichnamiger Orte verwendet)
 * **Lizenz:** [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
-* **Erzeugt von:** `scripts/plz-tabelle.py`
+* **Erzeugt von:** `scripts/postal-codes.py`
 * **Namensnennung:** steht im Impressum der Anwendung (`/impressum`), weil CC BY
   sie gegenüber den Nutzenden verlangt und eine Datei im Quellbaum niemand von
   ihnen sieht.
@@ -22,7 +22,7 @@ Warum die Daten mitreisen statt einen Geokodierdienst zu rufen, steht in
 
 **Erneuern:** die vier Archive nach `<verzeichnis>/{DE,AT,CH}/` bzw.
 `<verzeichnis>/dump-{DE,AT,CH}/` entpacken und
-`python3 scripts/plz-tabelle.py <verzeichnis>` aufrufen. Das Skript nennt am
+`python3 scripts/postal-codes.py <verzeichnis>` aufrufen. Das Skript nennt am
 Ende, wie viele Postleitzahlen und Orte herauskamen und wie viele Zeilen es
 verworfen hat — eine Zahl, die stark abweicht, ist ein Grund nachzusehen und
 nicht durchzuwinken.

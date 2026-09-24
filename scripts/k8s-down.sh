@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
-# Der Cluster wird gelöscht, samt Daten. Das ist hier richtig: eine lokale
-# Staging-Umgebung ist zum Wegwerfen da, und ein halb abgebauter Cluster mit
-# alten PVCs erzeugt beim nächsten Hochfahren Fehler, die wie Codefehler
-# aussehen.
+# The cluster is deleted, data included. That is right here: a local staging
+# environment exists to be thrown away, and a half-dismantled cluster with old
+# PVCs produces errors at the next start that look like code errors.
 #
-# Nur das Release entfernen und den Cluster behalten: `helm uninstall workertransfer`.
+# Remove only the release and keep the cluster: `helm uninstall workertransfer`.
 #
-# Nur PAUSIEREN statt löschen: `docker stop workertransfer-control-plane`, zurück
-# mit `docker start`. Das ist der richtige Weg vor `make test` (Testcontainers
-# und der Cluster vertragen sich nicht). Aber Vorsicht mit der Erwartung: nach dem
-# Start antwortet `kubectl` schon nach Sekunden, bis alle fünfzehn Pods BEREIT
-# sind vergehen jedoch ein bis zwei Minuten. Solange gibt das Gateway 502 —
-# das erholt sich von allein und ist kein Grund, neu auszurollen.
+# Only PAUSE instead of deleting: `docker stop workertransfer-control-plane`, back
+# with `docker start`. That is the right way before `make test` (Testcontainers
+# and the cluster do not get along). But careful with the expectation: after
+# the start `kubectl` answers within seconds, yet until all fifteen pods are
+# READY one to two minutes pass. Meanwhile the gateway answers 502 — that
+# recovers on its own and is no reason to roll out again.
 set -euo pipefail
 
 CLUSTER=workertransfer
 
 if ! kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
-  echo "kind-Cluster '$CLUSTER' existiert nicht — nichts zu tun."
+  echo "kind cluster '$CLUSTER' does not exist — nothing to do."
   exit 0
 fi
 
@@ -25,14 +24,13 @@ if kind delete cluster --name "$CLUSTER"; then
   exit 0
 fi
 
-# Zweiter Versuch, und zwar mit Grund.
+# A second attempt, and for a reason.
 #
-# Docker meldet beim Abräumen eines beschäftigten Knotens gelegentlich
-# "tried to kill container, but did not receive an exit event" und gibt einen
-# Fehler zurück — der Container ist danach trotzdem `Exited`. Nur die
-# Rückmeldung fehlte. Ein `make k8s-down`, das darüber rot wird, lässt eine
-# Leiche stehen, und der nächste `make k8s-up` scheitert an einem Namen, der
-# schon vergeben ist.
-echo "Löschen fehlgeschlagen — der Knoten ist meist trotzdem beendet. Zweiter Versuch." >&2
+# When clearing away a busy node Docker occasionally reports "tried to kill
+# container, but did not receive an exit event" and returns an error — the
+# container is `Exited` afterwards all the same. Only the acknowledgement was
+# missing. A `make k8s-down` that goes red over that leaves a corpse behind, and
+# the next `make k8s-up` fails on a name that is already taken.
+echo "Deleting failed — the node has usually ended anyway. Second attempt." >&2
 docker rm -f -v "${CLUSTER}-control-plane" 2>/dev/null || true
 kind delete cluster --name "$CLUSTER"

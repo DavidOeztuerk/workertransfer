@@ -1,12 +1,12 @@
--- Eine Datenbank je Dienst: ADR-0004 verbietet eine gemeinsame und jeden
--- dienstuebergreifenden Speicher. `identity` legt der Postgres-Einstiegspunkt
--- ueber POSTGRES_DB an; jede weitere steht hier.
+-- One database per service: ADR-0004 forbids a shared one and any
+-- cross-service store. `identity` is created by the Postgres entrypoint via
+-- POSTGRES_DB; every further one stands here.
 --
--- Laeuft NUR beim ersten Start des Behaelters (leerer Datentraeger). Nach einer
--- Ergaenzung hier den Datentraeger neu anlegen:
+-- Runs ONLY at the container's first start (empty volume). After an addition
+-- here, recreate the volume:
 --   docker compose down -v && docker compose up -d
 --
--- Was fehlt, ist eine Datenbank fuer das Gateway: es haelt nichts.
+-- What is missing is a database for the gateway: it holds nothing.
 CREATE DATABASE consent OWNER worker;
 CREATE DATABASE profile OWNER worker;
 CREATE DATABASE resume OWNER worker;
