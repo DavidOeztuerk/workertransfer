@@ -19,6 +19,6 @@ public sealed class IdentityDesignTimeFactory : IDesignTimeDbContextFactory<Iden
         new((DbContextOptions<IdentityDbContext>)IdentityDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<IdentityDbContext>(),
-                "Host=entwurfszeit;Database=identity")
+                "Host=design-time;Database=identity")
             .Options);
 }

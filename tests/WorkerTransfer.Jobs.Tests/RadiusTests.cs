@@ -71,7 +71,7 @@ public class PlaceLookupTests
 
     /// <summary>The embedded table is there at all.</summary>
     /// <remarks>
-    /// Without this probe a missing <c>Postleitzahlen.txt</c> could not be told
+    /// Without this probe a missing <c>PostalCodes.txt</c> could not be told
     /// apart from "no place known" — the radius search would then find nothing
     /// and not complain. The numbers are rough and bounded from below, so that
     /// a new data release does not turn them red.

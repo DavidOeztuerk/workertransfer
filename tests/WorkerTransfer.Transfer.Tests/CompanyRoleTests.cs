@@ -118,7 +118,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var company = Guid.CreateVersion7();
         var (caseItem, _) = await InConversation(company);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var asMember = await Offer(AsCompany(company), caseItem);
 
         asMember.StatusCode.Should().Be(
@@ -145,7 +145,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         (await AsPerson(subject).PostAsync($"/transfers/{caseItem}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var asMember = await AsCompany(company).PostAsync($"/transfers/{caseItem}/complete", null);
 
         asMember.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -172,7 +172,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var company = Guid.CreateVersion7();
         var (caseItem, _) = await InConversation(company);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
 
         var withdrawn = await AsCompany(company).PostAsync($"/transfers/{caseItem}/withdraw", null);
 

@@ -16,8 +16,8 @@ public class SkillVocabularyTests
     [InlineData("k8s", "Kubernetes")]
     [InlineData("dotnet", ".NET")]
     [InlineData("kundenservice", "Kundenbetreuung")]
-    public void The_same_thing_gets_the_same_word(string getippt, string erwartet) =>
-        Vocabulary.Canonicalise(getippt).Should().Be(erwartet);
+    public void The_same_thing_gets_the_same_word(string typed, string expected) =>
+        Vocabulary.Canonicalise(typed).Should().Be(expected);
 
     /// <summary>
     /// The core of ADR-0023: "React" means React and nothing else.
@@ -60,8 +60,8 @@ public class SkillVocabularyTests
     [InlineData("code 95", "Berufskraftfahrer-Qualifikation")]
     [InlineData("gesundheits- und krankenpfleger", "Pflegefachkraft")]
     [InlineData("  Ameise  ", "Hubwagen")]
-    public void Trade_terms_get_the_same_word(string getippt, string erwartet) =>
-        Vocabulary.Canonicalise(getippt).Should().Be(erwartet);
+    public void Trade_terms_get_the_same_word(string typed, string expected) =>
+        Vocabulary.Canonicalise(typed).Should().Be(expected);
 
     [Fact]
     public void What_is_unknown_stays_as_it_was_typed() =>
@@ -87,23 +87,23 @@ public class SkillVocabularyTests
     [Fact]
     public void A_name_never_stands_as_its_own_spelling()
     {
-        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
+        foreach (var (name, spellings) in Vocabulary.Spellings)
         {
-            schreibweisen.Should().NotContain(
-                schreibweise => string.Equals(schreibweise, name, StringComparison.OrdinalIgnoreCase),
-                $"'{name}' wird ohnehin erkannt");
+            spellings.Should().NotContain(
+                spelling => string.Equals(spelling, name, StringComparison.OrdinalIgnoreCase),
+                $"'{name}' is recognised anyway");
         }
     }
 
     [Fact]
     public void A_spelling_belongs_to_at_most_one_name()
     {
-        var alle = Vocabulary.Spellings
+        var all = Vocabulary.Spellings
             .SelectMany(entry => entry.Value)
-            .Select(schreibweise => schreibweise.ToLowerInvariant())
+            .Select(spelling => spelling.ToLowerInvariant())
             .ToList();
 
-        alle.Should().OnlyHaveUniqueItems();
+        all.Should().OnlyHaveUniqueItems();
     }
 
     /// <summary>
@@ -113,15 +113,15 @@ public class SkillVocabularyTests
     [Fact]
     public void No_name_is_the_spelling_of_another()
     {
-        var namen = Vocabulary.Spellings.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = Vocabulary.Spellings.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
+        foreach (var (name, spellings) in Vocabulary.Spellings)
         {
-            foreach (var schreibweise in schreibweisen)
+            foreach (var spelling in spellings)
             {
-                namen.Should().NotContain(
-                    schreibweise,
-                    $"'{schreibweise}' ist Schreibweise von '{name}' und zugleich ein eigener Name");
+                names.Should().NotContain(
+                    spelling,
+                    $"'{spelling}' is a spelling of '{name}' and a name of its own at the same time");
             }
         }
     }
@@ -138,17 +138,18 @@ public class SkillVocabularyTests
     [InlineData("gewicht")]
     [InlineData("score")]
     [InlineData("punkt")]
+    [InlineData("point")]
     [InlineData("rank")]
     [InlineData("rang")]
     [InlineData("implies")]
     [InlineData("impliziert")]
-    public void The_vocabulary_knows_no_word_for_evaluation(string verboten)
+    public void The_vocabulary_knows_no_word_for_evaluation(string forbidden)
     {
-        var namen = typeof(Vocabulary)
+        var names = typeof(Vocabulary)
             .GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
             .Select(member => member.Name);
 
-        namen.Should().NotContain(
-            name => name.Contains(verboten, StringComparison.OrdinalIgnoreCase));
+        names.Should().NotContain(
+            name => name.Contains(forbidden, StringComparison.OrdinalIgnoreCase));
     }
 }

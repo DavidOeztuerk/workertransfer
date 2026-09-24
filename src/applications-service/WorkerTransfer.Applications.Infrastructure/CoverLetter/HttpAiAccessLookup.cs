@@ -106,7 +106,7 @@ public sealed class HttpAiAccessLookup(
                     $"identity-service (internal) answers with {(int)response.StatusCode}.");
             }
 
-            var body = await response.Content.ReadFromJsonAsync<KiZugangV1>(cancellationToken)
+            var body = await response.Content.ReadFromJsonAsync<AiAccessV1>(cancellationToken)
                 ?? throw new CoverLetterUnavailable(
                     "identity-service (internal) sent an unusable or empty response.");
 

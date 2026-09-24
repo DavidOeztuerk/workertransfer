@@ -16,6 +16,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\shared\WorkerTransfer.Ablage\WorkerTransfer.Ablage.csproj" />
+    <ProjectReference Include="..\..\src\shared\WorkerTransfer.DocumentStore\WorkerTransfer.DocumentStore.csproj" />
   </ItemGroup>
 </Project>

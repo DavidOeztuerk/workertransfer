@@ -62,14 +62,14 @@ public sealed class HttpConsentGate(
             })
             .ToArray();
 
-        if (pairs.Length > ConsentLimits.HoechsteSammelgroesse)
+        if (pairs.Length > ConsentLimits.MaxBatchSize)
         {
             // The caller asks more than the contract carries. That is a
             // programming error and no information about a human being — hence
             // loud, not as "not released".
             throw new ConsentGateSilent(
                 $"{pairs.Length} pairs exceed "
-                + $"{ConsentLimits.HoechsteSammelgroesse}");
+                + $"{ConsentLimits.MaxBatchSize}");
         }
 
         var response = await SendAsync(pairs, cancellationToken);

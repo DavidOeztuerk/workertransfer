@@ -21,7 +21,7 @@ builder.Services.AddWorkerTransferDefaults(
 // publicly — writing it demands an `admin`. Who that is, the MEMBERSHIP TABLE
 // of identity-service decides, per request: a role in the token would take
 // effect after a removal only at expiry.
-builder.Services.AddAdminrechte(builder.Configuration, ShopWindowPermissions.Write);
+builder.Services.AddAdminPermissions(builder.Configuration, ShopWindowPermissions.Write);
 
 builder.Services.AddCompaniesInfrastructure(
     builder.Configuration,
@@ -38,7 +38,7 @@ app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 app.MapEmployerEndpoints();
 
 // No MapErasureEndpoints(): this service holds nothing about a natural person
-// and therefore does not stand in `ErasureRecipient.Fremde` (ADR-0027 §2). An
+// and therefore does not stand in `ErasureRecipient.Services` (ADR-0027 §2). An
 // erasure endpoint here would be one that says "done" without ever having done
 // anything.
 

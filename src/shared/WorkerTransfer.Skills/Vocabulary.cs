@@ -141,15 +141,15 @@ public static class Vocabulary
     /// The canonical name points at itself so it does not fall through the net
     /// when somebody writes it directly.
     /// </remarks>
-    private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
+    private static readonly FrozenDictionary<string, string> BySpelling = Build();
 
     /// <summary>The known spelling — or unchanged, whatever came in.</summary>
     /// <param name="skill">What somebody typed.</param>
     public static string Canonicalise(string skill)
     {
-        var geputzt = (skill ?? string.Empty).Trim();
+        var trimmed = (skill ?? string.Empty).Trim();
 
-        return NachSchreibweise.TryGetValue(geputzt, out var name) ? name : geputzt;
+        return BySpelling.TryGetValue(trimmed, out var name) ? name : trimmed;
     }
 
     /// <summary>Like <see cref="Canonicalise"/>, for a list. Empties fall away.</summary>
@@ -168,18 +168,18 @@ public static class Vocabulary
 
     private static FrozenDictionary<string, string> Build()
     {
-        var tabelle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (name, spellings) in Spellings)
         {
-            tabelle[name] = name;
+            table[name] = name;
 
-            foreach (var schreibweise in spellings)
+            foreach (var spelling in spellings)
             {
-                tabelle[schreibweise] = name;
+                table[spelling] = name;
             }
         }
 
-        return tabelle.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+        return table.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
     }
 }

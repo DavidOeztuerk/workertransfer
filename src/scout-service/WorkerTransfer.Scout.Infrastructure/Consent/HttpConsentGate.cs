@@ -26,7 +26,7 @@ public sealed class ConsentSettings
     /// In the compose network the service name, not <c>localhost</c> — the call
     /// runs from container to container. And it stands in the configuration
     /// because the egress boundary derives its allowed hosts from there
-    /// (<c>ServiceFoundation.GerufeneHosts</c>).
+    /// (<c>ServiceFoundation.CalledHosts</c>).
     /// </remarks>
     public string Adresse { get; set; } = "http://consent-service:8002";
 
@@ -92,14 +92,14 @@ public sealed class HttpConsentGate(
             })
             .ToArray();
 
-        if (pairs.Length > ConsentLimits.HoechsteSammelgroesse)
+        if (pairs.Length > ConsentLimits.MaxBatchSize)
         {
             // The caller asks more than the contract carries. That is a
             // programming error and no information about a human being —
             // therefore loud, not as "not released".
             throw new ConsentGateSilent(
                 $"{pairs.Length} pairs exceed "
-                + $"{ConsentLimits.HoechsteSammelgroesse}");
+                + $"{ConsentLimits.MaxBatchSize}");
         }
 
         var response = await Ask(pairs, cancellationToken);

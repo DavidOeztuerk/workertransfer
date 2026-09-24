@@ -52,6 +52,6 @@ public sealed class NotificationDesignTimeFactory
         new((DbContextOptions<NotificationDbContext>)NotificationDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<NotificationDbContext>(),
-                "Host=entwurfszeit;Database=notification")
+                "Host=design-time;Database=notification")
             .Options);
 }

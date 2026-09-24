@@ -30,7 +30,7 @@ public static class WithdrawalEndpoints
         ArgumentNullException.ThrowIfNull(app);
 
         app.MapPost("/companies/withdrawal", async (
-            UnternehmensrueckzugV1 body,
+            CompanyWithdrawalV1 body,
             IMediator mediator,
             IOptions<WithdrawalSettings> settings,
             HttpContext context,

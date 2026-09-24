@@ -24,7 +24,7 @@ builder.Services.AddWorkerTransferDefaults(
 //
 // `withdraw` is deliberately not among them: whoever may start must be allowed
 // to stop.
-builder.Services.AddAdminrechte(
+builder.Services.AddAdminPermissions(
     builder.Configuration,
     CasePermissions.Offer,
     CasePermissions.Complete);

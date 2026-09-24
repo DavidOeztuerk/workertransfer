@@ -17,7 +17,7 @@ namespace WorkerTransfer.Contracts.Identity;
 /// is <see cref="CompanyMembersResponseV1"/>, and that is a door of its own with
 /// a question of its own.</para>
 /// </remarks>
-public sealed record UnternehmensauskunftV1(
+public sealed record CompanyLookupV1(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("domain")] string Domain);
 
@@ -37,6 +37,6 @@ public sealed record UnternehmensauskunftV1(
 /// fetched <em>before</em> this call. Whoever uses this door for something else
 /// fetches the check along with it.</para>
 /// </remarks>
-public sealed record PersonenauskunftV1(
+public sealed record PersonLookupV1(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("email")] string Email);

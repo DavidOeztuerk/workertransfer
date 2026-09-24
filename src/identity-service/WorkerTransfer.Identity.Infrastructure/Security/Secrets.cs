@@ -15,7 +15,7 @@ public sealed class Secrets(SecretStore store) : ISecrets
     public string Encrypt(string plainText) => store.Encrypt(plainText);
 
     /// <inheritdoc />
-    public string Suffix(string plainText) => SecretStore.Endung(plainText);
+    public string Suffix(string plainText) => SecretStore.Suffix(plainText);
 
     /// <inheritdoc />
     public string? Decrypt(string? stored) => store.Decrypt(stored);

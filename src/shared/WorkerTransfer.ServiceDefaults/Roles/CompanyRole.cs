@@ -17,7 +17,7 @@ public enum CompanyRole
     None,
 
     /// <summary>May act for the company.</summary>
-    Mitglied,
+    Member,
 
     /// <summary>May also bind: invite, remove, publish, offer.</summary>
     Admin
@@ -33,11 +33,11 @@ public enum CompanyRole
 public static class RoleNames
 {
     /// <summary>Reads what identity-service wrote.</summary>
-    /// <param name="roh">The word off the wire, or <c>null</c>.</param>
-    public static CompanyRole Lies(string? roh) => roh switch
+    /// <param name="raw">The word off the wire, or <c>null</c>.</param>
+    public static CompanyRole Read(string? raw) => raw switch
     {
         "admin" => CompanyRole.Admin,
-        "member" => CompanyRole.Mitglied,
+        "member" => CompanyRole.Member,
         _ => CompanyRole.None
     };
 }

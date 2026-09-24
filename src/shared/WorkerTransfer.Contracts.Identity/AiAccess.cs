@@ -17,7 +17,7 @@ namespace WorkerTransfer.Contracts.Identity;
 /// <c>anthropic</c>. With a server of one's own, <c>key</c> may be empty.
 /// </para>
 /// </remarks>
-public sealed record KiZugangV1(
+public sealed record AiAccessV1(
     [property: JsonPropertyName("provider")] string Provider,
     [property: JsonPropertyName("base_url")] string BaseUrl,
     [property: JsonPropertyName("model")] string Model,

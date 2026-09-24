@@ -125,7 +125,7 @@ public static class AdvisorInfrastructure
     /// <para>The reasons stay German: they appear word for word in the German
     /// evidence document.</para>
     /// </remarks>
-    public static IReadOnlyList<TermException> TermExceptions { get; } =
+    public static IReadOnlyList<TermExemption> TermExemptions { get; } =
     [
         new("MandateV1.WorkloadPercent", WorkloadReason),
         new("WriteMandateV1.WorkloadPercent", WorkloadReason),
@@ -160,7 +160,7 @@ public static class AdvisorInfrastructure
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(TransitionNotAllowed).Assembly, typeof(MandateV1).Assembly],
-            TermExceptions));
+            TermExemptions));
 
         // No AI seam: `ProviderCheck` without a source reports NichtAnwendbar,
         // and that is expressly NOT a green tick — a tick on something that does

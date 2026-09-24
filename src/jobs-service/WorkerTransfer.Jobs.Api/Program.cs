@@ -23,7 +23,7 @@ builder.Services.AddWorkerTransferDefaults(
 //
 // The list stands HERE and not in `AddWorkerTransferDefaults`: the mechanism
 // must not be answered eleven times, the list is a decision.
-builder.Services.AddAdminrechte(
+builder.Services.AddAdminPermissions(
     builder.Configuration,
     JobPermissions.Publish,
     JobPermissions.Close);

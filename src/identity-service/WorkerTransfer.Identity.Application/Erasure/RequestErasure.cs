@@ -47,9 +47,9 @@ public sealed class RequestErasureHandler(
     /// </remarks>
     public static IReadOnlyList<string> Intents { get; } =
     [
-        .. ErasureRecipient.Fremde.Select(ErasureRecipient.Art),
-        ErasureRecipient.Schlussnachricht,
-        ErasureRecipient.Identitaet
+        .. ErasureRecipient.Services.Select(ErasureRecipient.Kind),
+        ErasureRecipient.FinalNotice,
+        ErasureRecipient.Identity
     ];
 
     /// <inheritdoc />

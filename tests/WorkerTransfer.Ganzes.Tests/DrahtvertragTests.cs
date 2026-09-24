@@ -71,7 +71,7 @@ public class DrahtvertragTests
         // the candidate list was empty.
         { "contracts.consent", typeof(Contracts.Consent.ConsentQuestionV1) },
         { "contracts.erasure", typeof(Contracts.Erasure.ErasureV1) },
-        { "contracts.identity", typeof(Contracts.Identity.Tokenform) },
+        { "contracts.identity", typeof(Contracts.Identity.TokenShape) },
 
         // And the contracts layer of EVERY service that has one. It lies in an
         // assembly of ITS OWN — whoever scans only the API layer does not see

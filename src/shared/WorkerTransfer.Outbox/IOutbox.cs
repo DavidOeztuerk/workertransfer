@@ -35,7 +35,7 @@ public interface IDelivery
     /// <see cref="OutboxRow.DeliveredAt"/> a lie, and the completeness proof
     /// of ADR-0027 would prove nothing.
     /// </remarks>
-    /// <exception cref="NochNichtException">The row's turn has not come.</exception>
+    /// <exception cref="NotYetException">The row's turn has not come.</exception>
     Task DeliverAsync(
         SubjectId recipient,
         string kind,
@@ -57,4 +57,4 @@ public interface IDelivery
 /// waited its turn.
 /// </para>
 /// </remarks>
-public sealed class NochNichtException(string reason) : Exception(reason);
+public sealed class NotYetException(string reason) : Exception(reason);

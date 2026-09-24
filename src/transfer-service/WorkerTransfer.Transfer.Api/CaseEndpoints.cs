@@ -148,14 +148,14 @@ public static class CaseEndpoints
         // An offer names a start date and a fee — it binds the company, and
         // that is why it demands an `admin`. Resolved from the membership table
         // of identity-service, never from the token.
-        .RequireAuthorization(AdminPermissionExtensions.Richtlinie(CasePermissions.Offer));
+        .RequireAuthorization(AdminPermissionExtensions.Policy(CasePermissions.Offer));
 
         cases.MapPost("/{id:guid}/complete", (
                 Guid id, IMediator mediator, ICurrentPrincipal principal,
                 HttpContext context, CancellationToken cancellationToken) =>
             Company(id, CompanyMove.Complete, mediator, principal, context, cancellationToken))
             .RequireAuthorization(
-                AdminPermissionExtensions.Richtlinie(CasePermissions.Complete));
+                AdminPermissionExtensions.Policy(CasePermissions.Complete));
 
         // NO company permission: whoever may start a case must be allowed to
         // end it. Otherwise the invitation would be a trap — the same sentence

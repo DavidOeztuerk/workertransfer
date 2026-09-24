@@ -17,5 +17,5 @@ namespace WorkerTransfer.ServiceDefaults;
 public static class SubjectKeyedTable
 {
     /// <summary>The name of the annotation on the entity type.</summary>
-    public const string Anmerkung = "WorkerTransfer:Personenzeile";
+    public const string Annotation = "WorkerTransfer:SubjectKeyedTable";
 }

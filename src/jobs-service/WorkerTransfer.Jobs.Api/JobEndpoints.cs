@@ -132,14 +132,14 @@ public static class JobEndpoints
             HttpContext context, CancellationToken cancellationToken) =>
             Transition(id, JobState.Published, mediator, principal, context, cancellationToken))
             .RequireAuthorization(
-                AdminPermissionExtensions.Richtlinie(JobPermissions.Publish));
+                AdminPermissionExtensions.Policy(JobPermissions.Publish));
 
         jobs.MapPost("/{id:guid}/close", (
             Guid id, IMediator mediator, ICurrentPrincipal principal,
             HttpContext context, CancellationToken cancellationToken) =>
             Transition(id, JobState.Closed, mediator, principal, context, cancellationToken))
             .RequireAuthorization(
-                AdminPermissionExtensions.Richtlinie(JobPermissions.Close));
+                AdminPermissionExtensions.Policy(JobPermissions.Close));
 
         // Public, WITHOUT sign-in, and that is a correction — and without any
         // ordering by fit. How well somebody suits a job is computed by the
@@ -187,8 +187,8 @@ public static class JobEndpoints
 
             var page = await mediator.Send(
                 new JobSearchQuery(
-                    PageSelection.Seite(query["page"]),
-                    PageSelection.Groesse(query["page_size"]),
+                    PageSelection.Page(query["page"]),
+                    PageSelection.Size(query["page_size"]),
                     query["skill"].Count > 0 ? [.. query["skill"]!] : null,
                     // WITH a radius the location is the CENTRE and no text
                     // filter. Both at once would mean "within 25 km AND the word
@@ -205,8 +205,8 @@ public static class JobEndpoints
             await context.Response.WriteAsJsonAsync(
                 new PageResponse<JobV1>(
                     [.. page.Items.Select(ToContract)],
-                    PageSelection.Seite(query["page"]),
-                    PageSelection.Groesse(query["page_size"]),
+                    PageSelection.Page(query["page"]),
+                    PageSelection.Size(query["page_size"]),
                     page.Total,
                     // Only for a radius search. Without it nothing was left out,
                     // and a `0` would claim the question had been asked.

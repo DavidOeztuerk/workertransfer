@@ -20,7 +20,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// it does not get one here.</para>
 ///
 /// <para><strong>An exemption exists exactly once.</strong>
-/// <c>AdvisorInfrastructure.TermExceptions</c> is public and read by both. Two
+/// <c>AdvisorInfrastructure.TermExemptions</c> is public and read by both. Two
 /// lists about the same question drift apart, and the quieter of the two is the
 /// one that grows.</para>
 /// </remarks>
@@ -36,7 +36,7 @@ public class VocabularyTests
     public static IReadOnlyList<(string Service, Type Domain, Type Contracts)> Pairs { get; } =
     [
         ("identity", typeof(Identity.Domain.Audit.AuditAction),
-         typeof(Contracts.Identity.KiZugangV1)),
+         typeof(Contracts.Identity.AiAccessV1)),
         ("consent", typeof(Consent.Domain.Audit.AuditAction),
          typeof(Contracts.Consent.ConsentQuestionV1)),
         ("profile", typeof(Profile.Domain.Profile.PersonProfile),
@@ -181,19 +181,19 @@ public class VocabularyTests
     }
 
     /// <summary>Every exemption in the tree, from the three sources that hold them.</summary>
-    private static IReadOnlyList<TermException> All() =>
+    private static IReadOnlyList<TermExemption> All() =>
     [
-        .. Advisor.Infrastructure.AdvisorInfrastructure.TermExceptions,
-        .. Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
-        .. Transfer.Infrastructure.TransferInfrastructure.TermExceptions
+        .. Advisor.Infrastructure.AdvisorInfrastructure.TermExemptions,
+        .. Applications.Infrastructure.ApplicationsInfrastructure.TermExemptions,
+        .. Transfer.Infrastructure.TransferInfrastructure.TermExemptions
     ];
 
     /// <summary>One service's exemptions — from its composition root, not from here.</summary>
-    private static IReadOnlyList<TermException> Exemptions(string service) => service switch
+    private static IReadOnlyList<TermExemption> Exemptions(string service) => service switch
     {
-        "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.TermExceptions,
-        "applications" => Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
-        "transfer" => Transfer.Infrastructure.TransferInfrastructure.TermExceptions,
+        "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.TermExemptions,
+        "applications" => Applications.Infrastructure.ApplicationsInfrastructure.TermExemptions,
+        "transfer" => Transfer.Infrastructure.TransferInfrastructure.TermExemptions,
         _ => []
     };
 }

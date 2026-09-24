@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 namespace WorkerTransfer.Outbox;
 
 /// <summary>Writes the intent into whatever transaction the caller has open.</summary>
-/// <typeparam name="TKontext">The service's own context. The table lives in its database.</typeparam>
-public sealed class EfOutbox<TKontext>(TKontext context, TimeProvider uhr) : IOutbox
-    where TKontext : DbContext
+/// <typeparam name="TContext">The service's own context. The table lives in its database.</typeparam>
+public sealed class EfOutbox<TContext>(TContext context, TimeProvider clock) : IOutbox
+    where TContext : DbContext
 {
     /// <inheritdoc />
     public Task<Guid> NoteAsync(
@@ -23,7 +23,7 @@ public sealed class EfOutbox<TKontext>(TKontext context, TimeProvider uhr) : IOu
             Id = id,
             UserId = recipient.Value,
             Kind = kind,
-            CreatedAt = uhr.GetUtcNow().UtcDateTime,
+            CreatedAt = clock.GetUtcNow().UtcDateTime,
             Attempts = 0,
             DeliveredAt = null,
             LastError = string.Empty

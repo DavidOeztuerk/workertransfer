@@ -33,7 +33,7 @@ public class LoeschempfaengerTests
 
     /// <summary>Every service with its context and its name in the cascade.</summary>
     /// <remarks>
-    /// The name is the one <c>ErasureRecipient.Fremde</c> carries and the one
+    /// The name is the one <c>ErasureRecipient.Services</c> carries and the one
     /// identity-service looks up in <c>Erasure__Adressen__&lt;name&gt;</c>.
     /// </remarks>
     public static TheoryData<string, Type> Dienste => new()
@@ -83,18 +83,18 @@ public class LoeschempfaengerTests
         if (name == "identity")
         {
             haeltMenschen.Should().BeTrue("sonst prüft dieser Test nichts");
-            ErasureRecipient.Fremde.Should().NotContain(name);
+            ErasureRecipient.Services.Should().NotContain(name);
             return;
         }
 
         if (haeltMenschen)
         {
-            ErasureRecipient.Fremde.Should().Contain(
+            ErasureRecipient.Services.Should().Contain(
                 name, $"{name} hält eine Zeile je Mensch");
         }
         else
         {
-            ErasureRecipient.Fremde.Should().NotContain(
+            ErasureRecipient.Services.Should().NotContain(
                 name, $"{name} hält nichts über einen natürlichen Menschen");
         }
     }
@@ -105,7 +105,7 @@ public class LoeschempfaengerTests
     {
         var bekannt = Dienste.Select(row => (string)row[0]!).ToHashSet(StringComparer.Ordinal);
 
-        ErasureRecipient.Fremde.Should().BeSubsetOf(bekannt);
+        ErasureRecipient.Services.Should().BeSubsetOf(bekannt);
     }
 
     /// <summary>What a context really creates: column names and subject-keyed tables.</summary>
@@ -130,6 +130,6 @@ public class LoeschempfaengerTests
                     .Distinct(StringComparer.Ordinal)
             ],
             typen.Any(entitaet =>
-                entitaet.FindAnnotation(SubjectKeyedTable.Anmerkung)?.Value is true));
+                entitaet.FindAnnotation(SubjectKeyedTable.Annotation)?.Value is true));
     }
 }

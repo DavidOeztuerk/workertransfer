@@ -15,10 +15,10 @@ namespace WorkerTransfer.Contracts.Identity;
 /// refresh token's job, whose row lives in the issuer's database.
 /// </para>
 /// </remarks>
-public static class Tokenform
+public static class TokenShape
 {
     /// <summary>Who is acting. A subject id.</summary>
-    public const string Subjekt = "sub";
+    public const string Subject = "sub";
 
     /// <summary>
     /// Which company they act for, when they do.
@@ -30,10 +30,10 @@ public static class Tokenform
     /// membership per operation, so withdrawing it takes effect on the next
     /// read and not on the next sign-in.
     /// </remarks>
-    public const string Mandant = "tenant";
+    public const string Tenant = "tenant";
 
     /// <summary>The sign-in this token belongs to, stable across rotation.</summary>
-    public const string Sitzung = "sid";
+    public const string Session = "sid";
 
     /// <summary>
     /// Deliberately absent: no address, no name, no roles, no permissions.
@@ -44,7 +44,7 @@ public static class Tokenform
     /// proxy log. Whoever needs one reads it from the service that owns it,
     /// for the person themselves.
     /// </remarks>
-    public static IReadOnlySet<string> NiemalsImToken { get; } =
+    public static IReadOnlySet<string> NeverInToken { get; } =
         new HashSet<string>(StringComparer.Ordinal)
         {
             "email", "name", "display_name", "given_name", "family_name",

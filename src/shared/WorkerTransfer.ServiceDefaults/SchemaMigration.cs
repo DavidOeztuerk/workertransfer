@@ -30,6 +30,11 @@ namespace WorkerTransfer.ServiceDefaults;
 public static class SchemaMigration
 {
     /// <summary>The switch in the configuration.</summary>
+    /// <remarks>
+    /// The key IS the environment key (<c>Datenbank__Wandern</c>), so it stays
+    /// German until the keys are renamed everywhere at once — in compose, in the
+    /// chart and in <c>.env.example</c>.
+    /// </remarks>
     public const string Key = "Datenbank:Wandern";
 
     /// <summary>How long a database that is still starting up is waited for.</summary>
@@ -48,13 +53,13 @@ public static class SchemaMigration
     /// answers every request with an error, and that would be the worse state.
     /// </para>
     /// </remarks>
-    public static readonly TimeSpan Geduld = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan Patience = TimeSpan.FromMinutes(1);
 
     /// <summary>Migrates this service's schema, if switched on.</summary>
-    /// <typeparam name="TKontext">The context the schema belongs to.</typeparam>
+    /// <typeparam name="TContext">The context the schema belongs to.</typeparam>
     /// <param name="app">The built application.</param>
-    public static async Task MigrateSchemaAsync<TKontext>(this WebApplication app)
-        where TKontext : DbContext
+    public static async Task MigrateSchemaAsync<TContext>(this WebApplication app)
+        where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -65,14 +70,14 @@ public static class SchemaMigration
 
         await using var scope = app.Services.CreateAsyncScope();
 
-        var protokoll = scope.ServiceProvider
+        var logger = scope.ServiceProvider
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(SchemaMigration));
 
-        protokoll.LogInformation("Wandere das Schema von {Kontext}", typeof(TKontext).Name);
+        logger.LogInformation("Migrating the schema of {Context}", typeof(TContext).Name);
 
-        var context = scope.ServiceProvider.GetRequiredService<TKontext>();
-        var uhr = System.Diagnostics.Stopwatch.StartNew();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var pause = TimeSpan.FromSeconds(1);
 
         while (true)
@@ -82,13 +87,13 @@ public static class SchemaMigration
                 await context.Database.MigrateAsync();
                 return;
             }
-            catch (Exception error) when (IsTransient(error) && uhr.Elapsed < Geduld)
+            catch (Exception error) when (IsTransient(error) && stopwatch.Elapsed < Patience)
             {
                 // The kind of failure, never the connection string: a password
                 // stands in it, and a log is also a place where something ends
                 // up.
-                protokoll.LogWarning(
-                    "Datenbank noch nicht bereit ({Art}), erneut in {Pause}s",
+                logger.LogWarning(
+                    "Database not ready yet ({Kind}), again in {Pause}s",
                     error.GetType().Name, pause.TotalSeconds);
 
                 await Task.Delay(pause);
@@ -116,14 +121,14 @@ public static class SchemaMigration
     /// </remarks>
     private static bool IsTransient(Exception error)
     {
-        for (var glied = error; glied is not null; glied = glied.InnerException)
+        for (var link = error; link is not null; link = link.InnerException)
         {
-            if (glied is System.Net.Sockets.SocketException)
+            if (link is System.Net.Sockets.SocketException)
             {
                 return true;
             }
 
-            if (glied is System.Data.Common.DbException { IsTransient: true })
+            if (link is System.Data.Common.DbException { IsTransient: true })
             {
                 return true;
             }

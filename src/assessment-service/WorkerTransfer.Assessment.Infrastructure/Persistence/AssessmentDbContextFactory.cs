@@ -43,6 +43,6 @@ public sealed class AssessmentDesignTimeFactory : IDesignTimeDbContextFactory<As
         new((DbContextOptions<AssessmentDbContext>)AssessmentDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<AssessmentDbContext>(),
-                "Host=entwurfszeit;Database=assessment")
+                "Host=design-time;Database=assessment")
             .Options);
 }

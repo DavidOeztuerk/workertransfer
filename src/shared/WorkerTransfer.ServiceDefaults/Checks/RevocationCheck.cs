@@ -70,9 +70,9 @@ public sealed class RevocationCheck<TGate>(IServiceProvider provider, Type direc
         // finding while being a defect of this check.
         using var scope = provider.CreateScope();
 
-        var aufgeloest = scope.ServiceProvider.GetService<TGate>();
+        var resolved = scope.ServiceProvider.GetService<TGate>();
 
-        if (aufgeloest is null)
+        if (resolved is null)
         {
             return Task.FromResult(Finding(
                 SecurityCheckStatus.NotApplicable,
@@ -82,9 +82,9 @@ public sealed class RevocationCheck<TGate>(IServiceProvider provider, Type direc
                 + "zwar synchron und ohne Zwischenspeicher (ADR-0013)."));
         }
 
-        var tatsaechlich = aufgeloest.GetType();
+        var actual = resolved.GetType();
 
-        return tatsaechlich == direct
+        return actual == direct
             ? Task.FromResult(Finding(
                 SecurityCheckStatus.Pass,
                 $"Zwischen der Frage ({ShortName(typeof(TGate))}) und dem Ledger steht "
@@ -97,7 +97,7 @@ public sealed class RevocationCheck<TGate>(IServiceProvider provider, Type direc
             : Task.FromResult(Finding(
                 SecurityCheckStatus.Fail,
                 $"Zwischen der Frage ({ShortName(typeof(TGate))}) und dem Ledger steht "
-                + $"{ShortName(tatsaechlich)} statt {ShortName(direct)}.",
+                + $"{ShortName(actual)} statt {ShortName(direct)}.",
                 Remediation));
     }
 

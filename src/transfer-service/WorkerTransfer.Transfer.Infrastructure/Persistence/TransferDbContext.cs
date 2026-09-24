@@ -111,7 +111,7 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             // would hit the one and leave the other. The annotation says it
             // instead: it is what `LoeschempfaengerTests` reads where no column
             // name is to be found.
-            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
             entity.Property(row => row.Availability)

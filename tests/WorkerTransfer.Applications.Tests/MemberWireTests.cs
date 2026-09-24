@@ -32,7 +32,7 @@ public sealed class MemberWireTests
         var read = JsonSerializer.Deserialize<CompanyMembersResponseV1>(json);
 
         read.Should().NotBeNull();
-        read!.Mitglieder.Should().ContainSingle()
+        read!.Members.Should().ContainSingle()
             .Which.SubjectId.Should().Be(subject);
     }
 
@@ -40,7 +40,7 @@ public sealed class MemberWireTests
     [Fact]
     public void The_ai_access_survives_the_round_trip()
     {
-        var written = new KiZugangV1(
+        var written = new AiAccessV1(
             "openai_compatible",
             "http://localhost:11434/v1/chat/completions",
             "qwen2.5-coder:7b",
@@ -51,7 +51,7 @@ public sealed class MemberWireTests
         json.Should().Contain("provider");
         json.Should().NotContain("baseUrl");
 
-        var read = JsonSerializer.Deserialize<KiZugangV1>(json);
+        var read = JsonSerializer.Deserialize<AiAccessV1>(json);
 
         read.Should().NotBeNull();
         read!.Provider.Should().Be("openai_compatible");

@@ -19,5 +19,10 @@ public sealed record CompanyMemberV1(
     [property: JsonPropertyName("subject_id")] Guid SubjectId);
 
 /// <summary>The answer for GET /internal/companies/{tenantId}/members.</summary>
+/// <remarks>
+/// The wire name <c>mitglieder</c> is German and stays: it is a contract between
+/// identity-service and applications-service, and <c>MemberWireTests</c> pins it.
+/// Renaming it is a contract change, not a refactor.
+/// </remarks>
 public sealed record CompanyMembersResponseV1(
-    [property: JsonPropertyName("mitglieder")] IReadOnlyList<CompanyMemberV1> Mitglieder);
+    [property: JsonPropertyName("mitglieder")] IReadOnlyList<CompanyMemberV1> Members);

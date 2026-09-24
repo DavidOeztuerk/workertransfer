@@ -47,7 +47,7 @@ public sealed class TestRecipient(TestControl control, IDelivery real) : IDelive
         // The real one for the two local kinds — they carry the order and the
         // final step, and faking them would fake the thing under test. The
         // foreign recipients are HTTP calls to services that do not run here.
-        if (kind is ErasureRecipient.Schlussnachricht or ErasureRecipient.Identitaet)
+        if (kind is ErasureRecipient.FinalNotice or ErasureRecipient.Identity)
         {
             await real.DeliverAsync(recipient, kind, cancellationToken);
         }
@@ -205,7 +205,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public void A_recipient_is_whoever_holds_a_row_per_human_being()
     {
-        ErasureRecipient.Fremde.Should().BeEquivalentTo(
+        ErasureRecipient.Services.Should().BeEquivalentTo(
         [
             "consent", "profile", "resume", "portfolio",
             "applications", "transfer", "github", "notification", "scout", "advisor",
@@ -217,14 +217,14 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         // stand on this list, because the deleted PACKAGE `worker-github` (which
         // evaluated people) was confused with the SERVICE built under ADR-0022,
         // which does the opposite.
-        ErasureRecipient.Fremde.Should().Contain("github");
+        ErasureRecipient.Services.Should().Contain("github");
 
         // `scout` joined with its first table (ADR-0036). It holds stored
         // SEARCHES — the filters, never a result — and each belongs to the human
         // being who filed it; plus outgoing rows that are about a human being.
         // Whoever holds one row per human being is a recipient: that is the
         // whole rule.
-        ErasureRecipient.Fremde.Should().Contain("scout");
+        ErasureRecipient.Services.Should().Contain("scout");
 
         // `advisor` joined with its first table (ADR-0037). It holds a MANDATE
         // whose key IS the person — entry month, salary range, workload,
@@ -232,7 +232,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         // it expressly does not hold; that falls at consent-service. Whoever
         // holds one row per human being is a recipient: that is the whole
         // rule.
-        ErasureRecipient.Fremde.Should().Contain("advisor");
+        ErasureRecipient.Services.Should().Contain("advisor");
 
         // `assessment` joined with its first table (ADR-0042). It holds the
         // tasks set to a human being, what they submitted and the one reply to
@@ -240,10 +240,10 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         // evaluation: it is no record belonging to somebody else, and one that
         // survived an erasure would be exactly the reference ADR-0042 rules
         // out.
-        ErasureRecipient.Fremde.Should().Contain("assessment");
+        ErasureRecipient.Services.Should().Contain("assessment");
 
-        ErasureRecipient.Fremde.Should().NotContain("jobs", "it holds nothing about a person");
-        ErasureRecipient.Fremde.Should().NotContain("companies");
+        ErasureRecipient.Services.Should().NotContain("jobs", "it holds nothing about a person");
+        ErasureRecipient.Services.Should().NotContain("companies");
     }
 
     [Fact]
@@ -286,17 +286,17 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         var (browser, subject, _) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
-        _control.Dead.Add(ErasureRecipient.Art("resume"));
+        _control.Dead.Add(ErasureRecipient.Kind("resume"));
 
         await Pass(3);
 
         var rows = await Rows(subject);
 
-        rows.Single(row => row.Kind == ErasureRecipient.Art("resume")).Delivered
+        rows.Single(row => row.Kind == ErasureRecipient.Kind("resume")).Delivered
             .Should().BeNull("the recipient does not answer");
-        rows.Single(row => row.Kind == ErasureRecipient.Schlussnachricht).Delivered
+        rows.Single(row => row.Kind == ErasureRecipient.FinalNotice).Delivered
             .Should().BeNull("it may go out only once everybody has acknowledged");
-        rows.Single(row => row.Kind == ErasureRecipient.Identitaet).Delivered
+        rows.Single(row => row.Kind == ErasureRecipient.Identity).Delivered
             .Should().BeNull("and the account falls last");
 
         (await AccountStatusValue(subject)).Should().Be("disabled", "it still stands, but disabled");
@@ -313,7 +313,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         var (browser, subject, _) = await Person();
         await browser.PostAsync("/account/erasure", null);
 
-        _control.Dead.Add(ErasureRecipient.Art("consent"));
+        _control.Dead.Add(ErasureRecipient.Kind("consent"));
         await Pass(3);
 
         await using var connection = new NpgsqlConnection(postgres.ConnectionString);
@@ -322,7 +322,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         command.CommandText =
             "SELECT attempts, last_error FROM outbox WHERE user_id = @who AND kind = @kind";
         command.Parameters.AddWithValue("who", subject);
-        command.Parameters.AddWithValue("kind", ErasureRecipient.Schlussnachricht);
+        command.Parameters.AddWithValue("kind", ErasureRecipient.FinalNotice);
 
         await using var reader = await command.ExecuteReaderAsync();
         (await reader.ReadAsync()).Should().BeTrue();

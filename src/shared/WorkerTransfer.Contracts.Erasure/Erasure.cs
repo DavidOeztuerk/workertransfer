@@ -41,13 +41,13 @@ public sealed record ErasureReceiptV1(int Retained = 0);
 /// toward the completeness proof of an erasure: otherwise a silent jobs-service
 /// would hold a person's erasure open.
 /// </remarks>
-public sealed record UnternehmensrueckzugV1([property: JsonPropertyName("tenant_id")] Guid TenantId);
+public sealed record CompanyWithdrawalV1([property: JsonPropertyName("tenant_id")] Guid TenantId);
 
 /// <summary>Who has to acknowledge before an erasure is finished.</summary>
 public static class ErasureRecipient
 {
     /// <summary>The prefix that marks an outbox row as part of a cascade.</summary>
-    public const string Praefix = "erasure:";
+    public const string Prefix = "erasure:";
 
     /// <summary>
     /// The services that hold something about a natural person.
@@ -99,7 +99,7 @@ public static class ErasureRecipient
     /// <c>subject_id</c> or <c>user_id</c> and is not on this list.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<string> Fremde { get; } =
+    public static IReadOnlyList<string> Services { get; } =
     [
         "consent", "profile", "resume", "portfolio",
         "applications", "transfer", "github", "notification", "scout", "advisor",
@@ -107,10 +107,10 @@ public static class ErasureRecipient
     ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>
-    public const string Schlussnachricht = Praefix + "final";
+    public const string FinalNotice = Prefix + "final";
 
     /// <summary>The origin's own tables, which fall last.</summary>
-    public const string Identitaet = Praefix + "identity";
+    public const string Identity = Prefix + "identity";
 
     /// <summary>
     /// The company withdrawal, deliberately <em>without</em> the prefix.
@@ -119,8 +119,8 @@ public static class ErasureRecipient
     /// So it cannot be mistaken for part of the completeness proof. A silent
     /// jobs-service must not be able to hold a person's erasure open.
     /// </remarks>
-    public const string Unternehmensrueckzug = "company.withdrawal";
+    public const string CompanyWithdrawal = "company.withdrawal";
 
     /// <summary>The kind for one foreign recipient.</summary>
-    public static string Art(string recipient) => Praefix + recipient;
+    public static string Kind(string recipient) => Prefix + recipient;
 }

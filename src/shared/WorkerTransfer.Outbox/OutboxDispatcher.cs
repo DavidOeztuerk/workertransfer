@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace WorkerTransfer.Outbox;
 
 /// <summary>One outstanding intent, as the dispatcher sees it.</summary>
-public sealed record OutboxEintrag(Guid Id, SubjectId Empfaenger, string Art, int Versuche);
+public sealed record OutboxEntry(Guid Id, SubjectId Recipient, string Kind, int Attempts);
 
 /// <summary>How often a row may fail before it is left lying.</summary>
 public static class DeliveryLimits
@@ -26,16 +26,16 @@ public static class DeliveryLimits
 /// its own: another service would be another deployment, another health check
 /// and another place to forget — for a loop that reads one table.
 /// </remarks>
-/// <typeparam name="TKontext">The service's own context.</typeparam>
-public sealed class OutboxDispatcher<TKontext>(
-    TKontext context,
-    IDelivery zustellung,
-    TimeProvider uhr,
-    ILogger<OutboxDispatcher<TKontext>> protokoll,
-    OutboxSettings? einstellungen = null)
-    where TKontext : DbContext
+/// <typeparam name="TContext">The service's own context.</typeparam>
+public sealed class OutboxDispatcher<TContext>(
+    TContext context,
+    IDelivery delivery,
+    TimeProvider clock,
+    ILogger<OutboxDispatcher<TContext>> logger,
+    OutboxSettings? settings = null)
+    where TContext : DbContext
 {
-    private readonly OutboxSettings _einstellungen = einstellungen ?? new OutboxSettings();
+    private readonly OutboxSettings _settings = settings ?? new OutboxSettings();
 
     /// <summary>One pass. Answers how many were due and how many really went out.</summary>
     /// <remarks>
@@ -45,30 +45,30 @@ public sealed class OutboxDispatcher<TKontext>(
     /// with no erasures the Python dispatcher sat at its ceiling after minutes,
     /// and the next erasure did not start for minutes.
     /// </remarks>
-    public async Task<(int Faellig, int Zugestellt)> PassAsync(
+    public async Task<(int Due, int Delivered)> PassAsync(
         CancellationToken cancellationToken = default)
     {
         // The rows are locked for the length of this transaction, so a second
         // dispatcher skips them instead of delivering the same intent twice.
         // Python has no such lock, which is one of three reasons its Helm chart
         // is pinned to one replica.
-        await using var klammer = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var faellige = await DueAsync(cancellationToken);
-        var zugestellt = 0;
+        var dueRows = await DueAsync(cancellationToken);
+        var delivered = 0;
 
-        foreach (var row in faellige)
+        foreach (var row in dueRows)
         {
             if (await DeliverAsync(row, cancellationToken))
             {
-                zugestellt++;
+                delivered++;
             }
         }
 
         await context.SaveChangesAsync(cancellationToken);
-        await klammer.CommitAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
-        return (faellige.Count, zugestellt);
+        return (dueRows.Count, delivered);
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ public sealed class OutboxDispatcher<TKontext>(
         // The table name is a setting, not caller input, and it is quoted — but
         // the two real parameters go in as parameters, because one day somebody
         // will make the batch size configurable from somewhere else.
-        var sql = "SELECT * FROM \"" + _einstellungen.Tabelle + "\" "
+        var sql = "SELECT * FROM \"" + _settings.Tabelle + "\" "
                   + "WHERE delivered_at IS NULL "
                   // `null` filters nothing: the row stays due however often it
                   // has failed. That is what "never give up" means in SQL.
@@ -97,7 +97,7 @@ public sealed class OutboxDispatcher<TKontext>(
                   // The whole reason more than one replica is safe.
                   + "FOR UPDATE SKIP LOCKED";
 
-        object limit = _einstellungen.HoechsteVersuche is { } value ? value : DBNull.Value;
+        object limit = _settings.HoechsteVersuche is { } value ? value : DBNull.Value;
 
         // Tracked, and the rows are handed on as they are. Reading them a
         // second time would hand back untracked copies wherever the service
@@ -105,7 +105,7 @@ public sealed class OutboxDispatcher<TKontext>(
         // onto an object nobody saves. That is not hypothetical: it is how this
         // method used to work.
         return await context.Set<OutboxRow>()
-            .FromSqlRaw(sql, limit, _einstellungen.Stapelgroesse)
+            .FromSqlRaw(sql, limit, _settings.Stapelgroesse)
             .AsTracking()
             .ToListAsync(cancellationToken);
     }
@@ -116,10 +116,10 @@ public sealed class OutboxDispatcher<TKontext>(
     {
         try
         {
-            await zustellung.DeliverAsync(
+            await delivery.DeliverAsync(
                 new SubjectId(row.UserId), row.Kind, cancellationToken);
         }
-        catch (NochNichtException)
+        catch (NotYetException)
         {
             // No attempt, no error, no trace: the row was not due. Offering it
             // again on the next tick IS how the order of ADR-0027 §6 is kept.
@@ -130,20 +130,20 @@ public sealed class OutboxDispatcher<TKontext>(
             // Only the kind, never the content — and shortened, so a talkative
             // failure cannot burst the column.
             row.Attempts += 1;
-            row.LastError = Gekuerzt(error.GetType().Name);
+            row.LastError = Truncated(error.GetType().Name);
 
-            protokoll.LogWarning(
-                "Zustellung fehlgeschlagen ({Art}, Versuch {Versuch})",
+            logger.LogWarning(
+                "Delivery failed ({Kind}, attempt {Attempt})",
                 error.GetType().Name, row.Attempts);
 
             return false;
         }
 
         row.Attempts += 1;
-        row.DeliveredAt = uhr.GetUtcNow().UtcDateTime;
+        row.DeliveredAt = clock.GetUtcNow().UtcDateTime;
 
         return true;
     }
 
-    private static string Gekuerzt(string value) => value.Length <= 120 ? value : value[..120];
+    private static string Truncated(string value) => value.Length <= 120 ? value : value[..120];
 }

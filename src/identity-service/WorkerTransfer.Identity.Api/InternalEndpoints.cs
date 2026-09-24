@@ -123,7 +123,7 @@ public static class InternalEndpoints
             }
 
             await context.Response.WriteAsJsonAsync(
-                new UnternehmensauskunftV1(company.Name, company.Domain.Value), cancellationToken);
+                new CompanyLookupV1(company.Name, company.Domain.Value), cancellationToken);
         });
 
         // The civil name and contact — the most sensitive of these doors.
@@ -161,7 +161,7 @@ public static class InternalEndpoints
             }
 
             await context.Response.WriteAsJsonAsync(
-                new PersonenauskunftV1(person.Name, person.Email), cancellationToken);
+                new PersonLookupV1(person.Name, person.Email), cancellationToken);
         });
 
         app.MapGet("/internal/account/{subjectId:guid}/ai", async (
@@ -183,7 +183,7 @@ public static class InternalEndpoints
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                new KiZugangV1(aiAccess.Provider, aiAccess.Address, aiAccess.Model, aiAccess.Key),
+                new AiAccessV1(aiAccess.Provider, aiAccess.Address, aiAccess.Model, aiAccess.Key),
                 cancellationToken);
         });
 

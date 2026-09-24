@@ -13,7 +13,7 @@ namespace WorkerTransfer.Scout.Api;
 /// This service has been an erasure recipient since it has had its first table
 /// (ADR-0027 §4, ADR-0036): <c>searches</c> carries a <c>subject_id</c>, the
 /// outbox a <c>user_id</c>. <c>"scout"</c> therefore stands in
-/// <c>ErasureRecipient.Fremde</c> and in <c>LoeschempfaengerTests.Dienste</c>.
+/// <c>ErasureRecipient.Services</c> and in <c>LoeschempfaengerTests.Dienste</c>.
 /// </remarks>
 public static class ErasureEndpoints
 {

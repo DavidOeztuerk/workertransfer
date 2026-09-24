@@ -21,7 +21,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         CancellationToken cancellationToken = default) =>
         context.Set<OutboxRow>().AnyAsync(
             row => row.UserId == subject.Value
-                     && row.Kind.StartsWith(ErasureRecipient.Praefix),
+                     && row.Kind.StartsWith(ErasureRecipient.Prefix),
             cancellationToken);
 
     /// <inheritdoc />
@@ -55,7 +55,7 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
         var open = await context.Set<OutboxRow>()
             .Where(row => row.UserId == subject.Value
                             && row.DeliveredAt == null
-                            && row.Kind.StartsWith(ErasureRecipient.Praefix))
+                            && row.Kind.StartsWith(ErasureRecipient.Prefix))
             .OrderBy(row => row.CreatedAt)
             .Select(row => row.Kind)
             .ToListAsync(cancellationToken);

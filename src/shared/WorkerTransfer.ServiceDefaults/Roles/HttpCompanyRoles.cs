@@ -12,6 +12,11 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 /// The same section and the same secret as for applications-service's member
 /// query — a second name for the same address would be the one left behind at
 /// the next move.
+/// <para>
+/// The property names ARE the environment keys (<c>Identity__Adresse</c>,
+/// <c>Identity__Geheimnis</c>), so they stay German until the keys are renamed
+/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// </para>
 /// </remarks>
 public sealed class CompanyRoleSettings
 {
@@ -46,16 +51,16 @@ public sealed class CompanyRoleSettings
 /// object: a field left unread would silently be "not an admin" here.</para>
 /// </remarks>
 public sealed class HttpCompanyRoles(
-    IHttpClientFactory fabrik,
-    IOptions<CompanyRoleSettings> einstellungen,
-    ILogger<HttpCompanyRoles> protokoll) : ICompanyRoles
+    IHttpClientFactory clientFactory,
+    IOptions<CompanyRoleSettings> settings,
+    ILogger<HttpCompanyRoles> logger) : ICompanyRoles
 {
     /// <summary>The name of the client in the factory.</summary>
-    public const string Klient = "identity-rollen";
+    public const string ClientName = "identity-roles";
 
-    private const string Geheimniskopf = "X-Notify-Secret";
+    private const string SecretHeader = "X-Notify-Secret";
 
-    private readonly CompanyRoleSettings _einstellungen = einstellungen.Value;
+    private readonly CompanyRoleSettings _settings = settings.Value;
 
     /// <inheritdoc />
     public async Task<CompanyRole> RoleAsync(
@@ -63,18 +68,18 @@ public sealed class HttpCompanyRoles(
         Guid company,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_einstellungen.Adresse))
+        if (string.IsNullOrEmpty(_settings.Adresse))
         {
-            throw new RoleLookupSilent("Identity:Adresse ist nicht gesetzt.");
+            throw new RoleLookupSilent("Identity:Adresse is not set.");
         }
 
-        if (string.IsNullOrEmpty(_einstellungen.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Geheimnis))
         {
-            throw new RoleLookupSilent("Identity:Geheimnis ist nicht gesetzt.");
+            throw new RoleLookupSilent("Identity:Geheimnis is not set.");
         }
 
-        using var klient = fabrik.CreateClient(Klient);
-        klient.Timeout = _einstellungen.Zeitueberschreitung;
+        using var client = clientFactory.CreateClient(ClientName);
+        client.Timeout = _settings.Zeitueberschreitung;
 
         HttpResponseMessage response;
 
@@ -83,23 +88,23 @@ public sealed class HttpCompanyRoles(
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
                 new Uri(
-                    new Uri(_einstellungen.Adresse),
+                    new Uri(_settings.Adresse),
                     $"/internal/companies/{company}/members/{subject}/role"));
-            request.Headers.Add(Geheimniskopf, _einstellungen.Geheimnis);
+            request.Headers.Add(SecretHeader, _settings.Geheimnis);
 
-            response = await klient.SendAsync(request, cancellationToken);
+            response = await client.SendAsync(request, cancellationToken);
         }
         catch (HttpRequestException error)
         {
-            protokoll.LogWarning(
-                "Rollenauskunft nicht erreichbar ({Art})", error.GetType().Name);
-            throw new RoleLookupSilent("identity-service (intern) ist nicht erreichbar.", error);
+            logger.LogWarning(
+                "Role lookup unreachable ({Kind})", error.GetType().Name);
+            throw new RoleLookupSilent("identity-service (internal) is unreachable.", error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            protokoll.LogWarning("Rollenauskunft antwortete nicht rechtzeitig");
+            logger.LogWarning("Role lookup did not answer in time");
             throw new RoleLookupSilent(
-                "identity-service (intern) antwortete nicht rechtzeitig.", error);
+                "identity-service (internal) did not answer in time.", error);
         }
 
         using (response)
@@ -111,27 +116,27 @@ public sealed class HttpCompanyRoles(
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new RoleLookupSilent(
-                    "identity-service (intern) nicht erreichbar oder Geheimnis ungültig.");
+                    "identity-service (internal) unreachable or secret invalid.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 throw new RoleLookupSilent(
-                    $"identity-service (intern) antwortete mit {(int)response.StatusCode}.");
+                    $"identity-service (internal) answered with {(int)response.StatusCode}.");
             }
 
             try
             {
-                var gelesen = await response.Content
+                var body = await response.Content
                     .ReadFromJsonAsync<CompanyRoleV1>(cancellationToken)
-                    ?? throw new RoleLookupSilent("identity-service (intern) sandte nichts.");
+                    ?? throw new RoleLookupSilent("identity-service (internal) sent nothing.");
 
-                return RoleNames.Lies(gelesen.Rolle);
+                return RoleNames.Read(body.Role);
             }
             catch (JsonException error)
             {
                 throw new RoleLookupSilent(
-                    "identity-service (intern) sandte eine unbrauchbare Antwort.", error);
+                    "identity-service (internal) sent an unusable answer.", error);
             }
         }
     }

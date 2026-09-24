@@ -60,7 +60,7 @@ public static class EmployerEndpoints
         // it therefore demands an `admin`. Resolved from identity-service's
         // membership table, never from the token.
         .RequireAuthorization(
-            AdminPermissionExtensions.Richtlinie(ShopWindowPermissions.Write));
+            AdminPermissionExtensions.Policy(ShopWindowPermissions.Write));
 
         // `null` instead of 404: "none yet" is a state, not an error. The
         // interface shows an empty form for it.

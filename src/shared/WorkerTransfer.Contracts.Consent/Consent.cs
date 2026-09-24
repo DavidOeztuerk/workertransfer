@@ -79,7 +79,7 @@ public static class ConsentLimits
     /// thousand.
     /// </para>
     /// </remarks>
-    public const int HoechsteSammelgroesse = 100;
+    public const int MaxBatchSize = 100;
 
     /// <summary>
     /// Never. The ledger is read synchronously and cached nowhere (ADR-0013).
@@ -90,5 +90,5 @@ public static class ConsentLimits
     /// effect on the very next read — a cache here is not a performance detail
     /// but a broken promise.
     /// </remarks>
-    public static readonly TimeSpan Zwischenspeicherdauer = TimeSpan.Zero;
+    public static readonly TimeSpan CacheDuration = TimeSpan.Zero;
 }

@@ -54,11 +54,11 @@ public static class TermFinder
     /// would notice, because a word that is not found looks like a document
     /// with no content.
     /// </remarks>
-    private static readonly FrozenDictionary<string, string> NachSchreibweise = Build();
+    private static readonly FrozenDictionary<string, string> BySpelling = Build();
 
     /// <summary>The longest spelling — the upper bound of every comparison window.</summary>
-    private static readonly int LaengsteSchreibweise =
-        NachSchreibweise.Keys.Max(schreibweise => schreibweise.Length);
+    private static readonly int LongestSpelling =
+        BySpelling.Keys.Max(spelling => spelling.Length);
 
     /// <summary>The canonical names that occur in this text.</summary>
     /// <param name="text">The full text that was found. It is held nowhere.</param>
@@ -69,20 +69,20 @@ public static class TermFinder
     /// </returns>
     public static IReadOnlyList<string> Find(string? text)
     {
-        var geputzt = Verdichte(text);
+        var condensed = Condense(text);
 
-        if (geputzt.Length == 0)
+        if (condensed.Length == 0)
         {
             return [];
         }
 
-        var klein = geputzt.ToLowerInvariant();
+        var lower = condensed.ToLowerInvariant();
         var found = new List<string>();
-        var schon = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        for (var start = 0; start < klein.Length; start++)
+        for (var start = 0; start < lower.Length; start++)
         {
-            if (!BeginntEinWort(klein, start))
+            if (!StartsAWord(lower, start))
             {
                 continue;
             }
@@ -92,30 +92,30 @@ public static class TermFinder
             // against every shorter piece inside it. The other way round the
             // first partial word would win and the longer name would never get
             // its turn.
-            var laengste = Math.Min(LaengsteSchreibweise, klein.Length - start);
+            var longest = Math.Min(LongestSpelling, lower.Length - start);
 
-            for (var length = laengste; length > 0; length--)
+            for (var length = longest; length > 0; length--)
             {
-                if (!EndetEinWort(klein, start + length))
+                if (!EndsAWord(lower, start + length))
                 {
                     continue;
                 }
 
-                var fenster = klein.Substring(start, length);
+                var window = lower.Substring(start, length);
 
-                if (!NachSchreibweise.TryGetValue(fenster, out var name))
+                if (!BySpelling.TryGetValue(window, out var name))
                 {
                     continue;
                 }
 
                 if (length < UpperCaseOnlyBelowLength
-                    && fenster.All(char.IsLetter)
-                    && !IstVersal(geputzt, start, length))
+                    && window.All(char.IsLetter)
+                    && !IsUpperCase(condensed, start, length))
                 {
                     continue;
                 }
 
-                if (schon.Add(name))
+                if (seen.Add(name))
                 {
                     found.Add(name);
                 }
@@ -136,18 +136,18 @@ public static class TermFinder
     /// and "sps" somewhere inside another word. A hyphen is a boundary, a letter
     /// is not.
     /// </remarks>
-    private static bool BeginntEinWort(string text, int job) =>
-        job == 0 || !char.IsLetterOrDigit(text[job - 1]);
+    private static bool StartsAWord(string text, int position) =>
+        position == 0 || !char.IsLetterOrDigit(text[position - 1]);
 
-    private static bool EndetEinWort(string text, int job) =>
-        job >= text.Length || !char.IsLetterOrDigit(text[job]);
+    private static bool EndsAWord(string text, int position) =>
+        position >= text.Length || !char.IsLetterOrDigit(text[position]);
 
     /// <summary>Does this piece stand in the text without a single lower-case letter?</summary>
-    private static bool IstVersal(string text, int start, int length)
+    private static bool IsUpperCase(string text, int start, int length)
     {
-        for (var job = start; job < start + length; job++)
+        for (var position = start; position < start + length; position++)
         {
-            if (char.IsLower(text[job]))
+            if (char.IsLower(text[position]))
             {
                 return false;
             }
@@ -164,52 +164,52 @@ public static class TermFinder
     /// stands between the two words — and in a typeset document one eventually
     /// stands between every pair of words.
     /// </remarks>
-    private static string Verdichte(string? text)
+    private static string Condense(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return string.Empty;
         }
 
-        var bau = new StringBuilder(text.Length);
-        var leerraum = false;
+        var builder = new StringBuilder(text.Length);
+        var whitespace = false;
 
-        foreach (var zeichen in text)
+        foreach (var character in text)
         {
-            if (char.IsWhiteSpace(zeichen))
+            if (char.IsWhiteSpace(character))
             {
-                leerraum = true;
+                whitespace = true;
                 continue;
             }
 
-            if (leerraum && bau.Length > 0)
+            if (whitespace && builder.Length > 0)
             {
-                bau.Append(' ');
+                builder.Append(' ');
             }
 
-            leerraum = false;
-            bau.Append(zeichen);
+            whitespace = false;
+            builder.Append(character);
         }
 
-        return bau.ToString();
+        return builder.ToString();
     }
 
     private static FrozenDictionary<string, string> Build()
     {
-        var tabelle = new Dictionary<string, string>(StringComparer.Ordinal);
+        var table = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var (name, schreibweisen) in Vocabulary.Spellings)
+        foreach (var (name, spellings) in Vocabulary.Spellings)
         {
             // The canonical name points at itself: whoever writes "Kubernetes"
             // has written Kubernetes.
-            tabelle[name.ToLowerInvariant()] = name;
+            table[name.ToLowerInvariant()] = name;
 
-            foreach (var schreibweise in schreibweisen)
+            foreach (var spelling in spellings)
             {
-                tabelle[schreibweise.ToLowerInvariant()] = name;
+                table[spelling.ToLowerInvariant()] = name;
             }
         }
 
-        return tabelle.ToFrozenDictionary(StringComparer.Ordinal);
+        return table.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }

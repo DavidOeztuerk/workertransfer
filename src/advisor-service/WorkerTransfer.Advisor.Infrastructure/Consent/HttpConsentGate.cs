@@ -28,7 +28,7 @@ public sealed class ConsentSettings
     /// In the compose network the service name, not <c>localhost</c> — the call
     /// runs from container to container. And it stands in the configuration,
     /// because the egress boundary derives its allowed hosts from there
-    /// (<c>ServiceFoundation.GerufeneHosts</c>): a destination that stood only in
+    /// (<c>ServiceFoundation.CalledHosts</c>): a destination that stood only in
     /// the source would be refused — without a log line.
     /// </remarks>
     public string Adresse { get; set; } = string.Empty;
@@ -91,7 +91,7 @@ public sealed class HttpConsentGate(
     /// caps a batch question at a hundred pairs. Four times twenty-five is a
     /// hundred.
     /// </remarks>
-    public const int PairsPerRound = ConsentLimits.HoechsteSammelgroesse / QuestionsPerPair;
+    public const int PairsPerRound = ConsentLimits.MaxBatchSize / QuestionsPerPair;
 
     /// <summary>The capabilities asked per pair — see <see cref="Capabilities"/>.</summary>
     private const int QuestionsPerPair = 4;

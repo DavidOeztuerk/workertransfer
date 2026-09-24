@@ -55,7 +55,7 @@ public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
         modelBuilder.Entity<ConnectionRow>(entity =>
         {
             entity.ToTable("github_connections");
-            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
             // WITHOUT `IsRequired`: a connection that comes into being over

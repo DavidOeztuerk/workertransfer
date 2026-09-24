@@ -4,7 +4,7 @@ using Testcontainers.PostgreSql;
 namespace WorkerTransfer.Outbox.Tests;
 
 /// <summary>A context that holds nothing but the outbox.</summary>
-public sealed class ProbeKontext(DbContextOptions<ProbeKontext> options) : DbContext(options)
+public sealed class ProbeContext(DbContextOptions<ProbeContext> options) : DbContext(options)
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -14,10 +14,10 @@ public sealed class ProbeKontext(DbContextOptions<ProbeKontext> options) : DbCon
 }
 
 /// <summary>Hands out contexts, the way the dispatcher asks for them.</summary>
-public sealed class Kontextfabrik(string connection) : IDbContextFactory<ProbeKontext>
+public sealed class ContextFactory(string connection) : IDbContextFactory<ProbeContext>
 {
-    public ProbeKontext CreateDbContext() =>
-        new(new DbContextOptionsBuilder<ProbeKontext>()
+    public ProbeContext CreateDbContext() =>
+        new(new DbContextOptionsBuilder<ProbeContext>()
             .UseNpgsql(connection)
             // As the services configure it. With tracking on by default
             // this suite could not see a dispatcher that writes onto an
@@ -42,7 +42,7 @@ public sealed class Postgres : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        await using var context = new Kontextfabrik(ConnectionString).CreateDbContext();
+        await using var context = new ContextFactory(ConnectionString).CreateDbContext();
         await context.Database.EnsureCreatedAsync();
     }
 

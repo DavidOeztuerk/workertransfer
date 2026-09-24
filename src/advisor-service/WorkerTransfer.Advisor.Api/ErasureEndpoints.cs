@@ -13,7 +13,7 @@ namespace WorkerTransfer.Advisor.Api;
 /// This service has been an erasure recipient since it got its first table
 /// (ADR-0027 §4, ADR-0037): <c>mandates</c> carries the person as its key,
 /// <c>conversations</c> a <c>subject_id</c>, the outbox a <c>user_id</c>.
-/// <c>"advisor"</c> therefore stands in <c>ErasureRecipient.Fremde</c> and in
+/// <c>"advisor"</c> therefore stands in <c>ErasureRecipient.Services</c> and in
 /// <c>LoeschempfaengerTests.Dienste</c>.
 /// </remarks>
 public static class ErasureEndpoints

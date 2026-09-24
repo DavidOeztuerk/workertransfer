@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Baut `Postleitzahlen.txt` aus den GeoNames-Rohdaten.
+"""Baut `PostalCodes.txt` aus den GeoNames-Rohdaten.
 
 Quelle: https://download.geonames.org/export/zip/{DE,AT,CH}.zip
 Lizenz: CC BY 4.0 — die Namensnennung steht in `NOTICE.md` und im Impressum.
@@ -127,7 +127,7 @@ def gruppiere(punkte):
 def main():
     quelle = pathlib.Path(sys.argv[1])
     ziel = pathlib.Path(__file__).parent.parent / (
-        "src/shared/WorkerTransfer.ServiceDefaults/Postleitzahlen.txt")
+        "src/shared/WorkerTransfer.ServiceDefaults/PostalCodes.txt")
 
     # --- Ortsnamen zuerst ---------------------------------------------------
     #

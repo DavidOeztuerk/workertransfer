@@ -113,7 +113,7 @@ public sealed class HttpCompanyMemberLookup(
                     .ReadFromJsonAsync<CompanyMembersResponseV1>(cancellationToken)
                     ?? throw new CompanyLookupSilent("identity-service (internal) sent nothing.");
 
-                return [.. read.Mitglieder.Select(member => new SubjectId(member.SubjectId))];
+                return [.. read.Members.Select(member => new SubjectId(member.SubjectId))];
             }
             catch (JsonException error)
             {

@@ -45,11 +45,11 @@ public static class KeyRing
     /// it would make it look like a SubjectKeyedTable in
     /// <c>LoeschempfaengerTests</c>.</para>
     /// </remarks>
-    /// <typeparam name="TKontext">The context whose database holds the ring.</typeparam>
+    /// <typeparam name="TContext">The context whose database holds the ring.</typeparam>
     /// <param name="services">The container.</param>
     /// <returns>The container.</returns>
-    public static IServiceCollection AddKeyRing<TKontext>(this IServiceCollection services)
-        where TKontext : DbContext
+    public static IServiceCollection AddKeyRing<TContext>(this IServiceCollection services)
+        where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -57,7 +57,7 @@ public static class KeyRing
         // access.
         services.TryAddSingleton<SecretStore>();
 
-        services.AddSingleton<IXmlRepository, KeyRingStore<TKontext>>();
+        services.AddSingleton<IXmlRepository, KeyRingStore<TContext>>();
         services.AddSingleton<IXmlEncryptor, MasterKeyEnvelope>();
         services.AddSingleton<IXmlDecryptor, MasterKeyEnvelope>();
         services.AddDataProtection().SetApplicationName(ApplicationName);
@@ -88,35 +88,35 @@ public static class KeyRing
 /// framework resolves the ring as a singleton, and a <c>DbContext</c> inside it
 /// would be a captive dependency that lives for ever.
 /// </remarks>
-/// <typeparam name="TKontext">This service's context.</typeparam>
+/// <typeparam name="TContext">This service's context.</typeparam>
 /// <param name="provider">The container.</param>
-internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRepository
-    where TKontext : DbContext
+internal sealed class KeyRingStore<TContext>(IServiceProvider provider) : IXmlRepository
+    where TContext : DbContext
 {
-    private const string Table = "dataprotection_schluessel";
+    private const string Table = "dataprotection_keys";
 
-    private readonly Lock _riegel = new();
-    private bool _angelegt;
+    private readonly Lock _lock = new();
+    private bool _created;
 
     /// <inheritdoc />
     public IReadOnlyCollection<XElement> GetAllElements()
     {
-        var elemente = new List<XElement>();
+        var elements = new List<XElement>();
 
         WithConnection(connection =>
         {
             using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT inhalt FROM {Table}";
+            command.CommandText = $"SELECT content FROM {Table}";
 
-            using var leser = command.ExecuteReader();
+            using var reader = command.ExecuteReader();
 
-            while (leser.Read())
+            while (reader.Read())
             {
-                elemente.Add(XElement.Parse(leser.GetString(0)));
+                elements.Add(XElement.Parse(reader.GetString(0)));
             }
         });
 
-        return elemente;
+        return elements;
     }
 
     /// <inheritdoc />
@@ -138,11 +138,11 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
         {
             using var command = connection.CreateCommand();
             command.CommandText =
-                $"INSERT INTO {Table} (name, inhalt) VALUES (@name, @inhalt) "
-                + "ON CONFLICT (name) DO UPDATE SET inhalt = EXCLUDED.inhalt";
+                $"INSERT INTO {Table} (name, content) VALUES (@name, @content) "
+                + "ON CONFLICT (name) DO UPDATE SET content = EXCLUDED.content";
 
             Bind(command, "@name", name);
-            Bind(command, "@inhalt", element.ToString(SaveOptions.DisableFormatting));
+            Bind(command, "@content", element.ToString(SaveOptions.DisableFormatting));
             command.ExecuteNonQuery();
         });
     }
@@ -150,7 +150,7 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
     private void WithConnection(Action<DbConnection> work)
     {
         using var scope = provider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TKontext>();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
         var connection = context.Database.GetDbConnection();
 
         if (connection.State != System.Data.ConnectionState.Open)
@@ -158,16 +158,16 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
             connection.Open();
         }
 
-        Job(connection);
+        EnsureTable(connection);
         work(connection);
     }
 
     /// <summary>Creates the table, if it does not exist yet.</summary>
-    private void Job(DbConnection connection)
+    private void EnsureTable(DbConnection connection)
     {
-        lock (_riegel)
+        lock (_lock)
         {
-            if (_angelegt)
+            if (_created)
             {
                 return;
             }
@@ -176,11 +176,11 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
             command.CommandText =
                 $"CREATE TABLE IF NOT EXISTS {Table} ("
                 + "name text PRIMARY KEY, "
-                + "inhalt text NOT NULL, "
-                + "angelegt timestamptz NOT NULL DEFAULT now())";
+                + "content text NOT NULL, "
+                + "created_at timestamptz NOT NULL DEFAULT now())";
 
             command.ExecuteNonQuery();
-            _angelegt = true;
+            _created = true;
         }
     }
 
@@ -203,7 +203,7 @@ internal sealed class KeyRingStore<TKontext>(IServiceProvider provider) : IXmlRe
 internal sealed class MasterKeyEnvelope(SecretStore store)
     : IXmlEncryptor, IXmlDecryptor
 {
-    private const string Envelope = "wtGeschuetzterSchluessel";
+    private const string Envelope = "wtProtectedKey";
 
     /// <inheritdoc />
     public EncryptedXmlInfo Encrypt(XElement plaintextElement)
@@ -229,8 +229,8 @@ internal sealed class MasterKeyEnvelope(SecretStore store)
 
         var plainText = store.Decrypt(encryptedElement.Value)
             ?? throw new InvalidOperationException(
-                "Ein Schlüssel des Bundes lässt sich nicht entschlüsseln. Das "
-                + $"passiert, wenn {SecretStore.Variable} gewechselt wurde.");
+                "A key of the ring cannot be decrypted. That happens when "
+                + $"{SecretStore.Variable} was changed.");
 
         return XElement.Parse(plainText);
     }

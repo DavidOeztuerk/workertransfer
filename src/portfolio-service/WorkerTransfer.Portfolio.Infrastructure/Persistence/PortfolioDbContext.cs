@@ -43,7 +43,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         modelBuilder.Entity<PortfolioRow>(row =>
         {
             row.ToTable("portfolios");
-            row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            row.HasAnnotation(SubjectKeyedTable.Annotation, true);
             row.HasKey(entry => entry.Id);
             row.Property(entry => entry.Id).HasColumnName("id");
             row.Property(entry => entry.Items)

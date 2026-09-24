@@ -13,7 +13,7 @@ public static class Readiness
     /// connection attempt does, and the orchestrator reads that absence as
     /// healthy until its own limit bites.
     /// </remarks>
-    private static readonly TimeSpan Geduld = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
 
     /// <summary>Reports the service ready only once its database answers.</summary>
     /// <remarks>
@@ -23,24 +23,24 @@ public static class Readiness
     /// database. The orchestrator then sends traffic to a service that answers
     /// every request with a 500.
     /// </remarks>
-    /// <typeparam name="TKontext">This service's context.</typeparam>
+    /// <typeparam name="TContext">This service's context.</typeparam>
     /// <param name="services">The container.</param>
     /// <param name="serviceName">Names the entry in the health report.</param>
     /// <returns>The container.</returns>
-    public static IServiceCollection AddDatabaseReadiness<TKontext>(
+    public static IServiceCollection AddDatabaseReadiness<TContext>(
         this IServiceCollection services, string serviceName)
-        where TKontext : DbContext
+        where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
         services.AddHealthChecks().Add(new HealthCheckRegistration(
-            $"{serviceName}-datenbank",
+            $"{serviceName}-database",
             provider => new DatabaseReadiness(
-                provider.GetRequiredService<TKontext>()),
+                provider.GetRequiredService<TContext>()),
             HealthStatus.Unhealthy,
             ["ready", "db"],
-            Geduld));
+            Patience));
 
         return services;
     }
@@ -69,12 +69,12 @@ internal sealed class DatabaseReadiness(DbContext dbContext) : IHealthCheck
         try
         {
             return await dbContext.Database.CanConnectAsync(cancellationToken)
-                ? HealthCheckResult.Healthy("Die Datenbank antwortet.")
-                : HealthCheckResult.Unhealthy("Die Datenbank antwortet nicht.");
+                ? HealthCheckResult.Healthy("The database answers.")
+                : HealthCheckResult.Unhealthy("The database does not answer.");
         }
         catch (Exception error)
         {
-            return HealthCheckResult.Unhealthy("Die Datenbank antwortet nicht.", error);
+            return HealthCheckResult.Unhealthy("The database does not answer.", error);
         }
     }
 }

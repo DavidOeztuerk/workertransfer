@@ -114,7 +114,7 @@ public sealed class AdvisorDbContext(DbContextOptions<AdvisorDbContext> options)
             // hit one and leave the other. The annotation says it instead: it
             // is what `LoeschempfaengerTests` reads where no column name is to
             // be found.
-            row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            row.HasAnnotation(SubjectKeyedTable.Annotation, true);
             row.HasKey(entry => entry.Id);
             row.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
             row.Property(entry => entry.EntryMonth)

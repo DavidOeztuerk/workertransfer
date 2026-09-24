@@ -1,13 +1,19 @@
 namespace WorkerTransfer.Outbox;
 
 /// <summary>How the dispatcher paces itself.</summary>
+/// <remarks>
+/// The property names ARE the environment keys (<c>Outbox__Stapelgroesse</c>,
+/// <c>Outbox__HoechsteVersuche</c>, …), so they stay German until the keys are
+/// renamed everywhere at once — in compose, in the chart and in
+/// <c>.env.example</c>.
+/// </remarks>
 public sealed class OutboxSettings
 {
     /// <summary>The configuration section this binds to.</summary>
     public const string Section = "Outbox";
 
     /// <summary>Which table. Only where a service's conventions differ.</summary>
-    public string Tabelle { get; set; } = OutboxModelBuilderExtensions.Tabelle;
+    public string Tabelle { get; set; } = OutboxModelBuilderExtensions.TableName;
 
     /// <summary>How many rows one pass takes.</summary>
     public int Stapelgroesse { get; set; } = 50;

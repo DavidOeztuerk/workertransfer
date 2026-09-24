@@ -27,7 +27,7 @@ namespace WorkerTransfer.ServiceDefaults;
 /// failure looks like on the wire, in which order the pipeline runs. What is
 /// <em>not</em> here is everything that is a decision — which database, which
 /// repositories, whether there is an outbox. Those live in each service's own
-/// <c>Add&lt;Dienst&gt;Infrastructure()</c>, where a reader can see them.</para>
+/// <c>Add&lt;Service&gt;Infrastructure()</c>, where a reader can see them.</para>
 ///
 /// <para><strong>Since Girder 4 the default is a default.</strong> Before
 /// that, <c>AddSharedInfrastructure</c> took a lambda, and that lambda
@@ -137,7 +137,7 @@ public static class ServiceFoundation
         // three further places: they are written down and not executable.
         //
         // And a test cannot cure it. `Adr0022Tests` and `EntwurfsgrenzeTests`
-        // check the TREE; a person's AI access stands in `KiZugangV1` —
+        // check the TREE; a person's AI access stands in `AiAccessV1` —
         // provider, address, model and key per person at run time —, and the
         // destinations of the egress boundary stand in the environment. Where
         // this container speaks tonight, only it knows itself.
@@ -211,9 +211,9 @@ public static class ServiceFoundation
                     .VisibleTo(EvidenceSetup.IsOperator)
                     .InspectConfiguration("Consent", "Draft", "Erasure")
                     .InProduction(
-                        "Der Betriebsnachweis dieser Instanz — Empfaenger, "
-                        + "Naht, Loeschkaskade — steht hinter einem eigenen "
-                        + "Geheimnis und traegt keinen Wert und keinen Namen."))
+                        "This instance's operations evidence — recipients, "
+                        + "seam, erasure cascade — stands behind a secret of "
+                        + "its own and carries no value and no name."))
 
                 // Noelia's rate limiter stands in the default, and measured
                 // against 4.0.2 it is in order (H2, measurement 1): it brakes,
@@ -231,19 +231,19 @@ public static class ServiceFoundation
                 // named here before is deleted.
                 .Without(
                     NoeliaModule.RateLimiting,
-                    "ein Dienst hinter dem Gateway sieht als Herkunft nur das "
-                    + "Gateway, also alle Aufrufer als einen — gebremst wird am "
-                    + "Eingang, in ocelot.json")
+                    "a service behind the gateway sees only the gateway as "
+                    + "the origin, so every caller as one — the brake sits at "
+                    + "the entrance, in ocelot.json")
 
                 // Does not stand in the default anyway. Named here so that the
                 // decision stands in the source and not in somebody's memory.
                 .Without(
                     NoeliaModule.HttpResponseCaching,
-                    "ETag ist ein Zwischenspeicher beim Aufrufer, und fast alles "
-                    + "hier steht hinter dem Einwilligungstor: ein 304 zeigte ein "
-                    + "widerrufenes Profil weiter. Caching selbst bleibt AN — das "
-                    + "Modul stellt Speicher nur bereit, und keine "
-                    + "Einwilligungsabfrage ist ein ICacheableQuery")
+                    "an ETag is a cache at the caller, and almost everything "
+                    + "here stands behind the consent gate: a 304 would go on "
+                    + "showing a revoked profile. Caching itself stays ON — the "
+                    + "module only provides storage, and no consent query is "
+                    + "an ICacheableQuery")
 
                 // Communication and Encryption do not stand in the default
                 // anyway — named here because a reason that stands only in a
@@ -262,9 +262,8 @@ public static class ServiceFoundation
                 // on every HttpClient from the factory.
                 .Without(
                     NoeliaModule.Communication,
-                    "verlangt IEventBus und damit einen Broker, den wir nicht "
-                    + "betreiben; die Korrelationskette bekommen wir seit 4.0.0 "
-                    + "ohne ihn")
+                    "demands IEventBus and with it a broker we do not run; "
+                    + "since 4.0.0 we get the correlation chain without it")
 
                 // Encryption: demands `IDataEncryptionService` AND
                 // `IMasterKeyProvider`, both out of Noelia.Redis or a secret
@@ -274,8 +273,8 @@ public static class ServiceFoundation
                 // here.
                 .Without(
                     NoeliaModule.Encryption,
-                    "verschluesselt wird heute auf Feldebene nichts; wer damit "
-                    + "anfaengt, entscheidet zuerst, wo der Hauptschluessel liegt")
+                    "nothing is encrypted at field level today; whoever starts "
+                    + "doing so decides first where the master key lies")
 
                 // ResourceAuthorization stays out (a module of its own since
                 // 4.0.2): no endpoint here calls resource policies, and it
@@ -284,10 +283,10 @@ public static class ServiceFoundation
                 // the company permissions in identity-service hang on.
                 .Without(
                     NoeliaModule.ResourceAuthorization,
-                    "ResourceRead und ResourceOwner ruft kein Endpunkt hier, und "
-                    + "das Modul verlangt einen Speicher. Unsere Autorisierung "
-                    + "sind die Permission-Richtlinien, und die entscheidet "
-                    + "Mitgliedschaftsrecht aus der Tabelle statt aus Anspruechen")
+                    "no endpoint here calls ResourceRead or ResourceOwner, and "
+                    + "the module demands a store. Our authorization is the "
+                    + "permission policies, and MembershipPermission decides "
+                    + "them out of the table rather than out of claims")
 
                 // Since 4.1.0 the blanket middleware is a module of its own,
                 // separated from the policy provider — exactly the separation we
@@ -323,10 +322,10 @@ public static class ServiceFoundation
                 // PermissionPolicyProvider carries the company permissions.
                 .Without(
                     NoeliaModule.PermissionEnforcement,
-                    "unsere oeffentliche Flaeche steht an den Endpunkten und in "
-                    + "docs/routenkarte.yml; sie hier ein zweites Mal zu erklaeren "
-                    + "hiesse zwei Listen ueber dieselbe Frage. Der "
-                    + "Richtlinienanbieter (Authorization) bleibt");
+                    "our public surface stands at the endpoints and in "
+                    + "docs/routenkarte.yml; declaring it here a second time "
+                    + "would mean two lists over the same question. The policy "
+                    + "provider (Authorization) stays");
 
             additional?.Invoke(noelia);
         });
@@ -354,9 +353,9 @@ public static class ServiceFoundation
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(publicKey))
         {
             throw new InvalidOperationException(
-                "Jwt:KeyId und Jwt:PublicKey sind nicht gesetzt. `make env` würfelt "
-                + "das Schlüsselpaar in die .env; in compose und im Chart kommen "
-                + "sie aus der Umgebung.");
+                "Jwt:KeyId and Jwt:PublicKey are not set. `make env` rolls the "
+                + "key pair into .env; in compose and in the chart they come from "
+                + "the environment.");
         }
 
         if (string.IsNullOrWhiteSpace(privateKey))
@@ -551,7 +550,7 @@ public static class ServiceFoundation
             // service that fails to start over a missing piece of information
             // trades a small problem for a big one.
             app.Logger.LogWarning(
-                "Noelia meldet keine Zusammensetzung für {Dienst} — der Bericht bleibt leer",
+                "Noelia reports no composition for {Service} — the report stays empty",
                 serviceName);
 
             return;
@@ -563,7 +562,7 @@ public static class ServiceFoundation
         // same 19 stood before and after a new `AddSovereignPlatform` line — the
         // number could not show the difference it existed to report.
         app.Logger.LogInformation(
-            "Noelia für {Dienst}: {Gefuehrt} Module in Betrieb ({Module}), {Ausgelassen} ausgelassen",
+            "Noelia for {Service}: {Included} modules in operation ({Modules}), {Excluded} left out",
             serviceName,
             composition.Included.Count,
             string.Join(", ", composition.Included),
@@ -572,7 +571,7 @@ public static class ServiceFoundation
         foreach (var (module, reason) in composition.Excluded)
         {
             app.Logger.LogInformation(
-                "Noelia-Modul {Modul} nicht in Betrieb: {Grund}", module, reason);
+                "Noelia module {Module} not in operation: {Reason}", module, reason);
         }
     }
 }

@@ -201,7 +201,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             // annotation the erasure guard would not find the table — it looks
             // for column names AND for this annotation, precisely because such
             // tables have no `subject_id` beside the key.
-            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.DeleteAfterMonths).HasColumnName("delete_after_months");
@@ -218,7 +218,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.Entity<PostalAddressRow>(entity =>
         {
             entity.ToTable("addresses");
-            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.Line1).HasColumnName("line1");

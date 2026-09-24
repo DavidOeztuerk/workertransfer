@@ -1,16 +1,21 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace WorkerTransfer.Ablage;
+namespace WorkerTransfer.DocumentStore;
 
 /// <summary>Where the local document store lies.</summary>
+/// <remarks>
+/// The section and the property name ARE the environment key
+/// (<c>Ablage__Verzeichnis</c>), so they stay German until the keys are renamed
+/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// </remarks>
 public sealed class DocumentStoreSettings
 {
     /// <summary>The section in the configuration.</summary>
     public const string Section = "Ablage";
 
     /// <summary>The directory. A volume in containers, a folder otherwise.</summary>
-    public string Verzeichnis { get; set; } = "ablage";
+    public string Verzeichnis { get; set; } = "document-store";
 }
 
 /// <summary>The document store on the file system.</summary>
@@ -22,38 +27,38 @@ public sealed class DocumentStoreSettings
 /// </remarks>
 public sealed class LocalDocumentStore : IDocumentStore
 {
-    private readonly string _wurzel;
+    private readonly string _root;
 
     /// <summary>Builds the store and creates its directory.</summary>
-    public LocalDocumentStore(IOptions<DocumentStoreSettings> einstellungen)
+    public LocalDocumentStore(IOptions<DocumentStoreSettings> settings)
     {
-        ArgumentNullException.ThrowIfNull(einstellungen);
+        ArgumentNullException.ThrowIfNull(settings);
 
-        _wurzel = Path.GetFullPath(einstellungen.Value.Verzeichnis);
-        Directory.CreateDirectory(_wurzel);
+        _root = Path.GetFullPath(settings.Value.Verzeichnis);
+        Directory.CreateDirectory(_root);
     }
 
     /// <inheritdoc />
     public async Task PutAsync(
         string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default)
     {
-        var target = Pfad(key);
+        var target = PathFor(key);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
 
-        var unterwegs = target + ".teil-" + Guid.CreateVersion7().ToString("N");
+        var inFlight = target + ".part-" + Guid.CreateVersion7().ToString("N");
 
         try
         {
-            await File.WriteAllBytesAsync(unterwegs, content, cancellationToken);
-            File.Move(unterwegs, target, overwrite: true);
+            await File.WriteAllBytesAsync(inFlight, content, cancellationToken);
+            File.Move(inFlight, target, overwrite: true);
         }
         catch
         {
             // The intermediate name must not be left behind: it carries no
             // valid key, so nobody would ever find it again.
-            if (File.Exists(unterwegs))
+            if (File.Exists(inFlight))
             {
-                File.Delete(unterwegs);
+                File.Delete(inFlight);
             }
 
             throw;
@@ -64,7 +69,7 @@ public sealed class LocalDocumentStore : IDocumentStore
     public async Task<byte[]?> GetAsync(
         string key, CancellationToken cancellationToken = default)
     {
-        var path = Pfad(key);
+        var path = PathFor(key);
 
         return File.Exists(path)
             ? await File.ReadAllBytesAsync(path, cancellationToken)
@@ -74,7 +79,7 @@ public sealed class LocalDocumentStore : IDocumentStore
     /// <inheritdoc />
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        var path = Pfad(key);
+        var path = PathFor(key);
 
         if (File.Exists(path))
         {
@@ -94,18 +99,18 @@ public sealed class LocalDocumentStore : IDocumentStore
     /// text check misses the next spelling, a comparison of the resolved paths
     /// does not.
     /// </remarks>
-    private string Pfad(string key)
+    private string PathFor(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        var voll = Path.GetFullPath(Path.Combine(_wurzel, key));
+        var full = Path.GetFullPath(Path.Combine(_root, key));
 
-        if (!voll.StartsWith(_wurzel + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        if (!full.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
             throw new ArgumentException("key escapes the storage root", nameof(key));
         }
 
-        return voll;
+        return full;
     }
 }
 
@@ -113,14 +118,14 @@ public sealed class LocalDocumentStore : IDocumentStore
 public static class DocumentStoreWiring
 {
     /// <summary>Registers the local document store together with its settings.</summary>
-    public static IServiceCollection AddAblage(
-        this IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration konfiguration)
+    public static IServiceCollection AddDocumentStore(
+        this IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(konfiguration);
+        ArgumentNullException.ThrowIfNull(configuration);
 
         services.Configure<DocumentStoreSettings>(
-            konfiguration.GetSection(DocumentStoreSettings.Section));
+            configuration.GetSection(DocumentStoreSettings.Section));
         services.AddSingleton<IDocumentStore, LocalDocumentStore>();
 
         return services;

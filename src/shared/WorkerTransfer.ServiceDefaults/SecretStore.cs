@@ -7,8 +7,8 @@ namespace WorkerTransfer.ServiceDefaults;
 /// <summary>The master key is missing, without which nothing can lie encrypted.</summary>
 /// <param name="key">Which configuration key is missing.</param>
 public sealed class MasterKeyMissing(string key)
-    : Exception($"'{key}' ist nicht gesetzt. Ohne Hauptschlüssel kann kein "
-                + "Geheimnis gespeichert werden — und im Klartext wird keines gespeichert.");
+    : Exception($"'{key}' is not set. Without a master key no secret can be "
+                + "stored — and none is stored in plain text.");
 
 /// <summary>Encrypts secrets a person deposited themselves.</summary>
 /// <remarks>
@@ -69,50 +69,50 @@ public sealed class SecretStore
     {
         ArgumentNullException.ThrowIfNull(plainText);
 
-        var vektor = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+        var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
         var content = Encoding.UTF8.GetBytes(plainText);
-        var geheim = new byte[content.Length];
+        var cipherText = new byte[content.Length];
         var checksum = new byte[AesGcm.TagByteSizes.MaxSize];
 
         using var aes = new AesGcm(_masterKey, AesGcm.TagByteSizes.MaxSize);
-        aes.Encrypt(vektor, content, geheim, checksum);
+        aes.Encrypt(nonce, content, cipherText, checksum);
 
-        return Convert.ToBase64String([.. vektor, .. checksum, .. geheim]);
+        return Convert.ToBase64String([.. nonce, .. checksum, .. cipherText]);
     }
 
     /// <summary>Decrypts a secret.</summary>
     /// <remarks>
     /// Returns <c>null</c> instead of throwing. An unreadable secret is not a
-    /// program error here but a master key that work changed — and the right
+    /// program error here but a master key that was changed — and the right
     /// answer to that is "none is deposited", not a crash while drafting.
     /// </remarks>
-    /// <param name="gespeichert">What stood in the row.</param>
+    /// <param name="stored">What stood in the row.</param>
     /// <returns>The plaintext, or <c>null</c>.</returns>
-    public string? Decrypt(string? gespeichert)
+    public string? Decrypt(string? stored)
     {
-        if (string.IsNullOrWhiteSpace(gespeichert))
+        if (string.IsNullOrWhiteSpace(stored))
         {
             return null;
         }
 
         try
         {
-            var alles = Convert.FromBase64String(gespeichert);
+            var bytes = Convert.FromBase64String(stored);
             var nonceLength = AesGcm.NonceByteSizes.MaxSize;
             var checksumLength = AesGcm.TagByteSizes.MaxSize;
 
-            if (alles.Length <= nonceLength + checksumLength)
+            if (bytes.Length <= nonceLength + checksumLength)
             {
                 return null;
             }
 
-            var vektor = alles.AsSpan(0, nonceLength);
-            var checksum = alles.AsSpan(nonceLength, checksumLength);
-            var geheim = alles.AsSpan(nonceLength + checksumLength);
-            var plainText = new byte[geheim.Length];
+            var nonce = bytes.AsSpan(0, nonceLength);
+            var checksum = bytes.AsSpan(nonceLength, checksumLength);
+            var cipherText = bytes.AsSpan(nonceLength + checksumLength);
+            var plainText = new byte[cipherText.Length];
 
             using var aes = new AesGcm(_masterKey, checksumLength);
-            aes.Decrypt(vektor, geheim, checksum, plainText);
+            aes.Decrypt(nonce, cipherText, checksum, plainText);
 
             return Encoding.UTF8.GetString(plainText);
         }
@@ -125,7 +125,7 @@ public sealed class SecretStore
     /// <summary>The last four characters — for recognising, not for using.</summary>
     /// <param name="plainText">The secret.</param>
     /// <returns>At most four characters.</returns>
-    public static string Endung(string plainText) =>
+    public static string Suffix(string plainText) =>
         string.IsNullOrEmpty(plainText) || plainText.Length <= 4
             ? string.Empty
             : plainText[^4..];

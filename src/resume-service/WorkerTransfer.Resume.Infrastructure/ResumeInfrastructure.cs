@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Application.Behaviors;
 using WorkerTransfer.Resume.Application.Ports;
@@ -83,7 +83,7 @@ public static class ResumeInfrastructure
         // here and not in `ServiceDefaults`: whether a service holds files is a
         // decision, and decisions belong in the composition root of the service
         // that makes them (ADR-0003).
-        services.AddAblage(configuration);
+        services.AddDocumentStore(configuration);
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IErasureLedger, EfErasureLedger>();

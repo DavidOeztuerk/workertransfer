@@ -25,7 +25,7 @@ public sealed class ProfileSettings
     /// <summary>The base address of profile-service.</summary>
     /// <remarks>
     /// Stands in the configuration because the egress boundary derives its
-    /// allowed hosts from there (<c>ServiceFoundation.GerufeneHosts</c>). A
+    /// allowed hosts from there (<c>ServiceFoundation.CalledHosts</c>). A
     /// destination that stands only in the source is refused — without a log
     /// line.
     /// </remarks>

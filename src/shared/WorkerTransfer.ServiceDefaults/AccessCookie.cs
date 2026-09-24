@@ -32,21 +32,21 @@ public static class AccessCookie
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var vorher = options.Events?.OnMessageReceived;
+        var previous = options.Events?.OnMessageReceived;
 
         options.Events ??= new JwtBearerEvents();
         options.Events.OnMessageReceived = async context =>
         {
-            if (vorher is not null)
+            if (previous is not null)
             {
-                await vorher(context);
+                await previous(context);
             }
 
             if (string.IsNullOrEmpty(context.Token)
-                && context.Request.Cookies.TryGetValue(Name, out var ausCookie)
-                && !string.IsNullOrEmpty(ausCookie))
+                && context.Request.Cookies.TryGetValue(Name, out var fromCookie)
+                && !string.IsNullOrEmpty(fromCookie))
             {
-                context.Token = ausCookie;
+                context.Token = fromCookie;
             }
         };
 

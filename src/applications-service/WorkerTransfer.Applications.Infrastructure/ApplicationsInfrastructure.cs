@@ -134,7 +134,7 @@ public static class ApplicationsInfrastructure
     /// The reason stays German: it goes into the German evidence document.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<TermException> TermExceptions { get; } =
+    public static IReadOnlyList<TermExemption> TermExemptions { get; } =
     [
         new("AddCommentV1.Quote", QuoteReason),
         new("CommentV1.Quote", QuoteReason)
@@ -169,7 +169,7 @@ public static class ApplicationsInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(ApplicationState).Assembly, typeof(ApplicationV1).Assembly],
-            TermExceptions));
+            TermExemptions));
 
         // THE FIELD SET, pinned — and pinned at what runs. `DraftRulesTests`
         // pins the same set at the tree; this one stands in the evidence. The

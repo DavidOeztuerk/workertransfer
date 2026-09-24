@@ -16,7 +16,7 @@ namespace WorkerTransfer.Skills.Tests;
 /// found, "Schweissen" is not inferred from it; "WIG" is found, the English
 /// "wig" is not.</para>
 /// </remarks>
-public class WortfundTests
+public class TermFinderTests
 {
     /// <summary>The spelling out of the reference, the canonical name back.</summary>
     /// <remarks>

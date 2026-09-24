@@ -143,7 +143,7 @@ public sealed class ErasureCheck : ISecurityCheck
             + "ohne Zeilen wäre ein Endpunkt, der „erledigt“ sagt, ohne je etwas "
             + "getan zu haben.",
             "Sobald hier eine Tabelle entsteht, deren Zeile einem Menschen "
-            + "gehört, gehört der Dienst in Loeschempfaenger.Fremde — "
+            + "gehört, gehört der Dienst in ErasureRecipient.Services — "
             + "LoeschempfaengerTests liest dafür das EF-Modell und nicht den "
             + "Quelltext.");
 
@@ -175,7 +175,7 @@ public sealed class ErasureCheck : ISecurityCheck
             + $"({string.Join(", ", _expected)}). Die eigenen Zeilen fallen "
             + "zuletzt, nach der Quittung jedes Empfängers.",
             "Ein zwölfter Dienst mit Zeilen über Menschen muss in derselben "
-            + "Bewegung in Loeschempfaenger.Fremde UND in die Umgebung — sonst "
+            + "Bewegung in ErasureRecipient.Services UND in die Umgebung — sonst "
             + "geht diese Prüfung rot, und das ist ihr Zweck.");
     }
 

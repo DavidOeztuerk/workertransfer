@@ -20,7 +20,7 @@ public sealed class ConsentSettings
     /// <para>In the compose network the service name, not <c>localhost</c> — the
     /// call runs from container to container. And it stands in the configuration
     /// because the egress boundary derives its allowed hosts from there
-    /// (<c>ServiceFoundation.GerufeneHosts</c>): a destination that stood only in
+    /// (<c>ServiceFoundation.CalledHosts</c>): a destination that stood only in
     /// the source is refused — without a log line, and the outage would then look
     /// like an outage of the ledger.</para>
     ///
@@ -71,7 +71,7 @@ public sealed class HttpConsentGate(
     /// Derived, not chosen: the ledger caps a batch question at a hundred
     /// questions, and each pair takes two.
     /// </remarks>
-    public const int PairsPerRound = ConsentLimits.HoechsteSammelgroesse / QuestionsPerRow;
+    public const int PairsPerRound = ConsentLimits.MaxBatchSize / QuestionsPerRow;
 
     private readonly ConsentSettings _settings = settings.Value;
 

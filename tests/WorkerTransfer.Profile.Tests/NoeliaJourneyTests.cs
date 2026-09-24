@@ -470,9 +470,9 @@ public sealed class ReadinessJourneyTests(Postgres postgres) : IAsyncLifetime
         checks.Should().NotBeEmpty(
             "a readiness without a registration reports 200 over any database");
 
-        // The check name comes from src/shared (`Readiness`) and is German there.
+        // The check name comes from src/shared (`Readiness`).
         checks.Should().Contain(
-            entry => entry.GetProperty("name").GetString() == "profile-datenbank",
+            entry => entry.GetProperty("name").GetString() == "profile-database",
             "the service cannot answer a single request without its database");
     }
 
@@ -560,7 +560,7 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
 
         await using var source = ProfileDbContextFactory.DataSource(postgres.ConnectionString);
         await using var command = source.CreateCommand(
-            "SELECT inhalt FROM dataprotection_schluessel");
+            "SELECT content FROM dataprotection_keys");
         await using var reader = await command.ExecuteReaderAsync();
 
         var rows = new List<string>();
@@ -577,7 +577,7 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
             row.Should().NotContain(
                 "<masterKey", "that would be the key material in plain text");
             row.Should().Contain(
-                "wtGeschuetzterSchluessel", "the wrapper names itself");
+                "wtProtectedKey", "the wrapper names itself");
         }
     }
 }

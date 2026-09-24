@@ -206,7 +206,7 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
             // (ADR-0027) would hit the one and leave the other standing. The
             // annotation says it instead: it is what `LoeschempfaengerTests`
             // reads where there is no column name to find.
-            entity.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
             entity.Property(row => row.Positions)

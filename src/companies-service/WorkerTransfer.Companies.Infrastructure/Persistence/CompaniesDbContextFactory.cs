@@ -58,6 +58,6 @@ public sealed class CompaniesDesignTimeFactory : IDesignTimeDbContextFactory<Com
         new((DbContextOptions<CompaniesDbContext>)CompaniesDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<CompaniesDbContext>(),
-                "Host=entwurfszeit;Database=companies")
+                "Host=design-time;Database=companies")
             .Options);
 }

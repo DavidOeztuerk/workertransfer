@@ -147,7 +147,7 @@ public class TokenShapeTests
     [InlineData("display_name")]
     public async Task The_civil_name_and_the_address_are_not_in_the_token(string claim)
     {
-        WorkerTransfer.Contracts.Identity.Tokenform.NiemalsImToken.Should().Contain(claim);
+        WorkerTransfer.Contracts.Identity.TokenShape.NeverInToken.Should().Contain(claim);
 
         var asPerson = await IssueAsync(Capacity.AsSelf.Instance);
         var forCompany = await IssueAsync(new Capacity.ForCompany(Company));

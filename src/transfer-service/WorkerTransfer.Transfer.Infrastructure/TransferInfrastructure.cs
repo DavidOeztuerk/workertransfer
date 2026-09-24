@@ -97,7 +97,7 @@ public static class TransferInfrastructure
     /// and therefore stands on the list.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<TermException> TermExceptions { get; } =
+    public static IReadOnlyList<TermExemption> TermExemptions { get; } =
     [
         new("MarketStatusV1.Note", Note),
         new("WriteMarketStatusV1.Note", Note),
@@ -127,7 +127,7 @@ public static class TransferInfrastructure
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(RequestState).Assembly, typeof(MarketStatusV1).Assembly],
-            TermExceptions));
+            TermExemptions));
 
         // No AI seam: `ProviderCheck` without a source reports NichtAnwendbar,
         // and that is expressly NO green tick — a tick on something that does

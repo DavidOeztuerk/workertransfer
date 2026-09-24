@@ -146,7 +146,7 @@ public static class IdentityInfrastructure
         IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
-            [typeof(AuditAction).Assembly, typeof(KiZugangV1).Assembly]));
+            [typeof(AuditAction).Assembly, typeof(AiAccessV1).Assembly]));
 
         // THE ONE LINE NO TEST CAN WRITE.
         //
@@ -169,13 +169,13 @@ public static class IdentityInfrastructure
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
         // ORIGIN and not recipient: identity does not stand in
-        // `ErasureRecipient.Fremde`, it IS the cascade. So the question is a
+        // `ErasureRecipient.Services`, it IS the cascade. So the question is a
         // different one — does it know an address for every recipient? Without
         // an address the recipient gets no order, and the cascade waits for a
         // receipt nobody asked for.
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsOrigin(
             "identity",
-            ErasureRecipient.Fremde,
+            ErasureRecipient.Services,
             [.. erasure.Adressen
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
                 .Select(entry => entry.Key)]));

@@ -40,7 +40,7 @@ public sealed class ProblemDetailsMiddleware(
             // none. Whoever writes the first one would, without this branch,
             // get a 500 for an input the caller got wrong.
             //
-            // 422 and not 400: the body work readable, its content is not.
+            // 422 and not 400: the body was readable, its content is not.
             // Exactly the distinction the hand-written checks at the endpoints
             // already make.
             //
@@ -66,7 +66,7 @@ public sealed class ProblemDetailsMiddleware(
                 "Request failed",
                 fields.Length > 0 ? $"invalid: {fields}" : "validation failed");
         }
-        catch (BadHttpRequestException kaputt)
+        catch (BadHttpRequestException badRequest)
         {
             // A BROKEN BODY IS NOT A SERVER ERROR.
             //
@@ -82,14 +82,14 @@ public sealed class ProblemDetailsMiddleware(
             // position, and that is already a statement about what somebody
             // sent. `detail` says the shape, never the content.
             logger.LogWarning(
-                "Malformed request body ({Status})", kaputt.StatusCode);
+                "Malformed request body ({Status})", badRequest.StatusCode);
 
             if (context.Response.HasStarted)
             {
                 throw;
             }
 
-            await Write(context, kaputt.StatusCode,
+            await Write(context, badRequest.StatusCode,
                 "Request failed", "malformed request body");
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)

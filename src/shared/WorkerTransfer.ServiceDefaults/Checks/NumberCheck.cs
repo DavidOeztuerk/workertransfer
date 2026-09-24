@@ -25,12 +25,12 @@ namespace WorkerTransfer.ServiceDefaults.Checks;
 /// </remarks>
 /// <param name="Name">The full name as the check forms it: <c>Type.Member</c> or <c>Type</c>.</param>
 /// <param name="Reason">Why this word is not a judgement about a human being here.</param>
-public sealed record TermException(string Name, string Reason);
+public sealed record TermExemption(string Name, string Reason);
 
 /// <summary>Does any public surface carry a number about a human being?</summary>
 /// <remarks>
 /// <para><strong>The run-time twin of <c>Adr0022Tests</c> and
-/// <c>AuflagenTests</c>.</strong> It reads the domain and the contracts of the
+/// <c>ConditionsTests</c>.</strong> It reads the domain and the contracts of the
 /// service that is currently running and asks the question ADR-0022 §1 asks: is
 /// there a name here that announces a number about a human being?</para>
 ///
@@ -64,7 +64,7 @@ public sealed record TermException(string Name, string Reason);
 /// should be allowed to stand there.</para>
 /// </remarks>
 /// <param name="surfaces">The domain and the contracts of this service.</param>
-/// <param name="exceptions">Names where a word is a genuine homonym.</param>
+/// <param name="exemptions">Names where a word is a genuine homonym.</param>
 /// <param name="vocabulary">
 /// The words. The default is <see cref="Core"/>; a service may be stricter —
 /// scout-service additionally forbids <c>bewert</c> in its own conditions,
@@ -72,7 +72,7 @@ public sealed record TermException(string Name, string Reason);
 /// </param>
 public sealed class NumberCheck(
     IReadOnlyList<Assembly> surfaces,
-    IReadOnlyList<TermException>? exceptions = null,
+    IReadOnlyList<TermExemption>? exemptions = null,
     IReadOnlyList<string>? vocabulary = null) : ISecurityCheck
 {
     /// <summary>Words that announce a number or a ranking about a human being.</summary>
@@ -89,7 +89,7 @@ public sealed class NumberCheck(
     ///
     /// <para><c>ability</c> and <c>talent</c> do not stand here either.
     /// <c>Capability</c> is the ledger's core type, and what a human being can
-    /// do is called <c>Faehigkeit</c> in this tree — a <em>naming</em> by the
+    /// do is called <c>Skill</c> in this tree — a <em>naming</em> by the
     /// person and expressly permitted (ADR-0023). A word that produces nothing
     /// but false alarms weakens the whole list.</para>
     ///
@@ -98,12 +98,21 @@ public sealed class NumberCheck(
     /// ADR-0042 builds the whole service around forbidding it. That in English
     /// it means "remark" is the price — and each of the seven exemptions says
     /// so in one sentence somebody reads.</para>
+    ///
+    /// <para><strong>Since the code is English, the German words have English
+    /// twins</strong> — otherwise an English <c>Points</c> would slip past the
+    /// list that stops <c>Punkte</c>. <c>point</c> stands beside <c>punkt</c>.
+    /// <c>anzahl</c> has deliberately NO <c>count</c> beside it: measured on
+    /// 24.09.2026, it hits <c>Country</c> at the syllable start in three
+    /// services — the false alarm this rule exists against — and
+    /// scout-service, where a count would be a number about people, forbids it
+    /// locally.</para>
     /// </remarks>
     public static IReadOnlyList<string> Core { get; } =
     [
         "score", "punkt", "rank", "rang", "passung", "fit", "percent", "prozent",
         "quote", "anzahl", "gewicht", "weight", "level", "note", "match",
-        "probability", "wahrscheinlich", "aktivitaet", "activity"
+        "probability", "wahrscheinlich", "aktivitaet", "activity", "point"
     ];
 
     /// <summary>The words this check runs.</summary>
@@ -169,7 +178,7 @@ public sealed class NumberCheck(
                 + "übergeben werden."));
         }
 
-        var allowed = exceptions ?? [];
+        var allowed = exemptions ?? [];
 
         // An exemption for a name that no longer exists is a licence nobody
         // needs any more and nobody withdraws.

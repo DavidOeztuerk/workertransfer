@@ -1,4 +1,4 @@
-namespace WorkerTransfer.Ablage;
+namespace WorkerTransfer.DocumentStore;
 
 /// <summary>Where files go that no field can hold.</summary>
 /// <remarks>

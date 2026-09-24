@@ -9,7 +9,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Evidence;
 /// <remarks>
 /// <para><strong>This is the line no test can write.</strong>
 /// <c>Adr0022Tests</c> and <c>EntwurfsgrenzeTests</c> check the tree; the AI
-/// access lives in <c>KiZugangV1</c> — provider, address, model and key per
+/// access lives in <c>AiAccessV1</c> — provider, address, model and key per
 /// person, at run time out of the account settings. Where this tree speaks
 /// tonight stands in this table and nowhere else.</para>
 ///

@@ -92,7 +92,7 @@ public sealed class HttpConsentGate(
 
         // Chunked, because the ledger caps a batch question. Several round
         // trips are still one per hundred instead of one per row.
-        foreach (var batch in pairs.Chunk(ConsentLimits.HoechsteSammelgroesse))
+        foreach (var batch in pairs.Chunk(ConsentLimits.MaxBatchSize))
         {
             var question = new ConsentBatchQuestionV1(
                 [.. batch.Select(pair => new ConsentQuestionV1(

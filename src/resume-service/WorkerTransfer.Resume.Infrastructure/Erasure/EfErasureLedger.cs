@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Infrastructure.Persistence;

@@ -23,4 +23,4 @@ namespace WorkerTransfer.Contracts.Identity;
 /// would be a disclosure about which companies exist.</para>
 /// </remarks>
 public sealed record CompanyRoleV1(
-    [property: JsonPropertyName("role")] string? Rolle);
+    [property: JsonPropertyName("role")] string? Role);

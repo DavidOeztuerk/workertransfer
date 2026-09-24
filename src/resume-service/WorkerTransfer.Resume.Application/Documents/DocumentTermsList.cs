@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Resume.Application.Messages;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Domain.Documents;

@@ -221,11 +221,11 @@ public static class ConsentEndpoints
             // Derived, not chosen: one page is fifty people and a person can be
             // asked about two capabilities. A batch makes asking cheaper, and a
             // ceiling keeps that difference small.
-            if (body.Pairs.Count > ConsentLimits.HoechsteSammelgroesse)
+            if (body.Pairs.Count > ConsentLimits.MaxBatchSize)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity, "Request failed",
-                    $"at most {ConsentLimits.HoechsteSammelgroesse} pairs per request");
+                    $"at most {ConsentLimits.MaxBatchSize} pairs per request");
                 return;
             }
 

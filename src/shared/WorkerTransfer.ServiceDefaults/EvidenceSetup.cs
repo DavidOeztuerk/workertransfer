@@ -42,6 +42,11 @@ public sealed class EvidenceSecret
     public const string Header = "X-Noelia-Operator";
 
     /// <summary>The secret. Empty means shut.</summary>
+    /// <remarks>
+    /// The property name IS the environment key (<c>Nachweis__Geheimnis</c>), so
+    /// it stays German until the keys are renamed everywhere at once — in
+    /// compose, in the chart and in <c>.env.example</c>.
+    /// </remarks>
     public string Geheimnis { get; set; } = string.Empty;
 }
 
@@ -105,13 +110,13 @@ public static class EvidenceSetup
 
         if (string.IsNullOrEmpty(secret)
             || !context.Request.Headers.TryGetValue(
-                EvidenceSecret.Header, out var vorgelegt))
+                EvidenceSecret.Header, out var presented))
         {
             return false;
         }
 
         return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(vorgelegt.ToString()),
+            Encoding.UTF8.GetBytes(presented.ToString()),
             Encoding.UTF8.GetBytes(secret));
     }
 }

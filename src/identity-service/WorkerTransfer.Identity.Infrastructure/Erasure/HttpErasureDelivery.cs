@@ -37,25 +37,25 @@ public sealed class HttpErasureDelivery(
         string kind,
         CancellationToken cancellationToken = default)
     {
-        if (kind == ErasureRecipient.Unternehmensrueckzug)
+        if (kind == ErasureRecipient.CompanyWithdrawal)
         {
             await WithdrawAdverts(recipient, cancellationToken);
             return;
         }
 
-        if (kind == ErasureRecipient.Schlussnachricht)
+        if (kind == ErasureRecipient.FinalNotice)
         {
             await SendClosingNotice(recipient, cancellationToken);
             return;
         }
 
-        if (kind == ErasureRecipient.Identitaet)
+        if (kind == ErasureRecipient.Identity)
         {
             await Finish(recipient, cancellationToken);
             return;
         }
 
-        var service = kind[ErasureRecipient.Praefix.Length..];
+        var service = kind[ErasureRecipient.Prefix.Length..];
         await PostAsync(service, "/erasure", new ErasureV1(recipient.Value), cancellationToken);
     }
 
@@ -73,10 +73,10 @@ public sealed class HttpErasureDelivery(
     {
         var open = await erasureLedger.OpenIntentsAsync(subject, cancellationToken);
 
-        if (open.Any(kind => kind != ErasureRecipient.Schlussnachricht
-                             && kind != ErasureRecipient.Identitaet))
+        if (open.Any(kind => kind != ErasureRecipient.FinalNotice
+                             && kind != ErasureRecipient.Identity))
         {
-            throw new NochNichtException("not every recipient has acknowledged yet");
+            throw new NotYetException("not every recipient has acknowledged yet");
         }
 
         // Read now, not carried along: the address and the language live in the
@@ -96,9 +96,9 @@ public sealed class HttpErasureDelivery(
     {
         var open = await erasureLedger.OpenIntentsAsync(subject, cancellationToken);
 
-        if (open.Any(kind => kind != ErasureRecipient.Identitaet))
+        if (open.Any(kind => kind != ErasureRecipient.Identity))
         {
-            throw new NochNichtException("the closing notice is still outstanding");
+            throw new NotYetException("the closing notice is still outstanding");
         }
 
         var dormant = await erasureLedger.CompleteAsync(subject, clock.GetUtcNow(), cancellationToken);
@@ -107,13 +107,13 @@ public sealed class HttpErasureDelivery(
         {
             await PostAsync(
                 "jobs", "/companies/withdrawal",
-                new UnternehmensrueckzugV1(company.Value), cancellationToken);
+                new CompanyWithdrawalV1(company.Value), cancellationToken);
         }
     }
 
     private Task WithdrawAdverts(SubjectId company, CancellationToken cancellationToken) =>
         PostAsync("jobs", "/companies/withdrawal",
-            new UnternehmensrueckzugV1(company.Value), cancellationToken);
+            new CompanyWithdrawalV1(company.Value), cancellationToken);
 
     /// <summary>
     /// One call, and it throws on anything that is not a success.

@@ -47,7 +47,7 @@ public static class EnvironmentFile
     /// working directory is process-wide and topples suites running in
     /// parallel.
     /// </param>
-    /// <returns>Which file work loaded, or <c>null</c>.</returns>
+    /// <returns>Which file was loaded, or <c>null</c>.</returns>
     public static string? Load(string? directory = null)
     {
         var environment =
@@ -58,9 +58,9 @@ public static class EnvironmentFile
 
         foreach (var name in new[] { $"{FileName}.{environment}", FileName })
         {
-            var kandidat = Path.Combine(where, name);
+            var candidate = Path.Combine(where, name);
 
-            if (!File.Exists(kandidat))
+            if (!File.Exists(candidate))
             {
                 continue;
             }
@@ -69,9 +69,9 @@ public static class EnvironmentFile
             // off so that a file from a parent directory does not apply by
             // accident — which secrets a service gets must not depend on where
             // somebody started it.
-            Env.Load(kandidat, new LoadOptions(setEnvVars: true, clobberExistingVars: false));
+            Env.Load(candidate, new LoadOptions(setEnvVars: true, clobberExistingVars: false));
 
-            return kandidat;
+            return candidate;
         }
 
         return null;

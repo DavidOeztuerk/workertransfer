@@ -48,7 +48,7 @@ public sealed class OutboxRow
 public static class OutboxModelBuilderExtensions
 {
     /// <summary>The default table name.</summary>
-    public const string Tabelle = "outbox";
+    public const string TableName = "outbox";
 
     /// <summary>
     /// Adds the table. Call it from <c>OnModelCreating</c>.
@@ -60,16 +60,16 @@ public static class OutboxModelBuilderExtensions
     /// migrations — and so the row commits with the change that caused it.
     /// </remarks>
     /// <param name="modelBuilder">The model being built.</param>
-    /// <param name="tabelle">Rename it where a service's conventions differ.</param>
+    /// <param name="table">Rename it where a service's conventions differ.</param>
     public static ModelBuilder ConfigureOutbox(
         this ModelBuilder modelBuilder,
-        string tabelle = Tabelle)
+        string table = TableName)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
         modelBuilder.Entity<OutboxRow>(entity =>
         {
-            entity.ToTable(tabelle);
+            entity.ToTable(table);
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
             entity.Property(row => row.UserId).HasColumnName("user_id").IsRequired();

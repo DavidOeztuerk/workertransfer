@@ -1,10 +1,10 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/shared/">
-    <Project Path="src/shared/WorkerTransfer.Ablage/WorkerTransfer.Ablage.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Consent/WorkerTransfer.Contracts.Consent.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Erasure/WorkerTransfer.Contracts.Erasure.csproj" />
     <Project Path="src/shared/WorkerTransfer.Contracts.Identity/WorkerTransfer.Contracts.Identity.csproj" />
+    <Project Path="src/shared/WorkerTransfer.DocumentStore/WorkerTransfer.DocumentStore.csproj" />
     <Project Path="src/shared/WorkerTransfer.Outbox/WorkerTransfer.Outbox.csproj" />
     <Project Path="src/shared/WorkerTransfer.ServiceDefaults/WorkerTransfer.ServiceDefaults.csproj" />
     <Project Path="src/shared/WorkerTransfer.Skills/WorkerTransfer.Skills.csproj" />
@@ -116,6 +116,7 @@
     <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.DocumentStore.Tests/WorkerTransfer.DocumentStore.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Ganzes.Tests/WorkerTransfer.Ganzes.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Gateway.Tests/WorkerTransfer.Gateway.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.GitHub.Tests/WorkerTransfer.GitHub.Tests.csproj" />
@@ -127,7 +128,6 @@
     <Project Path="tests/WorkerTransfer.Profile.Tests/WorkerTransfer.Profile.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Resume.Tests/WorkerTransfer.Resume.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Scout.Tests/WorkerTransfer.Scout.Tests.csproj" />
-    <Project Path="tests/WorkerTransfer.Ablage.Tests/WorkerTransfer.Ablage.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Skills.Tests/WorkerTransfer.Skills.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Transfer.Tests/WorkerTransfer.Transfer.Tests.csproj" />
   </Folder>

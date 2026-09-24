@@ -98,7 +98,7 @@ public class RoleTests(Postgres postgres) : IAsyncLifetime
         var browser = AsCompany(company);
         var id = await Draft(browser);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var asMember = await browser.PostAsync($"/jobs/{id}/publish", null);
 
         asMember.StatusCode.Should().Be(
@@ -129,7 +129,7 @@ public class RoleTests(Postgres postgres) : IAsyncLifetime
         (await browser.PostAsync($"/jobs/{id}/publish", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var asMember = await browser.PostAsync($"/jobs/{id}/close", null);
 
         asMember.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -152,7 +152,7 @@ public class RoleTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task A_member_writes_and_changes_an_advert()
     {
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
 
         var browser = AsCompany(Guid.CreateVersion7());
         var id = await Draft(browser);

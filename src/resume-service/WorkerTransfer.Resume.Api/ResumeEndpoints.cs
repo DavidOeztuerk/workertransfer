@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Resume.Application.Documents;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Application.Requests;
@@ -366,7 +366,7 @@ public static class ResumeEndpoints
             context.Response.ContentType = hit.Document.ContentType;
             context.Response.Headers.ContentDisposition =
                 "inline; filename=\"" + hit.Document.Id.ToString("N")
-                + Typerkennung.Endung(hit.Document.ContentType) + "\"";
+                + ContentTypeDetection.Extension(hit.Document.ContentType) + "\"";
 
             await context.Response.Body.WriteAsync(hit.Content, cancellationToken);
         });
@@ -568,7 +568,7 @@ public static class ResumeEndpoints
             context.Response.ContentType = hit.Document.ContentType;
             context.Response.Headers.ContentDisposition =
                 "inline; filename=\"" + hit.Document.Id.ToString("N")
-                + Typerkennung.Endung(hit.Document.ContentType) + "\"";
+                + ContentTypeDetection.Extension(hit.Document.ContentType) + "\"";
 
             await context.Response.Body.WriteAsync(hit.Content, cancellationToken);
         });

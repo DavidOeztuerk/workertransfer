@@ -214,7 +214,7 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
         modelBuilder.Entity<ProfileRow>(row =>
         {
             row.ToTable("profiles");
-            row.HasAnnotation(SubjectKeyedTable.Anmerkung, true);
+            row.HasAnnotation(SubjectKeyedTable.Annotation, true);
             row.HasKey(column => column.Id);
             row.Property(column => column.Id).HasColumnName("id");
             row.Property(column => column.Headline).HasColumnName("headline");

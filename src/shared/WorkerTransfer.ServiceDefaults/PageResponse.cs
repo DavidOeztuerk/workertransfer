@@ -18,16 +18,16 @@ namespace WorkerTransfer.ServiceDefaults;
 /// <para>
 /// <strong>The total counts ADVERTS, not people.</strong> On a candidate list
 /// the same number would be a statement about persons, and ADR-0026 forbids
-/// that. Whoever uses this envelope there leaves <see cref="Gesamt"/> out and
-/// falls back on <see cref="HatWeiter"/>.
+/// that. Whoever uses this envelope there leaves <see cref="TotalItems"/> out and
+/// falls back on <see cref="HasNext"/>.
 /// </para>
 /// </remarks>
 /// <typeparam name="T">What stands on the page.</typeparam>
 /// <param name="Items">The entries of this page, in the order of the query.</param>
-/// <param name="Seite">The current page, 1-based. People count from one.</param>
-/// <param name="Seitengroesse">How many entries were asked for.</param>
-/// <param name="Gesamt">How many entries there are in total.</param>
-/// <param name="Ausgelassen">
+/// <param name="Page">The current page, 1-based. People count from one.</param>
+/// <param name="PageSize">How many entries were asked for.</param>
+/// <param name="TotalItems">How many entries there are in total.</param>
+/// <param name="Omitted">
 /// How many entries a filter <em>could not judge</em> and therefore left out.
 /// <c>null</c> when the question did not arise — then the field does not stand
 /// in the answer either.
@@ -42,12 +42,12 @@ namespace WorkerTransfer.ServiceDefaults;
 /// </param>
 public sealed record PageResponse<T>(
     [property: JsonPropertyName("items")] IReadOnlyList<T> Items,
-    [property: JsonPropertyName("page")] int Seite,
-    [property: JsonPropertyName("page_size")] int Seitengroesse,
-    [property: JsonPropertyName("total_items")] int Gesamt,
+    [property: JsonPropertyName("page")] int Page,
+    [property: JsonPropertyName("page_size")] int PageSize,
+    [property: JsonPropertyName("total_items")] int TotalItems,
     [property: JsonPropertyName("omitted")]
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    int? Ausgelassen = null)
+    int? Omitted = null)
 {
     /// <summary>How many pages there are. At least one, even with zero entries.</summary>
     /// <remarks>
@@ -55,15 +55,15 @@ public sealed record PageResponse<T>(
     /// nobody can read, and a pager with zero pages has no state it could draw.
     /// </remarks>
     [JsonPropertyName("total_pages")]
-    public int Seiten => Math.Max(1, (int)Math.Ceiling(Gesamt / (double)Math.Max(1, Seitengroesse)));
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalItems / (double)Math.Max(1, PageSize)));
 
     /// <summary>Is there a page after this one?</summary>
     [JsonPropertyName("has_next")]
-    public bool HatWeiter => Seite < Seiten;
+    public bool HasNext => Page < TotalPages;
 
     /// <summary>Is there a page before this one?</summary>
     [JsonPropertyName("has_previous")]
-    public bool HatZurueck => Seite > 1;
+    public bool HasPrevious => Page > 1;
 }
 
 /// <summary>Reads page and page size out of a query — in one place.</summary>
@@ -85,22 +85,22 @@ public static class PageSelection
     /// Twelve, because a card list divides evenly into two, three and four
     /// columns — ten or twenty leave a gap in the last row.
     /// </remarks>
-    public const int VorgabeGroesse = 12;
+    public const int DefaultSize = 12;
 
     /// <summary>The ceiling. Above it, it is no longer paging.</summary>
-    public const int HoechsteGroesse = 96;
+    public const int MaxSize = 96;
 
     /// <summary>The page, 1-based. Nonsense becomes 1.</summary>
-    /// <param name="roh">What stood in the query.</param>
+    /// <param name="raw">What stood in the query.</param>
     /// <returns>A page number from 1 upwards.</returns>
-    public static int Seite(string? roh) =>
-        int.TryParse(roh, out var value) && value > 0 ? value : 1;
+    public static int Page(string? raw) =>
+        int.TryParse(raw, out var value) && value > 0 ? value : 1;
 
     /// <summary>The page size, capped. Nonsense becomes the default.</summary>
-    /// <param name="roh">What stood in the query.</param>
-    /// <returns>A size between 1 and <see cref="HoechsteGroesse"/>.</returns>
-    public static int Groesse(string? roh) =>
-        int.TryParse(roh, out var value) && value > 0
-            ? Math.Min(value, HoechsteGroesse)
-            : VorgabeGroesse;
+    /// <param name="raw">What stood in the query.</param>
+    /// <returns>A size between 1 and <see cref="MaxSize"/>.</returns>
+    public static int Size(string? raw) =>
+        int.TryParse(raw, out var value) && value > 0
+            ? Math.Min(value, MaxSize)
+            : DefaultSize;
 }

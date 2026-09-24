@@ -1,6 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Resume.Application.Messages;
 using WorkerTransfer.Resume.Application.Ports;
 using WorkerTransfer.Resume.Domain.Documents;
@@ -73,7 +73,7 @@ public sealed class DocumentCommands(
         // THE TYPE COMES FROM THE BYTES. A `Content-Type` and an extension are
         // both freely chosen; whoever believes them accepts an executable
         // because somebody named it `reference.png`.
-        var type = Typerkennung.Erkenne(request.Content.Span);
+        var type = ContentTypeDetection.Detect(request.Content.Span);
 
         if (type is null)
         {

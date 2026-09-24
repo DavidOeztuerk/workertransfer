@@ -46,7 +46,7 @@ public sealed class ProfileRow
 /// <remarks>
 /// No outbox: this service sends nothing. And no erasure table — it holds
 /// nothing about a natural person, which is why it does not stand in
-/// <c>ErasureRecipient.Fremde</c> either (ADR-0027 §2). An erasure endpoint
+/// <c>ErasureRecipient.Services</c> either (ADR-0027 §2). An erasure endpoint
 /// here would be one that says "done" without ever having done anything.
 /// <para>
 /// Tracking is off for the whole context. The store leads read values back

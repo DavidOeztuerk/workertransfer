@@ -37,9 +37,9 @@ public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
     /// 503 means "did not answer", 403 means "no"; this tree makes the same
     /// distinction at the consent ledger.
     /// </remarks>
-    public const string Schweigt = "workertransfer.rollenauskunft.schweigt";
+    public const string Silent = "workertransfer.role-lookup.silent";
 
-    private readonly AuthorizationMiddlewareResultHandler _weiter = new();
+    private readonly AuthorizationMiddlewareResultHandler _default = new();
 
     /// <inheritdoc />
     public async Task HandleAsync(
@@ -61,7 +61,7 @@ public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
 
         if (authorizeResult.Forbidden)
         {
-            if (context.Items.ContainsKey(Schweigt))
+            if (context.Items.ContainsKey(Silent))
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status503ServiceUnavailable,
@@ -75,6 +75,6 @@ public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
             return;
         }
 
-        await _weiter.HandleAsync(next, context, policy, authorizeResult);
+        await _default.HandleAsync(next, context, policy, authorizeResult);
     }
 }

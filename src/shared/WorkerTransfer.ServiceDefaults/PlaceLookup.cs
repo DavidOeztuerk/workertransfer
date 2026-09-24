@@ -23,9 +23,9 @@ public readonly record struct PlacePoint(double Latitude, double Longitude);
 ///
 /// <para>
 /// <strong>The coverage is complete all the same</strong>, because the data are
-/// small enough to ship: <c>Postleitzahlen.txt</c> holds every postcode and
+/// small enough to ship: <c>PostalCodes.txt</c> holds every postcode and
 /// every place of any note in DE, AT and CH (GeoNames, CC BY 4.0 — see
-/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-table.py</c>; whoever wants
+/// <c>NOTICE.md</c>). Produced by <c>scripts/plz-tabelle.py</c>; whoever wants
 /// to refresh it calls the script.
 /// </para>
 ///
@@ -349,10 +349,10 @@ public static class PlaceLookup
         var byName = new Dictionary<string, PlacePoint>(StringComparer.Ordinal);
 
         using var stream = typeof(PlaceLookup).Assembly.GetManifestResourceStream(
-            "WorkerTransfer.ServiceDefaults.Postleitzahlen.txt")
+            "WorkerTransfer.ServiceDefaults.PostalCodes.txt")
             ?? throw new InvalidOperationException(
-                "Postleitzahlen.txt fehlt im Bild. Ohne sie kennt die "
-                + "Umkreissuche keinen einzigen Ort.");
+                "PostalCodes.txt is missing from the image. Without it the "
+                + "radius search knows not a single place.");
 
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
@@ -400,9 +400,9 @@ public static class PlaceLookup
         return new Table(byPostalCode, byName);
     }
 
-    private static PlacePoint? Point(string latitude, string length) =>
-        double.TryParse(latitude, NumberStyles.Float, CultureInfo.InvariantCulture, out var b)
-        && double.TryParse(length, NumberStyles.Float, CultureInfo.InvariantCulture, out var l)
-            ? new PlacePoint(b, l)
+    private static PlacePoint? Point(string latitude, string longitude) =>
+        double.TryParse(latitude, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat)
+        && double.TryParse(longitude, NumberStyles.Float, CultureInfo.InvariantCulture, out var lon)
+            ? new PlacePoint(lat, lon)
             : null;
 }

@@ -43,6 +43,6 @@ public sealed class PortfolioDesignTimeFactory : IDesignTimeDbContextFactory<Por
         new((DbContextOptions<PortfolioDbContext>)PortfolioDbContextFactory
             .AtDesignTime(
                 new DbContextOptionsBuilder<PortfolioDbContext>(),
-                "Host=entwurfszeit;Database=portfolio")
+                "Host=design-time;Database=portfolio")
             .Options);
 }

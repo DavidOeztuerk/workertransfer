@@ -279,7 +279,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task More_than_a_hundred_pairs_are_refused()
     {
-        var pairs = Enumerable.Range(0, ConsentLimits.HoechsteSammelgroesse + 1)
+        var pairs = Enumerable.Range(0, ConsentLimits.MaxBatchSize + 1)
             .Select(_ => new
             {
                 subject_id = Guid.CreateVersion7(),
@@ -296,7 +296,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task Exactly_a_hundred_pairs_go_through()
     {
-        var pairs = Enumerable.Range(0, ConsentLimits.HoechsteSammelgroesse)
+        var pairs = Enumerable.Range(0, ConsentLimits.MaxBatchSize)
             .Select(_ => new
             {
                 subject_id = Guid.CreateVersion7(),
@@ -309,7 +309,7 @@ public class LedgerJourneyTests(Postgres postgres) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Json(response)).GetProperty("results").GetArrayLength()
-            .Should().Be(ConsentLimits.HoechsteSammelgroesse);
+            .Should().Be(ConsentLimits.MaxBatchSize);
     }
 
     /// <summary>

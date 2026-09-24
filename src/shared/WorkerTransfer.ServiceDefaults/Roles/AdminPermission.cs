@@ -40,7 +40,7 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 public sealed class AdminPermission(
     AdminPermissions permissions,
     ICompanyRoles roles,
-    IHttpContextAccessor zugang)
+    IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<PermissionRequirement>
 {
     /// <inheritdoc />
@@ -51,30 +51,30 @@ public sealed class AdminPermission(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(requirement);
 
-        if (!permissions.NurAdmin(requirement.Permission))
+        if (!permissions.RequiresAdmin(requirement.Permission))
         {
             // No Succeed and no Fail: about this permission this service has
             // nothing to say — and another handler may still answer.
             return;
         }
 
-        if (Wer(context.User) is not { } handelnder || Firma(context.User) is not { } company)
+        if (ActingSubject(context.User) is not { } actor || ActingCompany(context.User) is not { } company)
         {
             return;
         }
 
         try
         {
-            if (await roles.RoleAsync(handelnder, company) == CompanyRole.Admin)
+            if (await roles.RoleAsync(actor, company) == CompanyRole.Admin)
             {
                 context.Succeed(requirement);
             }
         }
         catch (RoleLookupSilent)
         {
-            if (zugang.HttpContext is { } laufende)
+            if (httpContextAccessor.HttpContext is { } current)
             {
-                laufende.Items[RejectionShape.Schweigt] = true;
+                current.Items[RejectionShape.Silent] = true;
             }
         }
     }
@@ -90,15 +90,15 @@ public sealed class AdminPermission(
     /// <c>ICurrentPrincipal.Current</c> is still empty. An authorization
     /// handler takes the principal it is given.
     /// </remarks>
-    private static Guid? Wer(ClaimsPrincipal nutzer)
+    private static Guid? ActingSubject(ClaimsPrincipal user)
     {
-        var roh = nutzer.FindFirst("sub")?.Value
-                  ?? nutzer.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var raw = user.FindFirst("sub")?.Value
+                  ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        return Guid.TryParse(roh, out var id) ? id : null;
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 
     /// <summary>Which company is acted for — the claim out of the token.</summary>
-    private static Guid? Firma(ClaimsPrincipal nutzer) =>
-        Guid.TryParse(nutzer.FindFirst("tenant")?.Value, out var id) ? id : null;
+    private static Guid? ActingCompany(ClaimsPrincipal user) =>
+        Guid.TryParse(user.FindFirst("tenant")?.Value, out var id) ? id : null;
 }

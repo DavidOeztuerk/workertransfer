@@ -79,7 +79,7 @@ public sealed class OperatorProviderSource(string label, string address, bool co
 /// and recognises a model endpoint by its host name
 /// (<c>HostJurisdiction.IsArtificialIntelligence</c>). Declaring happens at
 /// <em>startup</em> — and that is exactly where the access does not stand here:
-/// it stands in <c>KiZugangV1</c>, per person, in a table. Noelia's directory
+/// it stands in <c>AiAccessV1</c>, per person, in a table. Noelia's directory
 /// is therefore rightly a lower bound; this one here can be complete.</para>
 ///
 /// <para><strong>And exactly for that reason the finding is about
@@ -168,15 +168,15 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> sources) : ISecur
                 + "als Etikett und Host, gezählt, nie namentlich.");
         }
 
-        var draussen = grouped
+        var outside = grouped
             .Where(row => HostJurisdiction.Classify(row.Host).Jurisdiction
                             != Jurisdiction.SelfHosted)
             .ToList();
 
         return Finding(
-            draussen.Count > 0 ? SecurityCheckStatus.Warning : SecurityCheckStatus.Pass,
+            outside.Count > 0 ? SecurityCheckStatus.Warning : SecurityCheckStatus.Pass,
             string.Join("; ", grouped.Select(Sentence)) + ".",
-            draussen.Count > 0
+            outside.Count > 0
                 ? Remediation
                 : "Solange jeder Eintrag im eigenen Netz liegt, verlässt kein "
                   + "Wort das Haus. Ein Eintrag mit einer öffentlichen Adresse "

@@ -78,7 +78,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
     {
         var browser = AsCompany(Guid.CreateVersion7());
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var asMember = await Write(browser, "Example GmbH");
 
         asMember.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -104,7 +104,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         (await Write(AsCompany(company), "Example GmbH"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        _roles.Answer = CompanyRole.Mitglied;
+        _roles.Answer = CompanyRole.Member;
         var read = await AsCompany(company).GetAsync("/companies/me/profile");
 
         read.StatusCode.Should().Be(HttpStatusCode.OK);

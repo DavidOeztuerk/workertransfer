@@ -31,7 +31,7 @@ cd "$(dirname "$0")/.."
 # gerade aufruft.
 export DOTNET_CLI_UI_LANGUAGE=en
 
-reihen=(Ablage Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
+reihen=(DocumentStore Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
         Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment)
 
 rot=0
