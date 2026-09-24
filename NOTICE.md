@@ -6,7 +6,7 @@ Programmbibliotheken, die stehen in `Directory.Packages.props` und
 
 ## GeoNames — Postleitzahlen und Ortskoordinaten
 
-* **Datei:** `src/shared/WorkerTransfer.ServiceDefaults/Postleitzahlen.txt`
+* **Datei:** `src/shared/WorkerTransfer.ServiceDefaults/PostalCodes.txt`
 * **Quelle:** [geonames.org](https://www.geonames.org) —
   `download.geonames.org/export/zip/{DE,AT,CH}.zip` (Postleitzahlen) und
   `download.geonames.org/export/dump/{DE,AT,CH}.zip` (Einwohnerzahlen, nur zum
