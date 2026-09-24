@@ -1,6 +1,6 @@
 {{/*
-Was alle elf Dienste gleich haben — das Gegenstück zum x-environment-Anker in
-docker-compose.yml. Geheimnisse stehen NICHT hier, sondern im Secret.
+What all services have in common — the counterpart to the x-environment anchor
+in docker-compose.yml. Secrets do NOT stand here but in the Secret.
 */}}
 apiVersion: v1
 kind: ConfigMap
@@ -15,9 +15,9 @@ data:
   Mail__Host: {{ .Values.smtp.host | quote }}
   Mail__Port: {{ .Values.smtp.port | quote }}
   {{/*
-  Die Basis für Bestätigungslinks — das muss sein, was der BROWSER erreicht,
-  nicht ein clusterinterner Servicename. Eine Mail mit http://identity-service
-  darin führt niemanden irgendwohin.
+  The base for confirmation links — that has to be what the BROWSER reaches,
+  not a cluster-internal service name. A mail with http://identity-service in
+  it leads nobody anywhere.
   */}}
   Mail__WebUrl: {{ .Values.webUrl | quote }}
   {{/*

@@ -1,10 +1,10 @@
-{{ .Chart.Name }} {{ .Chart.Version }} ist ausgerollt — Release {{ .Release.Name }}.
+{{ .Chart.Name }} {{ .Chart.Version }} is rolled out — release {{ .Release.Name }}.
 
-  Oberflaeche         {{ .Values.webUrl }}
-  API (Gateway)       {{ .Values.publicUrl }}
+  UI                  {{ .Values.webUrl }}
+  API (gateway)       {{ .Values.publicUrl }}
 {{- if .Values.mailpit.enabled }}
 {{- if .Values.mailpit.nodePort }}
-  Mailpit             http://localhost:8025 — dort liegt der Bestätigungslink
+  Mailpit             http://localhost:8025 — the confirmation link lies there
 {{- else }}
   Mailpit             kubectl port-forward svc/mailpit 8025:8025
 {{- end }}
@@ -13,31 +13,30 @@
   Jaeger              kubectl port-forward svc/jaeger 16686:16686
 {{- end }}
 {{- if .Values.gateway.dashboard }}
-  Traefik-Übersicht   kubectl port-forward deploy/gateway 8081:8080
+  Traefik overview    kubectl port-forward deploy/gateway 8081:8080
 {{- end }}
 
-{{ .Values.services | len }} Dienste, jeder mit {{ .Values.replicaCount }} Replik(en).
+{{ .Values.services | len }} services, each with {{ .Values.replicaCount }} replica(s).
 
 {{- if gt (int .Values.replicaCount) 1 }}
 
-  ACHTUNG: replicaCount ist {{ .Values.replicaCount }}.
+  CAREFUL: replicaCount is {{ .Values.replicaCount }}.
 
-  Drei Dinge in diesem System vertragen das heute NICHT (ADR-0028 §3):
-    - die Auth-Bremse zählt im Prozess, das Limit vervielfacht sich
-    - der Outbox-Zusteller hat kein SKIP LOCKED, Mails gehen mehrfach raus
-    - migriert wird im initContainer, also je Pod
+  Things in this system do NOT tolerate that today (ADR-0028 §3):
+    - every service migrates its schema at startup, so per pod
+    - the auth brake counts in-process — that is the gateway's, pinned to 1
 
-  Das ist kein Hinweis auf eine Feineinstellung, sondern auf drei Änderungen
-  am Code, die vorher nötig sind.
+  This is no hint at a fine-tuning but at a change in the code that is needed
+  first.
 {{- end }}
 
 {{- if not .Values.secrets.existingSecret }}
 
-Die Geheimnisse hält dieses Release selbst und behält sie über Upgrades.
-Für eine echte Umgebung gehört dort `secrets.existingSecret` hin.
+This release holds the secrets itself and keeps them across upgrades.
+For a real environment `secrets.existingSecret` belongs there.
 {{- end }}
 
-Prüfen, ob es wirklich läuft — nicht nur, ob es ausgerollt ist:
+Check whether it really runs — not only whether it is rolled out:
 
   curl -s {{ .Values.publicUrl }}/jobs
-  curl -s {{ .Values.publicUrl }}/config.js
+  curl -s {{ .Values.webUrl }}/config.js

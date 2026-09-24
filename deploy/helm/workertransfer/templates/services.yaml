@@ -1,11 +1,11 @@
 {{/*
-Deployment + Service je Dienst, erzeugt aus der Liste in values.yaml.
+Deployment + Service per service, generated from the list in values.yaml.
 
-Der Name des Service-Objekts ist NICHT frei wählbar: die Landkarte des
-Gateways spricht `http://identity-service:8001` an, und sie reist im Bild mit.
-Heisst das Objekt hier anders, zeigt die Landkarte ins Leere — und zwar
-lautlos, denn Ocelot meldet einen unerreichbaren Nachbarn erst beim ersten
-Aufruf.
+The Service object's name is NOT free to choose: the gateway's route map
+addresses `http://identity-service:8001`, and it travels along in the image. If
+the object is called differently here, the map points into the void — and
+silently, because Ocelot reports an unreachable neighbour only at the first
+call.
 */}}
 {{- $root := . }}
 {{- range $svc := .Values.services }}
@@ -20,11 +20,11 @@ metadata:
 spec:
   replicas: {{ $root.Values.replicaCount }}
   {{/*
-  Recreate, nicht RollingUpdate. Zwei Gründe, und beide hängen an replicas=1:
-  ein rollendes Update stellte kurzzeitig eine ZWEITE Instanz daneben — genau
-  das, was die Auth-Bremse und der Outbox-Zusteller nicht vertragen (siehe
-  values.yaml) — und bei portfolio-service könnte das zweite Pod das
-  ReadWriteOnce-Volume gar nicht bekommen und bliebe hängen.
+  Recreate, not RollingUpdate. Two reasons, and both hang on replicas=1: a
+  rolling update would briefly put a SECOND instance beside it — exactly what
+  the schema migration at startup does not tolerate (see values.yaml) — and
+  with portfolio-service and resume-service the second pod could not get the
+  ReadWriteOnce volume at all and would hang.
   */}}
   strategy:
     type: Recreate
@@ -39,29 +39,30 @@ spec:
         app.kubernetes.io/component: {{ $svc.name }}
       annotations:
         {{/*
-        Ohne diese Prüfsumme bliebe ein Pod nach einer Änderung an der
-        gemeinsamen Umgebung mit den ALTEN Werten stehen — `helm upgrade`
-        meldete Erfolg, und nichts hätte sich geändert.
+        Without this checksum a pod would stay with the OLD values after a
+        change to the shared environment — `helm upgrade` would report
+        success, and nothing would have changed.
         */}}
         checksum/env: {{ include (print $root.Template.BasePath "/configmap-env.yaml") $root | sha256sum }}
     spec:
       {{/*
-      KEIN initContainer mehr, und das ist der sichtbare Unterschied zur
-      Python-Zeit: dort wanderte ein eigener Behälter das Schema und rief dafür
-      `docker/entrypoint.sh` mit `true` auf.
+      NO initContainer any more, and that is the visible difference to the
+      Python days: there a container of its own migrated the schema and called
+      `docker/entrypoint.sh` with `true` for it.
 
-      Jetzt wandert der Dienst beim Start selbst (ServiceDefaults.Wanderung).
-      Der Grund ist kein Geschmack: `dotnet ef` braucht das SDK, und ein
-      Laufzeitbild hat keins. Ein Migrationsbündel wäre der andere Weg gewesen
-      und hätte ein zweites Artefakt eingeführt, das mit dem Bild altert.
+      Now the service migrates itself at startup
+      (ServiceDefaults.SchemaMigration). The reason is not taste: `dotnet ef`
+      needs the SDK, and a runtime image has none. A migration bundle would
+      have been the other way and would have introduced a second artefact that
+      ages with the image.
 
-      Das Warten steht damit ebenfalls im Dienst — was ohnehin richtig ist:
-      hier gibt es kein `depends_on`, der Behälter startet, wann er will. Der
-      alte initContainer wartete mit einer Schleife auf Postgres; dieselbe
-      Geduld liegt nun in `Wanderung.Geduld`.
+      So the waiting stands in the service too — which is right anyway: there
+      is no `depends_on` here, the container starts when it likes. The old
+      initContainer waited for Postgres in a loop; the same patience now lies
+      in `SchemaMigration`, which retries transient failures for a minute.
 
-      ACHTUNG bei replicas > 1: dann wandern zwei Pods dasselbe Schema. Siehe
-      values.yaml — die Zahl steht dort nicht zufällig auf 1.
+      CAREFUL with replicas > 1: then two pods migrate the same schema. See
+      values.yaml — the number does not stand at 1 by chance.
       */}}
       {{- if $svc.persistence }}
       {{/*
@@ -79,11 +80,11 @@ spec:
           image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
           {{/*
-          KEIN `command`: der ENTRYPOINT des Bildes bleibt stehen und liest
-          `SERVICE_DIR` aus der Umgebung. Zur Python-Zeit stand hier ein
-          uvicorn-Aufruf, der den Entrypoint umging — weil der sonst ein
-          zweites Mal gewandert wäre. Beides ist weg, und damit auch die Frage,
-          ob die beiden Beschreibungen desselben Starts noch übereinstimmen.
+          NO `command`: the image's ENTRYPOINT stays and reads `SERVICE_DIR`
+          from the environment. In the Python days a uvicorn call stood here
+          that bypassed the entrypoint — because that would otherwise have
+          migrated a second time. Both are gone, and with them the question
+          whether the two descriptions of the same start still agree.
           */}}
           envFrom:
             - configMapRef:
@@ -94,24 +95,23 @@ spec:
             - name: http
               containerPort: {{ $svc.port }}
           {{/*
-          live sagt "der Prozess lebt", ready sagt "die Datenbank antwortet
-          auch". Sie zu vertauschen
-          hiesse: bei einer kurzen Datenbankstörung wird der Dienst NEU
-          GESTARTET statt aus dem Verkehr genommen — und startet in dieselbe
-          Störung hinein.
+          live says "the process is alive", ready says "the database answers
+          too". Swapping them would mean: at a short database disruption the
+          service is RESTARTED instead of taken out of traffic — and starts
+          right into the same disruption.
           */}}
           {{/*
-          timeoutSeconds steht ÜBERALL, weil die Voreinstellung 1 Sekunde ist —
-          und die ist hier falsch. Gemessen, nicht vermutet: beim ersten
-          Ausrollen starteten fünfzehn Pods gleichzeitig auf einem Knoten, und
-          jede einzelne Fehlermeldung lautete "timed out after 1s". Drei
-          Dienste wurden deshalb neu gestartet, obwohl sie liefen.
+          timeoutSeconds stands EVERYWHERE, because the default is 1 second —
+          and that is wrong here. Measured, not assumed: at the first roll-out
+          fifteen pods started at once on one node, and every single error
+          message read "timed out after 1s". Three services were restarted
+          because of it although they were running.
 
-          Eine Bereitschaftsprüfung, die die Datenbank fragt, hat in einer
-          Sekunde nicht sicher geantwortet — nicht weil etwas kaputt ist,
-          sondern weil elf Prozesse gleichzeitig hochfahren. Wer das
-          über die Zeitgrenze "löst", schreibt einen Fehler als normales
-          Verhalten fest; wer es zu knapp lässt, startet gesunde Dienste neu.
+          A readiness check that asks the database has not reliably answered
+          within one second — not because something is broken, but because
+          all processes start at once. Whoever "solves" that via the time
+          limit writes a defect down as normal behaviour; whoever leaves it
+          too tight restarts healthy services.
           */}}
           livenessProbe:
             httpGet:

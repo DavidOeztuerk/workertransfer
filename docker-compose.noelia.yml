@@ -1,14 +1,14 @@
-# Die Noelia Control Plane, die diese Flotte einsammelt.
+# The Noelia Control Plane that collects this fleet.
 #
-# EIN EIGENES OVERLAY UND NICHT IN docker-compose.yml. Das Produkt liegt in
-# einem Nachbarrepositorium; der Hauptstapel darf davon nicht abhaengen, sonst
-# scheitert `make up` bei jedem, der es nicht ausgecheckt hat.
+# AN OVERLAY OF ITS OWN AND NOT IN docker-compose.yml. The product lives in a
+# neighbouring repository; the main stack must not depend on it, otherwise
+# `make up` fails for everybody who has not checked it out.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.noelia.yml up -d
 #   make control-plane
 #
-# Sie liest nur. Es gibt keinen Weg von hier in einen Dienst hinein: sie holt
-# `/noelia/report.json` ab und legt es zusammen.
+# It only reads. There is no path from here into a service: it fetches
+# `/noelia/report.json` and lays the reports side by side.
 
 services:
   noelia-control-plane:
@@ -22,42 +22,45 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://0.0.0.0:8080"
 
-      # DASSELBE PAPIER WIE DIE BETRIEBSOBERFLAECHE, und kein zweites: sie legt
-      # es an genau der Tuer vor, die es prueft. Leer heisst, dass jeder Dienst
-      # mit 404 antwortet — die Flotte bliebe leer, ohne dass etwas kaputt ist.
-      ControlPlane__OperatorSecret: ${WORKERTRANSFER_EVIDENCE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      # THE SAME PAPER AS THE OPERATIONS DASHBOARD, and no second one: it
+      # presents it at exactly the door that checks it. Empty means that every
+      # service answers 404 — the fleet would stay empty without anything being
+      # broken.
+      ControlPlane__OperatorSecret: ${WORKERTRANSFER_EVIDENCE_SECRET:?missing — `make env` writes a .env and rolls it}
 
-      # Die Lizenz steht in der Umgebung und nicht in der Flottendatei: sie ist
-      # ein unterschriebenes Papier auf einen Kunden, und ein solches gehoert
-      # nicht in git.
+      # The licence stands in the environment and not in the fleet file: it is a
+      # signed paper naming a customer, and such a thing does not belong in git.
       ControlPlane__Licence: ${WORKERTRANSFER_NOELIA_LICENCE:-}
 
-      # Der Verlauf gehoert auf den Datentraeger, nicht ins Arbeitsverzeichnis.
-      # Das Bild laeuft als Nicht-Root und darf in `/app` nicht schreiben — die
-      # Vorgabe legt die SQLite-Datei aber genau dorthin, und der Behaelter
-      # stirbt beim Aufloesen mit „unable to open database file".
+      # The history belongs on the volume, not in the working directory. The
+      # image runs as non-root and may not write in `/app` — the default puts
+      # the SQLite file exactly there, though, and the container dies while
+      # resolving with "unable to open database file".
       ControlPlane__HistoryPath: /var/lib/noelia-control-plane/verlauf.sqlite
     volumes:
-      # Die Flotte: WELCHE Dienste, unter welchen Adressen. Sie gehoert hierher
-      # und nicht ins Nachbarrepositorium — sie beschreibt DIESEN Stapel, und
-      # die Adressen sind die compose-Dienstnamen.
+      # The fleet: WHICH services, under which addresses. It belongs here and
+      # not in the neighbouring repository — it describes THIS stack, and the
+      # addresses are the compose service names.
       #
-      # Der Zielname ist `appsettings.Development.json` und kein sprechender:
-      # die Anwendung laedt `appsettings.{ASPNETCORE_ENVIRONMENT}.json` und
-      # sonst keine Datei — eine `appsettings.Flotte.json` laege im Bild und
-      # wuerde nie gelesen, und die Flotte waere still leer. Im Bild steht dort
-      # die Demo-Flotte des Herstellers; die muss ohnehin weg, sonst sammelt
-      # sie sieben unerreichbare Adressen ein.
+      # The target name is `appsettings.Development.json` and not a descriptive
+      # one: the application loads `appsettings.{ASPNETCORE_ENVIRONMENT}.json`
+      # and no other file — an `appsettings.Flotte.json` would lie in the image
+      # and never be read, and the fleet would be silently empty. The vendor's
+      # demo fleet stands at that path in the image; it has to go anyway,
+      # otherwise it collects seven unreachable addresses.
       - ./docker/noelia-control-plane.json:/app/appsettings.Development.json:ro
 
-      # DER SIGNIERSCHLUESSEL UEBERLEBT DEN BEHAELTER. Eine Bescheinigung, die
-      # mit einem Schluessel unterschrieben wurde, der mit dem Prozess starb,
-      # laesst sich hinterher von niemandem mehr pruefen.
+      # THE SIGNING KEY OUTLIVES THE CONTAINER. An attestation signed with a key
+      # that died with the process can afterwards be checked by nobody.
+      #
+      # The volume and the history file keep their names on purpose: renaming
+      # either would start with an empty volume or file, and the signing key
+      # and the history in it would be gone.
       - noelia-control-plane-daten:/var/lib/noelia-control-plane
     ports:
-      # 8091, gleich neben dem Gateway auf 8090. Nicht 8080: das ist der Port,
-      # um den sich compose und kind schon einmal gestritten haben, und danach
-      # konnte niemand sagen, wer geantwortet hat.
+      # 8091, right beside the gateway on 8090. Not 8080: that is the port
+      # compose and kind have already quarrelled over once, and afterwards
+      # nobody could say who answered.
       - "8091:8080"
     depends_on:
       gateway:

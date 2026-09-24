@@ -1,10 +1,10 @@
 {{/*
-Das Gateway — derselbe Dienst wie die elf anderen, nur mit SERVICE_DIR=gateway.
+The gateway — the same service as the others, only with SERVICE_DIR=gateway.
 
-Zur Python-Zeit stand hier Traefik mit einer ConfigMap, die
-`docker/traefik/dynamic.yml` ins Cluster trug. Beides ist weg: die Landkarte
-reist jetzt IM BILD (`ocelot.json`), und damit fährt hier, was Compose fährt.
-Eine Kopie, die beim ersten neuen Pfad falsch wird, gibt es nicht mehr.
+In the Python days Traefik stood here with a ConfigMap that carried
+`docker/traefik/dynamic.yml` into the cluster. Both are gone: the route map now
+travels IN THE IMAGE (`ocelot.json`), and with that what compose runs runs
+here. A copy that goes wrong at the first new path no longer exists.
 */}}
 apiVersion: apps/v1
 kind: Deployment
@@ -14,17 +14,16 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway
 spec:
-  # EINS, und seit der Bremse ist das kein Beiwerk mehr.
+  # ONE, and since the brake that is no side issue any more.
   #
-  # Der Zaehler der Auth-Bremse (Bremse.cs) laeuft IM PROZESS. Bei zwei
-  # Gateways hat jedes sein eigenes Fenster, die wirksame Grenze verdoppelt
-  # sich, und niemand sieht es — jede Instanz rechnet fuer sich korrekt.
+  # The auth brake's counter (Noelia's DistributedRateLimiting) runs IN THE
+  # PROCESS. With two gateways each has its own window, the effective limit
+  # doubles, and nobody sees it — every instance counts correctly for itself.
   #
-  # Wer hier hochzaehlt, muss vorher den Zaehler teilen: der Speicher haengt
-  # hinter IDistributedRateLimitStore, und RedisDistributedRateLimitStore
-  # erfuellt dieselbe Schnittstelle. Das ist ein Registrierungswechsel in
-  # Program.cs, kein Umbau — aber er muss passiert sein, bevor diese Zahl
-  # steigt.
+  # Whoever raises this must share the counter first: the store hangs behind
+  # IDistributedRateLimitStore, and RedisDistributedRateLimitStore satisfies
+  # the same interface. That is a registration change in Program.cs, no
+  # rebuild — but it has to have happened before this number goes up.
   replicas: 1
   selector:
     matchLabels:
@@ -51,9 +50,9 @@ spec:
             - name: web
               containerPort: {{ .Values.gateway.port }}
           {{/*
-          Das Gateway beantwortet seine Proben SELBST und reicht sie nicht
-          weiter. Sonst kippte ein einzelner kranker Dienst es aus dem
-          Lastverteiler und nähme die anderen elf mit.
+          The gateway answers its probes ITSELF and does not pass them on.
+          Otherwise a single sick service would tip it out of the load
+          balancer and take all the others with it.
           */}}
           livenessProbe:
             httpGet:
@@ -81,9 +80,8 @@ metadata:
     app.kubernetes.io/component: gateway
 spec:
   {{/*
-  NodePort, damit deploy/kind/cluster.yaml ihn auf den Host-Port 8090 legt.
-  8090 und nicht 8080: zwei Umgebungen, die sich um einen Hafen streiten,
-  ergeben genau die Fehlersuche, in der niemand sagen kann, wer geantwortet hat.
+  NodePort, so deploy/kind/cluster.yaml maps it onto host port 8090 — the same
+  port compose uses; deploy/kind/cluster.yaml says why.
   */}}
   type: NodePort
   selector:

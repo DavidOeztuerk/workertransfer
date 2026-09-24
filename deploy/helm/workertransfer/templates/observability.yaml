@@ -1,9 +1,9 @@
 {{/*
-Mailpit und Jaeger. Beide sind lokale Einrichtungen und in Produktion aus:
-dort gibt es einen echten SMTP-Server und einen eigenen Kollektor.
+Mailpit and Jaeger. Both are local facilities and off in production: there a
+real SMTP server and a collector of its own exist.
 
-Beide Service-Objekte heissen wie in docker-compose.yml (`mailpit`, `jaeger`),
-damit WORKER_SMTP_HOST und WORKER_OTLP_ENDPOINT unverändert gelten.
+Both Service objects are called as in docker-compose.yml (`mailpit`, `jaeger`),
+so `Mail__Host` and `OTEL_EXPORTER_OTLP_ENDPOINT` hold unchanged.
 */}}
 {{- if .Values.mailpit.enabled }}
 apiVersion: apps/v1
@@ -49,8 +49,8 @@ metadata:
     app.kubernetes.io/component: mailpit
 spec:
   {{/*
-  NodePort nur für die OBERFLÄCHE, nicht für SMTP: Mails sollen aus dem
-  Cluster kommen, nicht von aussen hineingeworfen werden können.
+  NodePort only for the UI, not for SMTP: mails are meant to come from the
+  cluster, not to be thrown in from outside.
   */}}
   type: {{ if .Values.mailpit.nodePort }}NodePort{{ else }}ClusterIP{{ end }}
   selector:

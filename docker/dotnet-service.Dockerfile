@@ -1,44 +1,44 @@
 # syntax=docker/dockerfile:1
 #
-# EIN Bild fuer alle fuenfzehn Dienste — die vierzehn fachlichen und das Gateway.
+# ONE image for all fifteen services — the fourteen domain ones and the gateway.
 #
-# Sie unterscheiden sich in genau einer Umgebungsvariablen, `SERVICE_DIR`, die
-# der Behaelter setzt. Fuenfzehn Bilder, die sich in einer Variablen unterscheiden,
-# waeren nicht fuenfzehnmal die Software (ADR-0028) — und sie waeren fuenfzehn
-# Gelegenheiten, eines davon zu vergessen.
+# They differ in exactly one environment variable, `SERVICE_DIR`, which the
+# container sets. Fifteen images that differ in one variable would not be
+# fifteen times the software (ADR-0028) — and they would be fifteen
+# opportunities to forget one of them.
 #
-# Deshalb steht `SERVICE_DIR` hier NICHT als Bauargument: das Bild wird einmal
-# gebaut, ohne zu wissen, wer es spaeter ist.
+# That is why `SERVICE_DIR` does NOT stand here as a build argument: the image
+# is built once, without knowing who it will be later.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS bau
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
-WORKDIR /quelle
+WORKDIR /source
 
-# Erst die Manifeste, dann der Rest: so bleibt die Wiederherstellung in der
-# Schichtzwischenablage, solange sich keine Abhaengigkeit aendert.
+# The manifests first, then the rest: that way the restore stays in the layer
+# cache as long as no dependency changes.
 COPY Directory.Build.props Directory.Packages.props NuGet.Config \
      WorkerTransfer.slnx ./
 COPY src ./src
 COPY tests ./tests
 
-# Noelia liegt auf nuget.org und verlangt keine Anmeldung. Frueher kam sie als
-# BuildKit-Geheimnis herein und wird NIE eine Schicht: ein Zugriff in einem Bild
-# bleibt in jeder Sicherung und in jedem `docker history`.
+# Noelia lives on nuget.org and demands no sign-in. It used to come in as a
+# BuildKit secret and NEVER becomes a layer: a credential in an image stays in
+# every backup and in every `docker history`.
 #
-# --locked gibt es fuer NuGet nicht wie fuer uv; `restore` liest die zentralen
-# Fassungen aus Directory.Packages.props, und die stehen im Baum.
-# OHNE GEHEIMNIS, seit Girder auf nuget.org lag (10.09.2026) und erst recht
-# seit Noelia (ADR-0045). Hier stand ein
-# `--mount=type=secret,id=nuget_config` — als Geheimnis und nicht als COPY,
-# damit die Anmeldung nie eine Bildschicht wird. Der Grund ist weg: es gibt
-# nichts mehr anzumelden.
+# --locked does not exist for NuGet as it did for uv; `restore` reads the
+# central versions from Directory.Packages.props, and those stand in the tree.
+# WITHOUT A SECRET since Girder lay on nuget.org (10.09.2026) and all the more
+# since Noelia (ADR-0045). Here stood a
+# `--mount=type=secret,id=nuget_config` — as a secret and not as a COPY, so the
+# sign-in never became an image layer. The reason is gone: there is nothing
+# left to sign in to.
 RUN \
     dotnet restore WorkerTransfer.slnx
 
-# Jeder Einstiegspunkt in sein eigenes Verzeichnis. Der Schluessel ist der
-# Dienstname, wie ihn `SERVICE_DIR` traegt.
+# Every entry point into its own directory. The key is the service name as
+# `SERVICE_DIR` carries it.
 RUN set -eu; \
-    for eintrag in \
+    for entry in \
         "identity:src/identity-service/WorkerTransfer.Identity.Api" \
         "consent:src/consent-service/WorkerTransfer.Consent.Api" \
         "profile:src/profile-service/WorkerTransfer.Profile.Api" \
@@ -55,40 +55,40 @@ RUN set -eu; \
         "notification:src/notification-service/WorkerTransfer.Notification.Api" \
         "gateway:src/gateway/WorkerTransfer.Gateway" \
     ; do \
-        name="${eintrag%%:*}"; pfad="${eintrag#*:}"; \
+        name="${entry%%:*}"; path="${entry#*:}"; \
         echo "==> ${name}"; \
-        dotnet publish "${pfad}" -c Release -o "/veroeffentlicht/${name}" --no-restore; \
+        dotnet publish "${path}" -c Release -o "/published/${name}" --no-restore; \
     done
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS laufzeit
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
-# curl gehoert ins Laufzeitbild, und zwar aus EINEM Grund: der Behaelter muss
-# seine eigene Gesundheitsprobe beantworten koennen.
+# curl belongs in the runtime image, and for ONE reason: the container has to
+# be able to answer its own health probe.
 #
-# Docker fragt von INNEN — `healthcheck:` in docker-compose.yml laeuft im
-# Behaelter. Das Laufzeitbild bringt aber weder curl noch wget noch nc mit, und
-# `sh` ist dash, kann also auch kein /dev/tcp. Ohne dieses Paket hat die Probe
-# nichts, womit sie fragen koennte; dort stand deshalb `dotnet --version` — und
-# das SCHEITERT auf einem Laufzeitbild immer (Abbruchcode 155, "No .NET SDKs
-# were found"). Jeder Dienst meldete daraufhin `unhealthy`, waehrend er
-# tadellos antwortete, und niemand hat den Meldungen mehr geglaubt.
+# Docker asks from INSIDE — `healthcheck:` in docker-compose.yml runs in the
+# container. The runtime image, however, ships neither curl nor wget nor nc,
+# and `sh` is dash, so it cannot do /dev/tcp either. Without this package the
+# probe has nothing to ask with; that is why `dotnet --version` stood there —
+# and that ALWAYS FAILS on a runtime image (exit code 155, "No .NET SDKs were
+# found"). Every service then reported `unhealthy` while answering perfectly,
+# and nobody believed the reports any more.
 #
-# Kubernetes braucht das NICHT — dort fragt das Kubelet selbst ueber HTTP und
-# steht ausserhalb. Die zwei Megabyte zahlt also nur Compose.
+# Kubernetes does NOT need this — there the kubelet asks over HTTP itself and
+# stands outside. So only compose pays the two megabytes.
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Nicht als root. Das Bild bedient HTTP und schreibt nichts ausser Protokoll.
-# USER bleibt hier root, damit der Entrypoint ein named Volume chownen
-# kann; er wechselt selbst auf uid 10001, bevor `dotnet` startet. Ein
-# `USER 10001` an dieser Stelle liess POST /resumes/me/documents mit
-# 500 sterben: /data/document-store kommt als root:root ins Volume.
-RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin dienst
+# Not as root. The image serves HTTP and writes nothing but logs.
+# USER stays root here so the entrypoint can chown a named volume; it switches
+# to uid 10001 itself before `dotnet` starts. A `USER 10001` at this point let
+# POST /resumes/me/documents die with 500: the document store's volume comes in
+# as root:root.
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin service
 
 WORKDIR /app
-COPY --from=bau --chown=10001:10001 /veroeffentlicht /app
+COPY --from=build --chown=10001:10001 /published /app
 
 COPY docker/dotnet-entrypoint.sh /usr/local/bin/entrypoint.sh
 

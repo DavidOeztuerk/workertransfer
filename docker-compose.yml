@@ -1,65 +1,64 @@
-# Der ganze Stapel: Datenbank, Mailfaenger, vierzehn Dienste, das Gateway und die
-# Oberflaeche.
+# The whole stack: database, mail catcher, fourteen services, the gateway and
+# the UI.
 #
-#   docker compose up --build     # alles starten
-#   docker compose down           # anhalten, Daten behalten
-#   docker compose down -v        # anhalten und Datenbanken wegwerfen
+#   docker compose up --build     # start everything
+#   docker compose down           # stop, keep the data
+#   docker compose down -v        # stop and throw the databases away
 #
-# Es gibt kein Begleitskript. `up` wandert jedes Schema und startet den Dienst;
-# ein frischer Klon braucht sonst nichts.
+# There is no companion script. `up` migrates every schema and starts the
+# service; a fresh clone needs nothing else.
 #
 # ---------------------------------------------------------------------------
-# DAS BAUEN BRAUCHT EIN GEHEIMNIS.
+# BUILDING NEEDS A SECRET.
 #
-# Noelia liegt auf nuget.org und verlangt KEINE Anmeldung. Der Bau
-# bindet dafuer die NuGet-Konfiguration des Nutzers als BuildKit-Geheimnis ein
-# (`secrets:` unten) — sie wird nie eine Schicht des Bildes, und der Zugriff
-# steht nicht im Verlauf.
+# Noelia lives on nuget.org and demands NO sign-in. The build binds the user's
+# NuGet configuration in as a BuildKit secret for it (`secrets:` below) — it
+# never becomes a layer of the image, and the access does not stand in the
+# history.
 #
-# Wer sie nicht hat: `dotnet nuget add source ... --username <du> --password
-# <token> --store-password-in-clear-text` legt sie an.
+# Whoever does not have one: `dotnet nuget add source ... --username <you>
+# --password <token> --store-password-in-clear-text` creates it.
 # ---------------------------------------------------------------------------
-# EINEN DIENST HINZUFUEGEN — drei Schritte, kein neues Dockerfile:
-#   1. scripts/initdb/01-create-service-databases.sql: seine Datenbank.
-#      ACHTUNG: initdb laeuft NUR bei leerem Datentraeger. Auf einem Stapel,
-#      der schon lief, passiert nichts, und der neue Dienst dreht sich in
-#      "database ... does not exist" im Kreis. Entweder einmal
-#      `docker compose down -v && docker compose up`, oder ohne Datenverlust:
+# ADDING A SERVICE — three steps, no new Dockerfile:
+#   1. scripts/initdb/01-create-service-databases.sql: its database.
+#      CAREFUL: initdb runs ONLY on an empty volume. On a stack that has run
+#      before nothing happens, and the new service spins in "database ... does
+#      not exist". Either once `docker compose down -v && docker compose up`,
+#      or without losing data:
 #        docker compose exec postgres psql -U worker -d postgres \
 #          -c 'CREATE DATABASE <name> OWNER worker;'
-#   2. docker/dotnet-service.Dockerfile: seinen Einstiegspunkt in die Liste.
-#   3. Einen Block unten kopieren und drei Dinge aendern: den Namen,
-#      SERVICE_DIR und den Hafen. Und die Route in
-#      src/gateway/WorkerTransfer.Gateway/ocelot.json.
+#   2. docker/dotnet-service.Dockerfile: its entry point into the list.
+#   3. Copy a block below and change three things: the name, SERVICE_DIR and
+#      the port. And the route in src/gateway/WorkerTransfer.Gateway/ocelot.json.
 # ---------------------------------------------------------------------------
 
 x-service: &service
   restart: unless-stopped
-  # Ollama und MiniMax laufen auf der Maschine, nicht im Behälter.
-  # Ohne diesen Eintrag ist localhost im Dienst der Behälter selbst.
+  # Ollama and MiniMax run on the machine, not in the container.
+  # Without this entry localhost inside the service is the container itself.
   extra_hosts:
     - "host.docker.internal:host-gateway"
   build:
     context: .
     dockerfile: docker/dotnet-service.Dockerfile
-  # EIN Bild fuer alle elf. Wer der Behaelter ist, sagt SERVICE_DIR aus der
-  # Umgebung — nicht ein Bauargument (ADR-0028).
+  # ONE image for all of them. Who the container is, SERVICE_DIR from the
+  # environment says — not a build argument (ADR-0028).
   image: workertransfer-dotnet:local
   depends_on:
     postgres:
       condition: service_healthy
-  # EINE Probe fuer alle vierzehn, und sie fragt das, was zaehlt: /health/live,
-  # dieselbe Adresse, die auch Kubernetes abfragt.
+  # ONE probe for all fourteen, and it asks what counts: /health/live, the same
+  # address Kubernetes asks too.
   #
-  # Der Hafen kommt aus ASPNETCORE_URLS, damit er nicht ein zweites Mal
-  # dasteht — eine zweite Liste von Haefen geht beim ersten neuen Dienst
-  # auseinander. `$$` schuetzt die Ersetzung vor Compose, `##*:` schneidet in
-  # dash alles bis zum letzten Doppelpunkt ab.
+  # The port comes from ASPNETCORE_URLS, so it does not stand here a second
+  # time — a second list of ports drifts apart at the first new service. `$$`
+  # protects the substitution from compose, `##*:` cuts off everything up to
+  # the last colon in dash.
   #
-  # Hier stand `dotnet --version`. Das kann auf einem LAUFZEITBILD nie
-  # gelingen (kein SDK, Abbruchcode 155) — jeder Dienst meldete `unhealthy`,
-  # waehrend er tadellos antwortete. Eine Probe, die immer rot ist, ist
-  # schlimmer als keine: nach der zweiten Woche liest sie niemand mehr.
+  # Here stood `dotnet --version`. That can never succeed on a RUNTIME IMAGE
+  # (no SDK, exit code 155) — every service reported `unhealthy` while
+  # answering perfectly. A probe that is always red is worse than none: after
+  # the second week nobody reads it any more.
   healthcheck:
     test:
       - CMD-SHELL
@@ -67,55 +66,54 @@ x-service: &service
     interval: 10s
     timeout: 5s
     retries: 12
-    # Wandern kostet Zeit, und der erste Start wartet zusaetzlich auf eine
-    # erreichbare Datenbank.
+    # Migrating takes time, and the first start additionally waits for a
+    # reachable database.
     start_period: 60s
 
-# KEIN GEHEIMNIS HAT HIER EINE VORGABE.
+# NO SECRET HAS A DEFAULT HERE.
 #
-# Frueher stand `${WORKERTRANSFER_JWT_SECRET:-dev-only-secret-...}` da. Das ist
-# bequem und falsch: ein eingebauter Vorgabewert IST das Geheimnis, und es liegt
-# damit in git. `:?` bricht stattdessen ab und nennt den fehlenden Schluessel.
+# `${WORKERTRANSFER_JWT_SECRET:-dev-only-secret-...}` used to stand here. That
+# is convenient and wrong: a built-in default IS the secret, and it then sits
+# in git. `:?` aborts instead and names the missing key.
 #
-# Wer neu ist: `make env` schreibt eine .env aus .env.example und wuerfelt die
-# drei Geheimnisse frisch. Compose liest sie von selbst.
+# Whoever is new: `make env` writes a .env from .env.example and rolls the
+# secrets fresh. Compose reads it by itself.
 x-environment: &environment
   ASPNETCORE_ENVIRONMENT: Development
-  # WER IM BROWSER RUFEN DARF.
+  # WHO MAY CALL FROM A BROWSER.
   #
-  # Ohne diesen Schluessel faellt Noelia in Development auf `localhost:3000`
-  # zurueck — also auf einen Ursprung, den es hier nicht gibt, waehrend die
-  # Oberflaeche auf 5173 liegt und durch das Gateway auf 8090. Gemessen: eine
-  # Vorpruefung kam mit 204 zurueck und ohne einen einzigen
-  # `Access-Control-Allow-*`-Kopf. CORS war eingehaengt und liess niemanden
-  # durch.
+  # Without this key Noelia falls back to `localhost:3000` in Development — to
+  # an origin that does not exist here, while the UI lies on 5173 and, through
+  # the gateway, on 8090. Measured: a preflight came back with 204 and without
+  # a single `Access-Control-Allow-*` header. CORS was wired in and let nobody
+  # through.
   #
-  # Kein Geheimnis, deshalb darf hier eine Vorgabe stehen.
+  # No secret, so a default may stand here.
   CORS_ORIGINS: ${WORKERTRANSFER_CORS_ORIGINS:-http://localhost:5173,http://localhost:8090}
-  # DER OEFFENTLICHE SCHLUESSEL GEHT AN ALLE, DER PRIVATE NUR AN IDENTITY.
-  # Er steht deshalb hier im gemeinsamen Anker und `Jwt__PrivateKey` allein
-  # beim identity-Dienst — wer praegen kann, ist damit in dieser Datei
-  # nachzulesen und nicht in einer Codezeile.
-  Jwt__PublicKey: ${WORKERTRANSFER_JWT_PUBLIC_KEY:?fehlt — `make env` legt eine .env an und erzeugt das Paar}
+  # THE PUBLIC KEY GOES TO ALL, THE PRIVATE ONE ONLY TO IDENTITY.
+  # So it stands here in the shared anchor and `Jwt__PrivateKey` alone at the
+  # identity service — who can mint can therefore be read in this file and not
+  # in a line of code.
+  Jwt__PublicKey: ${WORKERTRANSFER_JWT_PUBLIC_KEY:?missing — `make env` writes a .env and generates the pair}
   Jwt__KeyId: ${WORKERTRANSFER_JWT_KEY_ID:-k1}
   JwtSettings__Issuer: workertransfer
   JwtSettings__Audience: workertransfer
-  # Gemeinsames Geheimnis der Loeschkaskade (ADR-0027 4.4). AUSDRUECKLICH EIN
-  # ANDERES als das der Benachrichtigung: "darf eine Mail anstossen" und "darf
-  # alles ueber einen Menschen loeschen" duerfen nicht dasselbe Papier sein.
-  # LEER hiesse: der Endpunkt ist zu.
-  Erasure__Secret: ${WORKERTRANSFER_ERASURE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-  # Der Hauptschluessel fuer hinterlegte Geheimnisse (heute: der KI-Schluessel
-  # einer Person). ROLLEN HEISST VERLIEREN — es gibt keine Versionierung.
-  WORKERTRANSFER_SECRETS_KEY: ${WORKERTRANSFER_SECRETS_KEY:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-  # Die Tuer vor dem Nachweis jedes Dienstes (ADR-0044). AUSDRUECKLICH EIN
-  # DRITTES PAPIER, neben dem der Benachrichtigung und dem der Loeschung: wer
-  # eine Mail anstossen darf, muss nicht erfahren, welche KI-Anbieter diese
-  # Instanz benutzt. LEER hiesse: die Tuer ist zu, und /nachweis antwortet 404.
-  # Ohne Flottennamen sieht ein Sammler vierzehn Einzeldienste statt eines
-  # Systems. Noelia erfindet keinen — ein geratener gruppierte Fremdes.
+  # The shared secret of the erasure cascade (ADR-0027 4.4). EXPRESSLY A
+  # DIFFERENT ONE from the notification's: "may trigger a mail" and "may erase
+  # everything about a person" must not be the same paper. EMPTY would mean:
+  # the endpoint is shut.
+  Erasure__Secret: ${WORKERTRANSFER_ERASURE_SECRET:?missing — `make env` writes a .env and rolls it}
+  # The master key for stored secrets (today: a person's AI key). ROLLING IT
+  # MEANS LOSING THEM — there is no versioning.
+  WORKERTRANSFER_SECRETS_KEY: ${WORKERTRANSFER_SECRETS_KEY:?missing — `make env` writes a .env and rolls it}
+  # The door in front of every service's evidence (ADR-0044). EXPRESSLY A THIRD
+  # PAPER, beside the notification's and the erasure's: whoever may trigger a
+  # mail need not learn which AI providers this instance uses. EMPTY would
+  # mean: the door is shut, and /noelia/… answers 404.
+  # Without a fleet name a collector sees fourteen single services instead of
+  # one system. Noelia invents none — a guessed one would group strangers.
   Dashboard__Fleet: workertransfer
-  Evidence__Secret: ${WORKERTRANSFER_EVIDENCE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+  Evidence__Secret: ${WORKERTRANSFER_EVIDENCE_SECRET:?missing — `make env` writes a .env and rolls it}
 
 services:
   postgres:
@@ -125,8 +123,8 @@ services:
     environment:
       POSTGRES_USER: worker
       POSTGRES_PASSWORD: worker
-      # Der Einstiegspunkt legt nur POSTGRES_DB an; jede weitere Datenbank
-      # kommt aus initdb (ADR-0004 verbietet eine gemeinsame).
+      # The entrypoint creates only POSTGRES_DB; every further database comes
+      # from initdb (ADR-0004 forbids a shared one).
       POSTGRES_DB: identity
     ports:
       - "5432:5432"
@@ -134,19 +132,20 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # `pg_isready` allein genuegt NICHT: waehrend initdb laeuft, hoert
-      # Postgres nur lokal, und die Probe meldet trotzdem bereit. Die Dienste
-      # bekamen dann "connection refused". Eine echte Abfrage ueber TCP ist die
-      # Frage, die zaehlt. (Sie loest das Rennen nicht allein — `Wanderung`
-      # wartet zusaetzlich, weil es in Kubernetes gar kein depends_on gibt.)
+      # `pg_isready` alone is NOT enough: while initdb runs, Postgres listens
+      # only locally, and the probe reports ready all the same. The services
+      # then got "connection refused". A real query over TCP is the question
+      # that counts. (It does not settle the race on its own — `SchemaMigration`
+      # waits in addition, because in Kubernetes there is no depends_on at
+      # all.)
       test: ["CMD-SHELL", "psql -h 127.0.0.1 -U worker -d identity -c 'select 1' || exit 1"]
       interval: 2s
       timeout: 3s
       retries: 30
 
   mailpit:
-    # Faengt jede ausgehende Mail ab und zeigt sie unter :8025. Kein Versand
-    # nach aussen — eine Entwicklungsumgebung darf niemanden anschreiben.
+    # Catches every outgoing mail and shows it at :8025. Nothing is sent out —
+    # a development environment must not write to anybody.
     image: axllent/mailpit:latest
     container_name: workertransfer-mailpit
     restart: unless-stopped
@@ -165,17 +164,17 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: identity
-      # DER EINZIGE DIENST MIT DEM PRIVATEN SCHLUESSEL. Ein zweiter waere eine
-      # zweite Stelle, die einen Handelnden erschaffen kann, und nichts weiter
-      # unten koennte die beiden auseinanderhalten.
-      Jwt__PrivateKey: ${WORKERTRANSFER_JWT_PRIVATE_KEY:?fehlt — `make env` legt eine .env an und erzeugt das Paar}
+      # THE ONLY SERVICE WITH THE PRIVATE KEY. A second one would be a second
+      # place that can create an acting principal, and nothing further down
+      # could tell the two apart.
+      Jwt__PrivateKey: ${WORKERTRANSFER_JWT_PRIVATE_KEY:?missing — `make env` writes a .env and generates the pair}
       ASPNETCORE_URLS: "http://0.0.0.0:8001"
       ConnectionStrings__identity: Host=postgres;Port=5432;Database=identity;Username=worker;Password=worker
       Mail__Host: mailpit
       Mail__Port: "1025"
       Mail__Sender: noreply@workertransfer.local
       Mail__WebUrl: ${WORKERTRANSFER_WEB_URL:-http://localhost:8090}
-      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Erasure__BaseUrls__consent: http://consent-service:8002
       Erasure__BaseUrls__profile: http://profile-service:8003
       Erasure__BaseUrls__resume: http://resume-service:8004
@@ -216,24 +215,24 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8003"
       ConnectionStrings__profile: Host=postgres;Port=5432;Database=profile;Username=worker;Password=worker
       Consent__BaseUrl: http://consent-service:8002
-      # Die interne Tuer, durch die scout-service sucht (ADR-0036). LEER heisst
-      # dort: die Tuer ist ZU — und sie antwortet dann 404 statt 401, damit sie
-      # sich nicht ueber eine Methode verraet.
+      # The internal door through which scout-service searches (ADR-0036).
+      # EMPTY means there: the door is SHUT — and it then answers 404 instead of
+      # 401, so it does not give itself away through a method.
       #
-      # OHNE DIESE ZEILE SUCHT DER SCOUT INS LEERE, und zwar lautlos: die Tuer
-      # sagt 404, und eine leere Trefferliste sieht aus wie „es gibt niemanden".
-      # Genau so gemessen am 11.09.2026 — zwoelf E2E-Reisen rot, Routenkarte
-      # gruen, weil die Statuscodes stimmten.
-      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
-      # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
-      # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
-      # nicht anhalten, anders als die drei echten Geheimnisse.
+      # WITHOUT THIS LINE THE SCOUT SEARCHES INTO THE VOID, and silently: the
+      # door says 404, and an empty hit list looks like "there is nobody".
+      # Measured exactly like that on 11.09.2026 — twelve E2E journeys red, the
+      # route map green, because the status codes were right.
+      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The AI seam. EMPTY is valid and the default: without a key no external
+      # service is called, and the UI says so (ADR-0024). That is why `:-` and
+      # not `:?` — a missing key must not stop the stack, unlike the three real
+      # secrets.
       Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
-      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
-      # eingebaute Zieladresse nach draussen ist genau das, was der
-      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
-      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      # The address stands HERE and not only as a default in the source: a
+      # built-in destination abroad is exactly what the sovereignty report is
+      # meant to surface — and the egress boundary reads its allowed hosts from
+      # the configuration (ServiceFoundation.cs).
       Draft__BaseUrl: https://api.anthropic.com/v1/messages
     ports:
       - "8003:8003"
@@ -248,15 +247,16 @@ services:
       ConnectionStrings__resume: Host=postgres;Port=5432;Database=resume;Username=worker;Password=worker
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Wo die Zertifikate liegen. Ein BAND und kein Ordner im Abbild: ein
-      # `up -d --build` ersetzt den Behaelter, und mit ihm waeren die Dateien
-      # fort — waehrend ihre Zeilen in der Datenbank stehen blieben. Genau
-      # diese Haelfte-fort-Haelfte-da-Lage ist die schlimmste (ADR-0035).
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # Where the certificates lie. A VOLUME and not a folder in the image: an
+      # `up -d --build` replaces the container, and the files would be gone
+      # with it — while their rows stayed in the database. Exactly this
+      # half-gone-half-there state is the worst (ADR-0035).
       #
-      # Das Band kommt als root:root. Der Entrypoint chownt es auf uid 10001
-      # und gibt root danach ab — sonst 500 beim ersten Unterverzeichnis
-      # (gemessen: UnauthorizedAccessException auf /data/document-store/<subject>).
+      # The volume comes as root:root. The entrypoint chowns it to uid 10001
+      # and gives up root afterwards — otherwise 500 at the first subdirectory
+      # (measured: UnauthorizedAccessException on /daten/ablage/<subject>, the
+      # path's name then).
       DocumentStore__Folder: /data/document-store
     volumes:
       - resume-document-store:/data/document-store
@@ -286,27 +286,26 @@ services:
       SERVICE_DIR: jobs
       ASPNETCORE_URLS: "http://0.0.0.0:8006"
       ConnectionStrings__jobs: Host=postgres;Port=5432;Database=jobs;Username=worker;Password=worker
-      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
-      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
-      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
-      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
-      # Tuer.
+      # The role lookup. Who is `admin` is decided by identity-service's
+      # membership table — per request and not by the token: a role in the
+      # token would take effect after a removal only at expiry. The same
+      # address and the same secret as every other internal door.
       #
-      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
-      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
-      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
-      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      # WITHOUT these two lines every protected route answers 503 (not 403):
+      # "did not answer" is not the same as "no". And the address stands here
+      # also because the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Die KI-Naht. LEER ist gueltig und die Vorgabe: ohne Schluessel wird kein
-      # externer Dienst gerufen, und die Oberflaeche sagt das (ADR-0024).
-      # Deshalb `:-` und nicht `:?` — ein fehlender Schluessel darf den Stapel
-      # nicht anhalten, anders als die drei echten Geheimnisse.
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The AI seam. EMPTY is valid and the default: without a key no external
+      # service is called, and the UI says so (ADR-0024). That is why `:-` and
+      # not `:?` — a missing key must not stop the stack, unlike the three real
+      # secrets.
       Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
-      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
-      # eingebaute Zieladresse nach draussen ist genau das, was der
-      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
-      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      # The address stands HERE and not only as a default in the source: a
+      # built-in destination abroad is exactly what the sovereignty report is
+      # meant to surface — and the egress boundary reads its allowed hosts from
+      # the configuration (ServiceFoundation.cs).
       Draft__BaseUrl: https://api.anthropic.com/v1/messages
     ports:
       - "8006:8006"
@@ -322,49 +321,48 @@ services:
       Consent__BaseUrl: http://consent-service:8002
       Jobs__BaseUrl: http://jobs-service:8006
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Mitglieder eines Unternehmens — dieselbe Adresse und dasselbe Geheimnis
-      # wie der Benachrichtigungsweg. Eine Firma hat kein Postfach.
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # A company's members — the same address and the same secret as the
+      # notification path. A company has no mailbox.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Der Anschreiben-Agent. Leer heisst: es wird NICHTS gerufen, und die
-      # Oberflaeche sagt es — statt einen leeren Entwurf zu zeigen, den jemand
-      # versehentlich freigibt (ADR-0034).
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The cover-letter agent. Empty means: NOTHING is called, and the UI says
+      # so — instead of showing an empty draft somebody releases by accident
+      # (ADR-0034).
       Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
-      # Die Adresse steht HIER und nicht nur als Vorgabe im Quelltext: eine
-      # eingebaute Zieladresse nach draussen ist genau das, was der
-      # Souveraenitaetsbericht sichtbar machen soll — und die Egress-Grenze
-      # liest ihre erlaubten Hosts aus der Konfiguration (Dienstgrundlage.cs).
+      # The address stands HERE and not only as a default in the source: a
+      # built-in destination abroad is exactly what the sovereignty report is
+      # meant to surface — and the egress boundary reads its allowed hosts from
+      # the configuration (ServiceFoundation.cs).
       Draft__BaseUrl: https://api.anthropic.com/v1/messages
-      # DIE ZIELE, DIE EINE PERSON FUER IHREN EIGENEN KI-ZUGANG WAEHLEN DARF.
+      # THE TARGETS A PERSON MAY CHOOSE FOR THEIR OWN AI ACCESS.
       #
-      # `Draft__BaseUrl` oben ist die Vorgabe des Betreibers. Ein Mensch kann
-      # aber einen EIGENEN Zugang einrichten (`KiZugang`: Anbieter, Adresse,
-      # Modell) — ein lokales Modell etwa, und genau dafuer steht in
-      # Anschreiber.cs „gemessen an Ollama".
+      # `Draft__BaseUrl` above is the operator's default. A person can,
+      # however, set up an access OF THEIR OWN (provider, address, model) — a
+      # local model, for instance, and exactly for that the cover-letter writer
+      # says "measured against Ollama".
       #
-      # Diese Adresse steht in der DATENBANK, nicht in der Konfiguration, und
-      # war damit fuer die Egress-Grenze unsichtbar: gemessen am 10.09.2026
-      # antwortete jeder Anschreiben-Auftrag mit
+      # That address stands in the DATABASE, not in the configuration, and was
+      # therefore invisible to the egress boundary: measured on 10.09.2026 every
+      # cover-letter job answered with
       # `EgressDeniedException: Outbound call to 'host.docker.internal' is not
-      # allowed` — der Auftrag lief an, schrieb nie, und in der Oberflaeche
-      # passierte schlicht nichts.
+      # allowed` — the job started, never wrote, and in the UI simply nothing
+      # happened.
       #
-      # Deshalb erklaert der BETREIBER hier, wohin ein Mensch zeigen darf, und
-      # die Person waehlt darin. Das ist kein Nachgeben gegenueber der Grenze,
-      # sondern ihr Sinn: ein Ziel, das niemand erklaert hat, bleibt zu — und
-      # ohne diese Angabe koennte jede Person die Anfragen an einen beliebigen
-      # fremden Server schicken.
+      # That is why the OPERATOR declares here where a person may point, and
+      # the person chooses within it. That is no concession to the boundary but
+      # its point: a target nobody declared stays shut — and without this
+      # declaration any person could send the requests to any foreign server.
       #
-      # Gelesen wird der Wert von NIEMANDEM ausser der Ableitung in
-      # `Dienstgrundlage.GerufeneHosts` — sie nimmt aus jedem Konfigurationswert
-      # den Host, der sich als absolute http-Adresse lesen laesst. Der Port ist
-      # dabei egal, die Grenze prueft nur den Host.
+      # The value is read by NOBODY except the derivation in
+      # `ServiceFoundation` — it takes the host from every configuration value
+      # that reads as an absolute http address. The port does not matter; the
+      # boundary checks only the host.
       Draft__AllowedTargets__0: ${WORKERTRANSFER_AI_TARGET_1:-http://host.docker.internal}
       Draft__AllowedTargets__1: ${WORKERTRANSFER_AI_TARGET_2:-http://localhost}
-      # Woher die EIGENEN Angaben der bewerbenden Person kommen. Serverseitig
-      # geholt und nicht vom Browser geschickt: „nur die eigenen Daten" ist eine
-      # Zusage, die allein der Server halten kann.
+      # Where the applying person's OWN details come from. Fetched on the
+      # server and not sent by the browser: "only the person's own data" is a
+      # promise only the server can keep.
       Lookup__Identity: http://identity-service:8001
       Lookup__Profile: http://profile-service:8003
       Lookup__Resume: http://resume-service:8004
@@ -377,23 +375,22 @@ services:
     container_name: workertransfer-companies
     environment:
       <<: *environment
-      # Kein /erasure: dieser Dienst haelt nichts ueber einen
-      # natuerlichen Menschen (ADR-0027 2).
+      # No /erasure: this service holds nothing about a natural person
+      # (ADR-0027 2).
       SERVICE_DIR: companies
       ASPNETCORE_URLS: "http://0.0.0.0:8008"
       ConnectionStrings__companies: Host=postgres;Port=5432;Database=companies;Username=worker;Password=worker
-      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
-      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
-      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
-      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
-      # Tuer.
+      # The role lookup. Who is `admin` is decided by identity-service's
+      # membership table — per request and not by the token: a role in the
+      # token would take effect after a removal only at expiry. The same
+      # address and the same secret as every other internal door.
       #
-      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
-      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
-      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
-      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      # WITHOUT these two lines every protected route answers 503 (not 403):
+      # "did not answer" is not the same as "no". And the address stands here
+      # also because the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "8008:8008"
 
@@ -405,21 +402,20 @@ services:
       SERVICE_DIR: transfer
       ASPNETCORE_URLS: "http://0.0.0.0:8009"
       ConnectionStrings__transfer: Host=postgres;Port=5432;Database=transfer;Username=worker;Password=worker
-      # Die Rollenauskunft. Wer `admin` ist, entscheidet die
-      # Mitgliedschaftstabelle von identity-service — je Anfrage und nicht das
-      # Token: eine Rolle im Token wirkte nach einer Entfernung erst beim
-      # Ablauf. Dieselbe Adresse und dasselbe Geheimnis wie jede andere interne
-      # Tuer.
+      # The role lookup. Who is `admin` is decided by identity-service's
+      # membership table — per request and not by the token: a role in the
+      # token would take effect after a removal only at expiry. The same
+      # address and the same secret as every other internal door.
       #
-      # OHNE diese zwei Zeilen antwortet jede geschuetzte Route mit 503 (nicht
-      # 403): „hat nicht geantwortet" ist nicht dasselbe wie „nein". Und die
-      # Adresse steht hier auch deshalb, weil die Egress-Grenze ihre erlaubten
-      # Hosts aus der Konfiguration ableitet (Dienstgrundlage.cs).
+      # WITHOUT these two lines every protected route answers 503 (not 403):
+      # "did not answer" is not the same as "no". And the address stands here
+      # also because the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "8009:8009"
 
@@ -432,7 +428,7 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8010"
       ConnectionStrings__notification: Host=postgres;Port=5432;Database=notification;Username=worker;Password=worker
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "8010:8010"
 
@@ -446,13 +442,13 @@ services:
       ConnectionStrings__github: Host=postgres;Port=5432;Database=github;Username=worker;Password=worker
       Consent__BaseUrl: http://consent-service:8002
       GitHub__Token: ${WORKERTRANSFER_GITHUB_TOKEN:-}
-      # Leer heisst: keine Anmeldung ueber GitHub, und der Gist bleibt der Weg.
-      # Eine Voreinstellung, die ein Geheimnis enthaelt, IST das Geheimnis.
+      # Empty means: no sign-in via GitHub, and the gist stays the path.
+      # A default that contains a secret IS the secret.
       GitHub__OAuth__ClientId: ${WORKERTRANSFER_GITHUB_OAUTH_ID:-}
       GitHub__OAuth__Secret: ${WORKERTRANSFER_GITHUB_OAUTH_SECRET:-}
       GitHub__OAuth__RedirectUrl: ${WORKERTRANSFER_GITHUB_OAUTH_REDIRECT_URL:-}
-      # Wie bei Draft__BaseUrl: das Ziel gehoert in die Konfiguration, damit
-      # Bericht und Egress-Grenze es sehen.
+      # As with Draft__BaseUrl: the target belongs in the configuration, so the
+      # report and the egress boundary see it.
       GitHub__BaseUrl: https://api.github.com
     ports:
       - "8011:8011"
@@ -464,33 +460,33 @@ services:
       SERVICE_DIR: scout
       ASPNETCORE_URLS: "http://0.0.0.0:8012"
       ConnectionStrings__scout: Host=postgres;Port=5432;Database=scout;Username=worker;Password=worker
-      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
-      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
-      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
-      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
-      # wie ein Ausfall des anderen Dienstes.
+      # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
+      # HERE: the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation). A target that stands only in the
+      # source is refused — without a log line, and the outage then looks like
+      # an outage of the other service.
       Consent__BaseUrl: http://consent-service:8002
-      # Die interne Tuer, durch die gesucht wird. Dasselbe geteilte Geheimnis wie
-      # jede andere interne Tuer — und ausdruecklich nicht das der Loeschung.
-      # OHNE diese zwei Zeilen antwortet /scout/candidates mit 503: „nicht
-      # eingerichtet" darf nicht aussehen wie „es gibt niemanden".
+      # The internal door through which the search goes. The same shared secret
+      # as every other internal door — and expressly not the erasure's.
+      # WITHOUT these two lines /scout/candidates answers 503: "not set up" must
+      # not look like "there is nobody".
       Profile__BaseUrl: http://profile-service:8003
-      Profile__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Die Belege. github-service, NICHT github.com: dieser Dienst fragt nie
-      # bei GitHub selbst.
+      Profile__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The evidence. github-service, NOT github.com: this service never asks
+      # GitHub itself.
       GitHub__BaseUrl: http://github-service:8011
-      # Die Stellenanzeige, gegen die das Erreichbarkeits-Haekchen gebildet wird
-      # (ADR-0041). Gelesen werden drei Felder: Ort, Postleitzahl, Remotegrad.
-      # Ohne diese Zeile traegt jeder Treffer einen Strich — und das ist eine
-      # vollstaendige Antwort, kein Ausfall.
+      # The job advert against which the reachability tick is formed
+      # (ADR-0041). Three fields are read: place, postal code, remote mode.
+      # Without this line every hit carries a dash — and that is a complete
+      # answer, no outage.
       Jobs__BaseUrl: http://jobs-service:8006
-      # „Dein Profil wurde entdeckt" (ADR-0033) — ueber den Postausgang,
-      # inhaltsfrei, und die Nachricht nennt kein Unternehmen.
+      # "Your profile was discovered" (ADR-0033) — via the outbox, free of
+      # content, and the message names no company.
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Der Entwurf einer Ansprache. Leer heisst: es wird NICHTS gerufen, und die
-      # Oberflaeche sagt es — statt einen leeren Entwurf zu zeigen, den jemand
-      # versehentlich an einen Menschen schickt (ADR-0024).
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The draft of an approach. Empty means: NOTHING is called, and the UI
+      # says so — instead of showing an empty draft somebody sends to a person
+      # by accident (ADR-0024).
       Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
       Draft__BaseUrl: https://api.anthropic.com/v1/messages
     ports:
@@ -504,30 +500,29 @@ services:
       SERVICE_DIR: advisor
       ASPNETCORE_URLS: "http://0.0.0.0:8013"
       ConnectionStrings__advisor: Host=postgres;Port=5432;Database=advisor;Username=worker;Password=worker
-      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
-      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
-      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
-      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
-      # wie ein Ausfall des anderen Dienstes.
+      # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
+      # HERE: the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation). A target that stands only in the
+      # source is refused — without a log line, and the outage then looks like
+      # an outage of the other service.
       #
-      # Der Ledger. Er traegt die STUFE eines Gespraechs (ADR-0037): gelesen bei
-      # jeder Anfrage, geschrieben bei jeder Freigabe. OHNE diese Zeile
-      # antwortet jede Route 503 — richtig, und sichtbar.
+      # The ledger. It carries the STAGE of a conversation (ADR-0037): read at
+      # every request, written at every release. WITHOUT this line every route
+      # answers 503 — rightly, and visibly.
       Consent__BaseUrl: http://consent-service:8002
-      # Die internen Tueren von identity-service, hinter dem geteilten
-      # Geheimnis: die Domain eines Unternehmens (damit ein Ausschluss greifen
-      # kann) und der Klarname eines Menschen (erst ab Stufe 3, und erst
-      # NACHDEM der Ledger sie bestaetigt hat).
+      # identity-service's internal doors, behind the shared secret: a
+      # company's domain (so an exclusion can take effect) and a person's civil
+      # name (only from stage 3, and only AFTER the ledger has confirmed it).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # Die Uebergabe der Einigung. Der Dreieckskonsens steht DORT und wird hier
-      # nicht nachgebaut: transfer-service prueft selbst, ob der Marktstatus
-      # freigegeben und die Person ansprechbar ist.
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The handover of the agreement. The triangle consensus stands THERE and
+      # is not rebuilt here: transfer-service checks itself whether the market
+      # status is released and the person approachable.
       Transfer__BaseUrl: http://transfer-service:8009
-      # „Ein Unternehmen hat ein Gespraech eroeffnet" — ueber den Postausgang,
-      # inhaltsfrei, und die Nachricht nennt kein Unternehmen (ADR-0025).
+      # "A company has opened a conversation" — via the outbox, free of content,
+      # and the message names no company (ADR-0025).
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "8013:8013"
 
@@ -539,27 +534,26 @@ services:
       SERVICE_DIR: assessment
       ASPNETCORE_URLS: "http://0.0.0.0:8014"
       ConnectionStrings__assessment: Host=postgres;Port=5432;Database=assessment;Username=worker;Password=worker
-      # JEDES ZIEL DIESES DIENSTES STEHT HIER, UND ZWAR WEIL ES HIER STEHEN MUSS:
-      # die Egress-Grenze leitet ihre erlaubten Hosts aus der Konfiguration ab
-      # (Dienstgrundlage.GerufeneHosts). Ein Ziel, das nur im Quelltext steht,
-      # wird abgewiesen — ohne Protokollzeile, und der Ausfall sieht dann aus
-      # wie ein Ausfall des anderen Dienstes.
+      # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
+      # HERE: the egress boundary derives its allowed hosts from the
+      # configuration (ServiceFoundation). A target that stands only in the
+      # source is refused — without a log line, and the outage then looks like
+      # an outage of the other service.
       #
-      # Der Ledger, und er ist der EINZIGE Waechter dieses Dienstes: eine
-      # Arbeitsprobe steht an `profile.visibility:*` und an keiner eigenen
-      # Faehigkeit (ADR-0042). OHNE diese Zeile antwortet die Firmenseite 503 —
-      # richtig, und sichtbar. Die Personenseite antwortet weiter, und das ist
-      # Absicht: wer seine Bewertung lesen will, braucht dafuer keinen Ledger.
+      # The ledger, and it is this service's ONLY guard: a work sample stands on
+      # `profile.visibility:*` and on no capability of its own (ADR-0042).
+      # WITHOUT this line the company side answers 503 — rightly, and visibly.
+      # The person side keeps answering, and that is on purpose: whoever wants
+      # to read their evaluation needs no ledger for it.
       Consent__BaseUrl: http://consent-service:8002
-      # „An deiner Arbeitsprobe hat sich etwas bewegt" — ueber den Postausgang,
-      # inhaltsfrei (ADR-0025). Kein Aufgabentext und keine Bewertung reisen
-      # mit: die Mail kann im Postfach des jetzigen Arbeitgebers landen.
+      # "Something has moved on your work sample" — via the outbox, free of
+      # content (ADR-0025). No task text and no evaluation travel along: the
+      # mail may land in the current employer's mailbox.
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
-      # AUSDRUECKLICH NICHT EINGETRAGEN: die Adresse, die eine Person
-      # einreicht. Sie wird gespeichert und angezeigt, nie abgerufen — ein
-      # Dienst, der sie holte, fuehrte eine von einem Fremden gewaehlte Adresse
-      # in eine Serveranfrage.
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # EXPRESSLY NOT ENTERED: the address a person submits. It is stored and
+      # shown, never fetched — a service that fetched it would carry an address
+      # chosen by a stranger into a server request.
     ports:
       - "8014:8014"
 
@@ -570,33 +564,34 @@ services:
       SERVICE_DIR: gateway
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: "http://0.0.0.0:8090"
-      # NUR HIER, und nur wegen des Pruefstands.
+      # ONLY HERE, and only because of the test bench.
       #
-      # Die Auth-Bremse steht in ocelot.json und gilt unveraendert, wo nichts
-      # anderes gesagt wird. Die Playwright-Reisen legen aber VIERUNDDREISSIG
-      # Konten an, alle von einer Herkunft, binnen weniger Minuten — gegen
-      # `/auth/register: 5` faellt das um, und zwar voellig zu Recht: kein
-      # Mensch legt vierunddreissig Konten an. Ein Pruefstand ist nicht die
-      # Bedrohung, gegen die die Bremse gebaut ist.
+      # The auth brake stands in ocelot.json and applies unchanged wherever
+      # nothing else is said. The Playwright journeys, however, create
+      # THIRTY-FOUR accounts, all from one origin, within a few minutes —
+      # against `/auth/register: 5` that falls over, and quite rightly so: no
+      # person creates thirty-four accounts. A test bench is not the threat the
+      # brake is built against.
       #
-      # Ein Faktor, kein Schalter: die Bremse laeuft weiter, zaehlt weiter und
-      # schluesselt weiter je Herkunft — nur die Decke liegt hoeher. Eine
-      # ausgeschaltete Bremse waere in der einzigen laufenden Umgebung gar
-      # nicht mehr zu sehen.
+      # A factor, not a switch: the brake keeps running, keeps counting and
+      # keeps keying per origin — only the ceiling lies higher. A switched-off
+      # brake would no longer be visible at all in the only running
+      # environment.
       #
-      # NICHT ins Helm-Chart uebernehmen. Dort laeuft kein Pruefstand, und ein
-      # Faktor in einer Staging-Umgebung waere eine Bremse, die nur so aussieht.
+      # DO NOT take this into the Helm chart. No test bench runs there, and a
+      # factor in a staging environment would be a brake that only looks like
+      # one.
       DistributedRateLimiting__LimitMultiplier: "${WORKERTRANSFER_BRAKE_FACTOR:-1}"
     depends_on:
-      # Nur auf die Datenbank, nicht auf die elf: das Gateway beantwortet
-      # /health/live selbst, und ein einzelner kranker Dienst darf es nicht
-      # aufhalten.
+      # Only on the database, not on the services: the gateway answers
+      # /health/live itself, and a single sick service must not hold it up.
       postgres:
         condition: service_healthy
     ports:
-      # DER Eingang. 8090 und nicht 8080 — zwei Umgebungen, die sich um einen
-      # Hafen streiten, ergeben genau die Fehlersuche, in der niemand sagen
-      # kann, wer geantwortet hat.
+      # THE entrance. The same host port the kind cluster's gateway uses — on
+      # purpose: the two environments cannot run at the same time anyway
+      # (scripts/k8s-up.sh checks the ports and names them), and one address
+      # for the API in both is the better trade.
       - "8090:8090"
 
   web:
@@ -606,8 +601,8 @@ services:
     container_name: workertransfer-web
     restart: unless-stopped
     environment:
-      # Alles ueber EINEN Ursprung. Die Oberflaeche kennt keine Einzelhaefen
-      # mehr; das Gateway trennt Seite von Ressource ueber Sec-Fetch-Dest.
+      # The UI calls the gateway for every request; the gateway serves the API
+      # and nothing else (ADR-0040).
       VITE_API_BASE_URL: http://localhost:8090
     volumes:
       - ./web/src:/app/src

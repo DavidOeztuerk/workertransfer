@@ -1,10 +1,10 @@
 {{/*
-Gemeinsame Bausteine. Die interessanten sind die letzten beiden:
-`workertransfer.serviceEnv` ist die eine Stelle, an der die Umgebung eines
-Dienstes entsteht. Zur Python-Zeit holten Deployment UND Migrations-Job sie von
-hier; seit der Dienst sein Schema beim Start selbst wandert, gibt es nur noch
-einen Abnehmer — und damit keine Gelegenheit mehr, dass die beiden gegen
-verschiedene Datenbanken laufen.
+Shared building blocks. The interesting ones are the last two:
+`workertransfer.serviceEnv` is the one place where a service's environment
+comes about. In the Python days the Deployment AND the migration Job fetched it
+from here; since the service migrates its schema itself at startup, there is
+only one consumer left — and with it no opportunity for the two to run against
+different databases.
 */}}
 
 {{- define "workertransfer.labels" -}}
@@ -14,7 +14,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 {{- end -}}
 
-{{/* Der Name des Secrets — entweder ein fremdverwaltetes oder unser eigenes. */}}
+{{/* The name of the Secret — either an externally managed one or our own. */}}
 {{- define "workertransfer.secretName" -}}
 {{- if .Values.secrets.existingSecret -}}
 {{- .Values.secrets.existingSecret -}}
@@ -24,14 +24,14 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 {{- end -}}
 
 {{/*
-Ein Geheimnis: der gewünschte Wert, sonst der bereits im Cluster liegende,
-sonst ein frisch gewürfelter.
+A secret: the wanted value, otherwise the one already lying in the cluster,
+otherwise a freshly rolled one.
 
-Die mittlere Stufe ist die wichtige. Ohne sie erzeugte jedes `helm upgrade` ein
-neues WORKER_JWT_SECRET und meldete damit jede offene Sitzung ab — ein Upgrade,
-das Menschen auswirft, ist keines.
+The middle step is the important one. Without it every `helm upgrade` would
+generate new secrets and thereby sign out every open session — an upgrade that
+throws people out is none.
 
-Aufruf: {{ include "workertransfer.keepOrMake" (dict "data" $old "key" "X" "wanted" .Values...) }}
+Call: {{ include "workertransfer.keepOrMake" (dict "data" $old "key" "X" "wanted" .Values...) }}
 */}}
 {{- define "workertransfer.keepOrMake" -}}
 {{- if .wanted -}}
@@ -43,19 +43,20 @@ Aufruf: {{ include "workertransfer.keepOrMake" (dict "data" $old "key" "X" "want
 {{- end -}}
 {{- end -}}
 
-{{/* Der Ursprung, unter dem der Browser die Anwendung erreicht. */}}
+{{/* The origin under which the browser reaches the API. */}}
 {{- define "workertransfer.apiOrigin" -}}
 {{- .Values.web.apiOrigin | default .Values.publicUrl -}}
 {{- end -}}
 
 {{/*
-Die Umgebung eines Dienstes.
+A service's environment.
 
-Aufruf: {{ include "workertransfer.serviceEnv" (dict "root" $ "svc" $svc) }}
+Call: {{ include "workertransfer.serviceEnv" (dict "root" $ "svc" $svc) }}
 
-DB_PASSWORT steht bewusst VOR der Verbindungszeichenfolge: Kubernetes ersetzt
-$(VAR) nur durch Variablen, die weiter oben in DERSELBEN Liste stehen. Aus
-`envFrom` ginge es nicht — deshalb kommt das Passwort hier einzeln.
+DB_PASSWORD stands deliberately BEFORE the connection string: Kubernetes
+replaces $(VAR) only with variables that stand further up in the SAME list.
+From `envFrom` it would not work — that is why the password comes here on its
+own.
 */}}
 {{- define "workertransfer.serviceEnv" -}}
 {{- $root := .root -}}
@@ -63,27 +64,27 @@ $(VAR) nur durch Variablen, die weiter oben in DERSELBEN Liste stehen. Aus
 - name: SERVICE_DIR
   value: {{ $svc.dir | quote }}
 {{/*
-0.0.0.0, nicht localhost: im Behälter beantwortete der Dienstport sonst nichts.
+0.0.0.0, not localhost: inside the container the service port would otherwise
+answer nothing.
 */}}
 - name: ASPNETCORE_URLS
   value: {{ printf "http://0.0.0.0:%v" $svc.port | quote }}
-- name: DB_PASSWORT
+- name: DB_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: POSTGRES_PASSWORD
 {{/*
-Der Schlüssel heisst wie die Datenbank, weil der Dienst sie so erfragt:
-`GetConnectionString("<name>")`. Zwei Namen für dieselbe Sache wären zwei
-Gelegenheiten, sie auseinanderlaufen zu lassen.
+The key is called like the database, because the service asks for it that way:
+`GetConnectionString("<name>")`. Two names for the same thing would be two
+opportunities to let them drift apart.
 */}}
 - name: {{ printf "ConnectionStrings__%s" $svc.database }}
-  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=%s;Password=$(DB_PASSWORT)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $root.Values.postgres.user | quote }}
+  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=%s;Password=$(DB_PASSWORD)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $root.Values.postgres.user | quote }}
 {{/*
-Die drei geteilten Geheimnisse. Einzeln aufgeführt statt als `envFrom` über das
-ganze Secret: sonst bekäme JEDER Dienst auch den Schlüssel der
-Formulierungshilfe, und einer, den neun von zwölf nicht brauchen, gehört nicht
-in ihre Umgebung.
+The shared secrets. Listed one by one instead of `envFrom` over the whole
+Secret: otherwise EVERY service would also get the drafting help's key, and one
+that most services do not need does not belong in their environment.
 */}}
 - name: Jwt__PublicKey
   valueFrom:
@@ -93,9 +94,9 @@ in ihre Umgebung.
 - name: Jwt__KeyId
   value: {{ $root.Values.secrets.jwtKeyId | quote }}
 {{/*
-Den privaten Schluessel bekommt NUR identity-service. Er steht deshalb hier in
-einer Bedingung und nicht im gemeinsamen Block: jeder weitere Traeger waere
-eine zweite Stelle, die einen Handelnden erschaffen kann.
+ONLY identity-service gets the private key. That is why it stands here in a
+condition and not in the shared block: every further holder would be a second
+place that can create an acting principal.
 */}}
 {{- if eq $svc.name "identity-service" }}
 - name: Jwt__PrivateKey
@@ -110,21 +111,21 @@ eine zweite Stelle, die einen Handelnden erschaffen kann.
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ERASURE_SECRET
 {{/*
-Das Meldegeheimnis heisst je nach Seite anders und ist DASSELBE: bei
-identity-service ist es `Notify__Secret` (er prüft es), bei jedem Dienst
-mit `Identity__BaseUrl` `Identity__Secret` (er legt es vor), und die
-absendenden Dienste tragen es als `Notifications__Secret`.
+The notification secret is called differently depending on the side and is THE
+SAME: at identity-service it is `Notify__Secret` (it checks it), at every
+service with `Identity__BaseUrl` it is `Identity__Secret` (it presents it), and
+the sending services carry it as `Notifications__Secret`.
 
-Ausdrücklich ein ANDERES als das der Löschung (ADR-0027 §4.4): "darf eine Mail
-anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
-Papier sein. Die Bedingungen sind unabhängig: applications-service hat BEIDE
-Adressen und braucht BEIDE Namen für dasselbe Geheimnis.
+Expressly a DIFFERENT one from the erasure's (ADR-0027 §4.4): "may trigger a
+mail" and "may erase everything about a person" must not be the same paper. The
+conditions are independent: applications-service has BOTH addresses and needs
+BOTH names for the same secret.
 */}}
 {{/*
-Die Tuer vor dem Nachweis, und sie steht an JEDEM Dienst: jeder beantwortet
-`/nachweis` ueber sich selbst (ADR-0044). Ein drittes Papier, ausdruecklich —
-wer eine Mail anstossen darf, muss nicht erfahren, welche KI-Anbieter diese
-Instanz benutzt. LEER heisst: die Tuer ist zu und die Seite antwortet 404.
+The door in front of the evidence, and it stands at EVERY service: each one
+answers its own operator report (ADR-0044). A third paper, expressly — whoever
+may trigger a mail need not learn which AI providers this instance uses. EMPTY
+means: the door is shut and the report answers 404.
 */}}
 - name: Evidence__Secret
   valueFrom:
@@ -143,9 +144,9 @@ right, because in the clear nothing is stored.
       key: WORKER_SECRETS_KEY
 {{- if or (eq $svc.name "identity-service") (eq $svc.name "profile-service") }}
 {{/*
-profile-service prueft es an seiner internen Suchtuer (ADR-0036). LEER hiesse
-dort: die Tuer ist zu — sie antwortet 404, und der Scout suchte lautlos ins
-Leere.
+profile-service checks it at its internal search door (ADR-0036). EMPTY would
+mean there: the door is shut — it answers 404, and the scout would search into
+the void without a sound.
 */}}
 - name: Notify__Secret
   valueFrom:
@@ -162,10 +163,10 @@ Leere.
 {{- end }}
 {{- if hasKey ($svc.env | default dict) "Profile__BaseUrl" }}
 {{/*
-Dieselbe Kennung noch einmal unter einem vierten Namen: scout-service sucht
-durch die interne Tuer von profile-service. LEER hiesse dort nicht „alles",
-sondern „es wird nicht gesucht" — und zwar als Fehlschlag, damit „nicht
-eingerichtet" nicht wie „es gibt niemanden" aussieht.
+The same secret once more under a fourth name: scout-service searches through
+profile-service's internal door. EMPTY would mean there not "everything" but
+"nothing is searched" — and as a failure, so "not set up" does not look like
+"there is nobody".
 */}}
 - name: Profile__Secret
   valueFrom:
@@ -182,8 +183,8 @@ eingerichtet" nicht wie „es gibt niemanden" aussieht.
 {{- end }}
 {{- if $svc.drafting }}
 {{/*
-Die Formulierungshilfe (ADR-0024). LEER heisst: sie ist aus, und die
-Oberfläche sagt das — es wird dann kein fremder Dienst angerufen.
+The drafting help (ADR-0024). EMPTY means: it is off, and the UI says so — no
+foreign service is called then.
 */}}
 - name: Draft__ApiKey
   valueFrom:

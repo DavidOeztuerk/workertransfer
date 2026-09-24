@@ -1,9 +1,9 @@
-# Der lokale Cluster. Ein Knoten reicht: dieses Chart fährt jeden Dienst mit
-# genau einer Replik (siehe ADR-0028 und values.yaml), es gibt also nichts zu
-# verteilen. Ein zweiter Knoten wäre Wartezeit ohne Aussage.
+# The local cluster. One node is enough: this chart runs every service with
+# exactly one replica (see ADR-0028 and values.yaml), so there is nothing to
+# distribute. A second node would be waiting time without a statement.
 #
 # `kind create cluster --config deploy/kind/cluster.yaml`
-# — oder einfacher `make k8s-up`, das ihn miterzeugt.
+# — or more simply `make k8s-up`, which creates it along the way.
 
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -11,23 +11,23 @@ name: workertransfer
 
 nodes:
   - role: control-plane
-    # So kommt der Verkehr von aussen herein — ohne Ingress-Controller,
-    # ohne LoadBalancer, ohne `kubectl port-forward` in einem zweiten Fenster.
-    # Der Gateway-Service ist ein NodePort auf 30080; diese Zeile legt ihn auf
-    # einen Host-Port.
+    # This is how traffic comes in from outside — without an ingress
+    # controller, without a LoadBalancer, without `kubectl port-forward` in a
+    # second window. The gateway Service is a NodePort on 30080; this line maps
+    # it onto a host port.
     #
-    # 8090 und NICHT 8080: 8080 gehört dem Compose-Gateway. Zwei Umgebungen,
-    # die um denselben Port streiten, erzeugen genau die Sorte Fehlersuche, die
-    # in diesem Repo schon mehrfach Zeit gekostet hat — man sieht eine Antwort
-    # und weiss nicht, wer sie gegeben hat.
+    # 8090, the same host port the compose gateway uses — on purpose: the two
+    # environments cannot run at the same time anyway (scripts/k8s-up.sh checks
+    # the ports before it builds anything and names them), and one address for
+    # the API in both is the better trade.
     extraPortMappings:
       - containerPort: 30080
         hostPort: 8090
         protocol: TCP
-      # Mailpit-Oberfläche, unter derselben Nummer wie bei docker compose.
-      # Der Bestätigungslink aus der Registrierung liegt dort, und eine
-      # Umgebung, in der man sich nur mit einem zweiten Fenster voll
-      # `kubectl port-forward` anmelden kann, wird nicht benutzt.
+      # The Mailpit UI, under the same number as with docker compose. The
+      # confirmation link from the registration lies there, and an environment
+      # in which one can only sign in with a second window full of
+      # `kubectl port-forward` does not get used.
       - containerPort: 30825
         hostPort: 8025
       # The UI, on the same host port compose uses. It is a door of its own —
