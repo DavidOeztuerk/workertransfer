@@ -14,7 +14,7 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260921093746_InitialSchema")]
+    [Migration("20260924123819_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />

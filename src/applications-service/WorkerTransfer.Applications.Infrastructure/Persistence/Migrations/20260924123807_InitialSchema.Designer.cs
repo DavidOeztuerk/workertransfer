@@ -12,7 +12,7 @@ using WorkerTransfer.Applications.Infrastructure.Persistence;
 namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationsDbContext))]
-    [Migration("20260921093721_InitialSchema")]
+    [Migration("20260924123807_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />

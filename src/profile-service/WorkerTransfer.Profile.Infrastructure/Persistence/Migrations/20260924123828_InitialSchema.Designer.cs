@@ -13,7 +13,7 @@ using WorkerTransfer.Profile.Infrastructure.Persistence;
 namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ProfileDbContext))]
-    [Migration("20260921093809_InitialSchema")]
+    [Migration("20260924123828_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -34,34 +34,34 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("AkteurId")
+                    b.Property<AuditAction>("Action")
+                        .HasColumnType("audit_action")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorId")
                         .HasColumnType("uuid")
                         .HasColumnName("actor_id");
 
-                    b.Property<Guid?>("BetroffenId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("target_id");
+                    b.Property<string>("CorrelationId")
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
 
-                    b.Property<string>("Daten")
+                    b.Property<string>("Metadata")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("metadata");
 
-                    b.Property<Guid?>("FirmaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("GeschehenAm")
+                    b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
 
-                    b.Property<AuditAction>("Handlung")
-                        .HasColumnType("audit_action")
-                        .HasColumnName("action");
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
 
-                    b.Property<string>("Korrelation")
-                        .HasColumnType("text")
-                        .HasColumnName("correlation_id");
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
 
                     b.HasKey("Id");
 
@@ -75,51 +75,51 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("AngelegtAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.PrimitiveCollection<string[]>("Faehigkeiten")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("skills");
-
-                    b.Property<DateTimeOffset>("GeaendertAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Ort")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("location");
-
-                    b.Property<string>("Pendelbereitschaft")
+                    b.Property<string>("Commute")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("commute_km");
 
-                    b.Property<bool>("RemoteMoeglich")
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Headline")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("headline");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Relocation")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("relocation");
+
+                    b.Property<bool>("RemoteOk")
                         .HasColumnType("boolean")
                         .HasColumnName("remote_ok");
+
+                    b.PrimitiveCollection<string[]>("Skills")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("skills");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("bio");
 
-                    b.Property<string>("Ueberschrift")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("headline");
-
-                    b.Property<string>("Umzugsbereitschaft")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("relocation");
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GeaendertAm", "Id")
+                    b.HasIndex("UpdatedAt", "Id")
                         .IsDescending()
                         .HasDatabaseName("ix_profiles_seite");
 

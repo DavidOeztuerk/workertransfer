@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using WorkerTransfer.Resume.Domain.Requests;
 using WorkerTransfer.Resume.Domain.Audit;
+using WorkerTransfer.Resume.Domain.Requests;
 
 #nullable disable
 

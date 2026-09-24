@@ -12,7 +12,7 @@ using WorkerTransfer.GitHub.Infrastructure.Persistence;
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(GitHubDbContext))]
-    [Migration("20260921093742_InitialSchema")]
+    [Migration("20260924123816_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />

@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using WorkerTransfer.Resume.Domain.Requests;
 using WorkerTransfer.Resume.Domain.Audit;
+using WorkerTransfer.Resume.Domain.Requests;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 
 #nullable disable
@@ -14,7 +14,7 @@ using WorkerTransfer.Resume.Infrastructure.Persistence;
 namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ResumeDbContext))]
-    [Migration("20260921093814_InitialSchema")]
+    [Migration("20260924123830_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
