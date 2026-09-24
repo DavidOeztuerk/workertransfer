@@ -1,86 +1,89 @@
 #!/usr/bin/env bash
-# Die Testreihen, EINZELN und der Reihe nach.
+# The test suites, ONE AT A TIME and in order.
 #
-# Nicht `dotnet test` ueber die Projektmappe: vierzehn Reihen starten dann
-# vierzehn Postgres-Behaelter gleichzeitig, der ResourceReaper von
-# Testcontainers laeuft in eine Zeitueberschreitung, und ALLE Reihen fallen
-# binnen einer Millisekunde mit `TypeInitializationException`. Gemessen, nicht
-# vermutet — und es sieht aus wie ein kaputter Bau, ist aber nur zu viel auf
-# einmal.
+# Not `dotnet test` over the solution: fourteen suites then start fourteen
+# Postgres containers at once, Testcontainers' ResourceReaper runs into a
+# timeout, and ALL suites fail within a millisecond with
+# `TypeInitializationException`. Measured, not assumed — and it looks like a
+# broken build while it is only too much at once.
 #
-# Laeuft DURCH statt beim ersten Rot zu enden, und nennt am Schluss die Zahl:
-# ein gruener Lauf mit zwanzig uebersprungenen Tests ist kein gruener Lauf, und
-# ein Lauf, der die Haelfte gar nicht eingesammelt hat, sieht genauso aus.
+# Runs THROUGH instead of stopping at the first red, and names the count at the
+# end: a green run with twenty skipped tests is no green run, and a run that
+# never collected half the suites looks exactly the same.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
-# DIE SPRACHE WIRD HIER FESTGENAGELT, WEIL DIESES SKRIPT SEINE EIGENE AUSGABE
-# LIEST.
+# THE LANGUAGE IS PINNED HERE, BECAUSE THIS SCRIPT READS ITS OWN OUTPUT.
 #
-# `dotnet test` antwortet in der Sprache der Umgebung: auf diesem Rechner
-# deutsch („Bestanden! … erfolgreich: 925"), auf dem Laeufer englisch
-# („Passed! … Passed: 925"). Das Skript griff nach den deutschen Woertern —
-# lokal gruen, in der CI meldeten alle sechzehn Reihen „lief gar nicht",
-# waehrend sie in Wahrheit liefen und gruen waren. Gemessen am 09.09.2026:
-# Identity brauchte zwei Minuten und galt trotzdem als nicht gelaufen.
+# `dotnet test` answers in the language of the environment: German on a German
+# machine ("Bestanden! … erfolgreich: 925"), English on the runner ("Passed! …
+# Passed: 925"). The script used to grab the German words — green locally,
+# while in CI all sixteen suites reported "did not run at all" although they
+# ran and were green. Measured 09.09.2026: Identity took two minutes and still
+# counted as not run.
 #
-# Es ist derselbe Griff, den `dependency-audit` in der CI schon tut. Er steht
-# hier im Skript und nicht im Workflow, weil das Skript die Ausgabe liest:
-# wer sie liest, legt ihre Sprache fest — sonst haengt das Ergebnis daran, wer
-# gerade aufruft.
+# It is the same pin `dependency-audit` in CI already sets. It stands here in
+# the script and not in the workflow, because the script reads the output:
+# whoever reads it fixes its language — otherwise the result depends on who
+# happens to call.
 export DOTNET_CLI_UI_LANGUAGE=en
 
-reihen=(DocumentStore Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
+suites=(DocumentStore Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
         Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment)
 
-rot=0
-gesamt=0
-uebersprungen=0
+red=0
+total=0
+skipped=0
 
-for reihe in "${reihen[@]}"; do
-  projekt="tests/WorkerTransfer.${reihe}.Tests/WorkerTransfer.${reihe}.Tests.csproj"
-  [ -f "$projekt" ] || continue
+for suite in "${suites[@]}"; do
+  project="tests/WorkerTransfer.${suite}.Tests/WorkerTransfer.${suite}.Tests.csproj"
+  [ -f "$project" ] || continue
 
-  zeile=$(dotnet test "$projekt" --no-build 2>&1 | grep -E "^(Passed!|Failed!)" | tail -1)
+  output=$(dotnet test "$project" --no-build 2>&1)
+  line=$(printf '%s\n' "$output" | grep -E "^(Passed!|Failed!)" | tail -1)
 
-  if [ -z "$zeile" ]; then
-    printf '  \033[31m%-14s keine Ausgabe — die Reihe lief gar nicht\033[0m\n' "$reihe"
-    rot=$((rot + 1))
+  if [ -z "$line" ]; then
+    printf '  \033[31m%-14s no output — the suite did not run at all\033[0m\n' "$suite"
+    red=$((red + 1))
     continue
   fi
 
-  erfolg=$(printf '%s' "$zeile" | grep -oE 'Passed: *[0-9]+' | grep -oE '[0-9]+')
-  sprung=$(printf '%s' "$zeile" | grep -oE 'Skipped: *[0-9]+' | grep -oE '[0-9]+')
+  passed=$(printf '%s' "$line" | grep -oE 'Passed: *[0-9]+' | grep -oE '[0-9]+')
+  skip=$(printf '%s' "$line" | grep -oE 'Skipped: *[0-9]+' | grep -oE '[0-9]+')
 
-  # Eine Zusammenfassung, aus der keine Zahl zu lesen ist, ist kein gruener
-  # Lauf — sie ist eine unbekannte. Ohne diesen Zweig wuerde `$((gesamt + ))`
-  # abbrechen oder still als 0 durchgehen.
-  if [ -z "$erfolg" ] || [ -z "$sprung" ]; then
-    printf '  \033[31m%-14s Zusammenfassung unlesbar: %s\033[0m\n' "$reihe" "$zeile"
-    rot=$((rot + 1))
+  # A summary no number can be read from is no green run — it is an unknown.
+  # Without this branch `$((total + ))` would abort or pass silently as 0.
+  if [ -z "$passed" ] || [ -z "$skip" ]; then
+    printf '  \033[31m%-14s unreadable summary: %s\033[0m\n' "$suite" "$line"
+    red=$((red + 1))
     continue
   fi
 
-  gesamt=$((gesamt + erfolg))
-  uebersprungen=$((uebersprungen + sprung))
+  total=$((total + passed))
+  skipped=$((skipped + skip))
 
-  if printf '%s' "$zeile" | grep -q '^Passed!'; then
-    printf '  \033[32m%-14s %s gruen\033[0m\n' "$reihe" "$erfolg"
+  if printf '%s' "$line" | grep -q '^Passed!'; then
+    printf '  \033[32m%-14s %s green\033[0m\n' "$suite" "$passed"
   else
-    printf '  \033[31m%-14s %s\033[0m\n' "$reihe" "$zeile"
-    rot=$((rot + 1))
+    printf '  \033[31m%-14s %s\033[0m\n' "$suite" "$line"
+    # The NAMES of what fell, not only the count. Measured 24.09.2026: a full
+    # run reported "Failed: 1" for Transfer after the machine had been
+    # suspended mid-run, three reruns were green, and which test had fallen
+    # could no longer be found out — the summary line was all this script kept.
+    printf '%s\n' "$output" | grep -E '^\s+Failed ' | sed 's/^/                 /'
+    red=$((red + 1))
   fi
 done
 
 echo
-if [ "$uebersprungen" -gt 0 ]; then
-  printf '\033[33m%s uebersprungen — das ist kein gruener Lauf.\033[0m\n' "$uebersprungen"
+if [ "$skipped" -gt 0 ]; then
+  printf '\033[33m%s skipped — that is no green run.\033[0m\n' "$skipped"
 fi
 
-if [ "$rot" -gt 0 ]; then
-  printf '\033[31m%s Reihen rot.\033[0m\n' "$rot"
+if [ "$red" -gt 0 ]; then
+  printf '\033[31m%s suites red.\033[0m\n' "$red"
   exit 1
 fi
 
-printf '\033[32m%s Tests gruen, 0 rot, %s uebersprungen.\033[0m\n' "$gesamt" "$uebersprungen"
+printf '\033[32m%s tests green, 0 red, %s skipped.\033[0m\n' "$total" "$skipped"
