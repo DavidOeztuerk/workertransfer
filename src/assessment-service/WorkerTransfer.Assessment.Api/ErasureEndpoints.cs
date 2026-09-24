@@ -13,7 +13,7 @@ namespace WorkerTransfer.Assessment.Api;
 /// This service has been an erasure recipient since it got its first table
 /// (ADR-0027 §4, ADR-0042): <c>assessments</c> carries a <c>subject_id</c>, the
 /// outbox a <c>user_id</c>. <c>"assessment"</c> therefore stands in
-/// <c>ErasureRecipient.Services</c> and in <c>LoeschempfaengerTests.Dienste</c>.
+/// <c>ErasureRecipient.Services</c> and in <c>ErasureRecipientTests.Services</c>.
 /// <para>
 /// And with no retention case: an evaluation that survived the erasure would be
 /// exactly the reference letter ADR-0042 rules out.

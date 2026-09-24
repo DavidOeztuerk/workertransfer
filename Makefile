@@ -68,7 +68,7 @@ nachweis-pruefen:  # Jede Pruefung in jedem Dienst; rot, sobald eine Zusage offe
 	./scripts/nachweis-pruefen.sh
 
 routenkarte:  # docs/routenkarte.yml gegen den laufenden Stapel fahren.
-	@# Die VOLLSTAENDIGKEIT der Karte prueft RoutenkarteTests und laeuft in
+	@# Die VOLLSTAENDIGKEIT der Karte prueft RouteMapTests und laeuft in
 	@# jeder Reihe mit. Hier werden die ANTWORTEN geprueft, und dafuer braucht
 	@# es den Stapel: `make up` zuerst.
 	./scripts/routenkarte.sh

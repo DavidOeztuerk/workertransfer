@@ -69,7 +69,7 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
             // adds the column. Then two statements about the same human being
             // would stand side by side, and the erasure (ADR-0027) would strike
             // the one and leave the other. The annotation says it instead: it
-            // is what `LoeschempfaengerTests` reads where no column name is to
+            // is what `ErasureRecipientTests` reads where no column name is to
             // be found.
             entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.Id);

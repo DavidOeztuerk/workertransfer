@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// The words in the three documents — checked without a running stack.
@@ -30,11 +30,16 @@ namespace WorkerTransfer.Ganzes.Tests;
 public class DocumentWordTests
 {
     /// <summary>Words that make a promise nobody here may give.</summary>
-    /// <remarks>The values stay German: the documents they guard are German.</remarks>
+    /// <remarks>
+    /// The German values stay: the documents they guard are German. The English
+    /// ones stand beside them because a generator that one day writes an English
+    /// sentence would otherwise slip past a list that only knows German.
+    /// </remarks>
     private static readonly string[] Forbidden =
     [
         "zertifi", "konform", "compliant", "certif", "bescheinig",
-        "attest", "auditiert", "erfuellt art", "erfüllt art"
+        "attest", "auditiert", "erfuellt art", "erfüllt art",
+        "conform", "compliance", "complies", "audited", "fulfils art", "fulfills art"
     ];
 
     /// <summary>No scope sentence claims compliance.</summary>
@@ -116,6 +121,8 @@ public class DocumentWordTests
     [InlineData("NICHT enthalten: eine Einstufung.", false)]
     [InlineData("Dieses System ist DSGVO-konform.", true)]
     [InlineData("Hiermit zertifiziert.", true)]
+    [InlineData("This system conforms to the GDPR.", true)]
+    [InlineData("Fulfils Art. 30 GDPR.", true)]
     public void The_word_list_matches_exactly_what_is_meant(string sentence, bool expected) =>
         Forbidden.Any(word => sentence.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(expected);
@@ -135,12 +142,12 @@ public class DocumentWordTests
                     // it: a pattern that knows its neighbourhood silently drops
                     // to zero hits when that neighbour is renamed.
                     "\"(?<name>datenschutz|ki|mitbestimmung)\":\\s*\\{.*?"
-                    + "\"scope\":\\s*\\((?<satz>.*?)\\),\\n",
+                    + "\"scope\":\\s*\\((?<sentence>.*?)\\),\\n",
                     RegexOptions.Singleline,
                     TimeSpan.FromSeconds(5))
                 .Select(hit => (
                     hit.Groups["name"].Value,
-                    Joined(hit.Groups["satz"].Value)))
+                    Joined(hit.Groups["sentence"].Value)))
         ];
     }
 
@@ -149,7 +156,7 @@ public class DocumentWordTests
     {
         var hit = Regex.Match(
             Source(),
-            "VORBEHALT = \\((?<satz>.*?)\\)\\n",
+            "VORBEHALT = \\((?<sentence>.*?)\\)\\n",
             RegexOptions.Singleline,
             TimeSpan.FromSeconds(5));
 
@@ -157,15 +164,15 @@ public class DocumentWordTests
             "without the disclaimer this suite checks nothing — and is then "
             + "green over a document that may no longer carry it at all");
 
-        return Joined(hit.Groups["satz"].Value);
+        return Joined(hit.Groups["sentence"].Value);
     }
 
     /// <summary>The strung-together Python literals become one sentence.</summary>
     private static string Joined(string raw) =>
         string.Concat(
-            Regex.Matches(raw, "\"(?<teil>[^\"]*)\"", RegexOptions.None,
+            Regex.Matches(raw, "\"(?<part>[^\"]*)\"", RegexOptions.None,
                     TimeSpan.FromSeconds(5))
-                .Select(part => part.Groups["teil"].Value));
+                .Select(part => part.Groups["part"].Value));
 
     /// <summary>The generator of the documents.</summary>
     /// <remarks>

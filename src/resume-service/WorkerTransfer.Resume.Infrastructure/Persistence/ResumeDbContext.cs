@@ -204,7 +204,7 @@ public sealed class ResumeDbContext(DbContextOptions<ResumeDbContext> options) :
             // for forgotten and adds the column. Then two statements about the
             // same human being would stand side by side, and the erasure
             // (ADR-0027) would hit the one and leave the other standing. The
-            // annotation says it instead: it is what `LoeschempfaengerTests`
+            // annotation says it instead: it is what `ErasureRecipientTests`
             // reads where there is no column name to find.
             entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.Id);

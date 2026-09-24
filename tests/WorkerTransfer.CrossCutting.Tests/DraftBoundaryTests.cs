@@ -3,7 +3,7 @@ using FluentAssertions;
 using WorkerTransfer.Jobs.Application.Ports;
 using WorkerTransfer.Profile.Application.Ports;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What goes out to the model is a <strong>closed</strong> set (ADR-0024 §3).
@@ -16,9 +16,9 @@ namespace WorkerTransfer.Ganzes.Tests;
 ///
 /// <para><strong>That test did not exist.</strong> What did exist checks the
 /// finished prompt <em>string</em> for a subject id and an <c>@</c>
-/// (<c>Der_Entwurf_traegt_nichts_ueber_die_Person_hinaus</c>). That is something
-/// else and considerably weaker: a new field <c>Arbeitgeber</c> on
-/// <see cref="DraftSituation"/>, filled with "Muster GmbH", contains neither a
+/// (<c>The_draft_carries_nothing_beyond_the_person</c>). That is something
+/// else and considerably weaker: a new field <c>Employer</c> on
+/// <see cref="DraftSituation"/>, filled with "Example Ltd", contains neither a
 /// Guid nor an <c>@</c> and would get through. So exactly the silent extension
 /// the record was chosen against in the first place would have stayed
 /// unchecked.</para>
@@ -35,7 +35,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// shared type would be the place where "invent nothing about the person" would
 /// one day apply to an advert — or worse, the other way round.</para>
 /// </remarks>
-public class EntwurfsgrenzeTests
+public class DraftBoundaryTests
 {
     /// <summary>
     /// The profile context carries four fields — and the person wrote every one
@@ -49,10 +49,10 @@ public class EntwurfsgrenzeTests
     [Fact]
     public void The_profile_context_carries_exactly_four_fields()
     {
-        Felder(typeof(DraftSituation)).Should().BeEquivalentTo(
+        Fields(typeof(DraftSituation)).Should().BeEquivalentTo(
             ["Headline", "Text", "Skills", "Wish", "Prompt"],
-            "ADR-0024 §3 nennt diese Menge, und wer sie erweitert, "
-            + "schickt etwas Neues über eine Person hinaus");
+            "ADR-0024 §3 names this set, and whoever extends it "
+            + "sends something new about a person out");
     }
 
     /// <summary>
@@ -67,9 +67,9 @@ public class EntwurfsgrenzeTests
     [Fact]
     public void The_advert_context_carries_exactly_five_fields()
     {
-        Felder(typeof(AdvertDraft)).Should().BeEquivalentTo(
+        Fields(typeof(AdvertDraft)).Should().BeEquivalentTo(
             ["Title", "Description", "Skills", "Location", "Wish", "Prompt"],
-            "ADR-0024 §3, Gegenstück — hier fehlt bewusst der Mandant");
+            "ADR-0024 §3, the counterpart — the tenant is missing here on purpose");
     }
 
     /// <summary>
@@ -84,16 +84,16 @@ public class EntwurfsgrenzeTests
     public void The_two_drafts_share_no_type()
     {
         var profile = typeof(DraftSituation);
-        var anzeige = typeof(AdvertDraft);
+        var advert = typeof(AdvertDraft);
 
-        profile.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
-        anzeige.BaseType.Should().Be<object>("kein gemeinsamer Basistyp");
+        profile.BaseType.Should().Be<object>("no shared base type");
+        advert.BaseType.Should().Be<object>("no shared base type");
 
         // Not "no interface at all": a record brings IEquatable<T> with it by
         // itself, and that is a different one per type. What is checked is the
         // intersection — the promise is that the two SHARE nothing.
-        profile.GetInterfaces().Intersect(anzeige.GetInterfaces())
-            .Should().BeEmpty("die beiden Entwuerfe teilen keine Schnittstelle");
+        profile.GetInterfaces().Intersect(advert.GetInterfaces())
+            .Should().BeEmpty("the two drafts share no interface");
     }
 
     /// <summary>The public instance properties of a record.</summary>
@@ -107,7 +107,7 @@ public class EntwurfsgrenzeTests
     /// sent. Both are meant to stand out.
     /// </para>
     /// </remarks>
-    private static string[] Felder(Type type) =>
+    private static string[] Fields(Type type) =>
         [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-              .Select(e => e.Name)];
+              .Select(property => property.Name)];
 }

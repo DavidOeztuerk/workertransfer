@@ -119,7 +119,7 @@ public static class ProfileInfrastructure
 
         // THE FIELD SET, pinned — and pinned at what runs.
         //
-        // `EntwurfsgrenzeTests` pins the same set at the TREE and is therefore
+        // `DraftBoundaryTests` pins the same set at the TREE and is therefore
         // the sharper guard: it falls before anything ships. What it cannot do
         // is STAND in the evidence. The human who has to answer the Annex III
         // question gets written down here what this system sends out to the

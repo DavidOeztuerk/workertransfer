@@ -29,26 +29,26 @@ namespace WorkerTransfer.Gateway.Tests;
 /// are shipped — otherwise the test would check its own copy.
 /// </para>
 /// </remarks>
-public class Landschaft : IAsyncLifetime
+public class Landscape : IAsyncLifetime
 {
     /// <summary>Whether the routes are loaded in reverse order.</summary>
     /// <remarks>
     /// A map whose answer depended on the order of its lines would be a trap for
     /// the next person who appends a route. Measured: with the shipped
     /// <c>Priority</c> values reversing changes nothing, without them eight
-    /// routes fall over. <see cref="UmgedreheteLandschaft"/> pins that.
+    /// routes fall over. <see cref="ReversedLandscape"/> pins that.
     /// </remarks>
-    protected virtual bool Umgedreht => false;
+    protected virtual bool Reversed => false;
 
     /// <summary>The names as they stand in the route map.</summary>
-    private static readonly string[] Namen =
+    private static readonly string[] Names =
     [
         "identity", "consent", "profile", "resume", "portfolio", "jobs",
         "applications", "companies", "transfer", "notification", "github",
         "scout", "advisor", "assessment", "web"
     ];
 
-    private readonly List<WebApplication> _attrappen = [];
+    private readonly List<WebApplication> _fakes = [];
     private WebApplication _gateway = null!;
 
     /// <summary>Where the gateway listens.</summary>
@@ -56,20 +56,20 @@ public class Landschaft : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var haefen = new Dictionary<string, int>(StringComparer.Ordinal);
+        var ports = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (var name in Namen)
+        foreach (var name in Names)
         {
-            var attrappe = Attrappe(name);
-            await attrappe.StartAsync();
-            _attrappen.Add(attrappe);
-            haefen[name] = Hafen(attrappe);
+            var fake = Fake(name);
+            await fake.StartAsync();
+            _fakes.Add(fake);
+            ports[name] = PortOf(fake);
         }
 
-        _gateway = Gateway(haefen, Umgedreht);
+        _gateway = Gateway(ports, Reversed);
         await _gateway.StartAsync();
 
-        Browser = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{Hafen(_gateway)}") };
+        Browser = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{PortOf(_gateway)}") };
     }
 
     public async Task DisposeAsync()
@@ -78,16 +78,16 @@ public class Landschaft : IAsyncLifetime
         await _gateway.StopAsync();
         await _gateway.DisposeAsync();
 
-        foreach (var attrappe in _attrappen)
+        foreach (var fake in _fakes)
         {
-            await attrappe.StopAsync();
-            await attrappe.DisposeAsync();
+            await fake.StopAsync();
+            await fake.DisposeAsync();
         }
     }
 
     /// <summary>Who answered, and on which path?</summary>
-    public async Task<(string Dienst, string Pfad)> Frage(
-        string path, params (string Name, string Wert)[] headers)
+    public async Task<(string Service, string Path)> Ask(
+        string path, params (string Name, string Value)[] headers)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
 
@@ -100,7 +100,7 @@ public class Landschaft : IAsyncLifetime
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return ("<keine Route>", path);
+            return ("<no route>", path);
         }
 
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
@@ -109,15 +109,15 @@ public class Landschaft : IAsyncLifetime
     }
 
     /// <summary>A service that says nothing but that it was the one.</summary>
-    private static WebApplication Attrappe(string name)
+    private static WebApplication Fake(string name)
     {
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
 
-        var service = bau.Build();
+        var service = builder.Build();
 
-        service.Map("/{**alles}", (HttpContext context) =>
+        service.Map("/{**rest}", (HttpContext context) =>
             Results.Ok(new { service = name, path = context.Request.Path.Value }));
 
         return service;
@@ -125,27 +125,27 @@ public class Landschaft : IAsyncLifetime
 
     /// <summary>The real gateway, with its ports bent onto the fakes.</summary>
     private static WebApplication Gateway(
-        IReadOnlyDictionary<string, int> haefen, bool umgedreht)
+        IReadOnlyDictionary<string, int> ports, bool reversed)
     {
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
 
-        bau.Configuration.AddJsonFile(
-            Landkarte(haefen, umgedreht), optional: false, reloadOnChange: false);
-        bau.Services.AddOcelot(bau.Configuration);
+        builder.Configuration.AddJsonFile(
+            RouteMapFile(ports, reversed), optional: false, reloadOnChange: false);
+        builder.Services.AddOcelot(builder.Configuration);
 
         // Word for word as in `Program.cs` — Noelia's counter AND its middleware.
-        bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
-        bau.Services.Configure<DistributedRateLimitingOptions>(
-            bau.Configuration.GetSection(DistributedRateLimitingOptions.SectionName));
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+        builder.Services.Configure<DistributedRateLimitingOptions>(
+            builder.Configuration.GetSection(DistributedRateLimitingOptions.SectionName));
 
-        var gateway = bau.Build();
+        var gateway = builder.Build();
 
         // The same order as in `Program.cs`. It is part of what is checked
         // here: Ocelot ends the chain.
-        gateway.UseGesundheit();
+        gateway.UseHealthProbes();
         gateway.UseMiddleware<CorrelationIdMiddleware>();
         gateway.UseMiddleware<DistributedRateLimitingMiddleware>();
         gateway.UseOcelot().GetAwaiter().GetResult();
@@ -154,74 +154,74 @@ public class Landschaft : IAsyncLifetime
     }
 
     /// <summary>The shipped route map, only with different ports.</summary>
-    private static string Landkarte(IReadOnlyDictionary<string, int> haefen, bool umgedreht)
+    private static string RouteMapFile(IReadOnlyDictionary<string, int> ports, bool reversed)
     {
         var source = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
-        var roh = File.ReadAllText(source);
+        var raw = File.ReadAllText(source);
 
         // `"Host": "jobs-service", "Port": 8006` -> the fake's port. The name
         // stays `127.0.0.1`, because that is where the fake listens.
-        var gebogen = Regex.Replace(
-            roh,
+        var bent = Regex.Replace(
+            raw,
             "\"Host\": \"(?<name>[a-z]+)(-service)?\",\\s*\n\\s*\"Port\": \\d+",
             hit => "\"Host\": \"127.0.0.1\",\n          \"Port\": "
-                       + haefen[hit.Groups["name"].Value]);
+                       + ports[hit.Groups["name"].Value]);
 
-        if (umgedreht)
+        if (reversed)
         {
-            gebogen = RoutenUmdrehen(gebogen);
+            bent = ReverseRoutes(bent);
         }
 
         var target = Path.Combine(Path.GetTempPath(), $"ocelot-{Guid.NewGuid():N}.json");
-        File.WriteAllText(target, gebogen);
+        File.WriteAllText(target, bent);
 
         return target;
     }
 
     /// <summary>The same routes, in reverse order.</summary>
-    private static string RoutenUmdrehen(string karte)
+    private static string ReverseRoutes(string map)
     {
-        var gelesen = JsonDocument.Parse(
-            karte, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
+        var parsed = JsonDocument.Parse(
+            map, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
 
-        var routen = gelesen.RootElement.GetProperty("Routes")
+        var routes = parsed.RootElement.GetProperty("Routes")
             .EnumerateArray().Reverse().ToList();
 
-        var neu = new Dictionary<string, object>(StringComparer.Ordinal)
+        var reversedMap = new Dictionary<string, object>(StringComparer.Ordinal)
         {
-            ["Routes"] = routen,
+            ["Routes"] = routes,
             // The rate limiter travels along: the reversed landscape should
             // differ ONLY in the order of its lines, otherwise it checks
             // something else on the side.
             ["DistributedRateLimiting"] =
-                gelesen.RootElement.GetProperty("DistributedRateLimiting"),
-            ["GlobalConfiguration"] = gelesen.RootElement.GetProperty("GlobalConfiguration"),
+                parsed.RootElement.GetProperty("DistributedRateLimiting"),
+            ["GlobalConfiguration"] = parsed.RootElement.GetProperty("GlobalConfiguration"),
         };
 
-        return JsonSerializer.Serialize(neu);
+        return JsonSerializer.Serialize(reversedMap);
     }
 
-    private static int Hafen(WebApplication anwendung) =>
-        new Uri(anwendung.Urls.First()).Port;
+    private static int PortOf(WebApplication application) =>
+        new Uri(application.Urls.First()).Port;
 }
 
 [CollectionDefinition(Name)]
-public sealed class LandschaftsSammlung : ICollectionFixture<Landschaft>
+public sealed class LandscapeCollection : ICollectionFixture<Landscape>
 {
-    public const string Name = "landschaft";
+    public const string Name = "landscape";
 }
 
 /// <summary>The same landscape, with the route map reversed.</summary>
-public sealed class UmgedreheteLandschaft : Landschaft
+public sealed class ReversedLandscape : Landscape
 {
     /// <inheritdoc />
-    protected override bool Umgedreht => true;
+    protected override bool Reversed => true;
 }
 
 [CollectionDefinition(Name)]
-public sealed class UmgedrehteSammlung : ICollectionFixture<UmgedreheteLandschaft>
+public sealed class ReversedCollection : ICollectionFixture<ReversedLandscape>
 {
-    public const string Name = "landschaft-umgedreht";
+    public const string Name = "landscape-reversed";
 }
 
 
@@ -230,14 +230,14 @@ public sealed class UmgedrehteSammlung : ICollectionFixture<UmgedreheteLandschaf
 /// </summary>
 /// <remarks>
 /// The rate-limit tests deliberately exhaust limits. If they did that in the
-/// shared landscape, the outcome of <c>LandkarteTests</c> would depend on who
+/// shared landscape, the outcome of <c>RoutingTests</c> would depend on who
 /// ran first — and a test whose outcome depends on the order is worse than
 /// none.
 /// </remarks>
-public sealed class GebremsteLandschaft : Landschaft;
+public sealed class BrakedLandscape : Landscape;
 
 [CollectionDefinition(Name)]
-public sealed class BremsSammlung : ICollectionFixture<GebremsteLandschaft>
+public sealed class BrakeCollection : ICollectionFixture<BrakedLandscape>
 {
-    public const string Name = "landschaft-bremse";
+    public const string Name = "landscape-brake";
 }

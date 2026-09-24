@@ -29,7 +29,7 @@ cd "$(dirname "$0")/.."
 # happens to call.
 export DOTNET_CLI_UI_LANGUAGE=en
 
-suites=(DocumentStore Outbox Skills Ganzes Gateway Identity Consent Profile Resume Portfolio
+suites=(DocumentStore Outbox Skills CrossCutting Gateway Identity Consent Profile Resume Portfolio
         Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment)
 
 red=0

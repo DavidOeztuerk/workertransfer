@@ -2,7 +2,7 @@ using FluentAssertions;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.ServiceDefaults.Checks;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// The build-time twin of <c>wt.ki.keine-zahl</c>, across all fourteen services.
@@ -118,6 +118,10 @@ public class VocabularyTests
     [InlineData("Passungsgrad", true)]
     [InlineData("PassungsGrad", true)]
     [InlineData("WorkloadPercent", true)]
+    [InlineData("PageLength", false)]
+    [InlineData("Country", false)]
+    [InlineData("FitScore", true)]
+    [InlineData("ActivityPoints", true)]
     public void The_detection_matches_exactly_what_is_meant(string name, bool expected) =>
         // Through the SAME rule the check runs, and not through a rebuilt one:
         // a second rule beside the first is the one that goes wrong first.

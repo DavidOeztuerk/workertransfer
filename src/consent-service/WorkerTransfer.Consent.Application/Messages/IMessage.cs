@@ -32,7 +32,7 @@ public interface ICommandMessage<out TResponse> : IRequest<TResponse>, ICommandM
 /// leaves both cache behaviours out of the pipeline entirely.
 /// </para>
 /// <para>
-/// <c>ZwischenspeicherTests</c> pins that absence — for all eleven services, not
+/// <c>QueryCacheTests</c> pins that absence — for all eleven services, not
 /// only this one. It did not exist when this sentence first claimed it did
 /// (found in H2, measurement 4); the promise held, but nothing held it.
 /// </para>

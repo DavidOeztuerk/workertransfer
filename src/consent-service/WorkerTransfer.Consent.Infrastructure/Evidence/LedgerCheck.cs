@@ -19,7 +19,7 @@ namespace WorkerTransfer.Consent.Infrastructure.Evidence;
 /// dated.</para>
 ///
 /// <para><strong>What is read is the EF model, not the source text.</strong> The
-/// same movement as in <c>LoeschempfaengerTests</c> and <c>AuflagenTests</c>: a
+/// same movement as in <c>ErasureRecipientTests</c> and <c>AuflagenTests</c>: a
 /// column arriving through a convention or a base class would stand in no file a
 /// text search looks through. The model is built for this, not queried — it
 /// needs no connection, and this check does not touch the database.</para>

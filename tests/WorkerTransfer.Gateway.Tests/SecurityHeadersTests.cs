@@ -43,86 +43,86 @@ namespace WorkerTransfer.Gateway.Tests;
 /// same defect could come back at the next tidy-up, and from the outside it
 /// would look like an improvement.</para>
 /// </remarks>
-public sealed class SicherheitskoepfeTests
+public sealed class SecurityHeadersTests
 {
-    private const string HerkunftsKopf = "X-Test-Herkunft";
+    private const string OriginHeader = "X-Test-Origin";
 
     /// <summary>The host, in the same order as <c>Program.cs</c>.</summary>
-    private static WebApplication Wirt()
+    private static WebApplication BuildHost()
     {
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
-        bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
-        bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+        builder.Services.Configure<DistributedRateLimitingOptions>(options =>
         {
-            einstellungen.RequestsPerMinute = 0;
-            einstellungen.RequestsPerHour = 0;
-            einstellungen.RequestsPerDay = 0;
-            einstellungen.Subject = RateLimitSubject.Origin;
-            einstellungen.WhitelistedIps = [];
-            einstellungen.WhitelistedEndpoints = [];
-            einstellungen.EndpointSpecificLimits = new Dictionary<string, EndpointRateLimit>(
+            options.RequestsPerMinute = 0;
+            options.RequestsPerHour = 0;
+            options.RequestsPerDay = 0;
+            options.Subject = RateLimitSubject.Origin;
+            options.WhitelistedIps = [];
+            options.WhitelistedEndpoints = [];
+            options.EndpointSpecificLimits = new Dictionary<string, EndpointRateLimit>(
                 StringComparer.Ordinal)
             {
                 ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = 1 }
             };
         });
 
-        var wirt = bau.Build();
+        var host = builder.Build();
 
-        wirt.Use(async (context, weiter) =>
+        host.Use(async (context, next) =>
         {
-            if (context.Request.Headers.TryGetValue(HerkunftsKopf, out var value))
+            if (context.Request.Headers.TryGetValue(OriginHeader, out var value))
             {
                 context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(value.ToString());
             }
 
-            await weiter();
+            await next();
         });
 
-        wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
+        host.UseMiddleware<DistributedRateLimitingMiddleware>();
 
         // Stands for what Ocelot otherwise passes through: a foreign page that
         // brings its own headers with it (or precisely none).
-        wirt.Run(async context =>
+        host.Run(async context =>
         {
             context.Response.ContentType = "text/html";
-            await context.Response.WriteAsync("<!doctype html><p>durchgereicht");
+            await context.Response.WriteAsync("<!doctype html><p>passed through");
         });
 
-        return wirt;
+        return host;
     }
 
-    private static HttpClient Browser(WebApplication wirt) =>
+    private static HttpClient Browser(WebApplication host) =>
         new()
         {
             BaseAddress = new Uri(
-                wirt.Urls.First(u => u.StartsWith("http://", StringComparison.Ordinal)))
+                host.Urls.First(url => url.StartsWith("http://", StringComparison.Ordinal)))
         };
 
     /// <summary>Signing in twice at a limit of one — the second one is the 429.</summary>
-    private static async Task<HttpResponseMessage> Abgewiesen(WebApplication wirt, string herkunft)
+    private static async Task<HttpResponseMessage> Rejected(WebApplication host, string origin)
     {
-        using var browser = Browser(wirt);
-        browser.DefaultRequestHeaders.Add(HerkunftsKopf, herkunft);
+        using var browser = Browser(host);
+        browser.DefaultRequestHeaders.Add(OriginHeader, origin);
 
-        using var erster = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
-        (await browser.PostAsync("/auth/login", erster)).Dispose();
+        using var first = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        (await browser.PostAsync("/auth/login", first)).Dispose();
 
-        using var zweiter = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
-        return await browser.PostAsync("/auth/login", zweiter);
+        using var second = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+        return await browser.PostAsync("/auth/login", second);
     }
 
     /// <summary>The rejection carries the two headers that matter for it.</summary>
     [Fact]
     public async Task The_rejection_carries_the_headers()
     {
-        await using var wirt = Wirt();
-        await wirt.StartAsync();
+        await using var host = BuildHost();
+        await host.StartAsync();
 
-        using var response = await Abgewiesen(wirt, "10.0.0.1");
+        using var response = await Rejected(host, "10.0.0.1");
 
         response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         response.Headers.GetValues("X-Content-Type-Options").Should().ContainSingle("nosniff");
@@ -136,21 +136,21 @@ public sealed class SicherheitskoepfeTests
     [Fact]
     public async Task What_is_passed_through_gets_no_CSP_from_the_gateway()
     {
-        await using var wirt = Wirt();
-        await wirt.StartAsync();
+        await using var host = BuildHost();
+        await host.StartAsync();
 
-        using var browser = Browser(wirt);
+        using var browser = Browser(host);
         using var response = await browser.GetAsync("/verify");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         response.Headers.Contains("Content-Security-Policy").Should().BeFalse(
-            "eine CSP des Gateways ueber fremdem HTML verbietet Vites inline-Einstieg "
-            + "und seine blob:-Worker — die Seite bleibt weiss");
+            "a gateway CSP over foreign HTML forbids Vite's inline entry and "
+            + "its blob: workers — the page stays white");
 
         response.Headers.TryGetValues("Content-Security-Policy", out var values);
         (values ?? []).Should().NotContain(
             value => value.Contains("upgrade-insecure-requests", StringComparison.Ordinal),
-            "der Browser schriebe http://localhost:8090 auf https:// um, wo niemand hoert");
+            "the browser would rewrite http://localhost:8090 to https://, where nobody listens");
     }
 }

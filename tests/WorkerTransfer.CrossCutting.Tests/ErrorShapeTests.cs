@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WorkerTransfer.ServiceDefaults;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What <see cref="ProblemDetailsMiddleware"/> makes of a thrown exception.
@@ -27,30 +27,30 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// validator somebody writes.
 /// </para>
 /// </remarks>
-public sealed class FehlergestaltTests
+public sealed class ErrorShapeTests
 {
-    private static WebApplication Wirt(Func<Task> was)
+    private static WebApplication BuildHost(Func<Task> action)
     {
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
 
-        var wirt = bau.Build();
-        wirt.UseMiddleware<ProblemDetailsMiddleware>();
-        wirt.Map("/werfen", async () => await was());
+        var host = builder.Build();
+        host.UseMiddleware<ProblemDetailsMiddleware>();
+        host.Map("/throw", async () => await action());
 
-        return wirt;
+        return host;
     }
 
-    private static async Task<(HttpStatusCode Code, JsonElement Rumpf, string? Typ)> Frag(
-        WebApplication wirt, HttpRequestMessage request)
+    private static async Task<(HttpStatusCode Code, JsonElement Body, string? Type)> Ask(
+        WebApplication host, HttpRequestMessage request)
     {
-        using var browser = new HttpClient { BaseAddress = new Uri(wirt.Urls.First()) };
+        using var browser = new HttpClient { BaseAddress = new Uri(host.Urls.First()) };
         using var response = await browser.SendAsync(request);
-        var roh = await response.Content.ReadAsStringAsync();
+        var raw = await response.Content.ReadAsStringAsync();
 
         return (response.StatusCode,
-                JsonDocument.Parse(roh).RootElement,
+                JsonDocument.Parse(raw).RootElement,
                 response.Content.Headers.ContentType?.MediaType);
     }
 
@@ -73,40 +73,40 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task An_aborted_call_does_not_become_a_server_error()
     {
-        var protokoll = new Sammelprotokoll();
+        var log = new CollectingLog();
 
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
-        bau.Logging.AddProvider(protokoll);
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(log);
 
-        var wirt = bau.Build();
-        wirt.UseMiddleware<ProblemDetailsMiddleware>();
-        wirt.Map("/langsam", async (HttpContext context) =>
+        var host = builder.Build();
+        host.UseMiddleware<ProblemDetailsMiddleware>();
+        host.Map("/slow", async (HttpContext context) =>
             await Task.Delay(TimeSpan.FromSeconds(30), context.RequestAborted));
 
-        await wirt.StartAsync();
+        await host.StartAsync();
 
         try
         {
-            using var browser = new HttpClient { BaseAddress = new Uri(wirt.Urls.First()) };
+            using var browser = new HttpClient { BaseAddress = new Uri(host.Urls.First()) };
             using var cancellationToken = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
-            var attempt = async () => await browser.GetAsync("/langsam", cancellationToken.Token);
+            var attempt = async () => await browser.GetAsync("/slow", cancellationToken.Token);
 
             await attempt.Should().ThrowAsync<TaskCanceledException>(
-                "der Aufrufer legt selbst auf");
+                "the caller hangs up by itself");
 
             // Give the service time to process the abort.
             await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-            protokoll.Fehler.Should().NotContain(
+            log.Errors.Should().NotContain(
                 row => row.Contains("Unhandled request exception", StringComparison.Ordinal),
-                "ein Aufrufer, der auflegt, ist kein Serverfehler");
+                "a caller who hangs up is no server error");
         }
         finally
         {
-            await wirt.StopAsync();
+            await host.StopAsync();
         }
     }
 
@@ -122,20 +122,20 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task A_timeout_of_our_own_stays_a_server_error()
     {
-        using var wirt = Wirt(() => throw new OperationCanceledException("unser Zeitlimit"));
-        await wirt.StartAsync();
+        using var host = BuildHost(() => throw new OperationCanceledException("our time limit"));
+        await host.StartAsync();
 
         try
         {
-            var (code, body, _) = await Frag(
-                wirt, new HttpRequestMessage(HttpMethod.Get, "/werfen"));
+            var (code, body, _) = await Ask(
+                host, new HttpRequestMessage(HttpMethod.Get, "/throw"));
 
             code.Should().Be(HttpStatusCode.InternalServerError);
             body.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
         }
         finally
         {
-            await wirt.StopAsync();
+            await host.StopAsync();
         }
     }
 
@@ -153,13 +153,13 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task A_broken_body_gives_400()
     {
-        await using var wirt = Wirt(() => throw new BadHttpRequestException(
-            "Failed to read parameter \"ProfilKoerper koerper\" from the request body as JSON.",
+        await using var host = BuildHost(() => throw new BadHttpRequestException(
+            "Failed to read parameter \"ProfileBody body\" from the request body as JSON.",
             StatusCodes.Status400BadRequest));
-        await wirt.StartAsync();
+        await host.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, body, type) = await Frag(wirt, request);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/throw");
+        var (code, body, type) = await Ask(host, request);
 
         code.Should().Be(HttpStatusCode.BadRequest);
         body.GetProperty("detail").GetString().Should().Be("malformed request body");
@@ -177,16 +177,16 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task The_broken_body_does_not_appear_in_the_answer()
     {
-        await using var wirt = Wirt(() => throw new BadHttpRequestException(
-            "Failed to read parameter \"Wert\": Termin bei Dr. Weber",
+        await using var host = BuildHost(() => throw new BadHttpRequestException(
+            "Failed to read parameter \"Remark\": appointment with Dr. Weber",
             StatusCodes.Status400BadRequest));
-        await wirt.StartAsync();
+        await host.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (_, body, _) = await Frag(wirt, request);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/throw");
+        var (_, body, _) = await Ask(host, request);
 
         body.ToString().Should().NotContain("Weber");
-        body.ToString().Should().NotContain("Wert");
+        body.ToString().Should().NotContain("Remark");
     }
 
     /// <summary>A failed validation gives 422 and names the fields.</summary>
@@ -196,17 +196,17 @@ public sealed class FehlergestaltTests
         var error = new[]
         {
             new FluentValidation.Results.ValidationFailure("Email", "email is required"),
-            new FluentValidation.Results.ValidationFailure("Passwort", "password is required")
+            new FluentValidation.Results.ValidationFailure("Password", "password is required")
         };
 
-        await using var wirt = Wirt(() => throw new ValidationException(error));
-        await wirt.StartAsync();
+        await using var host = BuildHost(() => throw new ValidationException(error));
+        await host.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, body, type) = await Frag(wirt, request);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/throw");
+        var (code, body, type) = await Ask(host, request);
 
         code.Should().Be(HttpStatusCode.UnprocessableEntity);
-        body.GetProperty("detail").GetString().Should().Be("invalid: Email, Passwort");
+        body.GetProperty("detail").GetString().Should().Be("invalid: Email, Password");
         type.Should().Be("application/problem+json");
     }
 
@@ -225,14 +225,14 @@ public sealed class FehlergestaltTests
         var error = new[]
         {
             new FluentValidation.Results.ValidationFailure(
-                "Email", "'Email' hat den Wert 'anna@example.org' und ist ungueltig")
+                "Email", "'Email' has the value 'anna@example.org' and is invalid")
         };
 
-        await using var wirt = Wirt(() => throw new ValidationException(error));
-        await wirt.StartAsync();
+        await using var host = BuildHost(() => throw new ValidationException(error));
+        await host.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (_, body, _) = await Frag(wirt, request);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/throw");
+        var (_, body, _) = await Ask(host, request);
 
         body.ToString().Should().NotContain("anna");
         body.ToString().Should().NotContain("example.org");
@@ -243,31 +243,31 @@ public sealed class FehlergestaltTests
     [Fact]
     public async Task An_unexpected_exception_stays_500()
     {
-        await using var wirt = Wirt(() => throw new InvalidOperationException("kaputt"));
-        await wirt.StartAsync();
+        await using var host = BuildHost(() => throw new InvalidOperationException("broken"));
+        await host.StartAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/werfen");
-        var (code, body, _) = await Frag(wirt, request);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/throw");
+        var (code, body, _) = await Ask(host, request);
 
         code.Should().Be(HttpStatusCode.InternalServerError);
         body.GetProperty("detail").GetString().Should().Be("An unexpected error occurred.");
-        body.ToString().Should().NotContain("kaputt", "die Ausnahmemeldung gehoert ins Log, nicht in die Antwort");
+        body.ToString().Should().NotContain("broken", "the exception message belongs in the log, not in the answer");
     }
 }
 
 /// <summary>A log that records only what was reported as an error.</summary>
-internal sealed class Sammelprotokoll : ILoggerProvider
+internal sealed class CollectingLog : ILoggerProvider
 {
     /// <summary>The messages of level "Error" or higher.</summary>
-    public List<string> Fehler { get; } = [];
+    public List<string> Errors { get; } = [];
 
     /// <inheritdoc />
-    public ILogger CreateLogger(string categoryName) => new Schreiber(Fehler);
+    public ILogger CreateLogger(string categoryName) => new Writer(Errors);
 
     /// <inheritdoc />
     public void Dispose() { }
 
-    private sealed class Schreiber(List<string> error) : ILogger
+    private sealed class Writer(List<string> error) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 

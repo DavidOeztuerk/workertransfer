@@ -43,7 +43,7 @@ public static class KeyRing
     /// have to replace them. The table comes into being here and not in a
     /// schema migration: it belongs to no domain model, and a <c>DbSet</c> for
     /// it would make it look like a SubjectKeyedTable in
-    /// <c>LoeschempfaengerTests</c>.</para>
+    /// <c>ErasureRecipientTests</c>.</para>
     /// </remarks>
     /// <typeparam name="TContext">The context whose database holds the ring.</typeparam>
     /// <param name="services">The container.</param>

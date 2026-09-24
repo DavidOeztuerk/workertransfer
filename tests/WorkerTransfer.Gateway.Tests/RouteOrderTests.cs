@@ -14,8 +14,8 @@ namespace WorkerTransfer.Gateway.Tests;
 /// the bottom: the same questions to the same map, only loaded backwards.
 /// </para>
 /// </remarks>
-[Collection(UmgedrehteSammlung.Name)]
-public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
+[Collection(ReversedCollection.Name)]
+public class RouteOrderTests(ReversedLandscape landscape)
 {
     /// <summary>The exceptions — exactly the ones that fall over without a priority.</summary>
     [Theory]
@@ -23,14 +23,14 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies/me/jobs", "jobs")]
     [InlineData("/companies/me/application-stats", "applications")]
     [InlineData("/companies/me/profile", "companies")]
-    [InlineData("/companies/by-slug/muster-gmbh", "companies")]
+    [InlineData("/companies/by-slug/example-ltd", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task The_exceptions_win_backwards_too(string path, string erwartet)
+    public async Task The_exceptions_win_backwards_too(string path, string expected)
     {
-        var (service, _) = await landschaft.Frage(path);
+        var (service, _) = await landscape.Ask(path);
 
-        service.Should().Be(erwartet);
+        service.Should().Be(expected);
     }
 
     /// <summary>And the ordinary cases stay where they are.</summary>
@@ -39,11 +39,11 @@ public class ReihenfolgeTests(UmgedreheteLandschaft landschaft)
     [InlineData("/companies", "identity")]
     [InlineData("/jobs", "jobs")]
     [InlineData("/notifications", "notification")]
-    public async Task The_ordinary_cases_stay_backwards_too(string path, string erwartet)
+    public async Task The_ordinary_cases_stay_backwards_too(string path, string expected)
     {
-        var (service, _) = await landschaft.Frage(path);
+        var (service, _) = await landscape.Ask(path);
 
-        service.Should().Be(erwartet);
+        service.Should().Be(expected);
     }
 
 }

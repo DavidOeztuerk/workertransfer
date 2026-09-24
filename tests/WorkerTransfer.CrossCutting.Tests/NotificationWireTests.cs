@@ -7,11 +7,11 @@ using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Infrastructure.Mail;
 using ApplicationsPost = WorkerTransfer.Applications.Infrastructure.Notification;
-using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Notification;
-using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Notification;
-using WechselPost = WorkerTransfer.Transfer.Infrastructure.Notification;
+using ResumePost = WorkerTransfer.Resume.Infrastructure.Notification;
+using ScoutPost = WorkerTransfer.Scout.Infrastructure.Notification;
+using TransferPost = WorkerTransfer.Transfer.Infrastructure.Notification;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What three services send to <c>notification-service</c>, that service has to
@@ -33,54 +33,54 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// id arrives. That is the promise, and it survives every rename.</para>
 ///
 /// <para><strong>Why no other suite catches it.</strong>
-/// <c>DrahtvertragTests</c> reads declared properties in the API and contracts
+/// <c>WireContractTests</c> reads declared properties in the API and contracts
 /// assemblies. Here the body stands as an <em>anonymous object</em> in the
 /// infrastructure — no declared type, so nothing to check. And no service suite
 /// crosses the seam: in the tests the sender has no receiver, the receiver no
 /// sender.</para>
 /// </remarks>
-public class BenachrichtigungsdrahtTests
+public class NotificationWireTests
 {
-    private static readonly Guid Empfaenger = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+    private static readonly Guid Recipient = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
 
     /// <summary>The body of transfer-service.</summary>
     [Fact]
     public Task Transfer_sends_an_id_that_arrives() =>
-        Check(async (fabrik, einstellungen) =>
-            await new WechselPost.HttpNotifier(
-                fabrik,
-                Options.Create(new WechselPost.NotificationSettings
+        Check(async (factory, address) =>
+            await new TransferPost.HttpNotifier(
+                factory,
+                Options.Create(new TransferPost.NotificationSettings
                 {
-                    Adresse = einstellungen,
+                    Adresse = address,
                     Geheimnis = "probe"
                 }))
-                .DeliverAsync(new SubjectId(Empfaenger), "market_request"));
+                .DeliverAsync(new SubjectId(Recipient), "market_request"));
 
     /// <summary>The body of applications-service.</summary>
     [Fact]
     public Task Applications_send_an_id_that_arrives() =>
-        Check(async (fabrik, einstellungen) =>
+        Check(async (factory, address) =>
             await new ApplicationsPost.HttpNotifier(
-                fabrik,
+                factory,
                 Options.Create(new ApplicationsPost.NotificationSettings
                 {
-                    Adresse = einstellungen,
+                    Adresse = address,
                     Geheimnis = "probe"
                 }))
-                .DeliverAsync(new SubjectId(Empfaenger), "application_status"));
+                .DeliverAsync(new SubjectId(Recipient), "application_status"));
 
     /// <summary>The body of resume-service.</summary>
     [Fact]
     public Task Resume_sends_an_id_that_arrives() =>
-        Check(async (fabrik, einstellungen) =>
-            await new LebenslaufPost.HttpNotifier(
-                fabrik,
-                Options.Create(new LebenslaufPost.NotificationSettings
+        Check(async (factory, address) =>
+            await new ResumePost.HttpNotifier(
+                factory,
+                Options.Create(new ResumePost.NotificationSettings
                 {
-                    Adresse = einstellungen,
+                    Adresse = address,
                     Geheimnis = "probe"
                 }))
-                .DeliverAsync(new SubjectId(Empfaenger), "resume_request"));
+                .DeliverAsync(new SubjectId(Recipient), "resume_request"));
 
     /// <summary>The body of scout-service.</summary>
     /// <remarks>
@@ -92,15 +92,15 @@ public class BenachrichtigungsdrahtTests
     /// </remarks>
     [Fact]
     public Task Scout_sends_an_id_that_arrives() =>
-        Check(async (fabrik, einstellungen) =>
-            await new SpaeherPost.HttpNotifier(
-                fabrik,
-                Options.Create(new SpaeherPost.NotificationSettings
+        Check(async (factory, address) =>
+            await new ScoutPost.HttpNotifier(
+                factory,
+                Options.Create(new ScoutPost.NotificationSettings
                 {
-                    Adresse = einstellungen,
+                    Adresse = address,
                     Geheimnis = "probe"
                 }))
-                .DeliverAsync(new SubjectId(Empfaenger), "profile_discovered"));
+                .DeliverAsync(new SubjectId(Recipient), "profile_discovered"));
 
     /// <summary>
     /// And the fourth hop: <c>notification-service</c> asks
@@ -122,32 +122,32 @@ public class BenachrichtigungsdrahtTests
     [Fact]
     public async Task Notification_asks_identity_with_an_id_that_arrives()
     {
-        var lauscher = new Lauscher();
+        var listener = new Listener();
 
         await new HttpMailer(
-            new Stubfabrik(lauscher),
+            new StubFactory(listener),
             Options.Create(new MailSettings
             {
                 Adresse = "http://probe.invalid",
                 Geheimnis = "probe"
             }),
             NullLogger<HttpMailer>.Instance)
-            .SendAsync(new SubjectId(Empfaenger));
+            .SendAsync(new SubjectId(Recipient));
 
-        lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
+        listener.Body.Should().NotBeNull("nothing was sent");
 
         var contract = typeof(WorkerTransfer.Identity.Api.NotifyEndpoints).Assembly
             .GetTypes()
             .Single(type => type.Name == "NotifyBodyV1");
 
-        var gelesen = JsonSerializer.Deserialize(lauscher.Rumpf!, contract);
+        var read = JsonSerializer.Deserialize(listener.Body!, contract);
 
-        gelesen.Should().NotBeNull();
-        contract.GetProperty("UserId")!.GetValue(gelesen).Should().Be(
-            Empfaenger,
-            "identity liest den Namen, den NotifyBodyV1 deklariert — kommt die "
-            + "Kennung anders, bindet sie still auf Guid.Empty und es geht keine "
-            + "Mail hinaus, ohne dass irgendetwas rot wird");
+        read.Should().NotBeNull();
+        contract.GetProperty("UserId")!.GetValue(read).Should().Be(
+            Recipient,
+            "identity reads the name NotifyBodyV1 declares — if the id arrives "
+            + "under another one, it binds silently to Guid.Empty and no mail goes "
+            + "out, without anything turning red");
     }
 
     /// <summary>
@@ -159,33 +159,33 @@ public class BenachrichtigungsdrahtTests
     /// here would make the test more lenient than reality — and `userId` would
     /// get through again.
     /// </remarks>
-    private static async Task Check(Func<IHttpClientFactory, string, Task> senden)
+    private static async Task Check(Func<IHttpClientFactory, string, Task> send)
     {
-        var lauscher = new Lauscher();
+        var listener = new Listener();
 
-        await senden(new Stubfabrik(lauscher), "http://probe.invalid");
+        await send(new StubFactory(listener), "http://probe.invalid");
 
-        lauscher.Rumpf.Should().NotBeNull("es wurde nichts geschickt");
+        listener.Body.Should().NotBeNull("nothing was sent");
 
-        var gelesen = JsonSerializer.Deserialize<NotifyV1>(lauscher.Rumpf!);
+        var read = JsonSerializer.Deserialize<NotifyV1>(listener.Body!);
 
-        gelesen.Should().NotBeNull();
-        gelesen!.UserId.Should().Be(
-            Empfaenger,
-            "der Empfaenger liest `user_id` — kommt die Kennung als etwas anderes, "
-            + "bindet sie still auf Guid.Empty und der Dienst antwortet 500");
-        gelesen.Kind.Should().NotBeNullOrEmpty("ohne Art gibt es 422");
+        read.Should().NotBeNull();
+        read!.UserId.Should().Be(
+            Recipient,
+            "the receiver reads `user_id` — if the id arrives as anything else, "
+            + "it binds silently to Guid.Empty and the service answers 500");
+        read.Kind.Should().NotBeNullOrEmpty("without a kind the answer is 422");
     }
 
     /// <summary>Takes the body and acknowledges like the real endpoint.</summary>
-    private sealed class Lauscher : HttpMessageHandler
+    private sealed class Listener : HttpMessageHandler
     {
-        public string? Rumpf { get; private set; }
+        public string? Body { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Rumpf = request.Content is null
+            Body = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
@@ -193,7 +193,7 @@ public class BenachrichtigungsdrahtTests
         }
     }
 
-    private sealed class Stubfabrik(HttpMessageHandler handler) : IHttpClientFactory
+    private sealed class StubFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }

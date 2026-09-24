@@ -1,14 +1,14 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
-using JobsEntwurf = WorkerTransfer.Jobs.Infrastructure.Draft;
+using JobsDraft = WorkerTransfer.Jobs.Infrastructure.Draft;
 using JobsPorts = WorkerTransfer.Jobs.Application.Ports;
-using ProfilEntwurf = WorkerTransfer.Profile.Infrastructure.Draft;
-using ProfilPorts = WorkerTransfer.Profile.Application.Ports;
+using ProfileDraft = WorkerTransfer.Profile.Infrastructure.Draft;
+using ProfilePorts = WorkerTransfer.Profile.Application.Ports;
 using ScoutDraft = WorkerTransfer.Scout.Infrastructure.Draft;
 using ScoutPorts = WorkerTransfer.Scout.Application.Ports;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// A failure reports the <strong>kind</strong>, never the content (ADR-0024 §4).
@@ -17,7 +17,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <para>ADR-0024 §4 promises: "Errors report the failure kind, never the
 /// content — a test checks that a network error does not drag the prompt along."
 /// <strong>That test did not exist.</strong> The source was correct; it hung
-/// solely on nobody appending a <c>{fehler.Message}</c> at the next error
+/// solely on nobody appending an <c>{error.Message}</c> at the next error
 /// branch — and that is exactly the most obvious movement, because a failure is
 /// the moment when one wants to see more.</para>
 ///
@@ -30,29 +30,29 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// them would fall behind at the next branch. scout-service's approach drafter
 /// joined when it was translated.</para>
 /// </remarks>
-public class EntwurfsfehlerTests
+public class DraftErrorTests
 {
     /// <summary>What must appear in no message.</summary>
-    private const string Geheim = "Ich bin 1998 aus Aleppo gekommen und pflege meine Mutter.";
+    private const string Secret = "I came from Aleppo in 1998 and I care for my mother.";
 
-    private const string Wunsch = "bitte kuerzer";
+    private const string Wish = "please shorter";
 
     /// <summary>
     /// A connection error names the kind — and does not carry the prompt along.
     /// </summary>
     [Theory]
-    [InlineData("profil")]
-    [InlineData("anzeige")]
-    [InlineData("ansprache")]
+    [InlineData("profile")]
+    [InlineData("advert")]
+    [InlineData("approach")]
     public async Task A_connection_error_does_not_carry_the_prompt_along(string page)
     {
-        var error = await Fange(
+        var error = await Catch(
             page,
-            new Stubhandler(_ => Task.FromException<HttpResponseMessage>(
-                new HttpRequestException("kein Netz"))));
+            new StubHandler(_ => Task.FromException<HttpResponseMessage>(
+                new HttpRequestException("no network"))));
 
-        error.Message.Should().Contain("HttpRequestException", "die Art gehoert hinein");
-        OhneInhalt(error);
+        error.Message.Should().Contain("HttpRequestException", "the kind belongs in it");
+        WithoutContent(error);
     }
 
     /// <summary>
@@ -64,19 +64,19 @@ public class EntwurfsfehlerTests
     /// that text stands in our own log after all, by way of the provider.
     /// </remarks>
     [Theory]
-    [InlineData("profil")]
-    [InlineData("anzeige")]
-    [InlineData("ansprache")]
+    [InlineData("profile")]
+    [InlineData("advert")]
+    [InlineData("approach")]
     public async Task An_error_response_carries_neither_body_nor_prompt(string page)
     {
-        var error = await Fange(page, new Stubhandler(_ =>
+        var error = await Catch(page, new StubHandler(_ =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
             {
-                Content = new StringContent($"invalid_request: '{Geheim}'")
+                Content = new StringContent($"invalid_request: '{Secret}'")
             })));
 
-        error.Message.Should().Contain("400", "der Statuscode ist die Art");
-        OhneInhalt(error);
+        error.Message.Should().Contain("400", "the status code is the kind");
+        WithoutContent(error);
     }
 
     /// <summary>
@@ -90,24 +90,24 @@ public class EntwurfsfehlerTests
     /// Measured as an audit finding; this is the test for it.
     /// </remarks>
     [Theory]
-    [InlineData("profil")]
-    [InlineData("anzeige")]
-    [InlineData("ansprache")]
+    [InlineData("profile")]
+    [InlineData("advert")]
+    [InlineData("approach")]
     public async Task A_timeout_becomes_a_provider_error(string page)
     {
-        var error = await Fange(
+        var error = await Catch(
             page,
-            new Stubhandler(async marke =>
+            new StubHandler(async token =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(30), marke);
+                await Task.Delay(TimeSpan.FromSeconds(30), token);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }),
-            zeitlimit: TimeSpan.FromMilliseconds(80));
+            timeLimit: TimeSpan.FromMilliseconds(80));
 
         // All three services name the kind in the same word since their
         // translation. Either way it is the KIND, never the content.
         error.Message.Should().Contain("timeout");
-        OhneInhalt(error);
+        WithoutContent(error);
     }
 
     /// <summary>
@@ -120,107 +120,107 @@ public class EntwurfsfehlerTests
     /// some of the time.
     /// </remarks>
     [Theory]
-    [InlineData("profil")]
-    [InlineData("anzeige")]
-    [InlineData("ansprache")]
+    [InlineData("profile")]
+    [InlineData("advert")]
+    [InlineData("approach")]
     public async Task An_abort_by_the_caller_stays_an_abort(string page)
     {
         using var cancellationToken = new CancellationTokenSource();
 
-        var handler = new Stubhandler(async marke =>
+        var handler = new StubHandler(async token =>
         {
             await cancellationToken.CancelAsync();
-            await Task.Delay(TimeSpan.FromSeconds(30), marke);
+            await Task.Delay(TimeSpan.FromSeconds(30), token);
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var tat = async () => await Entwirf(page, handler, TimeSpan.FromSeconds(30), cancellationToken.Token);
+        var act = async () => await Draft(page, handler, TimeSpan.FromSeconds(30), cancellationToken.Token);
 
-        await tat.Should().ThrowAsync<OperationCanceledException>(
-            "wer auflegt, meldet keinen Anbieterausfall");
+        await act.Should().ThrowAsync<OperationCanceledException>(
+            "whoever hangs up reports no provider outage");
     }
 
     /// <summary>No message carries content — neither the text nor the wish.</summary>
-    private static void OhneInhalt(Exception error)
+    private static void WithoutContent(Exception error)
     {
-        error.Message.Should().NotContain("Aleppo", "kein Wort aus dem Text der Person");
-        error.Message.Should().NotContain(Geheim);
-        error.Message.Should().NotContain(Wunsch, "auch der Wunsch ist Inhalt");
+        error.Message.Should().NotContain("Aleppo", "no word from the person's text");
+        error.Message.Should().NotContain(Secret);
+        error.Message.Should().NotContain(Wish, "the wish is content too");
     }
 
-    private static async Task<Exception> Fange(
-        string page, Stubhandler handler, TimeSpan? zeitlimit = null)
+    private static async Task<Exception> Catch(
+        string page, StubHandler handler, TimeSpan? timeLimit = null)
     {
         try
         {
-            await Entwirf(page, handler, zeitlimit ?? TimeSpan.FromSeconds(30), default);
+            await Draft(page, handler, timeLimit ?? TimeSpan.FromSeconds(30), default);
         }
         catch (Exception error)
         {
             return error;
         }
 
-        throw new InvalidOperationException("es fiel keine Ausnahme — der Test prueft dann nichts");
+        throw new InvalidOperationException("no exception was thrown — the test then checks nothing");
     }
 
-    private static Task<string> Entwirf(
-        string page, Stubhandler handler, TimeSpan zeitlimit, CancellationToken marke)
+    private static Task<string> Draft(
+        string page, StubHandler handler, TimeSpan timeLimit, CancellationToken token)
     {
-        var fabrik = new Stubfabrik(handler);
+        var factory = new StubFactory(handler);
 
-        if (page == "profil")
+        if (page == "profile")
         {
-            var einstellungen = new ProfilEntwurf.DraftSettings
+            var settings = new ProfileDraft.DraftSettings
             {
                 Schluessel = "probe",
-                Zeitueberschreitung = zeitlimit
+                Zeitueberschreitung = timeLimit
             };
 
-            return new ProfilEntwurf.HttpDrafter(fabrik, Options.Create(einstellungen))
+            return new ProfileDraft.HttpDrafter(factory, Options.Create(settings))
                 .DraftAsync(
-                    new ProfilPorts.DraftSituation("Titel", Geheim, ["Python"], Wunsch), marke);
+                    new ProfilePorts.DraftSituation("Title", Secret, ["Python"], Wish), token);
         }
 
-        if (page == "ansprache")
+        if (page == "approach")
         {
             var scout = new ScoutDraft.DraftSettings
             {
                 Schluessel = "probe",
-                Zeitueberschreitung = zeitlimit
+                Zeitueberschreitung = timeLimit
             };
 
             // The context carries no free text of the person, so the secret
             // travels as the headline — the field that does reach the prompt.
-            return new ScoutDraft.HttpDrafter(fabrik, Options.Create(scout))
+            return new ScoutDraft.HttpDrafter(factory, Options.Create(scout))
                 .DraftAsync(
-                    new ScoutPorts.ApproachSituation(Geheim, ["Python"], ["Python"], Wunsch),
-                    marke);
+                    new ScoutPorts.ApproachSituation(Secret, ["Python"], ["Python"], Wish),
+                    token);
         }
 
-        var jobs = new JobsEntwurf.DraftSettings
+        var jobs = new JobsDraft.DraftSettings
         {
             Schluessel = "probe",
-            Zeitueberschreitung = zeitlimit
+            Zeitueberschreitung = timeLimit
         };
 
-        return new JobsEntwurf.HttpDrafter(fabrik, Options.Create(jobs))
+        return new JobsDraft.HttpDrafter(factory, Options.Create(jobs))
             .DraftAsync(
-                new JobsPorts.AdvertDraft("Titel", Geheim, ["Python"], "Berlin", Wunsch),
-                marke);
+                new JobsPorts.AdvertDraft("Title", Secret, ["Python"], "Berlin", Wish),
+                token);
     }
 
     /// <summary>A factory that always hands out the same stub.</summary>
-    private sealed class Stubfabrik(HttpMessageHandler handler) : IHttpClientFactory
+    private sealed class StubFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
     /// <summary>A handler that does what it was given.</summary>
-    private sealed class Stubhandler(Func<CancellationToken, Task<HttpResponseMessage>> tat)
+    private sealed class StubHandler(Func<CancellationToken, Task<HttpResponseMessage>> act)
         : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken) =>
-            tat(cancellationToken);
+            act(cancellationToken);
     }
 }

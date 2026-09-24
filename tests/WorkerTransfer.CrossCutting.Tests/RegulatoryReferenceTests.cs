@@ -4,7 +4,7 @@ using Noelia.Abstractions.Compliance;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.ServiceDefaults.Checks;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>Evidence, not compliance — and as a test.</summary>
 /// <remarks>
@@ -26,16 +26,20 @@ public class RegulatoryReferenceTests
 {
     /// <summary>Words that make a promise nobody here may give.</summary>
     /// <remarks>
-    /// The values stay German because the documents this guards are German.
+    /// The German values stay because the documents this guards are German.
     /// <c>attest</c> is on the list: in German an "Attest" is every bit as much
     /// a certificate as a Certificate is, so the English escape the American
-    /// vendors take does not work here.
+    /// vendors take does not work here. The English words beside them catch a
+    /// citation somebody writes in English — a list that only knows German
+    /// would wave "GDPR compliance" through.
     /// </remarks>
     public static IReadOnlyList<string> Forbidden { get; } =
     [
         "zertifi", "zertifikat", "konform", "compliant", "certif",
         "bescheinig", "attest", "auditiert", "geprüft durch", "erfüllt art",
-        "dsgvo-konform"
+        "dsgvo-konform",
+        "conform", "compliance", "complies", "audited", "verified by",
+        "checked by", "fulfils art", "fulfills art"
     ];
 
     /// <summary>No citation settles its own article.</summary>
@@ -93,6 +97,9 @@ public class RegulatoryReferenceTests
     [InlineData("Hiermit zertifiziert.", true)]
     [InlineData("Wir bescheinigen die Einhaltung.", true)]
     [InlineData("Geprüft durch eine unabhängige Stelle.", true)]
+    [InlineData("Evidence for Art. 30 (1).", false)]
+    [InlineData("Ensures GDPR compliance.", true)]
+    [InlineData("Verified by an independent body.", true)]
     public void The_word_list_matches_exactly_what_is_meant(string sentence, bool expected) =>
         Forbidden.Any(word => sentence.Contains(word, StringComparison.OrdinalIgnoreCase))
             .Should().Be(expected);

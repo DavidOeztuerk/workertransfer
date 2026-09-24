@@ -2,7 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using Noelia.Application.Interfaces;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// No query may be cached (ADR-0013).
@@ -17,7 +17,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// consent.</strong> It is not meant to answer the question "is THIS query
 /// sensitive", but to prevent anybody from having to answer it. Almost every
 /// read query in this system hangs indirectly on a consent check:
-/// <c>KandidatenAbfrage</c> asks the ledger directly, <c>ForeignProfileQuery</c>
+/// <c>CandidatesQuery</c> asks the ledger directly, <c>ForeignProfileQuery</c>
 /// does too, and what looks harmless today gets a gate in front of it tomorrow.
 /// Whoever really wants to cache a query has to change this test and, in doing
 /// so, write down why the query neither contains a check nor depends on one —
@@ -26,22 +26,22 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <para><strong>What this test replaces.</strong> Five services carry the
 /// sentence in the source that nobody here implements <c>ICacheableQuery</c>,
 /// which is why <c>AddCQRS</c> leaves both cache behaviours out of the chain —
-/// and <c>IAbfrage</c> even claimed a test pinned it. <strong>That test did not
+/// and <c>IQueryMessage</c> even claimed a test pinned it. <strong>That test did not
 /// exist.</strong> Measured in H2, measurement 4: the promise was true, but it
 /// hung solely on nobody ever writing that one line.</para>
 ///
 /// <para>The check is made on the <em>type</em>, not on the source: a regular
 /// expression would miss a base class that brings the interface with it.</para>
 /// </remarks>
-public class ZwischenspeicherTests
+public class QueryCacheTests
 {
     /// <summary>One type from each service's application layer.</summary>
     /// <remarks>
     /// The assembly is found through it. A new service belongs here — if
     /// somebody forgets it, this test does not check it, and that is why the
-    /// count stands below: eleven, not "at least one".
+    /// count stands below: thirteen, not "at least one".
     /// </remarks>
-    public static TheoryData<string, Type> Dienste => new()
+    public static TheoryData<string, Type> Services => new()
     {
         { "identity", typeof(Identity.Application.SignIn.SessionStateQuery) },
         { "consent", typeof(Consent.Application.Consents.CheckConsentQuery) },
@@ -70,19 +70,19 @@ public class ZwischenspeicherTests
 
     /// <summary>No type of a service implements <c>ICacheableQuery</c>.</summary>
     [Theory]
-    [MemberData(nameof(Dienste))]
-    public void No_query_may_be_cached(string service, Type ausDerSchicht)
+    [MemberData(nameof(Services))]
+    public void No_query_may_be_cached(string service, Type fromLayer)
     {
-        var speicherbare = ausDerSchicht.Assembly
+        var cacheable = fromLayer.Assembly
             .GetTypes()
             .Where(type => typeof(ICacheableQuery).IsAssignableFrom(type))
             .Where(type => type is { IsInterface: false, IsAbstract: false })
             .Select(type => type.FullName)
             .ToArray();
 
-        speicherbare.Should().BeEmpty(
-            "{0} darf nichts zwischenspeichern: eine Ruecknahme muss beim "
-            + "naechsten Lesen wirken (ADR-0013)", service);
+        cacheable.Should().BeEmpty(
+            "{0} must not cache anything: a withdrawal has to take effect on "
+            + "the next read (ADR-0013)", service);
     }
 
     /// <summary>
@@ -97,16 +97,16 @@ public class ZwischenspeicherTests
     [Fact]
     public void The_list_covers_every_service()
     {
-        var services = Dienste.Select(row => (string)row[0]!).ToArray();
+        var services = Services.Select(row => (string)row[0]!).ToArray();
 
         services.Should().HaveCount(13);
         services.Should().OnlyHaveUniqueItems();
 
-        foreach (var row in Dienste)
+        foreach (var row in Services)
         {
             var type = (Type)row[1]!;
             type.Assembly.GetTypes().Should().NotBeEmpty(
-                "die Assembly von {0} muss wirklich geladen sein", type.FullName);
+                "the assembly of {0} has to be really loaded", type.FullName);
         }
     }
 }

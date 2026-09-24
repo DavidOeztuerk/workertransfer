@@ -32,7 +32,7 @@ builder.Services.AddOcelot(builder.Configuration);
 //     only routes. `Noelia.Http` brings NONE with it.
 //
 // The five limits still stand in `ocelot.json`, next to the routes they are
-// selected from. `BremsenkarteTests` still pins that every braked path really
+// selected from. `BrakeTests` still pins that every braked path really
 // has a route — the promise outlives the file.
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
@@ -48,7 +48,7 @@ var app = builder.Build();
 //               of the load balancer — the brake would then be the outage.
 //   Correlation before the brake, so that a 429 carries its id too: whoever
 //               complains about being locked out should be able to name one.
-app.UseGesundheit();
+app.UseHealthProbes();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<DistributedRateLimitingMiddleware>();
 

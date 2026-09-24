@@ -13,14 +13,14 @@ namespace WorkerTransfer.Gateway;
 /// with it.
 /// </para>
 /// </remarks>
-public static class Gesundheit
+public static class HealthProbes
 {
     /// <summary>Hangs the probes into the chain — before Ocelot.</summary>
-    public static IApplicationBuilder UseGesundheit(this IApplicationBuilder app)
+    public static IApplicationBuilder UseHealthProbes(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        return app.Use(async (context, weiter) =>
+        return app.Use(async (context, next) =>
         {
             var path = context.Request.Path.Value;
 
@@ -31,7 +31,7 @@ public static class Gesundheit
                 return;
             }
 
-            await weiter();
+            await next();
         });
     }
 }

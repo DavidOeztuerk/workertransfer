@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Contracts.Erasure;
 using WorkerTransfer.ServiceDefaults;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// Whoever holds rows about people MUST be a recipient of the erasure
@@ -26,17 +26,17 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// Python tree; this suite is its successor, not its replacement.
 /// </para>
 /// </remarks>
-public class LoeschempfaengerTests
+public class ErasureRecipientTests
 {
     /// <summary>The column names that name a natural person.</summary>
-    private static readonly string[] Personenspalten = ["subject_id", "user_id"];
+    private static readonly string[] PersonColumns = ["subject_id", "user_id"];
 
     /// <summary>Every service with its context and its name in the cascade.</summary>
     /// <remarks>
     /// The name is the one <c>ErasureRecipient.Services</c> carries and the one
     /// identity-service looks up in <c>Erasure__Adressen__&lt;name&gt;</c>.
     /// </remarks>
-    public static TheoryData<string, Type> Dienste => new()
+    public static TheoryData<string, Type> Services => new()
     {
         { "identity", typeof(Identity.Infrastructure.Persistence.IdentityDbContext) },
         { "consent", typeof(Consent.Infrastructure.Persistence.ConsentDbContext) },
@@ -65,37 +65,37 @@ public class LoeschempfaengerTests
     /// acknowledgement.
     /// </remarks>
     [Theory]
-    [MemberData(nameof(Dienste))]
+    [MemberData(nameof(Services))]
     public void A_recipient_is_exactly_whoever_holds_a_row_per_person(string name, Type context)
     {
-        var (columns, personenzeilen) = Modell(context);
+        var (columns, subjectKeyed) = ReadModel(context);
 
         // Two signals, and both are needed. Mostly the person stands in a
         // column; with some aggregates the person IS the key, and then the
         // column is simply called `id`. Whoever searches only by column names
         // misses profile, portfolio and github — measured, on the first run of
         // this suite.
-        var haeltMenschen =
-            columns.Intersect(Personenspalten, StringComparer.Ordinal).Any() || personenzeilen;
+        var holdsPeople =
+            columns.Intersect(PersonColumns, StringComparer.Ordinal).Any() || subjectKeyed;
 
         // identity is the origin of the cascade, not its recipient: its own
         // tables fall last and over a note of their own.
         if (name == "identity")
         {
-            haeltMenschen.Should().BeTrue("sonst prüft dieser Test nichts");
+            holdsPeople.Should().BeTrue("otherwise this test checks nothing");
             ErasureRecipient.Services.Should().NotContain(name);
             return;
         }
 
-        if (haeltMenschen)
+        if (holdsPeople)
         {
             ErasureRecipient.Services.Should().Contain(
-                name, $"{name} hält eine Zeile je Mensch");
+                name, $"{name} holds a row per person");
         }
         else
         {
             ErasureRecipient.Services.Should().NotContain(
-                name, $"{name} hält nichts über einen natürlichen Menschen");
+                name, $"{name} holds nothing about a natural person");
         }
     }
 
@@ -103,33 +103,33 @@ public class LoeschempfaengerTests
     [Fact]
     public void The_list_names_only_services_that_exist()
     {
-        var bekannt = Dienste.Select(row => (string)row[0]!).ToHashSet(StringComparer.Ordinal);
+        var known = Services.Select(row => (string)row[0]!).ToHashSet(StringComparer.Ordinal);
 
-        ErasureRecipient.Services.Should().BeSubsetOf(bekannt);
+        ErasureRecipient.Services.Should().BeSubsetOf(known);
     }
 
     /// <summary>What a context really creates: column names and subject-keyed tables.</summary>
-    private static (IReadOnlyCollection<string> Spalten, bool Personenzeilen) Modell(Type context)
+    private static (IReadOnlyCollection<string> Columns, bool SubjectKeyed) ReadModel(Type context)
     {
         var type = typeof(DbContextOptionsBuilder<>).MakeGenericType(context);
-        var bauer = (DbContextOptionsBuilder)Activator.CreateInstance(type)!;
+        var builder = (DbContextOptionsBuilder)Activator.CreateInstance(type)!;
 
         // Npgsql, because the contexts map Postgres types (jsonb, citext,
         // enumerations). It never connects — only the model is built.
-        bauer.UseNpgsql("Host=modell;Database=modell");
+        builder.UseNpgsql("Host=model;Database=model");
 
-        using var instanz = (DbContext)Activator.CreateInstance(context, bauer.Options)!;
+        using var instance = (DbContext)Activator.CreateInstance(context, builder.Options)!;
 
-        var typen = instanz.Model.GetEntityTypes().ToList();
+        var types = instance.Model.GetEntityTypes().ToList();
 
         return (
             [
-                .. typen
-                    .SelectMany(entitaet => entitaet.GetProperties())
-                    .Select(eigenschaft => eigenschaft.GetColumnName())
+                .. types
+                    .SelectMany(entity => entity.GetProperties())
+                    .Select(property => property.GetColumnName())
                     .Distinct(StringComparer.Ordinal)
             ],
-            typen.Any(entitaet =>
-                entitaet.FindAnnotation(SubjectKeyedTable.Annotation)?.Value is true));
+            types.Any(entity =>
+                entity.FindAnnotation(SubjectKeyedTable.Annotation)?.Value is true));
     }
 }

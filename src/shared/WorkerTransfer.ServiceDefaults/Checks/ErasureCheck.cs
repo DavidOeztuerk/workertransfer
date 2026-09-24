@@ -28,7 +28,7 @@ public enum ErasureRole
 /// <summary>Can the erasure cascade work, and what remains afterwards as evidence?</summary>
 /// <remarks>
 /// <para><strong>What is measured here, no test sees.</strong>
-/// <c>LoeschempfaengerTests</c> checks the <em>list</em> against the EF models,
+/// <c>ErasureRecipientTests</c> checks the <em>list</em> against the EF models,
 /// and does it well: no service can silently grow a table about people and be
 /// missing from the list. What a test cannot know is whether the doors of
 /// <em>this instance</em> are open and whether the origin knows every address.
@@ -144,7 +144,7 @@ public sealed class ErasureCheck : ISecurityCheck
             + "getan zu haben.",
             "Sobald hier eine Tabelle entsteht, deren Zeile einem Menschen "
             + "gehört, gehört der Dienst in ErasureRecipient.Services — "
-            + "LoeschempfaengerTests liest dafür das EF-Modell und nicht den "
+            + "ErasureRecipientTests liest dafür das EF-Modell und nicht den "
             + "Quelltext.");
 
     private SecurityCheckResult Origin()

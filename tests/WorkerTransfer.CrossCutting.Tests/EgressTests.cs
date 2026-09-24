@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Noelia.Infrastructure.Sovereignty;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What Noelia's egress policy does with OUR addresses — measured before it is
@@ -49,8 +49,8 @@ public sealed class EgressTests
     public void A_container_name_does_not_fall_under_the_default(string address)
     {
         Default().IsAllowed(new Uri(address)).Should().BeFalse(
-            "sonst reichte die Default fuer Dienst-zu-Dienst-Verkehr, und der "
-            + "Test unten waere ueberfluessig");
+            "otherwise the default would suffice for service-to-service traffic, "
+            + "and the test below would be superfluous");
     }
 
     /// <summary>Allowed by name, and then it works.</summary>
@@ -75,7 +75,7 @@ public sealed class EgressTests
             .Should().BeTrue();
 
         // And what is not named stays out — that is the whole purpose.
-        policy.IsAllowed(new Uri("https://telemetrie.beispiel.test/v1/traces"))
+        policy.IsAllowed(new Uri("https://telemetry.example.test/v1/traces"))
             .Should().BeFalse();
     }
 

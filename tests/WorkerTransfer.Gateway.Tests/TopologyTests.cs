@@ -21,19 +21,19 @@ namespace WorkerTransfer.Gateway.Tests;
 /// along with it.
 /// </para>
 /// </remarks>
-public class TopologieTests
+public class TopologyTests
 {
     /// <summary>What the gateway's route map addresses.</summary>
-    private static readonly Lazy<IReadOnlyDictionary<string, int>> Landkarte = new(() =>
+    private static readonly Lazy<IReadOnlyDictionary<string, int>> RouteMap = new(() =>
     {
-        var roh = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ocelot.json"));
+        var raw = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "ocelot.json"));
 
-        using var gelesen = JsonDocument.Parse(
-            roh, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
+        using var parsed = JsonDocument.Parse(
+            raw, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
 
         var targets = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (var route in gelesen.RootElement.GetProperty("Routes").EnumerateArray())
+        foreach (var route in parsed.RootElement.GetProperty("Routes").EnumerateArray())
         {
             foreach (var target in route.GetProperty("DownstreamHostAndPorts").EnumerateArray())
             {
@@ -45,31 +45,31 @@ public class TopologieTests
     });
 
     /// <summary>What compose creates: service name to (SERVICE_DIR, port).</summary>
-    private static readonly Lazy<IReadOnlyDictionary<string, (string Dir, int Hafen)>> Compose =
+    private static readonly Lazy<IReadOnlyDictionary<string, (string Dir, int Port)>> Compose =
         new(() =>
         {
-            var wurzel = Repowurzel();
-            var roh = File.ReadAllText(Path.Combine(wurzel, "docker-compose.yml"));
-            var gelesen = new DeserializerBuilder().Build()
-                .Deserialize<Dictionary<string, object>>(roh);
+            var root = RepositoryRoot.Find();
+            var raw = File.ReadAllText(Path.Combine(root, "docker-compose.yml"));
+            var parsed = new DeserializerBuilder().Build()
+                .Deserialize<Dictionary<string, object>>(raw);
 
-            var services = (Dictionary<object, object>)gelesen["services"];
+            var services = (Dictionary<object, object>)parsed["services"];
             var found = new Dictionary<string, (string, int)>(StringComparer.Ordinal);
 
             foreach (var (name, block) in services)
             {
                 if (block is not Dictionary<object, object> fields
-                    || !fields.TryGetValue("environment", out var umgebung)
-                    || umgebung is not Dictionary<object, object> values
+                    || !fields.TryGetValue("environment", out var environment)
+                    || environment is not Dictionary<object, object> values
                     || !values.TryGetValue("SERVICE_DIR", out var dir))
                 {
                     continue;
                 }
 
                 var urls = values["ASPNETCORE_URLS"]!.ToString()!;
-                var hafen = int.Parse(Regex.Match(urls, @":(\d+)").Groups[1].Value);
+                var port = int.Parse(Regex.Match(urls, @":(\d+)").Groups[1].Value);
 
-                found[name.ToString()!] = (dir.ToString()!, hafen);
+                found[name.ToString()!] = (dir.ToString()!, port);
             }
 
             return found;
@@ -78,14 +78,14 @@ public class TopologieTests
     /// <summary>What the chart creates.</summary>
     private static readonly Lazy<IReadOnlyList<Dictionary<object, object>>> Chart = new(() =>
     {
-        var wurzel = Repowurzel();
-        var roh = File.ReadAllText(
-            Path.Combine(wurzel, "deploy", "helm", "workertransfer", "values.yaml"));
+        var root = RepositoryRoot.Find();
+        var raw = File.ReadAllText(
+            Path.Combine(root, "deploy", "helm", "workertransfer", "values.yaml"));
 
-        var gelesen = new DeserializerBuilder().Build()
-            .Deserialize<Dictionary<string, object>>(roh);
+        var parsed = new DeserializerBuilder().Build()
+            .Deserialize<Dictionary<string, object>>(raw);
 
-        return [.. ((List<object>)gelesen["services"]).Cast<Dictionary<object, object>>()];
+        return [.. ((List<object>)parsed["services"]).Cast<Dictionary<object, object>>()];
     });
 
     /// <summary>Every host the route map names is also created.</summary>
@@ -96,19 +96,19 @@ public class TopologieTests
     [Fact]
     public void The_route_map_names_only_services_that_exist()
     {
-        foreach (var (rechner, hafen) in Landkarte.Value)
+        foreach (var (host, port) in RouteMap.Value)
         {
-            if (rechner == "web")
+            if (host == "web")
             {
                 // The interface is not a .NET service and carries no
                 // SERVICE_DIR — it stands in compose all the same.
-                Compose.Value.Should().NotContainKey(rechner);
+                Compose.Value.Should().NotContainKey(host);
                 continue;
             }
 
-            Compose.Value.Should().ContainKey(rechner);
-            Compose.Value[rechner].Hafen.Should().Be(
-                hafen, $"die Landkarte spricht {rechner}:{hafen} an");
+            Compose.Value.Should().ContainKey(host);
+            Compose.Value[host].Port.Should().Be(
+                port, $"the route map addresses {host}:{port}");
         }
     }
 
@@ -116,24 +116,24 @@ public class TopologieTests
     [Fact]
     public void Compose_and_the_chart_describe_the_same_landscape()
     {
-        var ausDemChart = Chart.Value.ToDictionary(
+        var fromChart = Chart.Value.ToDictionary(
             entry => entry["name"].ToString()!,
             entry => (Dir: entry["dir"].ToString()!,
-                        Hafen: int.Parse(entry["port"].ToString()!)),
+                        Port: int.Parse(entry["port"].ToString()!)),
             StringComparer.Ordinal);
 
         // `gateway` stands in compose as a service, but in the chart in a
         // template of its own — it is the entrance, not a neighbour.
-        var ausCompose = Compose.Value
+        var fromCompose = Compose.Value
             .Where(entry => entry.Key != "gateway")
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
 
-        ausDemChart.Keys.Should().BeEquivalentTo(ausCompose.Keys);
+        fromChart.Keys.Should().BeEquivalentTo(fromCompose.Keys);
 
-        foreach (var (name, compose) in ausCompose)
+        foreach (var (name, compose) in fromCompose)
         {
-            ausDemChart[name].Dir.Should().Be(compose.Dir, $"{name}: SERVICE_DIR");
-            ausDemChart[name].Hafen.Should().Be(compose.Hafen, $"{name}: Hafen");
+            fromChart[name].Dir.Should().Be(compose.Dir, $"{name}: SERVICE_DIR");
+            fromChart[name].Port.Should().Be(compose.Port, $"{name}: port");
         }
     }
 
@@ -146,45 +146,30 @@ public class TopologieTests
     [Fact]
     public void Every_service_database_is_created_too()
     {
-        var wurzel = Repowurzel();
+        var root = RepositoryRoot.Find();
         var sql = File.ReadAllText(Path.Combine(
-            wurzel, "scripts", "initdb", "01-create-service-databases.sql"));
+            root, "scripts", "initdb", "01-create-service-databases.sql"));
 
         // Comments away first. Without that a commented-out line read like a
         // created database — measured: the counter-probe "a database is
         // missing" stayed green, because `-- CREATE DATABASE notification` hit
         // the same expression as the real line.
-        var ohneKommentar = Regex.Replace(
+        var withoutComments = Regex.Replace(
             sql, @"^\s*--.*$", string.Empty, RegexOptions.Multiline);
 
-        var angelegt = Regex.Matches(ohneKommentar, @"CREATE DATABASE (\w+)")
+        var created = Regex.Matches(withoutComments, @"CREATE DATABASE (\w+)")
             .Select(hit => hit.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
         // `identity` is created by the Postgres entrypoint itself (POSTGRES_DB).
-        angelegt.Add("identity");
+        created.Add("identity");
 
         foreach (var entry in Chart.Value)
         {
-            var datenbank = entry["database"].ToString()!;
+            var database = entry["database"].ToString()!;
 
-            angelegt.Should().Contain(
-                datenbank, $"{entry["name"]} erwartet die Datenbank {datenbank}");
+            created.Should().Contain(
+                database, $"{entry["name"]} expects the database {database}");
         }
-    }
-
-    /// <summary>Where this repository begins, found by walking upwards.</summary>
-    private static string Repowurzel()
-    {
-        var verzeichnis = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (verzeichnis is not null
-               && !File.Exists(Path.Combine(verzeichnis.FullName, "CLAUDE.md")))
-        {
-            verzeichnis = verzeichnis.Parent;
-        }
-
-        return verzeichnis?.FullName
-            ?? throw new InvalidOperationException("Die Repowurzel wurde nicht gefunden.");
     }
 }

@@ -2,7 +2,7 @@ using System.Reflection;
 using FluentAssertions;
 using YamlDotNet.RepresentationModel;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// Every configuration key compose sets for a service reaches a settings
@@ -188,7 +188,7 @@ public sealed class ComposeKeyTests
         var stream = new YamlStream();
 
         using var reader = new StreamReader(
-            Path.Combine(Postgres_Ersatz2.Repowurzel(), "docker-compose.yml"));
+            Path.Combine(RepositoryRoot.Find(), "docker-compose.yml"));
         stream.Load(reader);
 
         return (YamlMappingNode)stream.Documents[0].RootNode;

@@ -96,7 +96,7 @@ public static class JobsInfrastructure
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(SkillList).Assembly, typeof(JobV1).Assembly]));
 
-        // THE FIELD SET, pinned — and pinned at what runs. `EntwurfsgrenzeTests`
+        // THE FIELD SET, pinned — and pinned at what runs. `DraftBoundaryTests`
         // pins the same set at the tree; this one stands in the evidence. The
         // description stays German: it goes into the German evidence document.
         services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(

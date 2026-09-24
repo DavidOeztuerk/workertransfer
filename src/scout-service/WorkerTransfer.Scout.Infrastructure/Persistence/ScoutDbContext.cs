@@ -28,7 +28,7 @@ public sealed class SearchRow
     /// Who saved it — this service's person column.
     /// </summary>
     /// <remarks>
-    /// By it <c>LoeschempfaengerTests</c> recognises this service as an erasure
+    /// By it <c>ErasureRecipientTests</c> recognises this service as an erasure
     /// recipient (ADR-0027 §4). From this one column on, <c>"scout"</c> belongs
     /// in <c>ErasureRecipient.Services</c>.
     /// </remarks>

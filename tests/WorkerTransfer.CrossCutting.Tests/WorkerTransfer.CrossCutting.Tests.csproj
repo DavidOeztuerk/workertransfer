@@ -18,10 +18,10 @@
   </ItemGroup>
   <ItemGroup>
     <!--
-      Alle vierzehn Infrastrukturen. Das ist der Punkt: diese Reihe prueft, was
-      ueber die Dienstgrenzen hinweg gilt, und kann das nur, wenn sie alle
-      sieht. Jeder neue Dienst gehoert hier hinein — und faellt sonst genau
-      durch die Luecke, die der Loeschwaechter schliesst.
+      All fourteen infrastructures. That is the point: this suite checks what
+      holds across the service boundaries, and it can only do that when it sees
+      all of them. Every new service belongs in here — otherwise it falls
+      through exactly the gap the erasure guard closes.
     -->
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Infrastructure\WorkerTransfer.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\consent-service\WorkerTransfer.Consent.Infrastructure\WorkerTransfer.Consent.Infrastructure.csproj" />

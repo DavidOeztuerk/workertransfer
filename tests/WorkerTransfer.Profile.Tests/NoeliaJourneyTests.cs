@@ -17,7 +17,7 @@ namespace WorkerTransfer.Profile.Tests;
 /// <para><strong>At the wire and not at the class.</strong> Between the check
 /// and what a human reads lie the composition root, the door, the switches and
 /// the escaping in the page — four places where a correct finding can become a
-/// wrong page. <c>NachweisTests</c> in the Ganzes suite checks the checks; this
+/// wrong page. <c>CheckTests</c> in the CrossCutting suite checks the checks; this
 /// suite checks the path.</para>
 ///
 /// <para><strong>The canary is the core.</strong> "No value, no key, no name of

@@ -5,7 +5,7 @@ using WorkerTransfer.Profile.Application.Ports;
 using WorkerTransfer.Profile.Infrastructure.Consent;
 using WorkerTransfer.ServiceDefaults.Checks;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What this field carries is the counter-probe — and it compiles.
@@ -108,8 +108,8 @@ public class CheckTests
 
         finding.References.Should().NotContain(
             reference => reference.Article.Contains("87", StringComparison.Ordinal),
-            "ein Arbeitsrechtsartikel unter einem DSGVO-Regelwerk wäre eine "
-            + "falsche Fundstelle");
+            "a labour-law article under a GDPR regime would be a wrong "
+            + "citation");
     }
 
     // ------------------------------------------------------------- wt.ki.naht
@@ -151,8 +151,8 @@ public class CheckTests
         finding.Status.Should().Be(SecurityCheckStatus.NotApplicable);
         finding.Status.Should().NotBe(
             SecurityCheckStatus.Pass,
-            "ein grüner Haken an etwas, das gar nicht gilt, ist Rauschen in "
-            + "genau dem Dokument, das Rauschen durchschneiden soll");
+            "a green tick on something that does not apply at all is noise in "
+            + "exactly the document meant to cut through noise");
     }
 
     /// <summary>It counts people and names none.</summary>

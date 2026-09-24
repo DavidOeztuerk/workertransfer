@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// Every outgoing call sets a time limit.
@@ -49,7 +49,7 @@ public sealed class TimeLimitTests
 
     private static IEnumerable<string> Sources() =>
         Directory.EnumerateFiles(
-                Path.Combine(Postgres_Ersatz2.Repowurzel(), "src"),
+                Path.Combine(RepositoryRoot.Find(), "src"),
                 "*.cs",
                 SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
@@ -129,23 +129,5 @@ public sealed class TimeLimitTests
         }
 
         found.Should().BeGreaterThan(30, "otherwise this test checks nothing");
-    }
-}
-
-/// <summary>Finds the repository root.</summary>
-internal static class Postgres_Ersatz2
-{
-    public static string Repowurzel()
-    {
-        var verzeichnis = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (verzeichnis is not null
-               && !File.Exists(Path.Combine(verzeichnis.FullName, "WorkerTransfer.slnx")))
-        {
-            verzeichnis = verzeichnis.Parent;
-        }
-
-        return verzeichnis?.FullName
-               ?? throw new InvalidOperationException("Repowurzel nicht gefunden.");
     }
 }

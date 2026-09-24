@@ -9,8 +9,8 @@ namespace WorkerTransfer.Gateway.Tests;
 /// writing it; that is why the real gateway runs here with the shipped file in
 /// front of eleven fakes, and every line is a question to a real address.
 /// </remarks>
-[Collection(LandschaftsSammlung.Name)]
-public class LandkarteTests(Landschaft landschaft)
+[Collection(LandscapeCollection.Name)]
+public class RoutingTests(Landscape landscape)
 {
     /// <summary>The ordinary cases: one prefix, one service.</summary>
     [Theory]
@@ -38,12 +38,12 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/notifications/me", "notification")]
     [InlineData("/assessments", "assessment")]
     [InlineData("/assessments/me", "assessment")]
-    public async Task An_address_lands_at_its_service(string path, string erwartet)
+    public async Task An_address_lands_at_its_service(string path, string expected)
     {
-        var (service, angekommen) = await landschaft.Frage(path);
+        var (service, arrived) = await landscape.Ask(path);
 
-        service.Should().Be(erwartet);
-        angekommen.Should().Be(path, "der Pfad wird durchgereicht, nicht umgeschrieben");
+        service.Should().Be(expected);
+        arrived.Should().Be(path, "the path is passed through, not rewritten");
     }
 
     /// <summary>The superseded path no longer hits a service.</summary>
@@ -59,9 +59,9 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/candidates/7f000001-0000-0000-0000-000000000000")]
     public async Task The_superseded_path_no_longer_hits_a_service(string path)
     {
-        var (service, _) = await landschaft.Frage(path);
+        var (service, _) = await landscape.Ask(path);
 
-        service.Should().Be("<keine Route>");
+        service.Should().Be("<no route>");
     }
 
     /// <summary>
@@ -75,14 +75,14 @@ public class LandkarteTests(Landschaft landschaft)
     [InlineData("/companies/me/jobs", "jobs")]
     [InlineData("/companies/me/application-stats", "applications")]
     [InlineData("/companies/me/profile", "companies")]
-    [InlineData("/companies/by-slug/muster-gmbh", "companies")]
+    [InlineData("/companies/by-slug/example-ltd", "companies")]
     [InlineData("/companies/7f000001-0000-0000-0000-000000000000/profile", "companies")]
     [InlineData("/me/notification-preferences", "notification")]
-    public async Task The_more_precise_rule_wins(string path, string erwartet)
+    public async Task The_more_precise_rule_wins(string path, string expected)
     {
-        var (service, _) = await landschaft.Frage(path);
+        var (service, _) = await landscape.Ask(path);
 
-        service.Should().Be(erwartet);
+        service.Should().Be(expected);
     }
 
     /// <summary>
@@ -119,11 +119,11 @@ public class LandkarteTests(Landschaft landschaft)
     // never needed: identity-service calls jobs-service directly.
     [InlineData("/companies/withdrawal", "jobs")]
     public async Task A_service_entrance_does_not_reach_its_owner(
-        string path, string besitzer)
+        string path, string owner)
     {
-        var (service, _) = await landschaft.Frage(path);
+        var (service, _) = await landscape.Ask(path);
 
-        service.Should().NotBe(besitzer);
+        service.Should().NotBe(owner);
     }
 
     /// <summary>The gateway answers the health probes itself.</summary>
@@ -134,7 +134,7 @@ public class LandkarteTests(Landschaft landschaft)
     [Fact]
     public async Task The_health_probe_is_not_passed_on()
     {
-        using var response = await landschaft.Browser.GetAsync("/health/live");
+        using var response = await landscape.Browser.GetAsync("/health/live");
 
         response.EnsureSuccessStatusCode();
         (await response.Content.ReadAsStringAsync()).Should().Contain("live");
@@ -144,7 +144,7 @@ public class LandkarteTests(Landschaft landschaft)
     [Fact]
     public async Task Without_an_id_one_is_granted()
     {
-        using var response = await landschaft.Browser.GetAsync("/jobs");
+        using var response = await landscape.Browser.GetAsync("/jobs");
 
         response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().NotBeEmpty();
     }
@@ -157,10 +157,10 @@ public class LandkarteTests(Landschaft landschaft)
     public async Task An_id_that_was_brought_along_stays()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/jobs");
-        request.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "meine-kette");
+        request.Headers.TryAddWithoutValidation(CorrelationId.HeaderName, "my-chain");
 
-        using var response = await landschaft.Browser.SendAsync(request);
+        using var response = await landscape.Browser.SendAsync(request);
 
-        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("meine-kette");
+        response.Headers.GetValues(CorrelationId.HeaderName).Single().Should().Be("my-chain");
     }
 }

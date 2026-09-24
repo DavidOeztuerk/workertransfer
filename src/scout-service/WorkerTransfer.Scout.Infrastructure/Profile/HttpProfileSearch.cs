@@ -58,7 +58,7 @@ public sealed class ProfileSettings
 /// the sender's type: the two services share no contract, and a shared type
 /// would be a translation layer that would have to be touched on both sides at
 /// once at a change. That the fields really arrive is pinned by a suite in
-/// <c>WorkerTransfer.Ganzes.Tests</c> — it serialises the sender's type and
+/// <c>WorkerTransfer.CrossCutting.Tests</c> — it serialises the sender's type and
 /// reads it with the receiver's.</para>
 /// </remarks>
 public sealed class HttpProfileSearch(

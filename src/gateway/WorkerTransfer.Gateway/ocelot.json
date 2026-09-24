@@ -1,44 +1,44 @@
-// Die Landkarte des Systems an EINER Stelle.
+// The system's route map, in ONE place.
 //
-// Sie ist der ganze Dienst: das Gateway routet und prueft nichts. Kein Token
-// wird hier gelesen, keine Einwilligung geprueft, keine Rolle erzwungen - das
-// tut jeder Dienst fuer sich, und ein Gateway, das es ebenfalls taete, waere
-// eine zweite Wahrheit ueber dieselbe Frage.
+// It is the whole service: the gateway routes and checks nothing. No token is
+// read here, no consent checked, no role enforced - every service does that
+// for itself, and a gateway that did it as well would be a second truth about
+// the same question.
 //
-// Was hier NICHT steht, ist ebenso wichtig: `/erasure`, `/internal/notify`
-// und `/companies/withdrawal`. Alle drei sind Dienst-zu-Dienst-Eingaenge
-// hinter einem gemeinsamen Geheimnis. Sie ueber den oeffentlichen Ursprung
-// erreichbar zu machen hiesse, "loesche alles ueber diesen Menschen" ins Netz
-// zu stellen, bewacht von einem Kopf. Ohne Route fallen sie auf die
-// Oberflaeche, und die kennt sie nicht.
+// What does NOT stand here matters just as much: `/erasure`, `/internal/notify`
+// and `/companies/withdrawal`. All three are service-to-service entrances
+// behind a shared secret. Making them reachable over the public origin would
+// mean putting "delete everything about this person" on the net, guarded by a
+// header. Without a route they reach none of the services that implement
+// them.
 //
-// `/companies/withdrawal` STAND hier bis D2, mit Prioritaet 100. Aufgefallen
-// ist es erst, als jede Route einzeln mit ihrer erwarteten Antwort geprueft
-// wurde: der Endpunkt antwortete oeffentlich mit 401 und bestaetigte damit,
-// dass es ihn gibt. Gebraucht wurde die Route nie — identity-service ruft
-// jobs-service direkt an (`Erasure__Adressen__jobs`), nicht ueber dieses
-// Gateway, und die Oberflaeche kennt den Pfad nicht.
+// `/companies/withdrawal` DID stand here until D2, with priority 100. It was
+// noticed only when every route was checked one by one against its expected
+// answer: the endpoint answered publicly with 401 and so confirmed that it
+// exists. The route was never needed — identity-service calls jobs-service
+// directly (`Erasure__Adressen__jobs`), not through this gateway, and the
+// interface does not know the path.
 //
-// Kommentare sind erlaubt: der JSON-Konfigurationsanbieter von .NET ueberliest
-// sie. Gemessen, bevor diese Datei so geschrieben wurde - denn eine Landkarte
-// ohne Begruendung ist die Landkarte, aus der jemand die Sec-Fetch-Dest-Regel
-// entfernt, weil sie seltsam aussieht.
+// Comments are allowed: .NET's JSON configuration provider skips them.
+// Measured before this file was written this way - because a route map without
+// reasons is the map from which somebody removes a rule because it looks
+// strange.
 {
   "Routes": [
-    // --- 100/90: die Ausnahmen ----------------------------------------------
+    // --- 100/90: the exceptions --------------------------------------------
     //
-    // Die Pfade der Dienste sind NICHT disjunkt: `/companies/{id}/members`
-    // gehoert identity, `/companies/{id}/profile` gehoert companies - sie
-    // unterscheiden sich erst im letzten Segment. Praefix-Routing allein
-    // reicht also nicht.
+    // The services' paths are NOT disjoint: `/companies/{id}/members`
+    // belongs to identity, `/companies/{id}/profile` belongs to companies -
+    // they differ only in the last segment. Prefix routing alone is therefore
+    // not enough.
     //
-    // WAS `Priority` HIER WIRKLICH TUT, gemessen: sie macht die Landkarte
-    // REIHENFOLGEUNABHAENGIG. Mit diesen Werten aendert das Umdrehen aller
-    // Zeilen nichts; ohne sie entscheidet die Dateireihenfolge, und acht
-    // Routen fallen um. Alle auf denselben Wert zu setzen sah zunaechst
-    // harmlos aus - die Reihe blieb gruen, weil die Zeilen zufaellig richtig
-    // standen. Wer hier unten eine Route anhaengt, soll sich darauf nicht
-    // verlassen muessen; `ReihenfolgeTests` haelt es fest.
+    // WHAT `Priority` REALLY DOES HERE, measured: it makes the route map
+    // INDEPENDENT OF ORDER. With these values reversing all lines changes
+    // nothing; without them the file order decides, and eight routes fall
+    // over. Setting all of them to the same value looked harmless at first -
+    // the suite stayed green because the lines happened to stand in the right
+    // order. Whoever appends a route down here should not have to rely on
+    // that; `RouteOrderTests` pins it.
     {
       "UpstreamPathTemplate": "/jobs/{stelle}/applications",
       "DownstreamPathTemplate": "/jobs/{stelle}/applications",
@@ -99,10 +99,10 @@
       ],
       "Priority": 100
     },
-    // Neu gegenueber der Traefik-Landkarte: `/me` gehoert identity, aber
-    // `/me/notification-preferences` gehoert notification-service. In Python
-    // lagen die Benachrichtigungen noch in identity; seit dem Umzug sind auch
-    // diese beiden Pfade nicht mehr disjunkt.
+    // New compared with the Traefik map: `/me` belongs to identity, but
+    // `/me/notification-preferences` belongs to notification-service. In
+    // Python the notifications still lived in identity; since the move these
+    // two paths are not disjoint any more either.
     {
       "UpstreamPathTemplate": "/me/notification-preferences",
       "DownstreamPathTemplate": "/me/notification-preferences",
@@ -128,13 +128,13 @@
       "Priority": 90
     },
 
-    // --- 10: die Regelfaelle -------------------------------------------------
+    // --- 10: the ordinary cases ---------------------------------------------
     //
-    // Zwei Zeilen je Praefix, weil Ocelot `/auth` und `/auth/login` nicht mit
-    // einem Muster trifft: `{rest}` verlangt ein Segment. Das ist der
-    // sichtbare Preis gegenueber Traefiks `PathPrefix` - dafuer steht hier
-    // jede Adresse, die es gibt, statt eines Musters, das auch Adressen
-    // traefe, die es nicht gibt.
+    // Two lines per prefix, because Ocelot does not hit `/auth` and
+    // `/auth/login` with one pattern: `{rest}` requires a segment. That is the
+    // visible price compared with Traefik's `PathPrefix` - in return every
+    // address that exists stands here, instead of a pattern that would also
+    // hit addresses that do not exist.
     {
       "UpstreamPathTemplate": "/auth",
       "DownstreamPathTemplate": "/auth",
@@ -388,10 +388,10 @@
       "Priority": 10
     },
     {
-      // Schreiben und Überarbeiten streamen Token vom Modell. Ocelot bricht
-      // sonst nach 90 Sekunden ab (DownstreamRoute.DefaultTimeoutSeconds),
-      // obwohl der Brief schon unterwegs ist. Drei Minuten: das Modell darf
-      // langsam sein, ein hängender Dienst nicht ewig.
+      // Writing and revising stream tokens from the model. Otherwise Ocelot
+      // aborts after 90 seconds (DownstreamRoute.DefaultTimeoutSeconds),
+      // although the letter is already on its way. Three minutes: the model
+      // may be slow, a hanging service may not hang for ever.
       "UpstreamPathTemplate": "/applications/{rest}",
       "DownstreamPathTemplate": "/applications/{rest}",
       "DownstreamScheme": "http",
@@ -500,16 +500,15 @@
       ],
       "Priority": 10
     },
-    // Der Scout (ADR-0036). Er hat `/candidates` abgeloest, und diese Route
-    // stand hier bis zum 11.09.2026 daneben — bis die Oberflaeche umgezogen
-    // war. Jetzt ist sie weg: zwei Suchen nebeneinander waeren zwei
-    // Wahrheiten, und `docs/routenkarte.yml` haelt fest, dass der alte Pfad
-    // wirklich nichts mehr beantwortet.
+    // The scout (ADR-0036). It replaced `/candidates`, and that route stood
+    // here beside it until 11.09.2026 — until the interface had moved. Now it
+    // is gone: two searches side by side would be two truths, and
+    // `docs/routenkarte.yml` records that the old path really answers nothing
+    // any more.
     //
-    // NUR `/scout/{rest}` und kein blankes `/scout`: unter diesem Pfad selbst
-    // liegt kein Endpunkt. Eine Route dorthin waere eine Zeile in der
-    // Routenkarte, die nichts beschreibt — und die Karte ist ein Test, keine
-    // Abhakliste.
+    // ONLY `/scout/{rest}` and no bare `/scout`: no endpoint lies under that
+    // path itself. A route there would be a line in the route map that
+    // describes nothing — and the map is a test, not a checklist.
     {
       "UpstreamPathTemplate": "/scout/{rest}",
       "DownstreamPathTemplate": "/scout/{rest}",
@@ -523,14 +522,13 @@
       "Priority": 10
     },
 
-    // Der Berater (ADR-0037). Das Mandat sind vier Werte; die STUFE eines
-    // Gespraechs steht im Ledger und nirgends sonst — dieser Dienst haelt
-    // keine Sichtbarkeit, er erteilt sie im Namen der Person.
+    // The advisor (ADR-0037). The mandate is four values; the STAGE of a
+    // conversation stands in the ledger and nowhere else — this service holds
+    // no visibility, it grants it in the person's name.
     //
-    // NUR `/advisor/{rest}` und kein blankes `/advisor`: unter diesem Pfad
-    // selbst liegt kein Endpunkt. Eine Route dorthin waere eine Zeile in der
-    // Routenkarte, die nichts beschreibt — und die Karte ist ein Test, keine
-    // Abhakliste.
+    // ONLY `/advisor/{rest}` and no bare `/advisor`: no endpoint lies under
+    // that path itself. A route there would be a line in the route map that
+    // describes nothing — and the map is a test, not a checklist.
     {
       "UpstreamPathTemplate": "/advisor/{rest}",
       "DownstreamPathTemplate": "/advisor/{rest}",
@@ -544,16 +542,16 @@
       "Priority": 10
     },
 
-    // Die Arbeitsprobe (ADR-0042). Der Dienst mit dem groessten
-    // Missbrauchspotenzial, und deshalb der mit den engsten Zusagen: der Umfang
-    // in Stunden steht vorne, die Bewertung gehoert dem VORGANG und verlaesst
-    // ihn nie, und die Person liest sie immer — auch nach einem Widerruf.
+    // The work sample (ADR-0042). The service with the greatest potential for
+    // abuse, and therefore the one with the tightest promises: the effort in
+    // hours stands up front, the evaluation belongs to the CASE and never
+    // leaves it, and the person always reads it — even after a revocation.
     //
-    // HIER ZWEI ROUTEN, anders als bei Scout und Berater: unter `/assessments`
-    // selbst liegen zwei Endpunkte (die Firma stellt, die Firma liest ihre
-    // Liste). Ocelot fuehrt `{rest}` nicht ins Leere weiter, also braucht der
-    // blanke Pfad eine eigene Zeile — sonst antwortet er 404, und zwar Ocelots
-    // leeres, das wie ein toter Dienst aussieht.
+    // TWO ROUTES HERE, unlike scout and advisor: two endpoints lie under
+    // `/assessments` itself (the company sets a task, the company reads its
+    // list). Ocelot does not carry `{rest}` on into nothing, so the bare path
+    // needs a line of its own — otherwise it answers 404, and Ocelot's empty
+    // one at that, which looks like a dead service.
     {
       "UpstreamPathTemplate": "/assessments",
       "DownstreamPathTemplate": "/assessments",
@@ -580,33 +578,32 @@
     }
   ],
 
-  // --- Die Bremse ----------------------------------------------------------
+  // --- The brake -----------------------------------------------------------
   //
-  // Sie steht in DIESER Datei und nicht in einer zweiten: die gebremsten Pfade
-  // sind eine Auswahl AUS der Landkarte darueber, und zwei Dateien ueber
-  // dieselben Pfade gehen beim ersten neuen Endpunkt auseinander.
-  // `BremsenkarteTests` laesst rot laufen, was hier steht und dort keine Route
-  // hat.
+  // It stands in THIS file and not in a second one: the braked paths are a
+  // selection FROM the route map above, and two files about the same paths
+  // drift apart at the first new endpoint. `BrakeTests` turns red whatever
+  // stands here and has no route there.
   //
-  // GEZAEHLT WIRD JE HERKUNFT, NIE JE E-MAIL-ADRESSE. Wer je Adresse braemste,
-  // baute genau den Aufzaehlungskanal, den /auth/register schliesst: eine
-  // gebremste Antwort verriete, dass die Adresse existiert. Und er liesse einen
-  // Fremden jeden aussperren, dessen Adresse er kennt.
+  // COUNTED PER ORIGIN, NEVER PER EMAIL ADDRESS. Whoever braked per address
+  // would build exactly the enumeration channel /auth/register closes: a
+  // braked answer would reveal that the address exists. And it would let a
+  // stranger lock out anybody whose address they know.
   //
-  // DIE ZAHLEN SIND GROSSZUEGIG, und das ist Absicht. Hinter einer Herkunft
-  // steht oft ein ganzes Buero mit einer Adresse. Eine Bremse, die dort greift,
-  // waere selbst der Ausfall. Sie soll SCHNELLES Raten unmoeglich machen — nicht
-  // langsames, denn dagegen hilft sie ohnehin nicht, und sie ist auch nicht das
-  // Einzige, was dagegen helfen muss.
-  // Der Abschnitt ist Girders eigener (`DistributedRateLimitingOptions`) — seit
-  // 4.2.0 gibt es hier nichts mehr selbst zu bauen.
+  // THE NUMBERS ARE GENEROUS, and that is on purpose. Behind one origin there
+  // is often a whole office with one address. A brake that bites there would
+  // itself be the outage. It is meant to make FAST guessing impossible — not
+  // slow guessing, because it does not help against that anyway, and it is
+  // not the only thing that has to.
+  // The section is Noelia's own (`DistributedRateLimitingOptions`) — since
+  // Girder 4.2.0 there is nothing left to build here ourselves.
   //
-  // DIE DREI VORGABEN STEHEN AUF 0, UND DAS IST DER GANZE TRICK: eine Grenze von
-  // 0 legt keinen Zaehler an, also zaehlen ausschliesslich die fuenf Pfade
-  // darunter. Ohne das braeche eine Vorgabe ueber allem — durch dieses Gateway
-  // laeuft auch die ganze Oberflaeche, und jeder Bildabruf zaehlte mit.
+  // THE THREE DEFAULTS STAND AT 0, AND THAT IS THE WHOLE TRICK: a limit of 0
+  // writes no counter, so exclusively the five paths below count. Without
+  // that a default would brake over everything — the whole interface travels
+  // through this gateway too, and every asset fetch would count along.
   //
-  // `Subject: Origin` haelt die zweite Zusage: je Herkunft, nie je Benutzer.
+  // `Subject: Origin` keeps the second promise: per origin, never per user.
   "DistributedRateLimiting": {
     "RequestsPerMinute": 0,
     "RequestsPerHour": 0,
@@ -614,36 +611,37 @@
     "Subject": "Origin",
     "EnableEndpointSpecificLimiting": true,
 
-    // Leer, nicht ausgelassen: Loopback steht sonst per Vorgabe darauf, und
-    // dann bremst hier lokal gar nichts — man sieht es nur nicht.
+    // Empty, not left out: otherwise loopback stands on it by default, and
+    // then nothing brakes here locally — you just do not see it.
     "WhitelistedIps": [],
     "WhitelistedEndpoints": [],
 
     "EndpointSpecificLimits": {
-      // Der eigentliche Grund fuer das Ganze: Passwortraten.
+      // The actual reason for all of this: password guessing.
       "/auth/login": { "RequestsPerMinute": 20 },
 
-      // Eine Anmeldung kostet nichts und laesst sich beliebig oft versuchen.
-      // Enger, weil hier Konten entstehen.
+      // A registration costs nothing and can be tried any number of times.
+      // Tighter, because accounts come into being here.
       "/auth/register": { "RequestsPerMinute": 5 },
 
-      // Verschickt eine MAIL. Ohne Bremse ist das ein Verstaerker: ein Fremder
-      // laesst eine Adresse hundertmal anschreiben, die ihm nicht gehoert.
+      // Sends a MAIL. Without a brake this is an amplifier: a stranger has an
+      // address that does not belong to them written to a hundred times.
       "/auth/resend-verification": { "RequestsPerMinute": 3 },
 
-      // Ein Bestaetigungslink wird auch mal zweimal geklickt. Weit genug, dass
-      // das nie stoert, eng genug, dass Token nicht durchprobiert werden.
+      // A confirmation link does get clicked twice now and then. Wide enough
+      // that this never gets in the way, tight enough that tokens cannot be
+      // tried through.
       "/auth/verify-email": { "RequestsPerMinute": 20 },
 
-      // WEIT, mit Absicht: jeder offene Tab erneuert. Zu eng, und ein Mensch
-      // mit sechs Tabs meldet sich staendig selbst ab.
+      // WIDE, on purpose: every open tab refreshes. Too tight, and a person
+      // with six tabs keeps signing themselves out.
       "/auth/refresh": { "RequestsPerMinute": 60 }
     }
   },
 
   "GlobalConfiguration": {
-    // Nur fuer die Adressen, die Ocelot selbst baut. Der Hoerer steht in
-    // ASPNETCORE_URLS und wird vom Behaelter gesetzt.
+    // Only for the addresses Ocelot builds itself. The listener stands in
+    // ASPNETCORE_URLS and is set by the container.
     "BaseUrl": "http://localhost:8090"
   }
 }

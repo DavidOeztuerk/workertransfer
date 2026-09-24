@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using FluentAssertions;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// Every compound field name on the wire stands there expressly.
@@ -10,7 +10,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <remarks>
 /// <para><strong>This platform's wire is snake_case.</strong> Nine services set
 /// it with <c>[JsonPropertyName]</c> on their contract types, and
-/// <c>apps/web</c> reads and writes accordingly. A body <em>without</em> those
+/// <c>web/</c> reads and writes accordingly. A body <em>without</em> those
 /// annotations falls back on camelCase from <c>NoeliaModule.JsonOptions</c> —
 /// and then the same field is called something different on each side.</para>
 ///
@@ -43,10 +43,10 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// on the source: a regular expression would miss a field that comes from a base
 /// type.</para>
 /// </remarks>
-public class DrahtvertragTests
+public class WireContractTests
 {
     /// <summary>One type from each service's API layer.</summary>
-    public static TheoryData<string, Type> ApiSchichten => new()
+    public static TheoryData<string, Type> ApiLayers => new()
     {
         { "identity", typeof(Identity.Api.AuthEndpoints) },
         { "consent", typeof(Consent.Api.ConsentEndpoints) },
@@ -99,15 +99,15 @@ public class DrahtvertragTests
     /// Exactly when another capital letter comes after the first character.
     /// <c>Token</c> does not come apart, <c>DisplayName</c> does.
     /// </remarks>
-    private static bool Zusammengesetzt(string name) =>
+    private static bool IsCompound(string name) =>
         name.Skip(1).Any(char.IsUpper);
 
     /// <summary>No body type leaves a compound name open.</summary>
     [Theory]
-    [MemberData(nameof(ApiSchichten))]
-    public void Compound_names_stand_there_expressly(string service, Type ausDerSchicht)
+    [MemberData(nameof(ApiLayers))]
+    public void Compound_names_stand_there_expressly(string service, Type fromLayer)
     {
-        var offen = ausDerSchicht.Assembly
+        var open = fromLayer.Assembly
             .GetTypes()
             // ALL records, including nested and private ones: `NotifyBodyV1` in
             // identity is a `private sealed record` inside the endpoint class,
@@ -117,32 +117,32 @@ public class DrahtvertragTests
             // Body types are records here; that can be told from the generated clone.
             .Where(type => type.GetMethod("<Clone>$", BindingFlags.Public | BindingFlags.Instance) is not null)
             .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(eigenschaft => Zusammengesetzt(eigenschaft.Name))
-                .Select(eigenschaft => (
-                    Name: $"{type.Name}.{eigenschaft.Name}",
-                    Draht: eigenschaft.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name))
+                .Where(property => IsCompound(property.Name))
+                .Select(property => (
+                    Name: $"{type.Name}.{property.Name}",
+                    Wire: property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name))
                 // If the annotation is missing, or a capital letter stands in
                 // it, it is not this platform's wire. The second half is not
                 // cosmetics: `NotifyV1` DID carry the annotation — with
                 // the value "userId". A guard that only checks presence would
                 // have waved that through and cemented the second dialect.
-                .Where(entry => entry.Draht is null || entry.Draht.Any(char.IsUpper))
-                .Select(entry => entry.Draht is null
+                .Where(entry => entry.Wire is null || entry.Wire.Any(char.IsUpper))
+                .Select(entry => entry.Wire is null
                     ? entry.Name
-                    : $"{entry.Name} (steht als \"{entry.Draht}\" auf dem Draht)"))
+                    : $"{entry.Name} (stands on the wire as \"{entry.Wire}\")"))
             .ToArray();
 
-        offen.Should().BeEmpty(
-            "{0} traegt einen zusammengesetzten Feldnamen ohne [JsonPropertyName]. "
-            + "Ohne ihn heisst das Feld auf dem Draht camelCase, die Oberflaeche "
-            + "schickt snake_case, und der Wert kommt nie an", service);
+        open.Should().BeEmpty(
+            "{0} carries a compound field name without [JsonPropertyName]. "
+            + "Without it the field is camelCase on the wire, the interface "
+            + "sends snake_case, and the value never arrives", service);
     }
 
     /// <summary>The list covers all thirteen API layers and the shared contracts.</summary>
     [Fact]
     public void The_list_covers_every_service()
     {
-        var services = ApiSchichten.Select(row => (string)row[0]!).ToArray();
+        var services = ApiLayers.Select(row => (string)row[0]!).ToArray();
 
         services.Should().HaveCount(27);
         services.Should().OnlyHaveUniqueItems();
@@ -159,6 +159,6 @@ public class DrahtvertragTests
     [InlineData("DisplayName", true)]
     [InlineData("SubjectId", true)]
     [InlineData("RemoteOk", true)]
-    public void The_detection_separates_correctly(string name, bool erwartet) =>
-        Zusammengesetzt(name).Should().Be(erwartet);
+    public void The_detection_separates_correctly(string name, bool expected) =>
+        IsCompound(name).Should().Be(expected);
 }

@@ -151,7 +151,7 @@ public sealed record DiscoveryNotificationV1(
 /// both at once at every change.</para>
 ///
 /// <para>That the fields really arrive is pinned by
-/// <c>ProfilsuchedrahtTests</c>: it serialises the sender's type and reads it
+/// <c>ProfileSearchWireTests</c>: it serialises the sender's type and reads it
 /// with this one. A comparison of names would not — it would check the same
 /// string twice and break together with it.</para>
 ///

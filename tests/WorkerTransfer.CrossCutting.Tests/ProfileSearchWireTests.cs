@@ -3,7 +3,7 @@ using FluentAssertions;
 using WorkerTransfer.Profile.Contracts;
 using WorkerTransfer.Scout.Contracts;
 
-namespace WorkerTransfer.Ganzes.Tests;
+namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
 /// What profile-service writes, scout-service has to be able to read.
@@ -25,31 +25,31 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// and <c>subject_id</c> and <c>remote_ok</c> are exactly that.</para>
 ///
 /// <para><strong>Why no other suite catches it.</strong>
-/// <c>DrahtvertragTests</c> checks that both sides carry <em>an</em> annotation
+/// <c>WireContractTests</c> checks that both sides carry <em>an</em> annotation
 /// — not that it is the same one. And no service suite crosses the seam: in the
 /// tests the sender has no receiver, the receiver no sender.</para>
 /// </remarks>
-public class ProfilsuchedrahtTests
+public class ProfileSearchWireTests
 {
-    private static readonly Guid Wer = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+    private static readonly Guid Subject = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
 
     /// <summary>A profile survives the seam — with id and remote tick.</summary>
     [Fact]
     public void A_profile_arrives_complete()
     {
-        var geschrieben = JsonSerializer.Serialize(
-            new ProfileHitV1(Wer, "Entwicklerin", "Ich baue verteilte Systeme.", "Berlin", true, ["Go", "PostgreSQL"]));
+        var written = JsonSerializer.Serialize(
+            new ProfileHitV1(Subject, "Developer", "I build distributed systems.", "Berlin", true, ["Go", "PostgreSQL"]));
 
-        var gelesen = JsonSerializer.Deserialize<ForeignProfileV1>(geschrieben);
+        var read = JsonSerializer.Deserialize<ForeignProfileV1>(written);
 
-        gelesen.Should().NotBeNull();
-        gelesen!.SubjectId.Should().Be(Wer, "ohne die Kennung ist ein Treffer niemand");
-        gelesen.Headline.Should().Be("Entwicklerin");
-        gelesen.Bio.Should().Be("Ich baue verteilte Systeme.");
-        gelesen.Location.Should().Be("Berlin");
-        gelesen.RemoteOk.Should().BeTrue(
-            "ein bool hat keine Not-Null-Sperre: er fiele still auf false zurück");
-        gelesen.Skills.Should().Equal("Go", "PostgreSQL");
+        read.Should().NotBeNull();
+        read!.SubjectId.Should().Be(Subject, "without the id a hit is nobody");
+        read.Headline.Should().Be("Developer");
+        read.Bio.Should().Be("I build distributed systems.");
+        read.Location.Should().Be("Berlin");
+        read.RemoteOk.Should().BeTrue(
+            "a bool has no not-null guard: it would fall back to false silently");
+        read.Skills.Should().Equal("Go", "PostgreSQL");
     }
 
     /// <summary>And a page together with its cursor.</summary>
@@ -60,16 +60,16 @@ public class ProfilsuchedrahtTests
     [Fact]
     public void A_page_arrives_with_its_cursor()
     {
-        var geschrieben = JsonSerializer.Serialize(
+        var written = JsonSerializer.Serialize(
             new ProfileHitPageV1(
-                [new ProfileHitV1(Wer, "Entwicklerin", "", "Berlin", false, ["Go"])],
+                [new ProfileHitV1(Subject, "Developer", "", "Berlin", false, ["Go"])],
                 "ZWVpbg=="));
 
-        var gelesen = JsonSerializer.Deserialize<ForeignProfilePageV1>(geschrieben);
+        var read = JsonSerializer.Deserialize<ForeignProfilePageV1>(written);
 
-        gelesen.Should().NotBeNull();
-        gelesen!.Items.Should().ContainSingle().Which.SubjectId.Should().Be(Wer);
-        gelesen.Next.Should().Be("ZWVpbg==");
+        read.Should().NotBeNull();
+        read!.Items.Should().ContainSingle().Which.SubjectId.Should().Be(Subject);
+        read.Next.Should().Be("ZWVpbg==");
     }
 
     /// <summary>
@@ -89,10 +89,10 @@ public class ProfilsuchedrahtTests
              "bio":"z","location":"y","remoteOk":true,"skills":[]}
             """;
 
-        var gelesen = JsonSerializer.Deserialize<ForeignProfileV1>(camelCase);
+        var read = JsonSerializer.Deserialize<ForeignProfileV1>(camelCase);
 
-        gelesen!.SubjectId.Should().Be(
-            Guid.Empty, "genau so band `userId` einmal still auf Guid.Empty");
-        gelesen.RemoteOk.Should().BeFalse();
+        read!.SubjectId.Should().Be(
+            Guid.Empty, "exactly this is how `userId` once bound silently to Guid.Empty");
+        read.RemoteOk.Should().BeFalse();
     }
 }

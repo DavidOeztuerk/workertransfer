@@ -136,7 +136,7 @@ public static class ServiceFoundation
         // selected them." The promises of this tree have exactly that illness in
         // three further places: they are written down and not executable.
         //
-        // And a test cannot cure it. `Adr0022Tests` and `EntwurfsgrenzeTests`
+        // And a test cannot cure it. `Adr0022Tests` and `DraftBoundaryTests`
         // check the TREE; a person's AI access stands in `AiAccessV1` —
         // provider, address, model and key per person at run time —, and the
         // destinations of the egress boundary stand in the environment. Where

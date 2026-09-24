@@ -26,104 +26,104 @@ namespace WorkerTransfer.Gateway.Tests;
 /// even if the brake threw all people into one bucket. That is exactly the bad
 /// defect.
 /// </remarks>
-public sealed class BremseTests
+public sealed class BrakeTests
 {
-    private const string HerkunftsKopf = "X-Test-Herkunft";
+    private const string OriginHeader = "X-Test-Origin";
 
-    private static WebApplication Wirt(int limit, bool auchDieProbe = false)
+    private static WebApplication BuildHost(int limit, bool alsoTheProbe = false)
     {
-        var bau = WebApplication.CreateBuilder();
-        bau.WebHost.UseUrls("http://127.0.0.1:0");
-        bau.Logging.ClearProviders();
-        bau.Services.AddMemoryCache();
-        bau.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
 
         var limits = new Dictionary<string, EndpointRateLimit>(StringComparer.Ordinal)
         {
             ["/auth/login"] = new EndpointRateLimit { RequestsPerMinute = limit }
         };
 
-        if (auchDieProbe)
+        if (alsoTheProbe)
         {
             limits["/health/live"] = new EndpointRateLimit { RequestsPerMinute = limit };
         }
 
-        bau.Services.Configure<DistributedRateLimitingOptions>(einstellungen =>
+        builder.Services.Configure<DistributedRateLimitingOptions>(options =>
         {
             // As in the shipped map: no default over everything, so that ONLY
             // the named paths count.
-            einstellungen.RequestsPerMinute = 0;
-            einstellungen.RequestsPerHour = 0;
-            einstellungen.RequestsPerDay = 0;
-            einstellungen.Subject = RateLimitSubject.Origin;
+            options.RequestsPerMinute = 0;
+            options.RequestsPerHour = 0;
+            options.RequestsPerDay = 0;
+            options.Subject = RateLimitSubject.Origin;
 
             // Loopback stands on the exemption list by default, and in the test
             // everything comes from there — without this line the probe measures
             // a brake that does not count at all.
-            einstellungen.WhitelistedIps = [];
-            einstellungen.WhitelistedEndpoints = [];
-            einstellungen.EndpointSpecificLimits = limits;
+            options.WhitelistedIps = [];
+            options.WhitelistedEndpoints = [];
+            options.EndpointSpecificLimits = limits;
         });
 
-        var wirt = bau.Build();
+        var host = builder.Build();
 
         // ONLY IN THE TEST: set the connection's origin. The generator takes it
         // out of `Connection.RemoteIpAddress`, and over a real socket that is
         // always the same loopback. This stands BEFORE the brake, so that it
         // reads what was set here.
-        wirt.Use(async (context, weiter) =>
+        host.Use(async (context, next) =>
         {
-            if (context.Request.Headers.TryGetValue(HerkunftsKopf, out var value))
+            if (context.Request.Headers.TryGetValue(OriginHeader, out var value))
             {
                 context.Connection.RemoteIpAddress =
                     System.Net.IPAddress.Parse(value.ToString());
             }
 
-            await weiter();
+            await next();
         });
 
         // The same order as in `Program.cs`: the probe first.
-        wirt.UseGesundheit();
-        wirt.UseMiddleware<CorrelationIdMiddleware>();
-        wirt.UseMiddleware<DistributedRateLimitingMiddleware>();
-        wirt.Map("/{**alles}", () => Results.Ok(new { durch = true }));
+        host.UseHealthProbes();
+        host.UseMiddleware<CorrelationIdMiddleware>();
+        host.UseMiddleware<DistributedRateLimitingMiddleware>();
+        host.Map("/{**rest}", () => Results.Ok(new { through = true }));
 
-        return wirt;
+        return host;
     }
 
-    private static async Task<HttpResponseMessage> Anmelden(
-        HttpClient browser, string herkunft, string address = "anna@example.org")
+    private static async Task<HttpResponseMessage> SignIn(
+        HttpClient browser, string origin, string address = "anna@example.org")
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
         {
             Content = new StringContent(
-                JsonSerializer.Serialize(new { email = address, password = "geheim" }),
+                JsonSerializer.Serialize(new { email = address, password = "secret" }),
                 Encoding.UTF8,
                 "application/json")
         };
-        request.Headers.TryAddWithoutValidation(HerkunftsKopf, herkunft);
+        request.Headers.TryAddWithoutValidation(OriginHeader, origin);
 
         return await browser.SendAsync(request);
     }
 
-    private static HttpClient Browser(WebApplication wirt) =>
-        new() { BaseAddress = new Uri(wirt.Urls.First()) };
+    private static HttpClient Browser(WebApplication host) =>
+        new() { BaseAddress = new Uri(host.Urls.First()) };
 
     [Fact]
     public async Task Above_the_limit_a_429_comes()
     {
-        await using var wirt = Wirt(limit: 3);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 3);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
-        var gesehen = new List<HttpStatusCode>();
+        var seen = new List<HttpStatusCode>();
         for (var i = 0; i < 5; i++)
         {
-            using var response = await Anmelden(browser, "10.0.0.1");
-            gesehen.Add(response.StatusCode);
+            using var response = await SignIn(browser, "10.0.0.1");
+            seen.Add(response.StatusCode);
         }
 
-        gesehen.Should().Equal(
+        seen.Should().Equal(
             HttpStatusCode.OK,
             HttpStatusCode.OK,
             HttpStatusCode.OK,
@@ -144,18 +144,18 @@ public sealed class BremseTests
     [Fact]
     public async Task Five_different_addresses_from_one_origin_share_a_bucket()
     {
-        await using var wirt = Wirt(limit: 3);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 3);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
-        var gesehen = new List<HttpStatusCode>();
+        var seen = new List<HttpStatusCode>();
         for (var i = 0; i < 5; i++)
         {
-            using var response = await Anmelden(browser, "10.0.0.1", $"mensch{i}@example.org");
-            gesehen.Add(response.StatusCode);
+            using var response = await SignIn(browser, "10.0.0.1", $"person{i}@example.org");
+            seen.Add(response.StatusCode);
         }
 
-        gesehen.Should().Equal(
+        seen.Should().Equal(
             HttpStatusCode.OK,
             HttpStatusCode.OK,
             HttpStatusCode.OK,
@@ -167,28 +167,28 @@ public sealed class BremseTests
     [Fact]
     public async Task Two_origins_do_not_share_a_bucket()
     {
-        await using var wirt = Wirt(limit: 2);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 2);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
         for (var i = 0; i < 4; i++)
         {
-            (await Anmelden(browser, "10.0.0.1")).Dispose();
+            (await SignIn(browser, "10.0.0.1")).Dispose();
         }
 
-        using var andere = await Anmelden(browser, "10.0.0.2");
+        using var other = await SignIn(browser, "10.0.0.2");
 
-        andere.StatusCode.Should().Be(
+        other.StatusCode.Should().Be(
             HttpStatusCode.OK,
-            "wer nichts getan hat, darf nicht ausgesperrt sein, weil ein anderer geraten hat");
+            "whoever did nothing must not be locked out because somebody else guessed");
     }
 
     [Fact]
     public async Task A_path_that_is_not_listed_is_never_braked()
     {
-        await using var wirt = Wirt(limit: 2);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 2);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
         for (var i = 0; i < 20; i++)
         {
@@ -208,48 +208,48 @@ public sealed class BremseTests
     [Fact]
     public async Task The_rejection_names_no_account()
     {
-        await using var wirt = Wirt(limit: 1);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 1);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
-        (await Anmelden(browser, "10.0.0.1", "anna@example.org")).Dispose();
-        using var abgewiesen = await Anmelden(browser, "10.0.0.1", "anna@example.org");
+        (await SignIn(browser, "10.0.0.1", "anna@example.org")).Dispose();
+        using var rejected = await SignIn(browser, "10.0.0.1", "anna@example.org");
 
-        var body = await abgewiesen.Content.ReadAsStringAsync();
+        var body = await rejected.Content.ReadAsStringAsync();
 
-        body.Should().NotContain("anna", "die Adresse darf in keiner Antwort auftauchen");
+        body.Should().NotContain("anna", "the address must appear in no answer");
         body.Should().NotContain("example.org");
 
-        var gelesen = JsonDocument.Parse(body).RootElement;
-        gelesen.GetProperty("status").GetInt32().Should().Be(429);
+        var parsed = JsonDocument.Parse(body).RootElement;
+        parsed.GetProperty("status").GetInt32().Should().Be(429);
         // The wording is Noelia's. What counts here is the promise above it:
         // it names no account — and cannot, because the brake never reads the
         // body.
-        gelesen.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
-        gelesen.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
-        abgewiesen.Content.Headers.ContentType!.MediaType
+        parsed.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
+        parsed.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
+        rejected.Content.Headers.ContentType!.MediaType
             .Should().Be("application/problem+json");
     }
 
     [Fact]
     public async Task The_rejection_says_when_it_works_again()
     {
-        await using var wirt = Wirt(limit: 1);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 1);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
-        (await Anmelden(browser, "10.0.0.1")).Dispose();
-        using var abgewiesen = await Anmelden(browser, "10.0.0.1");
+        (await SignIn(browser, "10.0.0.1")).Dispose();
+        using var rejected = await SignIn(browser, "10.0.0.1");
 
         // One minute, and that is no longer adjustable: Noelia counts in fixed
         // windows (minute, hour, day). The shipped map stood at one minute
         // anyway, so nothing changes in operation.
-        abgewiesen.Headers.GetValues("Retry-After").Single().Should().Be("60");
-        abgewiesen.Headers.GetValues("X-RateLimit-Limit").Single().Should().Be("1");
-        abgewiesen.Headers.GetValues("X-RateLimit-Remaining").Single().Should().Be("0");
+        rejected.Headers.GetValues("Retry-After").Single().Should().Be("60");
+        rejected.Headers.GetValues("X-RateLimit-Limit").Single().Should().Be("1");
+        rejected.Headers.GetValues("X-RateLimit-Remaining").Single().Should().Be("0");
     }
 
-    // `Das_Fenster_laeuft_ab_und_gibt_wieder_frei` stood here and has gone. It
+    // A test that the window expires and lets go again stood here and has gone. It
     // ran a one-second window and waited 1.5 seconds; Noelia counts in fixed
     // windows, so the same test would now mean waiting a minute.
     //
@@ -274,24 +274,24 @@ public sealed class BremseTests
     [Fact]
     public async Task A_forwarding_header_brought_along_does_not_change_the_bucket()
     {
-        await using var wirt = Wirt(limit: 2);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 2);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
-        var gesehen = new List<HttpStatusCode>();
+        var seen = new List<HttpStatusCode>();
 
         for (var i = 0; i < 4; i++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login");
-            request.Headers.TryAddWithoutValidation(HerkunftsKopf, "10.0.0.1");
+            request.Headers.TryAddWithoutValidation(OriginHeader, "10.0.0.1");
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", $"203.0.113.{i}");
             request.Headers.TryAddWithoutValidation("X-Real-IP", $"198.51.100.{i}");
 
             using var response = await browser.SendAsync(request);
-            gesehen.Add(response.StatusCode);
+            seen.Add(response.StatusCode);
         }
 
-        gesehen.Should().Equal(
+        seen.Should().Equal(
             HttpStatusCode.OK,
             HttpStatusCode.OK,
             HttpStatusCode.TooManyRequests,
@@ -303,17 +303,17 @@ public sealed class BremseTests
     /// </summary>
     /// <remarks>
     /// Here <c>/health/live</c> is deliberately BRAKED ALONG and must answer
-    /// forty times all the same: <c>UseGesundheit()</c> stands before
-    /// <c>UseBremse()</c> and ends the chain earlier. The other way round a
+    /// forty times all the same: <c>UseHealthProbes()</c> stands before
+    /// the brake and ends the chain earlier. The other way round a
     /// braked probe would take the container out of the load balancer — the
     /// brake would itself be the outage, and precisely under load.
     /// </remarks>
     [Fact]
     public async Task The_health_probe_stays_unbraked_even_when_it_is_listed()
     {
-        await using var wirt = Wirt(limit: 2, auchDieProbe: true);
-        await wirt.StartAsync();
-        using var browser = Browser(wirt);
+        await using var host = BuildHost(limit: 2, alsoTheProbe: true);
+        await host.StartAsync();
+        using var browser = Browser(host);
 
         for (var i = 0; i < 40; i++)
         {
@@ -337,17 +337,17 @@ public sealed class BremseTests
     [Fact]
     public void The_shipped_map_brakes_exactly_the_five_auth_paths()
     {
-        var pfade = Bremskarte.Pfade();
+        var paths = BrakeMap.Paths();
 
-        pfade.Keys.Should().BeEquivalentTo(
+        paths.Keys.Should().BeEquivalentTo(
             "/auth/login",
             "/auth/register",
             "/auth/resend-verification",
             "/auth/verify-email",
             "/auth/refresh");
 
-        pfade.Values.Should().OnlyContain(
-            limit => limit > 0, "eine Grenze von null wäre eine Sperre, keine Bremse");
+        paths.Values.Should().OnlyContain(
+            limit => limit > 0, "a limit of zero would be a lock, not a brake");
     }
 
     /// <summary>
@@ -362,7 +362,7 @@ public sealed class BremseTests
     /// </remarks>
     [Fact]
     public void The_shipped_map_has_no_default_over_everything() =>
-        Bremskarte.Vorgaben().Should().AllSatisfy(defaultValue => defaultValue.Should().Be(0));
+        BrakeMap.Defaults().Should().AllSatisfy(defaultValue => defaultValue.Should().Be(0));
 
     /// <summary>
     /// The shipped map multiplies nothing.
@@ -375,7 +375,7 @@ public sealed class BremseTests
     /// </remarks>
     [Fact]
     public void The_shipped_map_multiplies_nothing() =>
-        Bremskarte.Multiplikator().Should().Be(1);
+        BrakeMap.Multiplier().Should().Be(1);
 
     /// <summary>
     /// Every braked path is also a route.
@@ -389,18 +389,18 @@ public sealed class BremseTests
     [Fact]
     public void Every_braked_path_has_a_route()
     {
-        var pfade = Bremskarte.Pfade();
-        var routen = Bremskarte.Routen();
+        var paths = BrakeMap.Paths();
+        var routes = BrakeMap.Routes();
 
-        foreach (var path in pfade.Keys)
+        foreach (var path in paths.Keys)
         {
-            routen.Should().Contain(
-                route => Passt(route, path),
-                $"'{path}' wird gebremst, aber keine Route führt dorthin");
+            routes.Should().Contain(
+                route => Matches(route, path),
+                $"'{path}' is braked, but no route leads there");
         }
     }
 
-    private static bool Passt(string route, string path)
+    private static bool Matches(string route, string path)
     {
         if (string.Equals(route, path, StringComparison.Ordinal))
         {
@@ -408,18 +408,18 @@ public sealed class BremseTests
         }
 
         // `/auth/{rest}` covers `/auth/login`.
-        var klammer = route.IndexOf('{', StringComparison.Ordinal);
+        var brace = route.IndexOf('{', StringComparison.Ordinal);
 
-        return klammer > 0
-               && path.StartsWith(route[..klammer], StringComparison.Ordinal)
-               && path.Length > klammer;
+        return brace > 0
+               && path.StartsWith(route[..brace], StringComparison.Ordinal)
+               && path.Length > brace;
     }
 }
 
 /// <summary>Reads the shipped <c>ocelot.json</c>.</summary>
-internal static class Bremskarte
+internal static class BrakeMap
 {
-    private static JsonElement Wurzel()
+    private static JsonElement Root()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "ocelot.json");
 
@@ -435,11 +435,11 @@ internal static class Bremskarte
     /// Read rather than built: what stands here is exactly what the container
     /// binds. A test against a copy of its own would check its own copy.
     /// </remarks>
-    public static IReadOnlyDictionary<string, int> Pfade()
+    public static IReadOnlyDictionary<string, int> Paths()
     {
-        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
+        var section = Root().GetProperty(DistributedRateLimitingOptions.SectionName);
 
-        return abschnitt.GetProperty("EndpointSpecificLimits").EnumerateObject()
+        return section.GetProperty("EndpointSpecificLimits").EnumerateObject()
             .ToDictionary(
                 entry => entry.Name,
                 entry => entry.Value.GetProperty("RequestsPerMinute").GetInt32(),
@@ -449,29 +449,29 @@ internal static class Bremskarte
     /// <summary>
     /// The three defaults. They MUST be 0 — otherwise every path counts along.
     /// </summary>
-    public static IReadOnlyList<int> Vorgaben()
+    public static IReadOnlyList<int> Defaults()
     {
-        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
+        var section = Root().GetProperty(DistributedRateLimitingOptions.SectionName);
 
         return
         [
-            abschnitt.GetProperty("RequestsPerMinute").GetInt32(),
-            abschnitt.GetProperty("RequestsPerHour").GetInt32(),
-            abschnitt.GetProperty("RequestsPerDay").GetInt32()
+            section.GetProperty("RequestsPerMinute").GetInt32(),
+            section.GetProperty("RequestsPerHour").GetInt32(),
+            section.GetProperty("RequestsPerDay").GetInt32()
         ];
     }
 
     /// <summary>The multiplier, if the map names one.</summary>
-    public static int Multiplikator()
+    public static int Multiplier()
     {
-        var abschnitt = Wurzel().GetProperty(DistributedRateLimitingOptions.SectionName);
+        var section = Root().GetProperty(DistributedRateLimitingOptions.SectionName);
 
-        return abschnitt.TryGetProperty("LimitMultiplier", out var value) ? value.GetInt32() : 1;
+        return section.TryGetProperty("LimitMultiplier", out var value) ? value.GetInt32() : 1;
     }
 
-    public static IReadOnlyList<string> Routen() =>
-        [.. Wurzel().GetProperty("Routes").EnumerateArray()
-            .Select(r => r.GetProperty("UpstreamPathTemplate").GetString()!)];
+    public static IReadOnlyList<string> Routes() =>
+        [.. Root().GetProperty("Routes").EnumerateArray()
+            .Select(route => route.GetProperty("UpstreamPathTemplate").GetString()!)];
 }
 
 /// <summary>
@@ -483,12 +483,12 @@ internal static class Bremskarte
 /// map, and does it lie in the right place? That is a different question, and
 /// both have been wrong individually at one time or another.
 /// <para>
-/// A landscape of its own (<see cref="GebremsteLandschaft"/>), because limits
+/// A landscape of its own (<see cref="BrakedLandscape"/>), because limits
 /// are deliberately exhausted here.
 /// </para>
 /// </remarks>
-[Collection(BremsSammlung.Name)]
-public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
+[Collection(BrakeCollection.Name)]
+public class BrakedGatewayTests(BrakedLandscape landscape)
 {
     /// <summary>
     /// At 3, `/auth/resend-verification` is the tightest limit of the map — and
@@ -498,17 +498,17 @@ public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
     [Fact]
     public async Task The_shipped_chain_really_brakes()
     {
-        var gesehen = new List<HttpStatusCode>();
+        var seen = new List<HttpStatusCode>();
 
         for (var i = 0; i < 5; i++)
         {
-            using var response = await landschaft.Browser.PostAsync(
+            using var response = await landscape.Browser.PostAsync(
                 "/auth/resend-verification", content: null);
-            gesehen.Add(response.StatusCode);
+            seen.Add(response.StatusCode);
         }
 
-        gesehen.Should().EndWith([HttpStatusCode.TooManyRequests]);
-        gesehen.Count(s => s == HttpStatusCode.OK).Should().Be(3);
+        seen.Should().EndWith([HttpStatusCode.TooManyRequests]);
+        seen.Count(status => status == HttpStatusCode.OK).Should().Be(3);
     }
 
     /// <summary>An ordinary path stays unbraked, even when called often.</summary>
@@ -517,7 +517,7 @@ public class GebremstesGatewayTests(GebremsteLandschaft landschaft)
     {
         for (var i = 0; i < 40; i++)
         {
-            using var response = await landschaft.Browser.GetAsync("/jobs");
+            using var response = await landscape.Browser.GetAsync("/jobs");
             response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }

@@ -12,7 +12,7 @@ namespace WorkerTransfer.Gateway.Tests;
 /// and the answer carried <c>X-RateLimit-Limit: 200</c> — a number that appears
 /// nowhere in <c>ocelot.json</c>.</para>
 ///
-/// <para><c>BremsenkarteTests</c> could not find that: it checks that every
+/// <para><c>BrakeTests</c> could not find that: it checks that every
 /// braked path has a route — a statement about the <em>selection</em>, not
 /// about the <em>binding</em>. A configuration that never arrives still has
 /// nothing but valid paths.</para>
@@ -21,28 +21,28 @@ namespace WorkerTransfer.Gateway.Tests;
 /// same file the service reads, binds it to the same type and asks what comes
 /// out.</para>
 /// </remarks>
-public sealed class BremsenbindungTests
+public sealed class BrakeBindingTests
 {
-    private static DistributedRateLimitingOptions Gebunden()
+    private static DistributedRateLimitingOptions Bound()
     {
         var path = Path.Combine(
             AppContext.BaseDirectory, "..", "..", "..", "..", "..",
             "src", "gateway", "WorkerTransfer.Gateway", "ocelot.json");
 
         File.Exists(path).Should().BeTrue(
-            "diese Reihe liest die ECHTE Landkarte — eine Kopie wuerde die "
-            + "Frage nicht beantworten, sondern verdoppeln");
+            "this suite reads the REAL route map — a copy would not answer "
+            + "the question but double it");
 
-        var konfiguration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.GetFullPath(path), optional: false)
             .Build();
 
-        var optionen = new DistributedRateLimitingOptions();
-        konfiguration
+        var options = new DistributedRateLimitingOptions();
+        configuration
             .GetSection(DistributedRateLimitingOptions.SectionName)
-            .Bind(optionen);
+            .Bind(options);
 
-        return optionen;
+        return options;
     }
 
     /// <summary>
@@ -57,11 +57,11 @@ public sealed class BremsenbindungTests
     [Fact]
     public void The_three_defaults_arrive_as_zero()
     {
-        var optionen = Gebunden();
+        var options = Bound();
 
-        optionen.RequestsPerMinute.Should().Be(0);
-        optionen.RequestsPerHour.Should().Be(0);
-        optionen.RequestsPerDay.Should().Be(0);
+        options.RequestsPerMinute.Should().Be(0);
+        options.RequestsPerHour.Should().Be(0);
+        options.RequestsPerDay.Should().Be(0);
     }
 
     /// <summary>Per origin, never per user.</summary>
@@ -74,14 +74,14 @@ public sealed class BremsenbindungTests
     [Fact]
     public void Counting_happens_per_origin()
     {
-        Gebunden().Subject.Should().Be(RateLimitSubject.Origin);
+        Bound().Subject.Should().Be(RateLimitSubject.Origin);
     }
 
     /// <summary>The five paths with their numbers, as they stand.</summary>
     [Fact]
     public void The_five_limits_arrive()
     {
-        var limits = Gebunden().EndpointSpecificLimits;
+        var limits = Bound().EndpointSpecificLimits;
 
         limits.Should().ContainKey("/auth/login");
         limits["/auth/login"].RequestsPerMinute.Should().Be(20);
@@ -102,9 +102,9 @@ public sealed class BremsenbindungTests
     [Fact]
     public void The_exemption_lists_stay_empty()
     {
-        var optionen = Gebunden();
+        var options = Bound();
 
-        optionen.WhitelistedIps.Should().BeEmpty();
-        optionen.WhitelistedEndpoints.Should().BeEmpty();
+        options.WhitelistedIps.Should().BeEmpty();
+        options.WhitelistedEndpoints.Should().BeEmpty();
     }
 }
