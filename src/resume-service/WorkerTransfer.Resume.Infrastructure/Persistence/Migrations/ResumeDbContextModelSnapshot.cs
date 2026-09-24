@@ -234,7 +234,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
 
                     b.ToTable("resumes", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.TermRow", b =>

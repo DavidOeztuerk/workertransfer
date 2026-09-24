@@ -168,7 +168,7 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
 
                     b.ToTable("market_status", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.RequestRow", b =>

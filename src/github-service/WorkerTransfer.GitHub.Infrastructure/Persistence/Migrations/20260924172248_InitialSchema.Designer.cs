@@ -12,7 +12,7 @@ using WorkerTransfer.GitHub.Infrastructure.Persistence;
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(GitHubDbContext))]
-    [Migration("20260924123816_InitialSchema")]
+    [Migration("20260924172248_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -73,7 +73,7 @@ namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
 
                     b.ToTable("github_connections", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

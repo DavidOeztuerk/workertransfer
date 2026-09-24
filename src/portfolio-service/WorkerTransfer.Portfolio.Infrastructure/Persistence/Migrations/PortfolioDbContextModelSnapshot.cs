@@ -46,7 +46,7 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence.Migrations
 
                     b.ToTable("portfolios", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

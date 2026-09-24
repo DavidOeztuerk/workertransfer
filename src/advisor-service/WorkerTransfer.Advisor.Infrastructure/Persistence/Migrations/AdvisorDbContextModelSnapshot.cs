@@ -101,7 +101,7 @@ namespace WorkerTransfer.Advisor.Infrastructure.Persistence.Migrations
 
                     b.ToTable("mandates", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>

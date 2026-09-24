@@ -14,7 +14,7 @@ using WorkerTransfer.Resume.Infrastructure.Persistence;
 namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ResumeDbContext))]
-    [Migration("20260924123830_InitialSchema")]
+    [Migration("20260924172259_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -237,7 +237,7 @@ namespace WorkerTransfer.Resume.Infrastructure.Persistence.Migrations
 
                     b.ToTable("resumes", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Resume.Infrastructure.Persistence.TermRow", b =>

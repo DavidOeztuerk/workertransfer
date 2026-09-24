@@ -12,7 +12,7 @@ using WorkerTransfer.Transfer.Infrastructure.Persistence;
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TransferDbContext))]
-    [Migration("20260924123834_InitialSchema")]
+    [Migration("20260924172303_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -171,7 +171,7 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
 
                     b.ToTable("market_status", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.RequestRow", b =>

@@ -12,7 +12,7 @@ using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 namespace WorkerTransfer.Portfolio.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PortfolioDbContext))]
-    [Migration("20260924123826_InitialSchema")]
+    [Migration("20260924172255_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -49,7 +49,7 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence.Migrations
 
                     b.ToTable("portfolios", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

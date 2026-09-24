@@ -12,7 +12,7 @@ using WorkerTransfer.Notification.Infrastructure.Persistence;
 namespace WorkerTransfer.Notification.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(NotificationDbContext))]
-    [Migration("20260924123824_InitialSchema")]
+    [Migration("20260924172254_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -75,7 +75,7 @@ namespace WorkerTransfer.Notification.Infrastructure.Persistence.Migrations
 
                     b.ToTable("notification_preferences", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

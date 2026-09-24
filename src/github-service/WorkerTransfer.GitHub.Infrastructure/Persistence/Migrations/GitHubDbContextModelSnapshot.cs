@@ -70,7 +70,7 @@ namespace WorkerTransfer.GitHub.Infrastructure.Persistence.Migrations
 
                     b.ToTable("github_connections", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

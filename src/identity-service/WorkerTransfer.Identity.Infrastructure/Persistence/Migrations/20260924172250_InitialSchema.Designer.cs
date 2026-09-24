@@ -14,7 +14,7 @@ using WorkerTransfer.Identity.Infrastructure.Persistence;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260924123819_InitialSchema")]
+    [Migration("20260924172250_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -132,7 +132,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.ToTable("account_settings", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AuditEventRow", b =>
@@ -320,7 +320,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.ToTable("addresses", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.SessionCapacityRow", b =>

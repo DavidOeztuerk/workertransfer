@@ -12,7 +12,7 @@ using WorkerTransfer.Scout.Infrastructure.Persistence;
 namespace WorkerTransfer.Scout.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ScoutDbContext))]
-    [Migration("20260924123833_InitialSchema")]
+    [Migration("20260924172301_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
