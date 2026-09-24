@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Infrastructure.Mail;
-using AnwendungenPost = WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
+using ApplicationsPost = WorkerTransfer.Applications.Infrastructure.Notification;
 using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Notification;
 using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
 using WechselPost = WorkerTransfer.Transfer.Infrastructure.Notification;
@@ -60,9 +60,9 @@ public class BenachrichtigungsdrahtTests
     [Fact]
     public Task Applications_send_an_id_that_arrives() =>
         Check(async (fabrik, einstellungen) =>
-            await new AnwendungenPost.HttpBenachrichtigung(
+            await new ApplicationsPost.HttpNotifier(
                 fabrik,
-                Options.Create(new AnwendungenPost.NotificationSettings
+                Options.Create(new ApplicationsPost.NotificationSettings
                 {
                     Adresse = einstellungen,
                     Geheimnis = "probe"

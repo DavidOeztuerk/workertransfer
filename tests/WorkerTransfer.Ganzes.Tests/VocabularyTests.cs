@@ -184,7 +184,7 @@ public class VocabularyTests
     private static IReadOnlyList<TermException> All() =>
     [
         .. Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
-        .. Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,
+        .. Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
         .. Transfer.Infrastructure.TransferInfrastructure.TermExceptions
     ];
 
@@ -192,7 +192,7 @@ public class VocabularyTests
     private static IReadOnlyList<TermException> Exemptions(string service) => service switch
     {
         "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
-        "applications" => Applications.Infrastructure.ApplicationsInfrastructure.Wortausnahmen,
+        "applications" => Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
         "transfer" => Transfer.Infrastructure.TransferInfrastructure.TermExceptions,
         _ => []
     };

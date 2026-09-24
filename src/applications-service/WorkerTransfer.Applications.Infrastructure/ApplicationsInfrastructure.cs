@@ -1,6 +1,5 @@
 using Noelia.Application.Extensions;
 using MediatR;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,15 +8,15 @@ using WorkerTransfer.Applications.Application.Behaviors;
 using WorkerTransfer.Applications.Application.Applications;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Domain.Applications;
-using WorkerTransfer.Applications.Infrastructure.Benachrichtigung;
-using WorkerTransfer.Applications.Infrastructure.Anschreiben;
-using WorkerTransfer.Applications.Infrastructure.Auskunft;
-using WorkerTransfer.Applications.Infrastructure.Einwilligung;
+using WorkerTransfer.Applications.Infrastructure.Companies;
+using WorkerTransfer.Applications.Infrastructure.Consent;
+using WorkerTransfer.Applications.Infrastructure.CoverLetter;
 using WorkerTransfer.Applications.Infrastructure.Erasure;
+using WorkerTransfer.Applications.Infrastructure.Jobs;
+using WorkerTransfer.Applications.Infrastructure.Lookup;
+using WorkerTransfer.Applications.Infrastructure.Notification;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.Applications.Infrastructure.Security;
-using WorkerTransfer.Applications.Infrastructure.Jobs;
-using WorkerTransfer.Applications.Infrastructure.Unternehmen;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.ServiceDefaults.Checks;
@@ -26,20 +25,19 @@ using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Applications.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the application layer's ports.</summary>
 /// <remarks>
-/// Alles, was dieser Dienst für sich entscheidet, steht hier in einem Aufruf —
-/// und ebenso laut, was nicht hier steht. Es gibt keinen Zwischenspeicher: die
-/// Freigaben schreibt dieser Dienst, er liest sie nirgends, und was er schreibt,
-/// muss sofort gelten (ADR-0013). Nichts hier ist ein
-/// <c>ICacheableQuery</c>, weshalb <c>AddCQRS</c> beide Zwischenspeicher-Glieder
-/// gar nicht erst in die Kette hängt.
+/// Everything this service decides for itself stands here in one call — and
+/// just as loudly what does not stand here. There is no cache: this service
+/// writes the releases, reads them nowhere, and what it writes must take effect
+/// at once (ADR-0013). Nothing here is an <c>ICacheableQuery</c>, which is why
+/// <c>AddCQRS</c> does not even hang the two caching links into the chain.
 /// </remarks>
 public static class ApplicationsInfrastructure
 {
-    /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger, Jobs und Secrets kommen.</param>
-    /// <param name="connectionString">Wo die Bewerbungsdatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, jobs and secrets come from.</param>
+    /// <param name="connectionString">Where the applications database lives.</param>
     public static IServiceCollection AddApplicationsInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -63,7 +61,6 @@ public static class ApplicationsInfrastructure
         services.Configure<LookupSettings>(
             configuration.GetSection(LookupSettings.Section));
 
-
         services.AddSingleton(_ => ApplicationsDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ApplicationsDbContext>((provider, options) =>
             ApplicationsDbContextFactory.Configure(
@@ -79,28 +76,28 @@ public static class ApplicationsInfrastructure
         services.AddScoped<IErasureLedger, EfErasureLedger>();
         services.AddScoped<IConsentWriter, HttpConsentWriter>();
         services.AddScoped<IJobLookup, HttpJobLookup>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
         services.AddScoped<IDraftStore, EfDraftStore>();
 
-        // Die eigenen Angaben und der Firmenname — beide über HTTP, beide mit
-        // dem Token des Aufrufers. Ein Adapter für zwei Ports, weil er dieselbe
-        // Connection und dieselben Einstellungen benutzt; zwei Klassen wären
-        // zwei Jobs, an denen ein Zeitlimit fehlen kann.
+        // One's own details and the company name — both over HTTP, both with the
+        // caller's token. One adapter for three ports, because it uses the same
+        // connection and the same settings; separate classes would be separate
+        // places where a time limit can be missing.
         services.AddScoped<HttpApplicantLookup>();
         services.AddScoped<IApplicantLookup>(
             provider => provider.GetRequiredService<HttpApplicantLookup>());
-        services.AddScoped<IUnternehmensauskunft>(
+        services.AddScoped<ICompanyNameLookup>(
             provider => provider.GetRequiredService<HttpApplicantLookup>());
-        services.AddScoped<IKontaktauskunft>(
+        services.AddScoped<IContactLookup>(
             provider => provider.GetRequiredService<HttpApplicantLookup>());
 
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
 
-        // Der Zugang kommt aus den AccountSettings der Person (Ollama,
-        // MiniMax, Anthropic). Draft__Schluessel bleibt ein Fallback für die
-        // Plattform, nicht die einzige Quelle — sonst antwortet Schreiben
-        // 503, während die Oberfläche schon einen Anbieter zeigt.
-        services.AddScoped<IKiZugangAbfrage, HttpKiZugang>();
+        // The access comes from the person's account settings (Ollama, MiniMax,
+        // Anthropic). Draft__Schluessel stays a fallback for the platform, not
+        // the only source — otherwise writing answers 503 while the interface
+        // already shows a provider.
+        services.AddScoped<IAiAccessLookup, HttpAiAccessLookup>();
         services.AddScoped<ICoverLetterWriter, HttpCoverLetterWriter>();
         services.AddSingleton<CoverLetterWorker>();
         services.AddSingleton<ICoverLetterQueue>(provider =>
@@ -108,87 +105,88 @@ public static class ApplicationsInfrastructure
         services.AddHostedService(provider =>
             provider.GetRequiredService<CoverLetterWorker>());
 
-        // Vorher ging die Benachrichtigung nach dem Commit als HTTP-Aufruf
-        // hinaus, dessen Fehler geschluckt wurde — die Zusage stimmte, aber die
-        // Nachricht war dann für immer weg. Jetzt committet die Absicht mit der
-        // Änderung, und ein Zusteller bringt sie (ADR-0025). Zehn Versuche, nicht
-        // unbegrenzt: nie aufzugeben ist der Löschung vorbehalten, wo ein toter
-        // Empfänger die Vollständigkeit blockieren muss.
-        services.AddScoped<IDelivery, HttpBenachrichtigung>();
+        // Before, the notification went out after the commit as an HTTP call
+        // whose failure was swallowed — the promise held, but the message was
+        // then gone for ever. Now the intent commits with the change, and a
+        // dispatcher delivers it (ADR-0025). Ten attempts, not unlimited: never
+        // giving up is reserved for the erasure, where a dead recipient must
+        // block completeness.
+        services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<ApplicationsDbContext>(configuration);
 
         services.AddCQRS(typeof(SubmitApplicationCommand).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Zwei Namen, bei denen <c>quote</c> ein echtes Homonym ist.</summary>
+    /// <summary>Two names in which <c>quote</c> is a genuine homonym.</summary>
     /// <remarks>
-    /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
-    /// zur Laufzeit und <c>VocabularyTests</c> zur Bauzeit. Zwei Listen über
-    /// dieselbe Frage laufen auseinander, und die stillere von beiden wüchse.
+    /// <strong>Public, because it has two readers</strong>: <c>wt.ki.keine-zahl</c>
+    /// at runtime and <c>VocabularyTests</c> at build time. Two lists about the
+    /// same question drift apart, and the quieter of the two would grow.
     /// <para>
-    /// <c>Quote</c> ist hier das <em>Zitat</em>: die Job im Anschreiben, auf
-    /// die sich eine Anmerkung bezieht — wörtlich, damit die Überarbeitung
-    /// weiß, wovon die Rede ist. Das deutsche Wort wäre ein Verhältnis und
-    /// gehört zu Recht auf die Liste.
+    /// <c>Quote</c> here is the <em>citation</em>: the passage in the cover
+    /// letter a comment refers to — verbatim, so the revision knows what is
+    /// meant. The German word would be a ratio and rightly stands on the list.
+    /// The reason stays German: it goes into the German evidence document.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<TermException> Wortausnahmen { get; } =
+    public static IReadOnlyList<TermException> TermExceptions { get; } =
     [
-        new("AnmerkenV1.Quote", Zitat),
-        new("AnmerkungV1.Quote", Zitat)
+        new("AddCommentV1.Quote", QuoteReason),
+        new("CommentV1.Quote", QuoteReason)
     ];
 
-    private const string Zitat =
+    private const string QuoteReason =
         "englisch quote = Zitat, die woertliche Stelle im eigenen Anschreiben, "
         + "auf die sich die Anmerkung bezieht; deutsch Quote waere ein "
         + "Verhaeltnis und gehoert auf die Liste";
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the service foundation, for the same
+    /// reason the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is missing here on purpose — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
-        var anschreiben = new CoverLetterSettings();
-        configuration.GetSection(CoverLetterSettings.Section).Bind(anschreiben);
+        var coverLetter = new CoverLetterSettings();
+        configuration.GetSection(CoverLetterSettings.Section).Bind(coverLetter);
 
-        // Der Schluessel des BETREIBERS ist hier nur der Rueckfall: den Zugang
-        // waehlt die Person in ihren AccountSettings, und ihn kennt allein
-        // identity-service. Was dieser Dienst ueber Anbieter sagen kann, ist
-        // deshalb die Haelfte — die andere steht in `identity-service`, gezaehlt.
-        var naht = !string.IsNullOrEmpty(anschreiben.Schluessel);
+        // The OPERATOR's key is only the fallback here: the person chooses the
+        // access in her account settings, and only identity-service knows it.
+        // What this service can say about providers is therefore half — the
+        // other half stands in `identity-service`, counted.
+        var seam = !string.IsNullOrEmpty(coverLetter.Schluessel);
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(ApplicationState).Assembly, typeof(ApplicationV1).Assembly],
-            Wortausnahmen));
+            TermExceptions));
 
+        // THE FIELD SET, pinned — and pinned at what runs. `DraftRulesTests`
+        // pins the same set at the tree; this one stands in the evidence. The
+        // description stays German: it goes into the German evidence document.
         services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
             typeof(CoverLetterContext),
-            ["StellenTitel", "Unternehmen", "StellenOrt", "StellenBeschreibung", "GesuchteFaehigkeiten", "EigenerName", "EigeneUeberschrift", "EigenerText", "EigeneFaehigkeiten", "EigenerWerdegang", "Sprache"],
+            ["JobTitle", "Company", "JobLocation", "JobDescription", "RequestedSkills", "OwnName", "OwnHeadline", "OwnText", "OwnSkills", "OwnCareer", "Language"],
             "für ein Anschreiben"));
 
-        // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
-        // der EnvironmentFile, einer fuer alle. Den Zugang je Person haelt
-        // identity-service, und dort wird gezaehlt statt genannt.
+        // This service's provider is the OPERATOR's: `Draft__*` from the
+        // environment file, one for everybody. Access per person stands in
+        // identity-service, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", anschreiben.Adresse, naht));
+            "anthropic", coverLetter.Adresse, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
-
 
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);

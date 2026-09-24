@@ -3,15 +3,15 @@ using WorkerTransfer.Applications.Infrastructure;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
 WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "applications-service";
 
-// Kein AsIssuer(): nur identity-service hält die private Hälfte.
+// No AsIssuer(): only identity-service holds the private half of the key.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
@@ -22,16 +22,16 @@ builder.Services.AddApplicationsInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
+// Migrate first, then serve (ADR-0010).
 await app.MigrateSchemaAsync<ApplicationsDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapBewerbungsEndpoints();
-app.MapEntwurfsEndpoints();
-app.MapLoeschEndpoints();
+app.MapApplicationEndpoints();
+app.MapDraftEndpoints();
+app.MapErasureEndpoint();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;
