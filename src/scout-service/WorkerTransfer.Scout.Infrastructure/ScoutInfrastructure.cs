@@ -6,17 +6,17 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.Scout.Application.Behaviors;
-using WorkerTransfer.Scout.Application.Kandidaten;
+using WorkerTransfer.Scout.Application.Candidates;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.Scout.Domain.Searches;
-using WorkerTransfer.Scout.Infrastructure.Belege;
-using WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
-using WorkerTransfer.Scout.Infrastructure.Einwilligung;
-using WorkerTransfer.Scout.Infrastructure.Entwurf;
+using WorkerTransfer.Scout.Infrastructure.Consent;
+using WorkerTransfer.Scout.Infrastructure.Draft;
 using WorkerTransfer.Scout.Infrastructure.Erasure;
+using WorkerTransfer.Scout.Infrastructure.GitHubEvidence;
+using WorkerTransfer.Scout.Infrastructure.Jobs;
+using WorkerTransfer.Scout.Infrastructure.Notification;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
 using WorkerTransfer.Scout.Infrastructure.Profile;
-using WorkerTransfer.Scout.Infrastructure.Jobs;
 using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Scout.Contracts;
 using Noelia.Abstractions.Security.Checks;
@@ -24,31 +24,31 @@ using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// <para>Alles, was dieser Dienst für sich entscheidet, steht hier in einem
-/// Aufruf (ADR-0003) — und genauso laut, was <em>nicht</em> hier steht.</para>
+/// <para>Everything this service decides for itself stands here in one call
+/// (ADR-0003) — and just as loudly, what does <em>not</em> stand here.</para>
 ///
-/// <para><strong>Kein Cache</strong>, und keiner zu registrieren: nichts
-/// implementiert Noelias <c>ICacheableQuery</c>, also lässt <c>AddCQRS</c>
-/// beide Cache-Behaviors ganz aus der Pipeline. Das ist keine Sparsamkeit, das
-/// ist ADR-0013 — ein Revocation muss beim nächsten Lesen wirken. In einem
-/// Dienst, der Menschen findet, ist das die wichtigste Zeile, die hier fehlt.</para>
+/// <para><strong>No cache</strong>, and none to register: nothing implements
+/// Noelia's <c>ICacheableQuery</c>, so <c>AddCQRS</c> leaves both cache
+/// behaviors out of the pipeline entirely. That is no thrift, that is ADR-0013 —
+/// a revocation has to take effect at the next read. In a service that finds
+/// people, that is the most important line missing here.</para>
 ///
-/// <para><strong>Kein Hintergrundlauf</strong> ausser der Ausgangsschleife. Es
-/// gibt keinen Nachtlauf, der gespeicherte Searches wiederholt und „neue Hit"
-/// meldet: das wäre der Hit-Zwischenspeicher mit einem Wecker davor
-/// (ADR-0036 Entscheidung 4).</para>
+/// <para><strong>No background run</strong> apart from the outbox loop. There
+/// is no nightly run that repeats saved searches and reports "new hits": that
+/// would be the hit cache with an alarm clock in front of it (ADR-0036
+/// decision 4).</para>
 ///
-/// <para><strong>Kein Postbote und keine Mailadresse.</strong> Der Entwurf einer
-/// Ansprache verlässt diesen Dienst über die Antwort an den Browser und auf
-/// keinem anderen Weg (Auflage 4).</para>
+/// <para><strong>No postman and no mail address.</strong> The draft of an
+/// approach leaves this service through the answer to the browser and by no
+/// other path (condition 4).</para>
 /// </remarks>
 public static class ScoutInfrastructure
 {
-    /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Woher Ledger, Profile, Belege und Secrets kommen.</param>
-    /// <param name="connectionString">Wo die Scout-Datenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, profiles, evidence and secrets come from.</param>
+    /// <param name="connectionString">Where the scout database lies.</param>
     public static IServiceCollection AddScoutInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -71,9 +71,9 @@ public static class ScoutInfrastructure
             configuration.GetSection(ErasureSettings.Section));
 
         services.AddSingleton(_ => ScoutDbContextFactory.DataSource(connectionString));
-        services.AddDbContext<ScoutDbContext>((provider, optionen) =>
+        services.AddDbContext<ScoutDbContext>((provider, options) =>
             ScoutDbContextFactory.Configure(
-                optionen, provider.GetRequiredService<NpgsqlDataSource>()));
+                options, provider.GetRequiredService<NpgsqlDataSource>()));
         services.AddDatabaseReadiness<ScoutDbContext>("scout");
         services.AddKeyRing<ScoutDbContext>();
 
@@ -85,12 +85,12 @@ public static class ScoutInfrastructure
         services.AddScoped<IConsentGate, HttpConsentGate>();
         services.AddScoped<IProfileSearch, HttpProfileSearch>();
         services.AddScoped<IEvidenceSource, HttpEvidenceSource>();
-        services.AddScoped<IJobs, HttpJobs>();
+        services.AddScoped<IJobLookup, HttpJobLookup>();
 
-        // Der Nullentwerfer ist die Voreinstellung, nicht der Rückfall: ohne
-        // hinterlegten Schlüssel wird kein Fremddienst gerufen, und der Dienst
-        // sagt das, statt eine ResumeTemplate auszugeben, die wie ein Vorschlag
-        // aussieht — und die jemand an einen Menschen schickte.
+        // The null drafter is the default, not the fallback: without a deposited
+        // key no foreign service is called, and the service says so instead of
+        // handing out a template that looks like a suggestion — and that somebody
+        // would send to a human being.
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
@@ -105,57 +105,57 @@ public static class ScoutInfrastructure
             services.AddScoped<IDrafter, HttpDrafter>();
         }
 
-        services.AddScoped<IDelivery, HttpBenachrichtigung>();
+        services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<ScoutDbContext>(configuration);
 
-        services.AddCQRS(typeof(KandidatenAbfrage).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(CandidatesQuery).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration, draft);
+        Evidence(services, configuration, draft);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der ServiceFoundation, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the ServiceFoundation, for the same
+    /// reason the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddEvidence</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services,
         IConfiguration configuration,
         DraftSettings draft)
     {
-        var naht = !string.IsNullOrEmpty(draft.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.Schluessel);
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
-            [typeof(Search).Assembly, typeof(HakenV1).Assembly]));
+            [typeof(Search).Assembly, typeof(TickV1).Assembly]));
 
+        // The purpose stays German: it is a phrase in the German evidence
+        // document ("Der Kontext für eine Ansprache trägt genau …").
         services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
-            typeof(Ansprachelage),
-            ["Ueberschrift", "Genannt", "Gesucht", "Wunsch", "Prompt"],
+            typeof(ApproachSituation),
+            ["Headline", "Named", "Searched", "Wish", "Prompt"],
             "für eine Ansprache"));
 
-        // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
-        // der EnvironmentFile, einer fuer alle. Den Zugang je Person haelt
-        // identity-service, und dort wird gezaehlt statt genannt.
+        // This service's provider is the OPERATOR's: `Draft__*` from the
+        // environment file, one for everybody. identity-service holds the access
+        // per person, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.Adresse, naht));
+            "anthropic", draft.Adresse, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
 
-
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem State von vorhin.
+        // No further type stands between the question and the ledger — the
+        // precondition at which ADR-0013 fails in practice. A cache in front of
+        // it is noticed by nobody, because everything keeps working, only with
+        // the state from a while ago.
         services.AddSingleton<ISecurityCheck>(provider =>
             new RevocationCheck<IConsentGate>(
                 provider, typeof(HttpConsentGate)));

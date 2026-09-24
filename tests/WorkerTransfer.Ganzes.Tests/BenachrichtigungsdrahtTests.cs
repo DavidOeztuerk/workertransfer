@@ -8,7 +8,7 @@ using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Infrastructure.Mail;
 using ApplicationsPost = WorkerTransfer.Applications.Infrastructure.Notification;
 using LebenslaufPost = WorkerTransfer.Resume.Infrastructure.Notification;
-using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Benachrichtigung;
+using SpaeherPost = WorkerTransfer.Scout.Infrastructure.Notification;
 using WechselPost = WorkerTransfer.Transfer.Infrastructure.Notification;
 
 namespace WorkerTransfer.Ganzes.Tests;
@@ -93,7 +93,7 @@ public class BenachrichtigungsdrahtTests
     [Fact]
     public Task Scout_sends_an_id_that_arrives() =>
         Check(async (fabrik, einstellungen) =>
-            await new SpaeherPost.HttpBenachrichtigung(
+            await new SpaeherPost.HttpNotifier(
                 fabrik,
                 Options.Create(new SpaeherPost.NotificationSettings
                 {

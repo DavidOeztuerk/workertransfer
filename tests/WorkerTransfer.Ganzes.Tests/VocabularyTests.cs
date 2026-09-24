@@ -58,7 +58,7 @@ public class VocabularyTests
         ("github", typeof(GitHub.Domain.Connections.LoginError),
          typeof(GitHub.Contracts.RepositoryV1)),
         ("scout", typeof(Scout.Domain.Searches.Search),
-         typeof(Scout.Contracts.HakenV1)),
+         typeof(Scout.Contracts.TickV1)),
         ("advisor", typeof(Advisor.Domain.Gespraeche.UebergangNichtErlaubt),
          typeof(Advisor.Contracts.MandateV1)),
         ("assessment", typeof(Assessment.Domain.Cases.InputError),

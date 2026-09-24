@@ -5,6 +5,8 @@ using JobsEntwurf = WorkerTransfer.Jobs.Infrastructure.Draft;
 using JobsPorts = WorkerTransfer.Jobs.Application.Ports;
 using ProfilEntwurf = WorkerTransfer.Profile.Infrastructure.Draft;
 using ProfilPorts = WorkerTransfer.Profile.Application.Ports;
+using ScoutDraft = WorkerTransfer.Scout.Infrastructure.Draft;
+using ScoutPorts = WorkerTransfer.Scout.Application.Ports;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -23,9 +25,10 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// <c>product-scope.md</c> forbids it in the log. An error message is a log
 /// entry that on top of that goes back to the caller.</para>
 ///
-/// <para>Both services give the same promise, which is why it stands in one
-/// place: the suite would otherwise be the same one twice, and one of the two
-/// would fall behind at the next branch.</para>
+/// <para>All three services give the same promise, which is why it stands in
+/// one place: the suite would otherwise be the same one three times, and one of
+/// them would fall behind at the next branch. scout-service's approach drafter
+/// joined when it was translated.</para>
 /// </remarks>
 public class EntwurfsfehlerTests
 {
@@ -40,6 +43,7 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
+    [InlineData("ansprache")]
     public async Task A_connection_error_does_not_carry_the_prompt_along(string page)
     {
         var error = await Fange(
@@ -62,6 +66,7 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
+    [InlineData("ansprache")]
     public async Task An_error_response_carries_neither_body_nor_prompt(string page)
     {
         var error = await Fange(page, new Stubhandler(_ =>
@@ -87,6 +92,7 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
+    [InlineData("ansprache")]
     public async Task A_timeout_becomes_a_provider_error(string page)
     {
         var error = await Fange(
@@ -98,7 +104,7 @@ public class EntwurfsfehlerTests
             }),
             zeitlimit: TimeSpan.FromMilliseconds(80));
 
-        // Both services name the kind in the same word since their
+        // All three services name the kind in the same word since their
         // translation. Either way it is the KIND, never the content.
         error.Message.Should().Contain("timeout");
         OhneInhalt(error);
@@ -116,6 +122,7 @@ public class EntwurfsfehlerTests
     [Theory]
     [InlineData("profil")]
     [InlineData("anzeige")]
+    [InlineData("ansprache")]
     public async Task An_abort_by_the_caller_stays_an_abort(string page)
     {
         using var cancellationToken = new CancellationTokenSource();
@@ -172,6 +179,22 @@ public class EntwurfsfehlerTests
             return new ProfilEntwurf.HttpDrafter(fabrik, Options.Create(einstellungen))
                 .DraftAsync(
                     new ProfilPorts.DraftSituation("Titel", Geheim, ["Python"], Wunsch), marke);
+        }
+
+        if (page == "ansprache")
+        {
+            var scout = new ScoutDraft.DraftSettings
+            {
+                Schluessel = "probe",
+                Zeitueberschreitung = zeitlimit
+            };
+
+            // The context carries no free text of the person, so the secret
+            // travels as the headline — the field that does reach the prompt.
+            return new ScoutDraft.HttpDrafter(fabrik, Options.Create(scout))
+                .DraftAsync(
+                    new ScoutPorts.ApproachSituation(Geheim, ["Python"], ["Python"], Wunsch),
+                    marke);
         }
 
         var jobs = new JobsEntwurf.DraftSettings

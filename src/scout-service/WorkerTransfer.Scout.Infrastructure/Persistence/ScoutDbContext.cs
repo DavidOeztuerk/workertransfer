@@ -3,69 +3,67 @@ using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Scout.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>searches</c> — eine gespeicherte ResumeRequest.</summary>
+/// <summary>A row of <c>searches</c> — a saved question.</summary>
 /// <remarks>
-/// <para><strong>Was hier NICHT steht, ist der Inhalt dieser Tabelle.</strong>
-/// Kein Hit, keine Kennung eines gefundenen Menschen, kein Zeitpunkt eines
-/// Laufs, keine Zahl. Ein gespeichertes Ergebnis über Menschen veraltet gegen
-/// einen Revocation, und ein Revocation muss beim nächsten Aufruf wirken
-/// (ADR-0013, ADR-0036 Entscheidung 4).</para>
+/// <para><strong>What does NOT stand here is the content of this table.</strong>
+/// No hit, no identifier of a human being who was found, no time of a run, no
+/// number. A saved result about people goes stale against a revocation, and a
+/// revocation has to take effect at the next call (ADR-0013, ADR-0036
+/// decision 4).</para>
 ///
-/// <para>Die Worte liegen als <c>jsonb</c> in einer Spalte und nicht in einer
-/// zweiten Tabelle: sie werden immer vollständig gelesen und vollständig
-/// ersetzt, es gibt keine Abfrage über ein einzelnes Wort, und eine eigene
-/// Tabelle brächte nur eine Verknüpfung und eine Reihenfolge, die niemand
-/// braucht.</para>
+/// <para>The words lie as <c>jsonb</c> in one column and not in a second table:
+/// they are always read completely and replaced completely, there is no query
+/// over a single word, and a table of their own would only bring a join and an
+/// order nobody needs.</para>
 /// </remarks>
 public sealed class SearchRow
 {
-    /// <summary>Welche Search.</summary>
+    /// <summary>Which search.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Für welches Unternehmen.</summary>
+    /// <summary>For which company.</summary>
     public Guid TenantId { get; set; }
 
     /// <summary>
-    /// Wer sie abgelegt hat — die Personenspalte dieses Dienstes.
+    /// Who saved it — this service's person column.
     /// </summary>
     /// <remarks>
-    /// An ihr erkennt <c>LoeschempfaengerTests</c> diesen Dienst als
-    /// Löschempfänger (ADR-0027 §4). Ab dieser einen Spalte gehört
-    /// <c>"scout"</c> in <c>ErasureRecipient.Fremde</c>.
+    /// By it <c>LoeschempfaengerTests</c> recognises this service as an erasure
+    /// recipient (ADR-0027 §4). From this one column on, <c>"scout"</c> belongs
+    /// in <c>ErasureRecipient.Fremde</c>.
     /// </remarks>
     public Guid SubjectId { get; set; }
 
-    /// <summary>Wie die Person sie genannt hat.</summary>
+    /// <summary>What the person called it.</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Die gesuchten Worte, als jsonb.</summary>
+    /// <summary>The searched words, as jsonb.</summary>
     public List<string> Skills { get; set; } = [];
 
-    /// <summary>Teiltext auf dem Ort.</summary>
+    /// <summary>Partial text on the location.</summary>
     public string Location { get; set; } = string.Empty;
 
-    /// <summary>Nur, wer Remote ausdrücklich angekreuzt hat.</summary>
+    /// <summary>Only whoever expressly ticked remote.</summary>
     public bool Remote { get; set; }
 
-    /// <summary>Wann sie abgelegt wurde.</summary>
+    /// <summary>When it was saved.</summary>
     public DateTime CreatedAt { get; set; }
 }
 
-/// <summary>Die eine eigene Tabelle dieses Dienstes — und der Postausgang.</summary>
+/// <summary>This service's one table of its own — and the outbox.</summary>
 /// <remarks>
-/// <para>Verfolgen ist aus, als Voreinstellung des Kontexts und nicht je
-/// Abfrage. Je Abfrage wäre es Disziplin, und die nächste hinzugefügte vergisst
-/// es. Ein änderndes <c>SaveAsync</c> nimmt sich sein
-/// <c>AsTracking()</c> deshalb ausdrücklich.</para>
+/// <para>Tracking is off, as the context's default and not per query. Per query
+/// it would be discipline, and the next one added forgets it. A changing store
+/// method therefore takes its <c>AsTracking()</c> expressly.</para>
 ///
-/// <para><strong>None Profiltabelle, keine Treffertabelle, keine Tabelle „wer
-/// hat wen angesehen".</strong> Die erste wäre eine Kopie fremder Daten
-/// (ADR-0004), die zweite der verbotene Zwischenspeicher (ADR-0013), die dritte
-/// die sensibelste Tabelle des Systems (ADR-0033).</para>
+/// <para><strong>No profile table, no hit table, no table "who looked at
+/// whom".</strong> The first would be a copy of foreign data (ADR-0004), the
+/// second the forbidden cache (ADR-0013), the third the most sensitive table of
+/// the system (ADR-0033).</para>
 /// </remarks>
 public sealed class ScoutDbContext(DbContextOptions<ScoutDbContext> options) : DbContext(options)
 {
-    /// <summary>Die gespeicherten Anfragen.</summary>
+    /// <summary>The saved questions.</summary>
     public DbSet<SearchRow> Searches => Set<SearchRow>();
 
     /// <inheritdoc />
@@ -89,8 +87,8 @@ public sealed class ScoutDbContext(DbContextOptions<ScoutDbContext> options) : D
             row.Property(entry => entry.Remote).HasColumnName("remote").IsRequired();
             row.Property(entry => entry.CreatedAt).HasColumnName("created_at").IsRequired();
 
-            // Die eine Abfrage, die es gibt: die Searches EINES Menschen in EINEM
-            // Unternehmen.
+            // The one query there is: the searches of ONE human being in ONE
+            // company.
             row.HasIndex(entry => new { entry.TenantId, entry.SubjectId });
         });
 

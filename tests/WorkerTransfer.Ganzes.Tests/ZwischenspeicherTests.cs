@@ -59,7 +59,7 @@ public class ZwischenspeicherTests
         // for people, and a cached result would survive a revocation. That is
         // why it stores the REQUEST and never the result (ADR-0036 decision 4)
         // — and the request is no cache either.
-        { "scout", typeof(Scout.Application.Kandidaten.KandidatenAbfrage) },
+        { "scout", typeof(Scout.Application.Candidates.CandidatesQuery) },
 
         // advisor-service holds it just as sharply: the STAGE of a
         // conversation stands only in the ledger and is asked for there on every
