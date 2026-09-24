@@ -16,7 +16,7 @@
 // noticed only when every route was checked one by one against its expected
 // answer: the endpoint answered publicly with 401 and so confirmed that it
 // exists. The route was never needed — identity-service calls jobs-service
-// directly (`Erasure__Adressen__jobs`), not through this gateway, and the
+// directly (`Erasure__BaseUrls__jobs`), not through this gateway, and the
 // interface does not know the path.
 //
 // Comments are allowed: .NET's JSON configuration provider skips them.

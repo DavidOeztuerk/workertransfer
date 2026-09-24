@@ -117,7 +117,7 @@ public static class GitHubInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "github",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: false));
     }
 }

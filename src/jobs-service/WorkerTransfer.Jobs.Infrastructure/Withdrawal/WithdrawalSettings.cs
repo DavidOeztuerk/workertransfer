@@ -8,9 +8,8 @@ namespace WorkerTransfer.Jobs.Infrastructure.Withdrawal;
 /// What arrives here is an intent about a <em>company</em>.
 /// <para>
 /// The section and the property name ARE the environment key
-/// (<c>Erasure__Geheimnis</c>), so they stay as they are until the keys are
-/// renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// (<c>Erasure__Secret</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </para>
 /// </remarks>
 public sealed class WithdrawalSettings
@@ -24,5 +23,5 @@ public sealed class WithdrawalSettings
     /// <remarks>
     /// <strong>Empty means: the endpoint is shut, not open.</strong>
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 }

@@ -12,9 +12,9 @@ namespace WorkerTransfer.Advisor.Infrastructure.Handover;
 
 /// <summary>Where transfer-service answers.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Transfer__Adresse</c>,
-/// <c>Transfer__Geduld</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Transfer__BaseUrl</c>,
+/// <c>Transfer__Timeout</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class HandoverSettings
 {
@@ -27,10 +27,10 @@ public sealed class HandoverSettings
     /// hosts from there. Without this line the handover is refused — without a
     /// log line, and the failure would look like one of transfer-service.
     /// </remarks>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>What transfer-service returns on creation — only the id matters.</summary>
@@ -76,16 +76,16 @@ public sealed class HttpCaseHandover(
     public async Task<Guid> HandOverAsync(
         SubjectId subject, string occasion, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new LookupSilent("Transfer:Adresse is not set.");
+            throw new LookupSilent("Transfer:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/transfers/"))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/transfers/"))
         {
             Content = JsonContent.Create(new InterestV1(subject.Value, occasion ?? string.Empty))
         };

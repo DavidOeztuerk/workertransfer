@@ -79,7 +79,7 @@ public static class ProfileInfrastructure
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(draft.Schluessel))
+        if (string.IsNullOrEmpty(draft.ApiKey))
         {
             services.AddScoped<IDrafter, NoDrafter>();
         }
@@ -115,7 +115,7 @@ public static class ProfileInfrastructure
         IConfiguration configuration,
         DraftSettings draft)
     {
-        var seam = !string.IsNullOrEmpty(draft.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.ApiKey);
 
         // THE FIELD SET, pinned — and pinned at what runs.
         //
@@ -137,7 +137,7 @@ public static class ProfileInfrastructure
         // environment file, one for everybody. Access per person stands in
         // identity-service, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.Adresse, seam));
+            "anthropic", draft.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
@@ -155,7 +155,7 @@ public static class ProfileInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "profile",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: true));
     }
 }

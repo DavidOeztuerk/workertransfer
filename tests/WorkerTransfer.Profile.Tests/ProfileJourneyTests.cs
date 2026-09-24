@@ -75,7 +75,7 @@ public class ProfileJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
+            host.UseSetting("Erasure:Secret", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {
@@ -419,7 +419,7 @@ public class ProfileJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", string.Empty);
+            host.UseSetting("Erasure:Secret", string.Empty);
             host.UseSetting("environment", "Development");
         });
 

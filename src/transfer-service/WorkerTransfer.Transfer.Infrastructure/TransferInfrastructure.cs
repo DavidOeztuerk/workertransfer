@@ -150,7 +150,7 @@ public static class TransferInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "transfer",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: false));
     }
 }

@@ -37,7 +37,7 @@ public sealed class SmtpMailSender(IOptions<MailSettings> settings) : IMailSende
                 _settings.Account, _settings.Password);
         }
 
-        using var message = new MailMessage(_settings.Absender, mail.To)
+        using var message = new MailMessage(_settings.Sender, mail.To)
         {
             Subject = mail.Subject,
             Body = mail.Text

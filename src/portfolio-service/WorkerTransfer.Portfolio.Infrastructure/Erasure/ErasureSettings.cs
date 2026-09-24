@@ -15,9 +15,8 @@ public sealed class ErasureSettings
     /// be the worst possible one — and an unset variable is exactly that case
     /// of doubt.
     ///
-    /// The property name IS the environment key (<c>Erasure__Geheimnis</c>), so
-    /// it stays German until the keys are renamed everywhere at once — in
-    /// compose, in the chart and in <c>.env.example</c>.
+    /// The property name IS the environment key (<c>Erasure__Secret</c>); renaming
+    /// it alone leaves the value on its default, silently.
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 }

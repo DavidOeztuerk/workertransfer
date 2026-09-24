@@ -46,13 +46,13 @@ public sealed class HttpAiAccessLookup(
             return fromAccount;
         }
 
-        if (_draft.Schluessel.Length > 0)
+        if (_draft.ApiKey.Length > 0)
         {
             return new AiAccess(
                 "anthropic",
-                _draft.Adresse,
-                _draft.Modell,
-                _draft.Schluessel);
+                _draft.BaseUrl,
+                _draft.Model,
+                _draft.ApiKey);
         }
 
         return fromAccount;
@@ -61,13 +61,13 @@ public sealed class HttpAiAccessLookup(
     private async Task<AiAccess> FromAccountAsync(
         SubjectId subject, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_identity.Adresse) || string.IsNullOrEmpty(_identity.Geheimnis))
+        if (string.IsNullOrEmpty(_identity.BaseUrl) || string.IsNullOrEmpty(_identity.Secret))
         {
             return new AiAccess("none", string.Empty, string.Empty, string.Empty);
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _identity.Zeitueberschreitung;
+        client.Timeout = _identity.Timeout;
 
         HttpResponseMessage response;
 
@@ -75,8 +75,8 @@ public sealed class HttpAiAccessLookup(
         {
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                new Uri(new Uri(_identity.Adresse), $"/internal/account/{subject.Value}/ai"));
-            request.Headers.Add(SecretHeader, _identity.Geheimnis);
+                new Uri(new Uri(_identity.BaseUrl), $"/internal/account/{subject.Value}/ai"));
+            request.Headers.Add(SecretHeader, _identity.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }

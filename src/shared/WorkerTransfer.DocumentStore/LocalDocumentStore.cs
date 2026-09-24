@@ -6,16 +6,16 @@ namespace WorkerTransfer.DocumentStore;
 /// <summary>Where the local document store lies.</summary>
 /// <remarks>
 /// The section and the property name ARE the environment key
-/// (<c>Ablage__Verzeichnis</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// (<c>DocumentStore__Folder</c>); renaming one alone leaves its value on the
+/// default, silently.
 /// </remarks>
 public sealed class DocumentStoreSettings
 {
     /// <summary>The section in the configuration.</summary>
-    public const string Section = "Ablage";
+    public const string Section = "DocumentStore";
 
     /// <summary>The directory. A volume in containers, a folder otherwise.</summary>
-    public string Verzeichnis { get; set; } = "document-store";
+    public string Folder { get; set; } = "document-store";
 }
 
 /// <summary>The document store on the file system.</summary>
@@ -34,7 +34,7 @@ public sealed class LocalDocumentStore : IDocumentStore
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        _root = Path.GetFullPath(settings.Value.Verzeichnis);
+        _root = Path.GetFullPath(settings.Value.Folder);
         Directory.CreateDirectory(_root);
     }
 

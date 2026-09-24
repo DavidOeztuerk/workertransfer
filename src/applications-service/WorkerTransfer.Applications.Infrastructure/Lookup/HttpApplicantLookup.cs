@@ -12,15 +12,14 @@ namespace WorkerTransfer.Applications.Infrastructure.Lookup;
 /// <summary>Where the services answer that hold one's own details.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Auskunft__Identity</c>, <c>Auskunft__Profile</c>, <c>Auskunft__Resume</c>,
-/// <c>Auskunft__Companies</c>, <c>Auskunft__Zeitueberschreitung</c>), so they
-/// stay as they are until the keys are renamed everywhere at once — in compose,
-/// in the chart and in <c>.env.example</c>.
+/// (<c>Lookup__Identity</c>, <c>Lookup__Profile</c>, <c>Lookup__Resume</c>,
+/// <c>Lookup__Companies</c>, <c>Lookup__Timeout</c>); renaming one alone leaves its
+/// value on the default, silently.
 /// </remarks>
 public sealed class LookupSettings
 {
     /// <summary>The configuration section.</summary>
-    public const string Section = "Auskunft";
+    public const string Section = "Lookup";
 
     /// <summary>identity-service — name and language.</summary>
     public string Identity { get; set; } = string.Empty;
@@ -30,10 +29,11 @@ public sealed class LookupSettings
 
     /// <summary>resume-service — the career history.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Auskunft__Resume</c>). It was
+    /// The property name IS the environment key (<c>Lookup__Resume</c>). It was
     /// renamed to <c>CurriculumVitae</c> once, on its own: compose kept setting
-    /// <c>Auskunft__Resume</c>, the address stayed empty, and every suite stayed
-    /// green because none of them reads compose. <c>ComposeKeyTests</c> does.
+    /// <c>Auskunft__Resume</c> (the section's name then), the address stayed
+    /// empty, and every suite stayed green because none of them reads compose.
+    /// <c>ComposeKeyTests</c> does.
     /// </remarks>
     public string Resume { get; set; } = string.Empty;
 
@@ -41,7 +41,7 @@ public sealed class LookupSettings
     public string Companies { get; set; } = string.Empty;
 
     /// <summary>How long a call may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 internal sealed record SessionResponse(
@@ -208,7 +208,7 @@ public sealed class HttpApplicantLookup(
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(baseAddress), path));

@@ -61,7 +61,7 @@ public static class JobsInfrastructure
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(draft.Schluessel))
+        if (string.IsNullOrEmpty(draft.ApiKey))
         {
             services.AddScoped<IDrafter, NoDrafter>();
         }
@@ -91,7 +91,7 @@ public static class JobsInfrastructure
     private static void Evidence(
         IServiceCollection services, DraftSettings draft)
     {
-        var seam = !string.IsNullOrEmpty(draft.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.ApiKey);
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(SkillList).Assembly, typeof(JobV1).Assembly]));
@@ -108,7 +108,7 @@ public static class JobsInfrastructure
         // environment file, one for everybody. Access per person stands in
         // identity-service, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.Adresse, seam));
+            "anthropic", draft.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));

@@ -14,9 +14,9 @@ namespace WorkerTransfer.Advisor.Infrastructure.Consent;
 
 /// <summary>Where the consent ledger can be reached.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Consent__Adresse</c>,
-/// <c>Consent__Geduld</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Consent__BaseUrl</c>,
+/// <c>Consent__Timeout</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class ConsentSettings
 {
@@ -31,7 +31,7 @@ public sealed class ConsentSettings
     /// (<c>ServiceFoundation.CalledHosts</c>): a destination that stood only in
     /// the source would be refused — without a log line.
     /// </remarks>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -39,7 +39,7 @@ public sealed class ConsentSettings
     /// HUNDRED seconds — that is not a timeout but a hanging call that ends some
     /// time, and it hangs the caller along with it.
     /// </remarks>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>What a grant looks like on the wire.</summary>
@@ -230,18 +230,18 @@ public sealed class HttpConsentGate(
     private async Task<TResponse> SendAsync<TQuestion, TResponse>(
         string path, TQuestion body, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // No ledger configured does not mean "everything released". It
             // means that this service cannot answer the question.
-            throw new ConsentGateSilent("Consent:Adresse is not set.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), path))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), path))
         {
             Content = JsonContent.Create(body)
         };

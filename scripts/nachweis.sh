@@ -38,12 +38,12 @@ done
 # Antwort: leer heisst, die Tuer ist zu.
 if [[ -f .env ]]; then
   # shellcheck disable=SC1091
-  GEHEIMNIS=$(grep -E '^WORKERTRANSFER_NACHWEIS_SECRET=' .env | head -1 | cut -d= -f2-)
+  GEHEIMNIS=$(grep -E '^WORKERTRANSFER_EVIDENCE_SECRET=' .env | head -1 | cut -d= -f2-)
 fi
-GEHEIMNIS="${WORKERTRANSFER_NACHWEIS_SECRET:-${GEHEIMNIS:-}}"
+GEHEIMNIS="${WORKERTRANSFER_EVIDENCE_SECRET:-${GEHEIMNIS:-}}"
 
 if [[ -z "$GEHEIMNIS" ]]; then
-  rot "WORKERTRANSFER_NACHWEIS_SECRET ist nicht gesetzt."
+  rot "WORKERTRANSFER_EVIDENCE_SECRET ist nicht gesetzt."
   echo "   \`make env\` legt eine .env an und wuerfelt es mit." >&2
   exit 1
 fi
@@ -86,7 +86,7 @@ done
 if [[ $ERREICHT -eq 0 ]]; then
   rot "Kein Dienst hat geantwortet. Laeuft der Stapel? \`make up\`."
   echo "   Und traegt er das Geheimnis? Eine .env ohne" >&2
-  echo "   WORKERTRANSFER_NACHWEIS_SECRET laesst compose gar nicht erst starten." >&2
+  echo "   WORKERTRANSFER_EVIDENCE_SECRET laesst compose gar nicht erst starten." >&2
   exit 1
 fi
 
@@ -98,7 +98,7 @@ fi
 # privater Schluessel mehr. Wer die Dokumente an jemanden gibt, gibt den
 # OEFFENTLICHEN Teil dazu; er steht in jeder Signaturdatei.
 # ---------------------------------------------------------------------------
-SCHLUESSEL="${WORKERTRANSFER_NACHWEIS_KEY:-.nachweis/schluessel.pem}"
+SCHLUESSEL="${WORKERTRANSFER_EVIDENCE_KEY:-.nachweis/schluessel.pem}"
 
 if [[ ! -f "$SCHLUESSEL" ]]; then
   mkdir -p "$(dirname "$SCHLUESSEL")"

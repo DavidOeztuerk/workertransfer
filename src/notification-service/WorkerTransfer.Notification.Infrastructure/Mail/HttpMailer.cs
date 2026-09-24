@@ -8,10 +8,9 @@ namespace WorkerTransfer.Notification.Infrastructure.Mail;
 
 /// <summary>Where identity-service answers, and what identifies us as us.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Identity__Adresse</c>,
-/// <c>Identity__Geheimnis</c>, <c>Identity__Zeitueberschreitung</c>), so they
-/// stay German until the keys are renamed everywhere at once — in compose, in
-/// the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
+/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone leaves
+/// its value on the default, silently.
 /// </remarks>
 public sealed class MailSettings
 {
@@ -19,13 +18,13 @@ public sealed class MailSettings
     public const string Section = "Identity";
 
     /// <summary>The base address of identity-service.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>The shared secret. Expressly not the erasure's.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long a call may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks identity-service to send the one sentence out.</summary>
@@ -55,8 +54,8 @@ public sealed class HttpMailer(
     /// <inheritdoc />
     public async Task SendAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse)
-            || string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.BaseUrl)
+            || string.IsNullOrEmpty(_settings.Secret))
         {
             // No secret, no attempt: the endpoint would be shut anyway, and a
             // call into the void costs a timeout at every case.
@@ -66,10 +65,10 @@ public sealed class HttpMailer(
         try
         {
             using var client = factory.CreateClient(ClientName);
-            client.Timeout = _settings.Zeitueberschreitung;
+            client.Timeout = _settings.Timeout;
 
             using var request = new HttpRequestMessage(
-                HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/internal/notify"))
+                HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/internal/notify"))
             {
                 // `user_id`, not `userId`. identity-service declares
                 // [JsonPropertyName("user_id")]; camelCase bound silently to
@@ -80,7 +79,7 @@ public sealed class HttpMailer(
                 Content = JsonContent.Create(new { user_id = subject.Value })
             };
 
-            request.Headers.Add("X-Notify-Secret", _settings.Geheimnis);
+            request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
             using var response = await client.SendAsync(request, cancellationToken);
 

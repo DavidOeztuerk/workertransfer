@@ -61,7 +61,7 @@ public class AdvisorJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
+            host.UseSetting("Erasure:Secret", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

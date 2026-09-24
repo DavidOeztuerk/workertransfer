@@ -35,7 +35,7 @@ public sealed class MailTray(
     public void ConfirmationLink(
         string to, SubjectId recipient, string plainTextToken, AccountLanguage language)
     {
-        var baseUrl = _settings.WebAdresse.TrimEnd('/');
+        var baseUrl = _settings.WebUrl.TrimEnd('/');
         var text = MailTexts.Confirmation(
             language, $"{baseUrl}/verify?token={plainTextToken}");
 
@@ -54,7 +54,7 @@ public sealed class MailTray(
         string to, SubjectId inviter, string company, string plainTextToken,
         AccountLanguage language)
     {
-        var baseUrl = _settings.WebAdresse.TrimEnd('/');
+        var baseUrl = _settings.WebUrl.TrimEnd('/');
         var who = string.IsNullOrWhiteSpace(company)
             ? MailTexts.ACompany(language)
             : company;
@@ -74,7 +74,7 @@ public sealed class MailTray(
     /// <inheritdoc />
     public void News(string to, SubjectId subject, AccountLanguage language)
     {
-        var baseUrl = _settings.WebAdresse.TrimEnd('/');
+        var baseUrl = _settings.WebUrl.TrimEnd('/');
         var text = MailTexts.News(language, baseUrl);
 
         _pending.Add(new OutgoingMail(to, text.Subject, text.Text, subject));

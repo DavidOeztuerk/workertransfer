@@ -33,7 +33,7 @@ public class ConnectionJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
+            host.UseSetting("Erasure:Secret", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

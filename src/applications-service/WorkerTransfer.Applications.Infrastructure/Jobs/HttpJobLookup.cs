@@ -12,9 +12,8 @@ namespace WorkerTransfer.Applications.Infrastructure.Jobs;
 /// <summary>Where jobs-service answers.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Jobs__Adresse</c>, <c>Jobs__Zeitueberschreitung</c>), so they stay German
-/// until the keys are renamed everywhere at once — in compose, in the chart and
-/// in <c>.env.example</c>.
+/// (<c>Jobs__BaseUrl</c>, <c>Jobs__Timeout</c>); renaming one alone leaves its
+/// value on the default, silently.
 /// </remarks>
 public sealed class JobSettings
 {
@@ -22,10 +21,10 @@ public sealed class JobSettings
     public const string Section = "Jobs";
 
     /// <summary>The base address of jobs-service.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long a call may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>What of <c>GET /jobs/{id}</c> is needed here.</summary>
@@ -56,20 +55,20 @@ public sealed class HttpJobLookup(
     public async Task<PublicJob?> GetAsync(
         Guid job, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new JobLookupSilent("Jobs:Adresse is not set.");
+            throw new JobLookupSilent("Jobs:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         HttpResponseMessage response;
 
         try
         {
             response = await client.GetAsync(
-                new Uri(new Uri(_settings.Adresse), $"/jobs/{job}"), cancellationToken);
+                new Uri(new Uri(_settings.BaseUrl), $"/jobs/{job}"), cancellationToken);
         }
         catch (HttpRequestException error)
         {

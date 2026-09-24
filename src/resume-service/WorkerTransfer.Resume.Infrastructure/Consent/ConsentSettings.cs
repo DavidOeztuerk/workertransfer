@@ -2,10 +2,9 @@ namespace WorkerTransfer.Resume.Infrastructure.Consent;
 
 /// <summary>Where the consent ledger answers.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Consent__Adresse</c>,
-/// <c>Consent__Zeitueberschreitung</c>), so they stay German until the keys are
-/// renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Consent__BaseUrl</c>,
+/// <c>Consent__Timeout</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class ConsentSettings
 {
@@ -13,7 +12,7 @@ public sealed class ConsentSettings
     public const string Section = "Consent";
 
     /// <summary>The ledger's base address.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// How long one question may take.
@@ -23,5 +22,5 @@ public sealed class ConsentSettings
     /// on it would turn one slow dependency into a service that answers
     /// nothing at all.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }

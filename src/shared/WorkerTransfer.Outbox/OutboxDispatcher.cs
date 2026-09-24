@@ -86,7 +86,7 @@ public sealed class OutboxDispatcher<TContext>(
         // The table name is a setting, not caller input, and it is quoted — but
         // the two real parameters go in as parameters, because one day somebody
         // will make the batch size configurable from somewhere else.
-        var sql = "SELECT * FROM \"" + _settings.Tabelle + "\" "
+        var sql = "SELECT * FROM \"" + _settings.Table + "\" "
                   + "WHERE delivered_at IS NULL "
                   // `null` filters nothing: the row stays due however often it
                   // has failed. That is what "never give up" means in SQL.
@@ -97,7 +97,7 @@ public sealed class OutboxDispatcher<TContext>(
                   // The whole reason more than one replica is safe.
                   + "FOR UPDATE SKIP LOCKED";
 
-        object limit = _settings.HoechsteVersuche is { } value ? value : DBNull.Value;
+        object limit = _settings.MaxAttempts is { } value ? value : DBNull.Value;
 
         // Tracked, and the rows are handed on as they are. Reading them a
         // second time would hand back untracked copies wherever the service
@@ -105,7 +105,7 @@ public sealed class OutboxDispatcher<TContext>(
         // onto an object nobody saves. That is not hypothetical: it is how this
         // method used to work.
         return await context.Set<OutboxRow>()
-            .FromSqlRaw(sql, limit, _settings.Stapelgroesse)
+            .FromSqlRaw(sql, limit, _settings.BatchSize)
             .AsTracking()
             .ToListAsync(cancellationToken);
     }

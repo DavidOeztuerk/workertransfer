@@ -24,11 +24,10 @@ public sealed class ConsentSettings
     /// the source is refused — without a log line, and the outage would then look
     /// like an outage of the ledger.</para>
     ///
-    /// <para>The property name IS the environment key (<c>Consent__Adresse</c>),
-    /// so it stays German until the keys are renamed everywhere at once — in
-    /// compose, in the chart and in <c>.env.example</c>.</para>
+    /// <para>The property name IS the environment key (<c>Consent__BaseUrl</c>);
+    /// renaming it alone leaves the value on its default, silently.</para>
     /// </remarks>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -136,18 +135,18 @@ public sealed class HttpConsentGate(
     private async Task<ConsentBatchResponseV1> SendAsync(
         ConsentBatchQuestionV1 body, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // No ledger configured does not mean "everything released". It means
             // this service cannot answer the question.
-            throw new ConsentGateSilent("Consent:Adresse is not configured.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not configured.");
         }
 
         using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/consent/check-batch"))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/consent/check-batch"))
         {
             Content = JsonContent.Create(body)
         };

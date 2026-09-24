@@ -12,13 +12,11 @@ public sealed class DocumentStoreSettings
 
     /// <summary>The directory everything lies under.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Storage__Wurzel</c>), so
-    /// it stays German until the keys are renamed everywhere at once — in
-    /// compose, in the chart and in <c>.env.example</c>. Renaming it alone
-    /// leaves the value unbound — measured 22.09.2026, attachment uploads then
-    /// answered 500.
+    /// The property name IS the environment key (<c>Storage__Root</c>). Renaming
+    /// it alone leaves the value unbound — measured 22.09.2026, attachment
+    /// uploads then answered 500.
     /// </remarks>
-    public string Wurzel { get; set; } = "/var/lib/workertransfer/portfolio";
+    public string Root { get; set; } = "/var/lib/workertransfer/portfolio";
 
     /// <summary>How large a work sample may be.</summary>
     /// <remarks>
@@ -116,7 +114,7 @@ public sealed class FileDocumentStore(IOptions<DocumentStoreSettings> settings) 
     }
 
     private string FolderFor(SubjectId subject) =>
-        Path.Combine(_settings.Wurzel, subject.Value.ToString("N"));
+        Path.Combine(_settings.Root, subject.Value.ToString("N"));
 
     /// <summary>
     /// The full path — or <c>null</c> when the name is not one.

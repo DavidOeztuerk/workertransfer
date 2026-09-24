@@ -45,8 +45,8 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
-            host.UseSetting("Notify:Geheimnis", NotifySecret);
+            host.UseSetting("Erasure:Secret", "erasure-secret");
+            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _gate)));

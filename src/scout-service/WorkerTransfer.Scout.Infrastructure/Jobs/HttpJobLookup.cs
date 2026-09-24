@@ -14,9 +14,8 @@ namespace WorkerTransfer.Scout.Infrastructure.Jobs;
 /// <summary>Where the adverts lie.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Jobs__Adresse</c>, <c>Jobs__Geduld</c>), so they stay German until the
-/// keys are renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// (<c>Jobs__BaseUrl</c>, <c>Jobs__Timeout</c>); renaming one alone leaves its
+/// value on the default, silently.
 /// </remarks>
 public sealed class JobSettings
 {
@@ -30,10 +29,10 @@ public sealed class JobSettings
     /// destination that stands only in the source is refused — without a log
     /// line.
     /// </remarks>
-    public string Adresse { get; set; } = "http://jobs-service:8006";
+    public string BaseUrl { get; set; } = "http://jobs-service:8006";
 
     /// <summary>How long to wait for an answer.</summary>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks jobs-service what an advert says about getting there.</summary>
@@ -62,16 +61,16 @@ public sealed class HttpJobLookup(
     public async Task<JobStatement?> GetAsync(
         Guid job, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new JobLookupSilent("Jobs:Adresse is not set.");
+            throw new JobLookupSilent("Jobs:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_settings.Adresse), $"/jobs/{job}"));
+            HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), $"/jobs/{job}"));
 
         // On the caller's behalf: an advert in draft is seen only by its own
         // company, and exactly the same decision is to fall here.

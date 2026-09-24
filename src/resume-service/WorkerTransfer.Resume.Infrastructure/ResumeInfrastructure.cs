@@ -147,7 +147,7 @@ public static class ResumeInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "resume",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: true));
     }
 }

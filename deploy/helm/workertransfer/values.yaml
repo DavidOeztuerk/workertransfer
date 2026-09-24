@@ -61,7 +61,7 @@ env:
   ASPNETCORE_ENVIRONMENT: Staging
   JwtSettings__Issuer: workertransfer
   JwtSettings__Audience: workertransfer
-  Mail__Absender: noreply@workertransfer.local
+  Mail__Sender: noreply@workertransfer.local
   # Traces nach Jaeger. LEER hiesse AUS.
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
 
@@ -113,7 +113,7 @@ secrets:
   # anstossen darf, muss nicht erfahren, welche KI-Anbieter diese Instanz
   # benutzt. LEER heisst hier: die Tuer ist zu, /nachweis antwortet 404 — was
   # in einem Cluster ohne Bedarf die richtige Vorgabe ist.
-  nachweisSecret: ""
+  evidenceSecret: ""
 
   # The master key. It encrypts a person's AI key AND the data-protection key
   # ring (ADR-0046), so EVERY service needs it — not just identity. Missing, a
@@ -208,7 +208,7 @@ web:
 
 # --- Die Dienste ------------------------------------------------------------
 # Eine Liste, über die zwei Templates laufen (Deployment, Service) — dasselbe
-# Prinzip wie der x-dienst-Anker in docker-compose.yml. Einen Dienst
+# Prinzip wie der x-service-Anker in docker-compose.yml. Einen Dienst
 # hinzuzufügen ist ein Eintrag, keine Kopie.
 #
 #   name      — Name des K8s-Service. MUSS dem Compose-Dienstnamen entsprechen,
@@ -226,18 +226,18 @@ services:
       # Wohin die Löschbefehle gehen (ADR-0027 §4). jobs-service steht dabei,
       # ist aber KEIN Empfänger der Kaskade — er bekommt nur die Absicht aus
       # §7, wenn ein Unternehmen ohne Administrator zurückbleibt.
-      Erasure__Adressen__consent: http://consent-service:8002
-      Erasure__Adressen__profile: http://profile-service:8003
-      Erasure__Adressen__resume: http://resume-service:8004
-      Erasure__Adressen__portfolio: http://portfolio-service:8005
-      Erasure__Adressen__jobs: http://jobs-service:8006
-      Erasure__Adressen__applications: http://applications-service:8007
-      Erasure__Adressen__transfer: http://transfer-service:8009
-      Erasure__Adressen__notification: http://notification-service:8010
-      Erasure__Adressen__github: http://github-service:8011
-      Erasure__Adressen__scout: http://scout-service:8012
-      Erasure__Adressen__advisor: http://advisor-service:8013
-      Erasure__Adressen__assessment: http://assessment-service:8014
+      Erasure__BaseUrls__consent: http://consent-service:8002
+      Erasure__BaseUrls__profile: http://profile-service:8003
+      Erasure__BaseUrls__resume: http://resume-service:8004
+      Erasure__BaseUrls__portfolio: http://portfolio-service:8005
+      Erasure__BaseUrls__jobs: http://jobs-service:8006
+      Erasure__BaseUrls__applications: http://applications-service:8007
+      Erasure__BaseUrls__transfer: http://transfer-service:8009
+      Erasure__BaseUrls__notification: http://notification-service:8010
+      Erasure__BaseUrls__github: http://github-service:8011
+      Erasure__BaseUrls__scout: http://scout-service:8012
+      Erasure__BaseUrls__advisor: http://advisor-service:8013
+      Erasure__BaseUrls__assessment: http://assessment-service:8014
 
   - name: consent-service
     dir: consent
@@ -251,7 +251,7 @@ services:
     env:
       # Fragt den Ledger, bevor er ein fremdes Profil zeigt (ADR-0013,
       # synchron und ohne Zwischenspeicher).
-      Consent__Adresse: http://consent-service:8002
+      Consent__BaseUrl: http://consent-service:8002
     drafting: true
 
   - name: resume-service
@@ -259,22 +259,22 @@ services:
     port: 8004
     database: resume
     env:
-      Consent__Adresse: http://consent-service:8002
-      Notifications__Adresse: http://notification-service:8010
-      Ablage__Verzeichnis: /daten/ablage
+      Consent__BaseUrl: http://consent-service:8002
+      Notifications__BaseUrl: http://notification-service:8010
+      DocumentStore__Folder: /data/document-store
     # Gleicher Grund wie portfolio: ohne Volume sind die Dateien beim
     # naechsten Pod weg, die Zeilen in Postgres stehen noch (ADR-0035).
     persistence:
       size: 2Gi
-      mountPath: /daten/ablage
+      mountPath: /data/document-store
 
   - name: portfolio-service
     dir: portfolio
     port: 8005
     database: portfolio
     env:
-      Consent__Adresse: http://consent-service:8002
-      Storage__Wurzel: /var/lib/workertransfer/portfolio-attachments
+      Consent__BaseUrl: http://consent-service:8002
+      Storage__Root: /var/lib/workertransfer/portfolio-attachments
     # Anhänge überleben den Pod. Ein Pfad im Image wäre beim nächsten Deploy
     # weg — dieselbe Überlegung wie das Volume in docker-compose.yml.
     persistence:
@@ -289,34 +289,34 @@ services:
     env:
       # Die Rollenauskunft: wer `admin` ist, steht in der
       # Mitgliedschaftstabelle von identity-service und nicht im Token.
-      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
-      Identity__Adresse: http://identity-service:8001
+      # `Identity__Secret` haengt in _helpers.tpl an dieser Zeile.
+      Identity__BaseUrl: http://identity-service:8001
 
   - name: applications-service
     dir: applications
     port: 8007
     database: applications
     env:
-      Consent__Adresse: http://consent-service:8002
-      Jobs__Adresse: http://jobs-service:8006
-      Notifications__Adresse: http://notification-service:8010
-      Identity__Adresse: http://identity-service:8001
+      Consent__BaseUrl: http://consent-service:8002
+      Jobs__BaseUrl: http://jobs-service:8006
+      Notifications__BaseUrl: http://notification-service:8010
+      Identity__BaseUrl: http://identity-service:8001
 
   - name: companies-service
     dir: companies
     port: 8008
     database: companies
     env:
-      Identity__Adresse: http://identity-service:8001
+      Identity__BaseUrl: http://identity-service:8001
 
   - name: transfer-service
     dir: transfer
     port: 8009
     database: transfer
     env:
-      Consent__Adresse: http://consent-service:8002
-      Notifications__Adresse: http://notification-service:8010
-      Identity__Adresse: http://identity-service:8001
+      Consent__BaseUrl: http://consent-service:8002
+      Notifications__BaseUrl: http://notification-service:8010
+      Identity__BaseUrl: http://identity-service:8001
 
   - name: notification-service
     dir: notification
@@ -325,14 +325,14 @@ services:
     env:
       # Dieser Dienst entscheidet, OB etwas hinausgeht; AN WEN weiss allein
       # identity-service. Ueber die Grenze geht nur eine userId.
-      Identity__Adresse: http://identity-service:8001
+      Identity__BaseUrl: http://identity-service:8001
 
   - name: github-service
     dir: github
     port: 8011
     database: github
     env:
-      Consent__Adresse: http://consent-service:8002
+      Consent__BaseUrl: http://consent-service:8002
 
   - name: scout-service
     dir: scout
@@ -344,17 +344,17 @@ services:
       # MUSS: die Egress-Grenze leitet ihre erlaubten Hosts aus der
       # Konfiguration ab. Ein Ziel, das nur im Quelltext steht, wird
       # abgewiesen — ohne Protokollzeile.
-      Consent__Adresse: http://consent-service:8002
-      # Die interne Tuer, durch die gesucht wird. `Profile__Geheimnis` haengt
+      Consent__BaseUrl: http://consent-service:8002
+      # Die interne Tuer, durch die gesucht wird. `Profile__Secret` haengt
       # in _helpers.tpl an dieser Zeile.
-      Profile__Adresse: http://profile-service:8003
+      Profile__BaseUrl: http://profile-service:8003
       # Die Belege — github-service, NICHT github.com: dieser Dienst fragt nie
       # bei GitHub selbst.
-      GitHub__Adresse: http://github-service:8011
+      GitHub__BaseUrl: http://github-service:8011
       # Die Anzeige fuer das Erreichbarkeits-Haekchen (ADR-0041).
-      Jobs__Adresse: http://jobs-service:8006
+      Jobs__BaseUrl: http://jobs-service:8006
       # „Dein Profil wurde entdeckt" (ADR-0033), ueber den Postausgang.
-      Notifications__Adresse: http://notification-service:8010
+      Notifications__BaseUrl: http://notification-service:8010
 
   - name: advisor-service
     dir: advisor
@@ -369,16 +369,16 @@ services:
       # Der Ledger traegt die STUFE eines Gespraechs (ADR-0037): gelesen bei
       # jeder Anfrage, geschrieben bei jeder Freigabe. Eine eigene Stufenspalte
       # gibt es nicht, also ist diese Zeile nicht optional.
-      Consent__Adresse: http://consent-service:8002
+      Consent__BaseUrl: http://consent-service:8002
       # Die internen Tueren von identity-service: die Domain eines Unternehmens
       # (damit ein Ausschluss greifen kann) und der Klarname eines Menschen
       # (erst ab Stufe 3, und erst NACHDEM der Ledger sie bestaetigt hat).
-      # `Identity__Geheimnis` haengt in _helpers.tpl an dieser Zeile.
-      Identity__Adresse: http://identity-service:8001
+      # `Identity__Secret` haengt in _helpers.tpl an dieser Zeile.
+      Identity__BaseUrl: http://identity-service:8001
       # Die Uebergabe der Einigung. Der Dreieckskonsens steht DORT.
-      Transfer__Adresse: http://transfer-service:8009
+      Transfer__BaseUrl: http://transfer-service:8009
       # „Ein Unternehmen hat ein Gespraech eroeffnet", ueber den Postausgang.
-      Notifications__Adresse: http://notification-service:8010
+      Notifications__BaseUrl: http://notification-service:8010
 
   - name: assessment-service
     dir: assessment
@@ -395,10 +395,10 @@ services:
       # Faehigkeit (ADR-0042). Ohne diese Zeile antwortet die Firmenseite 503;
       # die Personenseite antwortet weiter, denn wer seine Bewertung lesen
       # will, braucht dafuer keinen Ledger.
-      Consent__Adresse: http://consent-service:8002
+      Consent__BaseUrl: http://consent-service:8002
       # „An deiner Arbeitsprobe hat sich etwas bewegt", ueber den Postausgang,
       # inhaltsfrei (ADR-0025).
-      Notifications__Adresse: http://notification-service:8010
+      Notifications__BaseUrl: http://notification-service:8010
       # NICHT eingetragen: die Adresse, die eine Person einreicht. Sie wird
       # gespeichert und angezeigt, nie abgerufen.
 

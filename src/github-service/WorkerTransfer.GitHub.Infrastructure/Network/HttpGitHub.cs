@@ -12,10 +12,9 @@ namespace WorkerTransfer.GitHub.Infrastructure.Network;
 
 /// <summary>Where to ask, and with what.</summary>
 /// <remarks>
-/// <c>Adresse</c> and <c>Zeitueberschreitung</c> ARE the environment keys
-/// (<c>GitHub__Adresse</c>, <c>GitHub__Zeitueberschreitung</c>), so they stay
-/// German until the keys are renamed everywhere at once — in compose, in the
-/// chart and in <c>.env.example</c>.
+/// <c>BaseUrl</c> and <c>Timeout</c> ARE the environment keys
+/// (<c>GitHub__BaseUrl</c>, <c>GitHub__Timeout</c>); renaming one alone leaves its
+/// value on the default, silently.
 /// </remarks>
 public sealed class GitHubSettings
 {
@@ -23,7 +22,7 @@ public sealed class GitHubSettings
     public const string Section = "GitHub";
 
     /// <summary>The base address of the API.</summary>
-    public string Adresse { get; set; } = "https://api.github.com";
+    public string BaseUrl { get; set; } = "https://api.github.com";
 
     /// <summary>Optional.</summary>
     /// <remarks>
@@ -49,7 +48,7 @@ public sealed class GitHubSettings
     public string UserAgent { get; set; } = "WorkerTransfer";
 
     /// <summary>How long a fetch may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>What a gist entry yields of what is needed here.</summary>
@@ -211,10 +210,10 @@ public sealed class HttpGitHub(
     private async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_settings.Adresse), path));
+            HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
 
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));

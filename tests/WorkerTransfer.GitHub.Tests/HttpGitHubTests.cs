@@ -73,7 +73,7 @@ public class HttpGitHubTests
         new(new SingleClientFactory(paper),
             Options.Create(new GitHubSettings
             {
-                Adresse = "https://api.github.test",
+                BaseUrl = "https://api.github.test",
                 Token = token
             }),
             NullLogger<HttpGitHub>.Instance);

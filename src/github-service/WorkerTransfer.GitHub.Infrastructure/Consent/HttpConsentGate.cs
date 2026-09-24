@@ -10,10 +10,9 @@ namespace WorkerTransfer.GitHub.Infrastructure.Consent;
 
 /// <summary>Where the consent ledger answers.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Consent__Adresse</c>,
-/// <c>Consent__Zeitueberschreitung</c>), so they stay German until the keys are
-/// renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Consent__BaseUrl</c>,
+/// <c>Consent__Timeout</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class ConsentSettings
 {
@@ -21,10 +20,10 @@ public sealed class ConsentSettings
     public const string Section = "Consent";
 
     /// <summary>The ledger's base address.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long a question may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks the ledger. Never writes into it.</summary>
@@ -52,16 +51,16 @@ public sealed class HttpConsentGate(
     public async Task<bool> MayBeShownAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new ConsentGateSilent("Consent:Adresse is not configured.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not configured.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/consent/check"))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/consent/check"))
         {
             Content = JsonContent.Create(
                 new ConsentQuestionV1(subject.Value, ConsentKey.Visibility),

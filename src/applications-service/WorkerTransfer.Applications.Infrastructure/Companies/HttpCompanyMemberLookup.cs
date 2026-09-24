@@ -12,9 +12,9 @@ namespace WorkerTransfer.Applications.Infrastructure.Companies;
 /// <summary>Where identity-service answers internal questions.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Identity__Adresse</c>, <c>Identity__Zeitueberschreitung</c>,
-/// <c>Identity__Geheimnis</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// (<c>Identity__BaseUrl</c>, <c>Identity__Timeout</c>,
+/// <c>Identity__Secret</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class CompanyMemberSettings
 {
@@ -22,17 +22,17 @@ public sealed class CompanyMemberSettings
     public const string Section = "Identity";
 
     /// <summary>The base address of identity-service.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
     /// Five seconds, like every other service-to-service call here. WITHOUT this
     /// line <c>HttpClient</c>'s default applies: a HUNDRED seconds.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>The same secret as <c>Notifications:Geheimnis</c>.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    /// <summary>The same secret as <c>Notifications:Secret</c>.</summary>
+    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Asks identity-service over the internal wire.</summary>
@@ -58,18 +58,18 @@ public sealed class HttpCompanyMemberLookup(
         TenantId company,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new CompanyLookupSilent("Identity:Adresse is not set.");
+            throw new CompanyLookupSilent("Identity:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Secret))
         {
-            throw new CompanyLookupSilent("Identity:Geheimnis is not set.");
+            throw new CompanyLookupSilent("Identity:Secret is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         HttpResponseMessage response;
 
@@ -77,8 +77,8 @@ public sealed class HttpCompanyMemberLookup(
         {
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                new Uri(new Uri(_settings.Adresse), $"/internal/companies/{company.Value}/members"));
-            request.Headers.Add(SecretHeader, _settings.Geheimnis);
+                new Uri(new Uri(_settings.BaseUrl), $"/internal/companies/{company.Value}/members"));
+            request.Headers.Add(SecretHeader, _settings.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }

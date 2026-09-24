@@ -81,16 +81,16 @@ public sealed class HttpConsentWriter(
         TBody body,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new ConsentGateSilent("Consent:Adresse is not set.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), path))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), path))
         {
             Content = JsonContent.Create(body, options: Format)
         };

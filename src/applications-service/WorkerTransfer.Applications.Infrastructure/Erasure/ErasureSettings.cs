@@ -8,9 +8,8 @@ namespace WorkerTransfer.Applications.Infrastructure.Erasure;
 /// about a person, a default that opens in doubt would be the worst imaginable.
 /// <para>
 /// The section and the property name ARE the environment key
-/// (<c>Erasure__Geheimnis</c>), so they stay as they are until the keys are
-/// renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// (<c>Erasure__Secret</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </para>
 /// </remarks>
 public sealed class ErasureSettings
@@ -19,5 +18,5 @@ public sealed class ErasureSettings
     public const string Section = "Erasure";
 
     /// <summary>The shared secret.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 }

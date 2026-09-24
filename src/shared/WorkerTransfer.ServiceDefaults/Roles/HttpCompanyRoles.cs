@@ -13,9 +13,9 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 /// query — a second name for the same address would be the one left behind at
 /// the next move.
 /// <para>
-/// The property names ARE the environment keys (<c>Identity__Adresse</c>,
-/// <c>Identity__Geheimnis</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
+/// <c>Identity__Secret</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </para>
 /// </remarks>
 public sealed class CompanyRoleSettings
@@ -24,10 +24,10 @@ public sealed class CompanyRoleSettings
     public const string Section = "Identity";
 
     /// <summary>Where identity-service answers.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>The shared secret of the internal doors.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long an answer is waited for.</summary>
     /// <remarks>
@@ -35,7 +35,7 @@ public sealed class CompanyRoleSettings
     /// this line the default of <c>HttpClient</c> applies: ONE HUNDRED seconds
     /// — and a hanging service would then hang every permission check with it.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks identity-service for the role — per request, with no store.</summary>
@@ -68,18 +68,18 @@ public sealed class HttpCompanyRoles(
         Guid company,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new RoleLookupSilent("Identity:Adresse is not set.");
+            throw new RoleLookupSilent("Identity:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Secret))
         {
-            throw new RoleLookupSilent("Identity:Geheimnis is not set.");
+            throw new RoleLookupSilent("Identity:Secret is not set.");
         }
 
         using var client = clientFactory.CreateClient(ClientName);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         HttpResponseMessage response;
 
@@ -88,9 +88,9 @@ public sealed class HttpCompanyRoles(
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
                 new Uri(
-                    new Uri(_settings.Adresse),
+                    new Uri(_settings.BaseUrl),
                     $"/internal/companies/{company}/members/{subject}/role"));
-            request.Headers.Add(SecretHeader, _settings.Geheimnis);
+            request.Headers.Add(SecretHeader, _settings.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }

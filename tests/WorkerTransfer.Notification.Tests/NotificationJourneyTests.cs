@@ -34,9 +34,9 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Identity:Adresse", "http://identity.test");
-            host.UseSetting("Identity:Geheimnis", NotifySecret);
-            host.UseSetting("Erasure:Geheimnis", "erasure-secret");
+            host.UseSetting("Identity:BaseUrl", "http://identity.test");
+            host.UseSetting("Identity:Secret", NotifySecret);
+            host.UseSetting("Erasure:Secret", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

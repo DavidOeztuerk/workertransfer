@@ -9,7 +9,7 @@ public sealed class DocumentStoreTests : IDisposable
         Path.Combine(Path.GetTempPath(), "wt-document-store-" + Guid.CreateVersion7().ToString("N"));
 
     private LocalDocumentStore Build() =>
-        new(Options.Create(new DocumentStoreSettings { Verzeichnis = _directory }));
+        new(Options.Create(new DocumentStoreSettings { Folder = _directory }));
 
     /// <inheritdoc />
     public void Dispose()

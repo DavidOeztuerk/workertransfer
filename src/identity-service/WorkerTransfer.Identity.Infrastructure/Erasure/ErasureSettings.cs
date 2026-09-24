@@ -2,10 +2,9 @@ namespace WorkerTransfer.Identity.Infrastructure.Erasure;
 
 /// <summary>Where the deletion orders go, and what proves they are ours.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Erasure__Geheimnis</c>,
-/// <c>Erasure__Adressen__*</c>, <c>Erasure__Zeitueberschreitung</c>), so they stay
-/// German until the keys are renamed everywhere at once — in compose, in the
-/// chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Erasure__Secret</c>,
+/// <c>Erasure__BaseUrls__*</c>, <c>Erasure__Timeout</c>); renaming one alone leaves
+/// its value on the default, silently.
 /// </remarks>
 public sealed class ErasureSettings
 {
@@ -21,10 +20,10 @@ public sealed class ErasureSettings
     /// piece of paper. Empty means nothing is delivered — and as a failure, not
     /// as a silent skip.
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>One base address per recipient, keyed by the name in the kind.</summary>
-    public Dictionary<string, string> Adressen { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> BaseUrls { get; } = new(StringComparer.Ordinal);
 
     /// <summary>How long a recipient is waited for.</summary>
     /// <remarks>
@@ -38,5 +37,5 @@ public sealed class ErasureSettings
     /// recipient counts as delivered.
     /// </para>
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }

@@ -94,7 +94,7 @@ public static class ScoutInfrastructure
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(draft.Schluessel))
+        if (string.IsNullOrEmpty(draft.ApiKey))
         {
             services.AddScoped<IDrafter, NoDrafter>();
         }
@@ -131,7 +131,7 @@ public static class ScoutInfrastructure
         IConfiguration configuration,
         DraftSettings draft)
     {
-        var seam = !string.IsNullOrEmpty(draft.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.ApiKey);
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(Search).Assembly, typeof(TickV1).Assembly]));
@@ -147,7 +147,7 @@ public static class ScoutInfrastructure
         // environment file, one for everybody. identity-service holds the access
         // per person, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.Adresse, seam));
+            "anthropic", draft.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
@@ -165,7 +165,7 @@ public static class ScoutInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "scout",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: false));
     }
 }

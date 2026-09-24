@@ -51,8 +51,8 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new TransferPost.NotificationSettings
                 {
-                    Adresse = address,
-                    Geheimnis = "probe"
+                    BaseUrl = address,
+                    Secret = "probe"
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "market_request"));
 
@@ -64,8 +64,8 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ApplicationsPost.NotificationSettings
                 {
-                    Adresse = address,
-                    Geheimnis = "probe"
+                    BaseUrl = address,
+                    Secret = "probe"
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "application_status"));
 
@@ -77,8 +77,8 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ResumePost.NotificationSettings
                 {
-                    Adresse = address,
-                    Geheimnis = "probe"
+                    BaseUrl = address,
+                    Secret = "probe"
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "resume_request"));
 
@@ -97,8 +97,8 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ScoutPost.NotificationSettings
                 {
-                    Adresse = address,
-                    Geheimnis = "probe"
+                    BaseUrl = address,
+                    Secret = "probe"
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "profile_discovered"));
 
@@ -128,8 +128,8 @@ public class NotificationWireTests
             new StubFactory(listener),
             Options.Create(new MailSettings
             {
-                Adresse = "http://probe.invalid",
-                Geheimnis = "probe"
+                BaseUrl = "http://probe.invalid",
+                Secret = "probe"
             }),
             NullLogger<HttpMailer>.Instance)
             .SendAsync(new SubjectId(Recipient));

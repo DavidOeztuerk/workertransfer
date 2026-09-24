@@ -29,12 +29,12 @@ for werkzeug in curl python3; do
 done
 
 if [[ -f .env ]]; then
-  GEHEIMNIS=$(grep -E '^WORKERTRANSFER_NACHWEIS_SECRET=' .env | head -1 | cut -d= -f2-)
+  GEHEIMNIS=$(grep -E '^WORKERTRANSFER_EVIDENCE_SECRET=' .env | head -1 | cut -d= -f2-)
 fi
-GEHEIMNIS="${WORKERTRANSFER_NACHWEIS_SECRET:-${GEHEIMNIS:-}}"
+GEHEIMNIS="${WORKERTRANSFER_EVIDENCE_SECRET:-${GEHEIMNIS:-}}"
 
 if [[ -z "$GEHEIMNIS" ]]; then
-  printf '%s✗%s WORKERTRANSFER_NACHWEIS_SECRET ist nicht gesetzt.\n' "$RED" "$AUS" >&2
+  printf '%s✗%s WORKERTRANSFER_EVIDENCE_SECRET ist nicht gesetzt.\n' "$RED" "$AUS" >&2
   echo "   Ohne es antwortet jede Nachweisadresse mit 404 — richtig, aber" >&2
   echo "   dann ist hier nichts zu pruefen. \`make env\` wuerfelt es mit." >&2
   exit 1

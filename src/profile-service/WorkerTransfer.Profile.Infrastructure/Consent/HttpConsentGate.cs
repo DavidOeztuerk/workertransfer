@@ -103,11 +103,11 @@ public sealed class HttpConsentGate(
         IReadOnlyList<ConsentQuestionV1> pairs, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            new Uri(new Uri(_settings.Adresse), "/consent/check-batch"))
+            new Uri(new Uri(_settings.BaseUrl), "/consent/check-batch"))
         {
             Content = JsonContent.Create(new ConsentBatchQuestionV1(pairs))
         };

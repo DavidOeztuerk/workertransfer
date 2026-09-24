@@ -32,7 +32,7 @@ namespace WorkerTransfer.ServiceDefaults;
 public sealed class EvidenceSecret
 {
     /// <summary>The section this binds to.</summary>
-    public const string Section = "Nachweis";
+    public const string Section = "Evidence";
 
     /// <summary>The header the secret is presented in.</summary>
     /// <remarks>
@@ -43,11 +43,10 @@ public sealed class EvidenceSecret
 
     /// <summary>The secret. Empty means shut.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Nachweis__Geheimnis</c>), so
-    /// it stays German until the keys are renamed everywhere at once — in
-    /// compose, in the chart and in <c>.env.example</c>.
+    /// The property name IS the environment key (<c>Evidence__Secret</c>); renaming
+    /// it alone leaves the value on its default, silently.
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Hangs the evidence onto the service foundation.</summary>
@@ -106,7 +105,7 @@ public static class EvidenceSetup
         ArgumentNullException.ThrowIfNull(context);
 
         var secret = context.RequestServices
-            .GetRequiredService<IOptions<EvidenceSecret>>().Value.Geheimnis;
+            .GetRequiredService<IOptions<EvidenceSecret>>().Value.Secret;
 
         if (string.IsNullOrEmpty(secret)
             || !context.Request.Headers.TryGetValue(

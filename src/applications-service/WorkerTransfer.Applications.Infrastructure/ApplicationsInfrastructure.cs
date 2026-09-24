@@ -94,7 +94,7 @@ public static class ApplicationsInfrastructure
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
 
         // The access comes from the person's account settings (Ollama, MiniMax,
-        // Anthropic). Draft__Schluessel stays a fallback for the platform, not
+        // Anthropic). Draft__ApiKey stays a fallback for the platform, not
         // the only source — otherwise writing answers 503 while the interface
         // already shows a provider.
         services.AddScoped<IAiAccessLookup, HttpAiAccessLookup>();
@@ -165,7 +165,7 @@ public static class ApplicationsInfrastructure
         // access in her account settings, and only identity-service knows it.
         // What this service can say about providers is therefore half — the
         // other half stands in `identity-service`, counted.
-        var seam = !string.IsNullOrEmpty(coverLetter.Schluessel);
+        var seam = !string.IsNullOrEmpty(coverLetter.ApiKey);
 
         services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
             [typeof(ApplicationState).Assembly, typeof(ApplicationV1).Assembly],
@@ -183,7 +183,7 @@ public static class ApplicationsInfrastructure
         // environment file, one for everybody. Access per person stands in
         // identity-service, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", coverLetter.Adresse, seam));
+            "anthropic", coverLetter.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));
@@ -193,7 +193,7 @@ public static class ApplicationsInfrastructure
 
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "applications",
-            !string.IsNullOrEmpty(erasure.Geheimnis),
+            !string.IsNullOrEmpty(erasure.Secret),
             auditTrailPresent: false));
     }
 }

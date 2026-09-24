@@ -55,8 +55,8 @@ public class NotificationTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
-            host.UseSetting("Notify:Geheimnis", NotifySecret);
+            host.UseSetting("Mail:WebUrl", "http://localhost:5173");
+            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));

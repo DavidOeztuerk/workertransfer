@@ -57,8 +57,8 @@ public sealed class EgressTests
     /// <remarks>
     /// That is the path WorkerTransfer has to take: every service names the
     /// hosts it really calls. The list must not be maintained by hand in doing
-    /// so — it already stands in the environment (<c>Consent__Adresse</c>,
-    /// <c>Jobs__Adresse</c>, …), and a second list beside it would be the one to
+    /// so — it already stands in the environment (<c>Consent__BaseUrl</c>,
+    /// <c>Jobs__BaseUrl</c>, …), and a second list beside it would be the one to
     /// go stale first.
     /// </remarks>
     [Fact]

@@ -62,7 +62,7 @@ public static class AdminPermissionExtensions
     /// permissions out of it.
     /// </summary>
     /// <param name="services">The container.</param>
-    /// <param name="configuration">Where <c>Identity:Adresse</c> comes from.</param>
+    /// <param name="configuration">Where <c>Identity:BaseUrl</c> comes from.</param>
     /// <param name="adminOnly">The permissions that demand an <c>admin</c>.</param>
     /// <remarks>
     /// Not in <c>AddWorkerTransferDefaults</c>, and that is the same separation

@@ -159,7 +159,7 @@ public class OutboxTests(Postgres postgres)
     {
         var subject = await RecordIntent("transfer.accepted");
         var delivery = new ProbeDelivery((_, _) => throw new HttpRequestException("gone"));
-        var settings = new OutboxSettings { HoechsteVersuche = 2 };
+        var settings = new OutboxSettings { MaxAttempts = 2 };
 
         for (var i = 0; i < 5; i++)
         {
@@ -180,7 +180,7 @@ public class OutboxTests(Postgres postgres)
     {
         var subject = await RecordIntent("erasure:consent");
         var delivery = new ProbeDelivery((_, _) => throw new HttpRequestException("dead"));
-        var settings = new OutboxSettings { HoechsteVersuche = null };
+        var settings = new OutboxSettings { MaxAttempts = null };
 
         for (var i = 0; i < 12; i++)
         {

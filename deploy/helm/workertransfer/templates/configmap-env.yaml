@@ -1,5 +1,5 @@
 {{/*
-Was alle elf Dienste gleich haben — das Gegenstück zum x-umgebung-Anker in
+Was alle elf Dienste gleich haben — das Gegenstück zum x-environment-Anker in
 docker-compose.yml. Geheimnisse stehen NICHT hier, sondern im Secret.
 */}}
 apiVersion: v1
@@ -19,7 +19,7 @@ data:
   nicht ein clusterinterner Servicename. Eine Mail mit http://identity-service
   darin führt niemanden irgendwohin.
   */}}
-  Mail__WebAdresse: {{ .Values.webUrl | quote }}
+  Mail__WebUrl: {{ .Values.webUrl | quote }}
   {{/*
   Who may call from a browser. Without this key Noelia falls back to
   localhost:3000 in Development — an origin that does not exist here — and

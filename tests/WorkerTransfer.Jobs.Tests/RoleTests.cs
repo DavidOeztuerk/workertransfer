@@ -44,7 +44,7 @@ public class RoleTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "withdrawal-secret");
+            host.UseSetting("Erasure:Secret", "withdrawal-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

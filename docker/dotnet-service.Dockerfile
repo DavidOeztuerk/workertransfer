@@ -84,7 +84,7 @@ RUN apt-get update \
 # USER bleibt hier root, damit der Entrypoint ein named Volume chownen
 # kann; er wechselt selbst auf uid 10001, bevor `dotnet` startet. Ein
 # `USER 10001` an dieser Stelle liess POST /resumes/me/documents mit
-# 500 sterben: /daten/ablage kommt als root:root ins Volume.
+# 500 sterben: /data/document-store kommt als root:root ins Volume.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin dienst
 
 WORKDIR /app

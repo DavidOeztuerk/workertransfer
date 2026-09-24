@@ -16,11 +16,10 @@ public sealed class ConsentSettings
 
     /// <summary>The base address of consent-service.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Consent__Adresse</c>), so
-    /// it stays German until the keys are renamed everywhere at once — in
-    /// compose, in the chart and in <c>.env.example</c>.
+    /// The property name IS the environment key (<c>Consent__BaseUrl</c>); renaming
+    /// it alone leaves the value on its default, silently.
     /// </remarks>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long an answer is waited for.</summary>
     /// <remarks>
@@ -30,11 +29,10 @@ public sealed class ConsentSettings
     /// and it hangs the caller with it.
     ///
     /// The property name IS the environment key
-    /// (<c>Consent__Zeitueberschreitung</c>), so it stays German until the keys
-    /// are renamed everywhere at once — in compose, in the chart and in
-    /// <c>.env.example</c>.
+    /// (<c>Consent__Timeout</c>); renaming it alone leaves the value on its
+    /// default, silently.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks the ledger — synchronously, every time, without a cache.</summary>
@@ -58,18 +56,18 @@ public sealed class HttpConsentGate(
     public async Task<bool> MaySeeAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // No ledger configured does not mean "everything is free". It
             // means this service cannot answer the question.
-            throw new ConsentGateSilent("Consent:Adresse is not set.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(nameof(HttpConsentGate));
 
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/consent/check"))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/consent/check"))
         {
             Content = JsonContent.Create(new ConsentQuestionV1(subject.Value, Capability))
         };

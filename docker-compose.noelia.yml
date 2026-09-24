@@ -25,7 +25,7 @@ services:
       # DASSELBE PAPIER WIE DIE BETRIEBSOBERFLAECHE, und kein zweites: sie legt
       # es an genau der Tuer vor, die es prueft. Leer heisst, dass jeder Dienst
       # mit 404 antwortet — die Flotte bliebe leer, ohne dass etwas kaputt ist.
-      ControlPlane__OperatorSecret: ${WORKERTRANSFER_NACHWEIS_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
+      ControlPlane__OperatorSecret: ${WORKERTRANSFER_EVIDENCE_SECRET:?fehlt — `make env` legt eine .env an und wuerfelt ihn}
 
       # Die Lizenz steht in der Umgebung und nicht in der Flottendatei: sie ist
       # ein unterschriebenes Papier auf einen Kunden, und ein solches gehoert

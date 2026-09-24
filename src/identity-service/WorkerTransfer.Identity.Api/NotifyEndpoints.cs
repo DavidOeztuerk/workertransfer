@@ -72,7 +72,7 @@ public static class NotifyEndpoints
     /// </remarks>
     private static bool MayNotify(HttpContext context, NotifySettings settings)
     {
-        if (string.IsNullOrEmpty(settings.Geheimnis)
+        if (string.IsNullOrEmpty(settings.Secret)
             || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
         {
             return false;
@@ -80,6 +80,6 @@ public static class NotifyEndpoints
 
         return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
             System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(settings.Geheimnis));
+            System.Text.Encoding.UTF8.GetBytes(settings.Secret));
     }
 }

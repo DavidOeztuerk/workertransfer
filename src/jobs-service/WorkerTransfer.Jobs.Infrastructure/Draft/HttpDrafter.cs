@@ -7,10 +7,10 @@ namespace WorkerTransfer.Jobs.Infrastructure.Draft;
 
 /// <summary>Whether and where a model is asked at all.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Draft__Schluessel</c>,
-/// <c>Draft__Adresse</c>, <c>Draft__Zeitueberschreitung</c>,
-/// <c>Draft__Modell</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Draft__ApiKey</c>,
+/// <c>Draft__BaseUrl</c>, <c>Draft__Timeout</c>,
+/// <c>Draft__Model</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class DraftSettings
 {
@@ -20,10 +20,10 @@ public sealed class DraftSettings
     /// <summary>
     /// Empty means: no foreign service is called, and the interface says so.
     /// </summary>
-    public string Schluessel { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The provider's address.</summary>
-    public string Adresse { get; set; } = "https://api.anthropic.com/v1/messages";
+    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -32,10 +32,10 @@ public sealed class DraftSettings
     /// without this line <c>HttpClient</c>'s default applies with a HUNDRED
     /// seconds, and nobody is to sit in front of a form that long.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Which model.</summary>
-    public string Modell { get; set; } = "claude-haiku-4-5-20251001";
+    public string Model { get; set; } = "claude-haiku-4-5-20251001";
 }
 
 /// <summary>The drafter when none is set up.</summary>
@@ -63,29 +63,29 @@ public sealed class HttpDrafter(
     {
         ArgumentNullException.ThrowIfNull(draft);
 
-        if (string.IsNullOrEmpty(_settings.Schluessel))
+        if (string.IsNullOrEmpty(_settings.ApiKey))
         {
             throw new DraftUnavailable("No draft provider is set up.");
         }
 
         using var client = factory.CreateClient(nameof(HttpDrafter));
 
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, _settings.Adresse)
+        using var request = new HttpRequestMessage(HttpMethod.Post, _settings.BaseUrl)
         {
             // What goes out stands in AdvertDraft and nowhere else: no
             // tenant_id, no company name, nothing about a human being.
             Content = JsonContent.Create(new
             {
-                model = _settings.Modell,
+                model = _settings.Model,
                 max_tokens = 800,
                 system = AdvertDraft.Rules,
                 messages = new[] { new { role = "user", content = draft.Prompt } }
             })
         };
 
-        request.Headers.Add("x-api-key", _settings.Schluessel);
+        request.Headers.Add("x-api-key", _settings.ApiKey);
         request.Headers.Add("anthropic-version", "2023-06-01");
 
         HttpResponseMessage response;

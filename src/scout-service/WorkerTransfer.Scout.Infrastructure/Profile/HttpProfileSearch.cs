@@ -13,9 +13,8 @@ namespace WorkerTransfer.Scout.Infrastructure.Profile;
 /// <summary>Where profile-service can be reached, and what identifies us there.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Profile__Adresse</c>, <c>Profile__Geheimnis</c>, <c>Profile__Geduld</c>),
-/// so they stay German until the keys are renamed everywhere at once — in
-/// compose, in the chart and in <c>.env.example</c>.
+/// (<c>Profile__BaseUrl</c>, <c>Profile__Secret</c>, <c>Profile__Timeout</c>);
+/// renaming one alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class ProfileSettings
 {
@@ -29,7 +28,7 @@ public sealed class ProfileSettings
     /// destination that stands only in the source is refused — without a log
     /// line.
     /// </remarks>
-    public string Adresse { get; set; } = "http://profile-service:8003";
+    public string BaseUrl { get; set; } = "http://profile-service:8003";
 
     /// <summary>The shared secret of the internal doors.</summary>
     /// <remarks>
@@ -38,14 +37,14 @@ public sealed class ProfileSettings
     /// that is a statement about people that would stem from a missing
     /// environment variable.
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
     /// Five seconds, like every other service-to-service call here. WITHOUT this
     /// line <c>HttpClient</c>'s default applies: a HUNDRED seconds.
     /// </remarks>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks profile-service through the internal door.</summary>
@@ -115,7 +114,7 @@ public sealed class HttpProfileSearch(
         // The search door has no "not found" case: it answers with a page, or it
         // does not let us in — without the shared secret it answers 404 instead
         // of 401, so as not to give itself away. Exactly that happened when
-        // `Notify__Geheimnis` was missing at profile-service: the door said 404,
+        // `Notify__Secret` was missing at profile-service: the door said 404,
         // this place turned it into `items: []`, the endpoint answered 200 — and
         // the UI claimed there was nobody.
         //
@@ -160,25 +159,25 @@ public sealed class HttpProfileSearch(
     private async Task<T?> Fetch<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new ProfileSearchSilent("Profile:Adresse is not set.");
+            throw new ProfileSearchSilent("Profile:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Secret))
         {
             // As a failure and not as an empty result: "not set up" must not
             // look like "there is nobody".
-            throw new ProfileSearchSilent("Profile:Geheimnis is not set.");
+            throw new ProfileSearchSilent("Profile:Secret is not set.");
         }
 
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_settings.Adresse), path));
+            HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
 
-        request.Headers.Add(SecretHeader, _settings.Geheimnis);
+        request.Headers.Add(SecretHeader, _settings.Secret);
 
         HttpResponseMessage response;
 

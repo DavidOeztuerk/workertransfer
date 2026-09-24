@@ -79,7 +79,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", "probe-secret");
+            host.UseSetting("Erasure:Secret", "probe-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

@@ -7,10 +7,9 @@ namespace WorkerTransfer.Resume.Infrastructure.Notification;
 
 /// <summary>Where notifications go, and what proves they are ours.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Notifications__Adresse</c>,
-/// <c>…__Zeitueberschreitung</c>, <c>…__Geheimnis</c>), so they stay German
-/// until the keys are renamed everywhere at once — in compose, in the chart and
-/// in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Notifications__BaseUrl</c>,
+/// <c>…__Timeout</c>, <c>…__Secret</c>); renaming one alone leaves its value on the
+/// default, silently.
 /// </remarks>
 public sealed class NotificationSettings
 {
@@ -18,7 +17,7 @@ public sealed class NotificationSettings
     public const string Section = "Notifications";
 
     /// <summary>The base address of notification-service.</summary>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -27,7 +26,7 @@ public sealed class NotificationSettings
     /// not a time limit, that is a hanging call with an end some time — and it
     /// hangs the caller along with it.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// The shared secret. Expressly a different one from the erasure secret.
@@ -37,7 +36,7 @@ public sealed class NotificationSettings
     /// be the same piece of paper. Empty means nothing is delivered — and as a
     /// <em>failure</em>, so the row stays due instead of counting as sent.
     /// </remarks>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Hands one intent to notification-service.</summary>
@@ -58,21 +57,21 @@ public sealed class HttpNotifier(
         string kind,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new InvalidOperationException("Notifications:Adresse is not configured.");
+            throw new InvalidOperationException("Notifications:BaseUrl is not configured.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Secret))
         {
-            throw new InvalidOperationException("Notifications:Geheimnis is not configured.");
+            throw new InvalidOperationException("Notifications:Secret is not configured.");
         }
 
         using var client = factory.CreateClient(nameof(HttpNotifier));
 
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), "/internal/notifications"))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), "/internal/notifications"))
         {
             // The whole payload: whom it is about and what kind. No text, no
             // reason, no company name — the recipient reads the current state
@@ -86,7 +85,7 @@ public sealed class HttpNotifier(
                 new { user_id = recipient.Value, kind = kind })
         };
 
-        request.Headers.Add("X-Notify-Secret", _settings.Geheimnis);
+        request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
         using var response = await client.SendAsync(request, cancellationToken);
 

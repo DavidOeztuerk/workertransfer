@@ -45,8 +45,8 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Mail:WebAdresse", "http://localhost:5173");
-            host.UseSetting("Notify:Geheimnis", "notify-secret");
+            host.UseSetting("Mail:WebUrl", "http://localhost:5173");
+            host.UseSetting("Notify:Secret", "notify-secret");
             // The master key. Without it the service throws while resolving —
             // and that is exactly what it should do, see `SecretStore`.
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");

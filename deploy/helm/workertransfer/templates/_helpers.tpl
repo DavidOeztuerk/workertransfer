@@ -104,16 +104,16 @@ eine zweite Stelle, die einen Handelnden erschaffen kann.
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_JWT_PRIVATE_KEY
 {{- end }}
-- name: Erasure__Geheimnis
+- name: Erasure__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ERASURE_SECRET
 {{/*
 Das Meldegeheimnis heisst je nach Seite anders und ist DASSELBE: bei
-identity-service ist es `Notify__Geheimnis` (er prüft es), bei jedem Dienst
-mit `Identity__Adresse` `Identity__Geheimnis` (er legt es vor), und die
-absendenden Dienste tragen es als `Notifications__Geheimnis`.
+identity-service ist es `Notify__Secret` (er prüft es), bei jedem Dienst
+mit `Identity__BaseUrl` `Identity__Secret` (er legt es vor), und die
+absendenden Dienste tragen es als `Notifications__Secret`.
 
 Ausdrücklich ein ANDERES als das der Löschung (ADR-0027 §4.4): "darf eine Mail
 anstossen" und "darf alles über einen Menschen löschen" dürfen nicht dasselbe
@@ -126,11 +126,11 @@ Die Tuer vor dem Nachweis, und sie steht an JEDEM Dienst: jeder beantwortet
 wer eine Mail anstossen darf, muss nicht erfahren, welche KI-Anbieter diese
 Instanz benutzt. LEER heisst: die Tuer ist zu und die Seite antwortet 404.
 */}}
-- name: Nachweis__Geheimnis
+- name: Evidence__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NACHWEIS_SECRET
+      key: WORKER_EVIDENCE_SECRET
 {{/*
 The master key, at EVERY service. It encrypts the data-protection key ring
 (ADR-0046) and a person's AI key. Without it the pod does not start — which is
@@ -147,34 +147,34 @@ profile-service prueft es an seiner internen Suchtuer (ADR-0036). LEER hiesse
 dort: die Tuer ist zu — sie antwortet 404, und der Scout suchte lautlos ins
 Leere.
 */}}
-- name: Notify__Geheimnis
+- name: Notify__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
 {{- end }}
-{{- if hasKey ($svc.env | default dict) "Identity__Adresse" }}
-- name: Identity__Geheimnis
+{{- if hasKey ($svc.env | default dict) "Identity__BaseUrl" }}
+- name: Identity__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
 {{- end }}
-{{- if hasKey ($svc.env | default dict) "Profile__Adresse" }}
+{{- if hasKey ($svc.env | default dict) "Profile__BaseUrl" }}
 {{/*
 Dieselbe Kennung noch einmal unter einem vierten Namen: scout-service sucht
 durch die interne Tuer von profile-service. LEER hiesse dort nicht „alles",
 sondern „es wird nicht gesucht" — und zwar als Fehlschlag, damit „nicht
 eingerichtet" nicht wie „es gibt niemanden" aussieht.
 */}}
-- name: Profile__Geheimnis
+- name: Profile__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_NOTIFY_SECRET
 {{- end }}
-{{- if hasKey ($svc.env | default dict) "Notifications__Adresse" }}
-- name: Notifications__Geheimnis
+{{- if hasKey ($svc.env | default dict) "Notifications__BaseUrl" }}
+- name: Notifications__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
@@ -185,14 +185,14 @@ eingerichtet" nicht wie „es gibt niemanden" aussieht.
 Die Formulierungshilfe (ADR-0024). LEER heisst: sie ist aus, und die
 Oberfläche sagt das — es wird dann kein fremder Dienst angerufen.
 */}}
-- name: Draft__Schluessel
+- name: Draft__ApiKey
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ANTHROPIC_API_KEY
-- name: Draft__Modell
+- name: Draft__Model
   value: {{ $root.Values.draftingModel | quote }}
-- name: Draft__Adresse
+- name: Draft__BaseUrl
   value: {{ $root.Values.draftingUrl | quote }}
 {{- end }}
 {{- range $key, $value := ($svc.env | default dict) }}

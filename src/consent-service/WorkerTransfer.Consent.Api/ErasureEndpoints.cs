@@ -59,7 +59,7 @@ public static class ErasureEndpoints
     /// </remarks>
     private static bool MayErase(HttpContext context, ErasureSettings settings)
     {
-        if (string.IsNullOrEmpty(settings.Geheimnis))
+        if (string.IsNullOrEmpty(settings.Secret))
         {
             return false;
         }
@@ -71,6 +71,6 @@ public static class ErasureEndpoints
 
         return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
             System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(settings.Geheimnis));
+            System.Text.Encoding.UTF8.GetBytes(settings.Secret));
     }
 }

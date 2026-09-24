@@ -12,10 +12,10 @@ namespace WorkerTransfer.Applications.Infrastructure.CoverLetter;
 /// platform, one provider, one key. Two sections would be two chances to forget
 /// one of them.
 /// <para>
-/// The property names ARE the environment keys (<c>Draft__Schluessel</c>,
-/// <c>Draft__Adresse</c>, <c>Draft__Zeitueberschreitung</c>,
-/// <c>Draft__Modell</c>), so they stay German until the keys are renamed
-/// everywhere at once — in compose, in the chart and in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Draft__ApiKey</c>,
+/// <c>Draft__BaseUrl</c>, <c>Draft__Timeout</c>,
+/// <c>Draft__Model</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </para>
 /// </remarks>
 public sealed class CoverLetterSettings
@@ -24,10 +24,10 @@ public sealed class CoverLetterSettings
     public const string Section = "Draft";
 
     /// <summary>Empty means: nothing is called, and the interface says so.</summary>
-    public string Schluessel { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The provider's address.</summary>
-    public string Adresse { get; set; } = "https://api.anthropic.com/v1/messages";
+    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -35,10 +35,10 @@ public sealed class CoverLetterSettings
     /// longer and carries more context. But not unlimited either — without this
     /// line <c>HttpClient</c>'s default applies with a HUNDRED seconds.
     /// </remarks>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(60);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
 
     /// <summary>Which model.</summary>
-    public string Modell { get; set; } = "claude-sonnet-5";
+    public string Model { get; set; } = "claude-sonnet-5";
 }
 
 /// <summary>The cover-letter writer when none is set up.</summary>
@@ -214,7 +214,7 @@ public sealed class HttpCoverLetterWriter(
         // With ResponseHeadersRead this limit applies until the first byte, not
         // until the last token. Otherwise a local model dies after a minute
         // although it has already written — measured against Ollama.
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = BuildRequest(access, instruction);
 
@@ -248,7 +248,7 @@ public sealed class HttpCoverLetterWriter(
             {
                 await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 var text = await ReadStreamAsync(
-                    access.Provider, stream, _settings.Zeitueberschreitung,
+                    access.Provider, stream, _settings.Timeout,
                     progress, cancellationToken);
 
                 return text is { Length: > 0 }

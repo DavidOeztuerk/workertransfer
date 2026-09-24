@@ -59,8 +59,8 @@ public class PortfolioJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Storage:Wurzel", _storageRoot);
-            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
+            host.UseSetting("Storage:Root", _storageRoot);
+            host.UseSetting("Erasure:Secret", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _gate)));
@@ -433,8 +433,8 @@ public class PortfolioJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Storage:Wurzel", _storageRoot);
-            host.UseSetting("Erasure:Geheimnis", string.Empty);
+            host.UseSetting("Storage:Root", _storageRoot);
+            host.UseSetting("Erasure:Secret", string.Empty);
             host.UseSetting("environment", "Development");
         });
 

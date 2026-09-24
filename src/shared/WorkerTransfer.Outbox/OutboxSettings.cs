@@ -2,10 +2,9 @@ namespace WorkerTransfer.Outbox;
 
 /// <summary>How the dispatcher paces itself.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Outbox__Stapelgroesse</c>,
-/// <c>Outbox__HoechsteVersuche</c>, …), so they stay German until the keys are
-/// renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Outbox__BatchSize</c>,
+/// <c>Outbox__MaxAttempts</c>, …); renaming one alone leaves its value on the
+/// default, silently.
 /// </remarks>
 public sealed class OutboxSettings
 {
@@ -13,10 +12,10 @@ public sealed class OutboxSettings
     public const string Section = "Outbox";
 
     /// <summary>Which table. Only where a service's conventions differ.</summary>
-    public string Tabelle { get; set; } = OutboxModelBuilderExtensions.TableName;
+    public string Table { get; set; } = OutboxModelBuilderExtensions.TableName;
 
     /// <summary>How many rows one pass takes.</summary>
-    public int Stapelgroesse { get; set; } = 50;
+    public int BatchSize { get; set; } = 50;
 
     /// <summary>
     /// After how many failed attempts a row is left lying, or <c>null</c> for
@@ -30,10 +29,10 @@ public sealed class OutboxSettings
     /// recipient therefore <em>blocks</em> completion. That is the point, and no
     /// timeout may "finish" it.
     /// </remarks>
-    public int? HoechsteVersuche { get; set; } = DeliveryLimits.Standard;
+    public int? MaxAttempts { get; set; } = DeliveryLimits.Standard;
 
     /// <summary>How long between passes while things are moving.</summary>
-    public TimeSpan Takt { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// How far the interval may grow while nothing gets through.
@@ -43,5 +42,5 @@ public sealed class OutboxSettings
     /// into a wall once a second. It grows against a wall, not against quiet —
     /// an empty table delivers nothing but is not a failure.
     /// </remarks>
-    public TimeSpan HoechsterTakt { get; set; } = TimeSpan.FromMinutes(5);
+    public TimeSpan MaxPollInterval { get; set; } = TimeSpan.FromMinutes(5);
 }

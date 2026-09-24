@@ -34,7 +34,7 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
 
     /// <summary>A key, as somebody deposits it by accident.</summary>
     /// <remarks>
-    /// It stands in <c>Draft:Schluessel</c>, so at exactly the place where a real
+    /// It stands in <c>Draft:ApiKey</c>, so at exactly the place where a real
     /// one would stand, and the AI seam therefore counts as set up. If it turns
     /// up on a page or in the report, that is no cosmetic flaw but a key in a
     /// document somebody passes around.
@@ -56,16 +56,16 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Erasure:Geheimnis", ErasureSecret);
-            host.UseSetting("Nachweis:Geheimnis", Secret);
+            host.UseSetting("Erasure:Secret", ErasureSecret);
+            host.UseSetting("Evidence:Secret", Secret);
 
             // The canary sits WHERE A REAL KEY WOULD SIT.
-            host.UseSetting("Draft:Schluessel", Canary);
-            host.UseSetting("Draft:Adresse", "https://api.anthropic.com/v1/messages");
+            host.UseSetting("Draft:ApiKey", Canary);
+            host.UseSetting("Draft:BaseUrl", "https://api.anthropic.com/v1/messages");
 
             // And a name that has no business in a configuration — but that is
             // exactly how it lands there when somebody enters a sender.
-            host.UseSetting("Mail:Absender", $"{NameCanary} <jane@example.test>");
+            host.UseSetting("Mail:Sender", $"{NameCanary} <jane@example.test>");
             host.UseSetting("environment", "Development");
         });
 
@@ -159,7 +159,7 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Nachweis:Geheimnis", "");
+            host.UseSetting("Evidence:Secret", "");
             host.UseSetting("environment", "Development");
         });
 

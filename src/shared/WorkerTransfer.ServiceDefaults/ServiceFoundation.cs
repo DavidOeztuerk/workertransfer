@@ -175,8 +175,8 @@ public static class ServiceFoundation
                 // the stack rather than in the tests.
                 //
                 // The hosts therefore come out of the CONFIGURATION and not out
-                // of a list here: `Consent__Adresse`, `Jobs__Adresse`,
-                // `Auskunft__*`, `Erasure__Adressen__*` stand in the environment
+                // of a list here: `Consent__BaseUrl`, `Jobs__BaseUrl`,
+                // `Lookup__*`, `Erasure__BaseUrls__*` stand in the environment
                 // anyway, and what a service calls it has already said there. A
                 // second list would be the one to go stale first — and nobody
                 // would notice it going stale, because the call is then simply
@@ -498,8 +498,8 @@ public static class ServiceFoundation
     /// derivation with one reader belongs where it is read.</para>
     ///
     /// <para><strong>Two destinations therefore stand in the environment that
-    /// used to stand only in the source</strong> — <c>Draft__Adresse</c> and
-    /// <c>GitHub__Adresse</c>. A built-in default address pointing abroad is
+    /// used to stand only in the source</strong> — <c>Draft__BaseUrl</c> and
+    /// <c>GitHub__BaseUrl</c>. A built-in default address pointing abroad is
     /// exactly what a sovereignty report exists to surface; leaving it in the
     /// code would mean hiding it from that report.</para>
     /// </remarks>

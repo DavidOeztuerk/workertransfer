@@ -27,7 +27,7 @@ public sealed class OutboxLoop<TContext>(
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = settings.Takt;
+        var interval = settings.PollInterval;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -62,8 +62,8 @@ public sealed class OutboxLoop<TContext>(
             var blocked = due > 0 && delivered == 0;
 
             interval = blocked
-                ? Smaller(interval * 2, settings.HoechsterTakt)
-                : settings.Takt;
+                ? Smaller(interval * 2, settings.MaxPollInterval)
+                : settings.PollInterval;
 
             try
             {

@@ -129,7 +129,7 @@ public sealed class HttpErasureDelivery(
         T body,
         CancellationToken cancellationToken)
     {
-        if (!_settings.Adressen.TryGetValue(service, out var baseUrl))
+        if (!_settings.BaseUrls.TryGetValue(service, out var baseUrl))
         {
             throw new InvalidOperationException($"No address configured for '{service}'.");
         }
@@ -137,21 +137,21 @@ public sealed class HttpErasureDelivery(
         // Empty means nothing is delivered — and as a FAILURE, not as a silent
         // skip. A row that counted as delivered while nobody deleted anything
         // would be the worst case there is.
-        if (string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.Secret))
         {
-            throw new InvalidOperationException("Erasure:Geheimnis is not set.");
+            throw new InvalidOperationException("Erasure:Secret is not set.");
         }
 
         using var client = factory.CreateClient(nameof(HttpErasureDelivery));
 
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
         using var request = new HttpRequestMessage(
             HttpMethod.Post, new Uri(new Uri(baseUrl), path))
         {
             Content = JsonContent.Create(body)
         };
 
-        request.Headers.Add("X-Erasure-Secret", _settings.Geheimnis);
+        request.Headers.Add("X-Erasure-Secret", _settings.Secret);
 
         using var response = await client.SendAsync(request, cancellationToken);
 

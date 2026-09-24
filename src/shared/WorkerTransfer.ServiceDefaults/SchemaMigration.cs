@@ -20,7 +20,7 @@ namespace WorkerTransfer.ServiceDefaults;
 /// come back here first.
 /// </para>
 /// <para>
-/// <strong>Switchable off through <c>Datenbank:Wandern</c>.</strong> Not for
+/// <strong>Switchable off through <c>Database:Migrate</c>.</strong> Not for
 /// convenience but for the case where an operator deliberately runs the schema
 /// migration by hand: a restart must then not start it after all. The default
 /// is on, because a service that starts without its schema answers every
@@ -31,11 +31,10 @@ public static class SchemaMigration
 {
     /// <summary>The switch in the configuration.</summary>
     /// <remarks>
-    /// The key IS the environment key (<c>Datenbank__Wandern</c>), so it stays
-    /// German until the keys are renamed everywhere at once — in compose, in the
-    /// chart and in <c>.env.example</c>.
+    /// The key IS the environment key (<c>Database__Migrate</c>); renaming it alone
+    /// leaves the value on its default, silently.
     /// </remarks>
-    public const string Key = "Datenbank:Wandern";
+    public const string Key = "Database:Migrate";
 
     /// <summary>How long a database that is still starting up is waited for.</summary>
     /// <remarks>

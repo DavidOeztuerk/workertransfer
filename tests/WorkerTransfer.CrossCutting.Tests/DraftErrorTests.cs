@@ -172,8 +172,8 @@ public class DraftErrorTests
         {
             var settings = new ProfileDraft.DraftSettings
             {
-                Schluessel = "probe",
-                Zeitueberschreitung = timeLimit
+                ApiKey = "probe",
+                Timeout = timeLimit
             };
 
             return new ProfileDraft.HttpDrafter(factory, Options.Create(settings))
@@ -185,8 +185,8 @@ public class DraftErrorTests
         {
             var scout = new ScoutDraft.DraftSettings
             {
-                Schluessel = "probe",
-                Zeitueberschreitung = timeLimit
+                ApiKey = "probe",
+                Timeout = timeLimit
             };
 
             // The context carries no free text of the person, so the secret
@@ -199,8 +199,8 @@ public class DraftErrorTests
 
         var jobs = new JobsDraft.DraftSettings
         {
-            Schluessel = "probe",
-            Zeitueberschreitung = timeLimit
+            ApiKey = "probe",
+            Timeout = timeLimit
         };
 
         return new JobsDraft.HttpDrafter(factory, Options.Create(jobs))

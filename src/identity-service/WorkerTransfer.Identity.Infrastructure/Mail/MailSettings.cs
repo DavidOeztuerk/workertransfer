@@ -14,11 +14,10 @@ public sealed class MailSettings
 
     /// <summary>What the mail is sent as.</summary>
     /// <remarks>
-    /// The property name IS the environment key (<c>Mail__Absender</c>), so it
-    /// stays German until the keys are renamed everywhere at once — in compose,
-    /// in the chart and in <c>.env.example</c>.
+    /// The property name IS the environment key (<c>Mail__Sender</c>); renaming it
+    /// alone leaves the value on its default, silently.
     /// </remarks>
-    public string Absender { get; set; } = "noreply@workertransfer.local";
+    public string Sender { get; set; } = "noreply@workertransfer.local";
 
     /// <summary>Set only where the server actually wants it.</summary>
     public string? Account { get; set; }
@@ -37,10 +36,9 @@ public sealed class MailSettings
     /// link is clicked by a person, from a mail client, outside every network
     /// this service knows about.
     /// <para>
-    /// The property name IS the environment key (<c>Mail__WebAdresse</c>), so it
-    /// stays German until the keys are renamed everywhere at once — in compose,
-    /// in the chart and in <c>.env.example</c>.
+    /// The property name IS the environment key (<c>Mail__WebUrl</c>); renaming it
+    /// alone leaves the value on its default, silently.
     /// </para>
     /// </remarks>
-    public string WebAdresse { get; set; } = "http://localhost:5173";
+    public string WebUrl { get; set; } = "http://localhost:5173";
 }

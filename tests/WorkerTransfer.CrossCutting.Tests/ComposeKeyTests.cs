@@ -10,13 +10,15 @@ namespace WorkerTransfer.CrossCutting.Tests;
 /// </summary>
 /// <remarks>
 /// <para><strong>A settings property name IS the environment key.</strong>
-/// <c>LookupSettings.Resume</c> binds <c>Auskunft__Resume</c>; rename the
+/// <c>LookupSettings.Resume</c> binds <c>Lookup__Resume</c>; rename the
 /// property alone and the value stays on its default, silently. Measured twice
-/// in the English rename: <c>GitHub__OAuth__Rueckadresse</c> after
-/// <c>Rueckadresse</c> became <c>RedirectUrl</c>, and <c>Auskunft__Resume</c>
-/// after <c>Resume</c> became <c>CurriculumVitae</c>. The build was green, and
-/// so was every suite — each test host sets its own keys or replaces the
-/// component with a probe, so none of them read what compose sets.</para>
+/// in the English rename, while the keys were still German:
+/// <c>GitHub__OAuth__Rueckadresse</c> after the property became
+/// <c>RedirectUrl</c>, and <c>Auskunft__Resume</c> after <c>Resume</c> became
+/// <c>CurriculumVitae</c>. The build was green, and so was every suite — each
+/// test host sets its own keys or replaces the component with a probe, so none
+/// of them read what compose sets. The keys were renamed afterwards in one pass
+/// over code, compose, the chart and <c>.env.example</c>.</para>
 ///
 /// <para>This test reads compose and the settings types, and nothing in
 /// between: a key must land on a property of a type whose <c>Section</c> is
@@ -32,12 +34,12 @@ public sealed class ComposeKeyTests
 
     /// <summary>Keys read by name elsewhere, each with the place that reads it.</summary>
     /// <remarks>
-    /// <c>Draft:ErlaubteZiele</c> has no property on purpose: the egress
+    /// <c>Draft:AllowedTargets</c> has no property on purpose: the egress
     /// boundary (<c>ServiceFoundation</c>) takes the host from any configuration
     /// value that reads as an absolute http URL, and these values exist only to
     /// be read that way.
     /// </remarks>
-    private static readonly string[] ReadByName = ["Draft:ErlaubteZiele"];
+    private static readonly string[] ReadByName = ["Draft:AllowedTargets"];
 
     /// <summary>The services compose starts from the one image, by <c>SERVICE_DIR</c>.</summary>
     public static TheoryData<string> Services
@@ -62,7 +64,7 @@ public sealed class ComposeKeyTests
             10, "otherwise this test reads no service and checks nothing");
 
         SharedKeys().Should().Contain(
-            "Erasure__Geheimnis", "otherwise the shared anchor was not found");
+            "Erasure__Secret", "otherwise the shared anchor was not found");
 
         SettingsTypes().Should().HaveCountGreaterThan(
             20, "otherwise the settings types were not found and every key looks unowned");
@@ -103,9 +105,15 @@ public sealed class ComposeKeyTests
     {
         var owners = SettingsTypes();
 
-        Lands("Auskunft__Resume", owners).Should().BeTrue();
-        Lands("Auskunft__CurriculumVitae", owners).Should().BeFalse();
-        Lands("GitHub__OAuth__RedirectUrl", owners).Should().BeFalse();
+        Lands("Lookup__Resume", owners).Should().BeTrue();
+        Lands("Lookup__CurriculumVitae", owners).Should().BeFalse();
+        Lands("GitHub__OAuth__RedirectUrl", owners).Should().BeTrue();
+
+        // The German keys are gone, not kept beside the English ones: a second
+        // name for the same setting is a second path.
+        Lands("GitHub__OAuth__Rueckadresse", owners).Should().BeFalse();
+        Lands("Consent__Adresse", owners).Should().BeFalse();
+        Lands("Auskunft__Resume", owners).Should().BeFalse();
     }
 
     // ---------------------------------------------------------------------
@@ -194,9 +202,9 @@ public sealed class ComposeKeyTests
         return (YamlMappingNode)stream.Documents[0].RootNode;
     }
 
-    /// <summary>The keys in the shared anchor (<c>x-umgebung</c>).</summary>
+    /// <summary>The keys in the shared anchor (<c>x-environment</c>).</summary>
     private static List<string> SharedKeys() =>
-        [.. ((YamlMappingNode)Compose().Children[new YamlScalarNode("x-umgebung")]).Children.Keys
+        [.. ((YamlMappingNode)Compose().Children[new YamlScalarNode("x-environment")]).Children.Keys
             .Select(key => ((YamlScalarNode)key).Value!)];
 
     /// <summary>

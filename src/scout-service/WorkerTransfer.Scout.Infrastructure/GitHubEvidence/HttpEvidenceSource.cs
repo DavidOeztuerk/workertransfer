@@ -15,9 +15,8 @@ namespace WorkerTransfer.Scout.Infrastructure.GitHubEvidence;
 /// <summary>Where the evidence lies.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>GitHub__Adresse</c>, <c>GitHub__Geduld</c>, <c>GitHub__HoechstzahlBelege</c>),
-/// so they stay German until the keys are renamed everywhere at once — in
-/// compose, in the chart and in <c>.env.example</c>.
+/// (<c>GitHub__BaseUrl</c>, <c>GitHub__Timeout</c>, <c>GitHub__MaxEvidence</c>);
+/// renaming one alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class EvidenceSettings
 {
@@ -32,10 +31,10 @@ public sealed class EvidenceSettings
     /// configuration because the egress boundary derives its allowed hosts from
     /// there.
     /// </remarks>
-    public string Adresse { get; set; } = "http://github-service:8011";
+    public string BaseUrl { get; set; } = "http://github-service:8011";
 
     /// <summary>How long to wait for an answer.</summary>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>How many pieces of evidence a hit carries at most.</summary>
     /// <remarks>
@@ -44,7 +43,7 @@ public sealed class EvidenceSettings
     /// which github-service delivers. Whoever sorted out by stars would have
     /// built a ranking (ADR-0022).
     /// </remarks>
-    public int HoechstzahlBelege { get; set; } = 24;
+    public int MaxEvidence { get; set; } = 24;
 }
 
 /// <summary>Fetches evidence to a hit — never to find it.</summary>
@@ -78,7 +77,7 @@ public sealed class HttpEvidenceSource(
     public async Task<EvidenceSheet> GetAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             return new EvidenceSheet([], EvidenceState.Unavailable);
         }
@@ -119,7 +118,7 @@ public sealed class HttpEvidenceSource(
             // Deduplicated over word AND project: the same topic on two
             // repositories is two pieces of evidence, on one repository one.
             .DistinctBy(item => (item.Word, item.Project, item.Kind))
-            .Take(Math.Max(1, _settings.HoechstzahlBelege))
+            .Take(Math.Max(1, _settings.MaxEvidence))
             .ToArray();
 
         if (evidence.Length == 0)
@@ -159,11 +158,11 @@ public sealed class HttpEvidenceSource(
     private async Task<ForeignConnectionV1?> Fetch(SubjectId subject, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            new Uri(new Uri(_settings.Adresse), $"/github/{subject.Value}"));
+            new Uri(new Uri(_settings.BaseUrl), $"/github/{subject.Value}"));
 
         // On the caller's behalf: github-service checks the release itself, and
         // the same decision is to fall as for a browser.

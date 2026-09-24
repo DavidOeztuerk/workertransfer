@@ -34,7 +34,7 @@ public class ErasureRecipientTests
     /// <summary>Every service with its context and its name in the cascade.</summary>
     /// <remarks>
     /// The name is the one <c>ErasureRecipient.Services</c> carries and the one
-    /// identity-service looks up in <c>Erasure__Adressen__&lt;name&gt;</c>.
+    /// identity-service looks up in <c>Erasure__BaseUrls__&lt;name&gt;</c>.
     /// </remarks>
     public static TheoryData<string, Type> Services => new()
     {

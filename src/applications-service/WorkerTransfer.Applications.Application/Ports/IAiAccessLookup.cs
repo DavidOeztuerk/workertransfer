@@ -7,7 +7,7 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// Comes from the account settings (identity-service), not from an environment
 /// variable of the platform. The interface sets up Ollama or MiniMax; without
 /// this lookup the cover-letter service would only ever see
-/// <c>Draft__Schluessel</c> and answer 503 while the person believes she has
+/// <c>Draft__ApiKey</c> and answer 503 while the person believes she has
 /// already asked someone.
 /// </remarks>
 /// <param name="Provider"><c>none</c>, <c>openai_compatible</c> or <c>anthropic</c>.</param>

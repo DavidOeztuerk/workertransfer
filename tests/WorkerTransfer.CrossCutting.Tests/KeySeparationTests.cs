@@ -55,7 +55,7 @@ public sealed class KeySeparationTests
                 && row.Contains($"{key}:", StringComparison.Ordinal))
             {
                 // Under `services:` the owner is the service, otherwise the
-                // anchor itself — `x-umgebung` has no second level.
+                // anchor itself — `x-environment` has no second level.
                 carriers.Add(topLevel == "services" ? service : topLevel);
             }
         }
@@ -79,7 +79,7 @@ public sealed class KeySeparationTests
     [Fact]
     public void The_public_key_stands_exactly_once_and_in_the_anchor()
         => CarriersOf("Jwt__PublicKey").Should().Equal(
-            ["x-umgebung"],
+            ["x-environment"],
             "it applies to all fifteen and therefore belongs in the shared anchor");
 
     /// <summary>The shared secret is gone, and gone everywhere.</summary>

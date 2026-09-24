@@ -36,8 +36,9 @@ namespace WorkerTransfer.CrossCutting.Tests;
 /// service, and every renamed call site silently dropped out of the check —
 /// sixteen of thirty-four, while the test stayed green over its floor of ten.
 /// The time-limit properties are found the same way: by what is assigned to
-/// <c>.Timeout</c>, not by the German word <c>Zeitueberschreitung</c>, which
-/// already missed <c>Geduld</c> and <c>Timeout</c>.</para>
+/// <c>.Timeout</c>, not by a property name — the German word
+/// <c>Zeitueberschreitung</c> it once searched for already missed
+/// <c>Geduld</c> and <c>Timeout</c>.</para>
 /// </remarks>
 public sealed class TimeLimitTests
 {

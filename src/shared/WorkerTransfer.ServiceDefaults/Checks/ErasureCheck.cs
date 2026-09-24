@@ -115,7 +115,7 @@ public sealed class ErasureCheck : ISecurityCheck
 
     /// <inheritdoc />
     public string Remediation =>
-        "Erasure__Geheimnis setzen, beziehungsweise Erasure__Adressen__<dienst> "
+        "Erasure__Secret setzen, beziehungsweise Erasure__BaseUrls__<dienst> "
         + "beim Ursprung. Ohne sie bleibt jede Loeschung offen: die Kaskade "
         + "wartet auf eine Quittung, die nie kommt.";
 
@@ -162,7 +162,7 @@ public sealed class ErasureCheck : ISecurityCheck
                 + $"{(missing.Count)} von "
                 + $"{(_expected.Count)} Empfängern keine Adresse: "
                 + $"{string.Join(", ", missing)}.",
-                "Erasure__Adressen__<dienst> setzen. Ohne Adresse bekommt der "
+                "Erasure__BaseUrls__<dienst> setzen. Ohne Adresse bekommt der "
                 + "Empfänger keinen Auftrag, die Kaskade wartet auf eine "
                 + "Quittung, die niemand angefordert hat — und von außen sieht "
                 + "das aus wie „läuft noch“.");
@@ -188,7 +188,7 @@ public sealed class ErasureCheck : ISecurityCheck
                 $"„{_serviceName}“ steht in der Löschkaskade, aber seine Tür ist "
                 + "zu: das Löschgeheimnis ist in dieser Instanz nicht gesetzt. "
                 + "Ein Löschauftrag erreicht diesen Dienst damit nicht.",
-                "Erasure__Geheimnis setzen — dasselbe, das der Ursprung "
+                "Erasure__Secret setzen — dasselbe, das der Ursprung "
                 + "vorzeigt, und ausdrücklich ein anderes als das der "
                 + "Benachrichtigung. Ohne es bleibt jede Löschung offen: die "
                 + "Kaskade wartet auf eine Quittung, die nie kommt. Dass sie "
@@ -215,7 +215,7 @@ public sealed class ErasureCheck : ISecurityCheck
             $"„{_serviceName}“ steht in der Löschkaskade, seine Tür ist "
             + "eingerichtet, und er schreibt eine Prüfspur in derselben "
             + "Transaktion wie die Löschung.",
-            "Ein leeres Erasure__Geheimnis stößt diesen Befund um — und zwar in "
+            "Ein leeres Erasure__Secret stößt diesen Befund um — und zwar in "
             + "genau der Umgebung, in der es leer ist, nicht im Baum.");
     }
 

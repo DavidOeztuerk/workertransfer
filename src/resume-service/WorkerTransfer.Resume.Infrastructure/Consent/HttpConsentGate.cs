@@ -152,16 +152,16 @@ public sealed class HttpConsentGate(
         TQuestion body,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new ConsentGateSilent("Consent:Adresse is not configured");
+            throw new ConsentGateSilent("Consent:BaseUrl is not configured");
         }
 
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Zeitueberschreitung;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, new Uri(new Uri(_settings.Adresse), path))
+            HttpMethod.Post, new Uri(new Uri(_settings.BaseUrl), path))
         {
             Content = JsonContent.Create(body, options: Format)
         };

@@ -12,9 +12,8 @@ namespace WorkerTransfer.Scout.Infrastructure.Consent;
 /// <summary>Where the consent ledger can be reached.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Consent__Adresse</c>, <c>Consent__Geduld</c>), so they stay German until
-/// the keys are renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>.
+/// (<c>Consent__BaseUrl</c>, <c>Consent__Timeout</c>); renaming one alone leaves
+/// its value on the default, silently.
 /// </remarks>
 public sealed class ConsentSettings
 {
@@ -28,7 +27,7 @@ public sealed class ConsentSettings
     /// because the egress boundary derives its allowed hosts from there
     /// (<c>ServiceFoundation.CalledHosts</c>).
     /// </remarks>
-    public string Adresse { get; set; } = "http://consent-service:8002";
+    public string BaseUrl { get; set; } = "http://consent-service:8002";
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -36,7 +35,7 @@ public sealed class ConsentSettings
     /// HUNDRED seconds — that is no time limit but a hanging call with an end
     /// some time, and it hangs the caller with it.
     /// </remarks>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks the ledger — synchronously, every time, without a cache.</summary>
@@ -75,11 +74,11 @@ public sealed class HttpConsentGate(
             return [];
         }
 
-        if (string.IsNullOrEmpty(_settings.Adresse))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // No ledger set up does not mean "everything released". It means
             // that this service cannot answer the question.
-            throw new ConsentGateSilent("Consent:Adresse is not set.");
+            throw new ConsentGateSilent("Consent:BaseUrl is not set.");
         }
 
         var forCompany = Visibilities.ForCompany(company);
@@ -125,11 +124,11 @@ public sealed class HttpConsentGate(
         IReadOnlyList<ConsentQuestionV1> pairs, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(Client);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            new Uri(new Uri(_settings.Adresse), "/consent/check-batch"))
+            new Uri(new Uri(_settings.BaseUrl), "/consent/check-batch"))
         {
             Content = JsonContent.Create(new ConsentBatchQuestionV1(pairs))
         };

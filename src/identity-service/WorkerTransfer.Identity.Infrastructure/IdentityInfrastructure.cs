@@ -98,7 +98,7 @@ public static class IdentityInfrastructure
         // for an erasure it is exactly the silent failure ADR-0027 exists
         // against — a promise nobody redeems, and nobody sees it.
         services.AddOutbox<IdentityDbContext>(
-            configuration, settings => settings.HoechsteVersuche = null);
+            configuration, settings => settings.MaxAttempts = null);
         services.AddSingleton<IOneTimeToken, Sha256OneTimeToken>();
         services.AddSingleton<IMailSender, SmtpMailSender>();
 
@@ -176,7 +176,7 @@ public static class IdentityInfrastructure
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsOrigin(
             "identity",
             ErasureRecipient.Services,
-            [.. erasure.Adressen
+            [.. erasure.BaseUrls
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
                 .Select(entry => entry.Key)]));
     }

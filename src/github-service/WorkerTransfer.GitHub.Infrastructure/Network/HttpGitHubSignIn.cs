@@ -13,14 +13,12 @@ namespace WorkerTransfer.GitHub.Infrastructure.Network;
 /// stance as with the drafting help: a default that contains a secret IS the
 /// secret — and it would then sit in version control.
 /// <para>
-/// <c>Kennung</c>, <c>Geheimnis</c>, <c>Rueckadresse</c> and
-/// <c>Zeitueberschreitung</c> ARE the environment keys
-/// (<c>GitHub__OAuth__Kennung</c> and so on), so they stay German until the keys
-/// are renamed everywhere at once — in compose, in the chart and in
-/// <c>.env.example</c>. <c>Rueckadresse</c> had been renamed to
-/// <c>RedirectUrl</c> on its own: compose still set
-/// <c>GitHub__OAuth__Rueckadresse</c>, the property stayed empty, and the
-/// sign-in counted as not configured.
+/// <c>ClientId</c>, <c>Secret</c>, <c>RedirectUrl</c> and <c>Timeout</c> ARE
+/// the environment keys (<c>GitHub__OAuth__ClientId</c> and so on); renaming
+/// one alone leaves its value on the default, silently. Measured once, while
+/// the keys were German: the property was renamed to <c>RedirectUrl</c> on its
+/// own, compose still set <c>GitHub__OAuth__Rueckadresse</c>, the property
+/// stayed empty, and the sign-in counted as not configured.
 /// </para>
 /// </remarks>
 public sealed class GitHubSignInSettings
@@ -29,19 +27,19 @@ public sealed class GitHubSignInSettings
     public const string Section = "GitHub:OAuth";
 
     /// <summary>The OAuth application's id. Empty means: there is none.</summary>
-    public string Kennung { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty;
 
     /// <summary>The secret that goes with it.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>Where GitHub sends the browser back to.</summary>
-    public string Rueckadresse { get; set; } = string.Empty;
+    public string RedirectUrl { get; set; } = string.Empty;
 
     /// <summary>Where GitHub's sign-in lies. Switchable for probes.</summary>
     public string AuthorizeUrl { get; set; } = "https://github.com";
 
     /// <summary>How long an exchange may take.</summary>
-    public TimeSpan Zeitueberschreitung { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>What GitHub answers to the exchange.</summary>
@@ -67,9 +65,9 @@ public sealed class HttpGitHubSignIn(
 
     /// <inheritdoc />
     public bool IsConfigured =>
-        _signIn.Kennung.Length > 0
-        && _signIn.Geheimnis.Length > 0
-        && _signIn.Rueckadresse.Length > 0;
+        _signIn.ClientId.Length > 0
+        && _signIn.Secret.Length > 0
+        && _signIn.RedirectUrl.Length > 0;
 
     /// <inheritdoc />
     public Uri AuthorizeUrl(string state)
@@ -79,8 +77,8 @@ public sealed class HttpGitHubSignIn(
         // public repositories would be a power of attorney for something that
         // is public anyway.
         var query =
-            $"client_id={Uri.EscapeDataString(_signIn.Kennung)}"
-            + $"&redirect_uri={Uri.EscapeDataString(_signIn.Rueckadresse)}"
+            $"client_id={Uri.EscapeDataString(_signIn.ClientId)}"
+            + $"&redirect_uri={Uri.EscapeDataString(_signIn.RedirectUrl)}"
             + $"&state={Uri.EscapeDataString(state)}"
             + "&scope=";
 
@@ -106,7 +104,7 @@ public sealed class HttpGitHubSignIn(
     private async Task<string?> ExchangeAsync(string code, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _signIn.Zeitueberschreitung;
+        client.Timeout = _signIn.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
@@ -114,10 +112,10 @@ public sealed class HttpGitHubSignIn(
         {
             Content = JsonContent.Create(new
             {
-                client_id = _signIn.Kennung,
-                client_secret = _signIn.Geheimnis,
+                client_id = _signIn.ClientId,
+                client_secret = _signIn.Secret,
                 code,
-                redirect_uri = _signIn.Rueckadresse
+                redirect_uri = _signIn.RedirectUrl
             })
         };
 
@@ -148,10 +146,10 @@ public sealed class HttpGitHubSignIn(
     private async Task<string?> NamesAsync(string token, CancellationToken cancellationToken)
     {
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _signIn.Zeitueberschreitung;
+        client.Timeout = _signIn.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_api.Adresse), "/user"));
+            HttpMethod.Get, new Uri(new Uri(_api.BaseUrl), "/user"));
 
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));

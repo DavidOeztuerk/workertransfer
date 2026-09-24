@@ -10,10 +10,9 @@ namespace WorkerTransfer.Advisor.Infrastructure.Lookup;
 
 /// <summary>Where identity-service has its internal doors.</summary>
 /// <remarks>
-/// The property names ARE the environment keys (<c>Identity__Adresse</c>,
-/// <c>Identity__Geheimnis</c>, <c>Identity__Geduld</c>), so they stay German
-/// until the keys are renamed everywhere at once — in compose, in the chart and
-/// in <c>.env.example</c>.
+/// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
+/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone leaves
+/// its value on the default, silently.
 /// </remarks>
 public sealed class LookupSettings
 {
@@ -26,17 +25,17 @@ public sealed class LookupSettings
     /// boundary derives its allowed hosts from there — a destination that stood
     /// only here in the code would be refused, and without a log line.
     /// </remarks>
-    public string Adresse { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
 
     /// <summary>The shared secret of the internal doors.</summary>
-    public string Geheimnis { get; set; } = string.Empty;
+    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
     /// Without this line <c>HttpClient</c>'s default applies: a hundred
     /// seconds. That is not a timeout but a hanging call.
     /// </remarks>
-    public TimeSpan Geduld { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>What the internal door says about a company.</summary>
@@ -100,22 +99,22 @@ public sealed class HttpLookups(
     private async Task<T?> ReadAsync<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
-        if (string.IsNullOrEmpty(_settings.Adresse)
-            || string.IsNullOrEmpty(_settings.Geheimnis))
+        if (string.IsNullOrEmpty(_settings.BaseUrl)
+            || string.IsNullOrEmpty(_settings.Secret))
         {
             // Not configured is a SYSTEM state and not a statement about a
             // human being. Answering `null` quietly would mean "this company
             // does not exist" here — and an exclusion would then never apply.
-            throw new LookupSilent("Identity:Adresse or :Geheimnis is not set.");
+            throw new LookupSilent("Identity:BaseUrl or :Secret is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Geduld;
+        client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_settings.Adresse), path));
+            HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
 
-        request.Headers.Add(SecretHeader, _settings.Geheimnis);
+        request.Headers.Add(SecretHeader, _settings.Secret);
 
         HttpResponseMessage response;
 
