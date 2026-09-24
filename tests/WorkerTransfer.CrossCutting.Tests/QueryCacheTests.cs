@@ -39,7 +39,9 @@ public class QueryCacheTests
     /// <remarks>
     /// The assembly is found through it. A new service belongs here — if
     /// somebody forgets it, this test does not check it, and that is why the
-    /// count stands below: thirteen, not "at least one".
+    /// list is compared with the service folders in the tree below, not with a
+    /// number: assessment-service was missing here while the count said
+    /// thirteen and stayed green.
     /// </remarks>
     public static TheoryData<string, Type> Services => new()
     {
@@ -65,7 +67,12 @@ public class QueryCacheTests
         // conversation stands only in the ledger and is asked for there on every
         // read (ADR-0037 decision 2). A cached answer would be the same thing
         // here as a stage column, only transient.
-        { "advisor", typeof(Advisor.Application.Conversations.CompanyConversationsQuery) }
+        { "advisor", typeof(Advisor.Application.Conversations.CompanyConversationsQuery) },
+
+        // assessment-service asks the ledger on every company read of a case
+        // (ADR-0042 §2): a cached answer would keep a revoked person's work
+        // visible to the company.
+        { "assessment", typeof(Assessment.Application.Cases.CompanyCasesQuery) }
     };
 
     /// <summary>No type of a service implements <c>ICacheableQuery</c>.</summary>
@@ -86,7 +93,7 @@ public class QueryCacheTests
     }
 
     /// <summary>
-    /// All thirteen services are really there — and the assemblies are not
+    /// Every service in the tree is really there — and the assemblies are not
     /// empty.
     /// </summary>
     /// <remarks>
@@ -99,7 +106,8 @@ public class QueryCacheTests
     {
         var services = Services.Select(row => (string)row[0]!).ToArray();
 
-        services.Should().HaveCount(13);
+        services.Should().BeEquivalentTo(
+            RepositoryRoot.Services(), "every service folder under src/ belongs in this list");
         services.Should().OnlyHaveUniqueItems();
 
         foreach (var row in Services)

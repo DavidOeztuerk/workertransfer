@@ -61,6 +61,7 @@ public class WireContractTests
         { "notification", typeof(Notification.Api.ErasureEndpoints) },
         { "scout", typeof(Scout.Api.ErasureEndpoints) },
         { "advisor", typeof(Advisor.Api.ErasureEndpoints) },
+        { "assessment", typeof(Assessment.Api.AssessmentEndpoints) },
 
         // The shared contracts belong here, and urgently so: this is where the
         // defect hid last. `ConsentQuestionV1` travels between two services, so
@@ -91,7 +92,8 @@ public class WireContractTests
         // here from its first type on.
         { "profile.contracts", typeof(Profile.Contracts.ProfileHitV1) },
         { "scout.contracts", typeof(Scout.Contracts.HitV1) },
-        { "advisor.contracts", typeof(Advisor.Contracts.ConversationV1) }
+        { "advisor.contracts", typeof(Advisor.Contracts.ConversationV1) },
+        { "assessment.contracts", typeof(Assessment.Contracts.CaseV1) }
     };
 
     /// <summary>Whether camelCase and snake_case come apart for this name.</summary>
@@ -138,14 +140,32 @@ public class WireContractTests
             + "sends snake_case, and the value never arrives", service);
     }
 
-    /// <summary>The list covers all thirteen API layers and the shared contracts.</summary>
+    /// <summary>
+    /// The list covers the API layer of every service in the tree, the
+    /// contracts layer of every service that has one, and the shared contracts.
+    /// </summary>
+    /// <remarks>
+    /// Compared with the tree, not with a number: the count stood at 27 while
+    /// assessment-service's API and contracts layers were both missing.
+    /// </remarks>
     [Fact]
     public void The_list_covers_every_service()
     {
-        var services = ApiLayers.Select(row => (string)row[0]!).ToArray();
+        var keys = ApiLayers.Select(row => (string)row[0]!).ToArray();
 
-        services.Should().HaveCount(27);
-        services.Should().OnlyHaveUniqueItems();
+        keys.Should().OnlyHaveUniqueItems();
+
+        keys.Where(key => !key.Contains('.', StringComparison.Ordinal))
+            .Should().BeEquivalentTo(RepositoryRoot.Services(), "every service's API layer belongs here");
+
+        keys.Where(key => key.EndsWith(".contracts", StringComparison.Ordinal))
+            .Select(key => key[..^".contracts".Length])
+            .Should().BeEquivalentTo(
+                RepositoryRoot.ServicesWithContracts(),
+                "every service contracts project that holds a type belongs here");
+
+        keys.Where(key => key.StartsWith("contracts.", StringComparison.Ordinal))
+            .Should().BeEquivalentTo("contracts.consent", "contracts.erasure", "contracts.identity");
     }
 
     /// <summary>
