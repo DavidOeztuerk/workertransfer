@@ -20,7 +20,7 @@ namespace WorkerTransfer.Ganzes.Tests;
 /// it does not get one here.</para>
 ///
 /// <para><strong>An exemption exists exactly once.</strong>
-/// <c>AdvisorInfrastructure.Wortausnahmen</c> is public and read by both. Two
+/// <c>AdvisorInfrastructure.TermExceptions</c> is public and read by both. Two
 /// lists about the same question drift apart, and the quieter of the two is the
 /// one that grows.</para>
 /// </remarks>
@@ -59,7 +59,7 @@ public class VocabularyTests
          typeof(GitHub.Contracts.RepositoryV1)),
         ("scout", typeof(Scout.Domain.Searches.Search),
          typeof(Scout.Contracts.TickV1)),
-        ("advisor", typeof(Advisor.Domain.Gespraeche.UebergangNichtErlaubt),
+        ("advisor", typeof(Advisor.Domain.Conversations.TransitionNotAllowed),
          typeof(Advisor.Contracts.MandateV1)),
         ("assessment", typeof(Assessment.Domain.Cases.InputError),
          typeof(Assessment.Contracts.SetTaskV1))
@@ -183,7 +183,7 @@ public class VocabularyTests
     /// <summary>Every exemption in the tree, from the three sources that hold them.</summary>
     private static IReadOnlyList<TermException> All() =>
     [
-        .. Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
+        .. Advisor.Infrastructure.AdvisorInfrastructure.TermExceptions,
         .. Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
         .. Transfer.Infrastructure.TransferInfrastructure.TermExceptions
     ];
@@ -191,7 +191,7 @@ public class VocabularyTests
     /// <summary>One service's exemptions — from its composition root, not from here.</summary>
     private static IReadOnlyList<TermException> Exemptions(string service) => service switch
     {
-        "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.Wortausnahmen,
+        "advisor" => Advisor.Infrastructure.AdvisorInfrastructure.TermExceptions,
         "applications" => Applications.Infrastructure.ApplicationsInfrastructure.TermExceptions,
         "transfer" => Transfer.Infrastructure.TransferInfrastructure.TermExceptions,
         _ => []

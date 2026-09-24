@@ -3,34 +3,34 @@ using WorkerTransfer.Advisor.Application.Ports;
 
 namespace WorkerTransfer.Advisor.Infrastructure.Persistence;
 
-/// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
+/// <summary>A database transaction around a command.</summary>
 /// <remarks>
-/// Sie umschliesst auch den Postausgang: der Vermerk, dass ein Unternehmen ein
-/// Gespräch eröffnet hat, entsteht in derselben Klammer wie das Gespräch, oder
-/// gar nicht (ADR-0025).
+/// It encloses the outbox too: the entry saying that a company opened a
+/// conversation comes about in the same transaction as the conversation, or not
+/// at all (ADR-0025).
 /// </remarks>
 public sealed class EfUnitOfWork(AdvisorDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
     public async Task<T> InTransactionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arbeit);
+        ArgumentNullException.ThrowIfNull(work);
 
         if (context.Database.CurrentTransaction is not null)
         {
-            // Schon in einer. Eine zweite zu öffnen würde entweder werfen oder
-            // die halbe Arbeit früh committen.
-            return await arbeit(cancellationToken);
+            // Already inside one. Opening a second would either throw or
+            // commit half the work early.
+            return await work(cancellationToken);
         }
 
-        await using var klammer = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var result = await arbeit(cancellationToken);
+        var result = await work(cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
-        await klammer.CommitAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return result;
     }

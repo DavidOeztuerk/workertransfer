@@ -65,7 +65,7 @@ public class ZwischenspeicherTests
         // conversation stands only in the ledger and is asked for there on every
         // read (ADR-0037 decision 2). A cached answer would be the same thing
         // here as a stage column, only transient.
-        { "advisor", typeof(Advisor.Application.Gespraeche.CompanyConversationsQuery) }
+        { "advisor", typeof(Advisor.Application.Conversations.CompanyConversationsQuery) }
     };
 
     /// <summary>No type of a service implements <c>ICacheableQuery</c>.</summary>

@@ -3,34 +3,34 @@ using WorkerTransfer.Advisor.Infrastructure;
 using WorkerTransfer.Advisor.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der EnvironmentFile. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
 WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
-const string dienstname = "advisor-service";
+const string serviceName = "advisor-service";
 
-// Kein AsIssuer(): dieser Dienst prüft Tokens, er stellt keine aus.
+// No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, dienstname);
+    builder.Configuration, builder.Environment, serviceName);
 
 builder.Services.AddAdvisorInfrastructure(
     builder.Configuration,
     builder.Configuration.GetConnectionString("advisor")
-    ?? throw new InvalidOperationException("ConnectionStrings:advisor ist nicht gesetzt."));
+    ?? throw new InvalidOperationException("ConnectionStrings:advisor is not configured."));
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
+// Migrate first, then serve (ADR-0010).
 await app.MigrateSchemaAsync<AdvisorDbContext>();
 
-app.UseWorkerTransferDefaults(builder.Environment, dienstname);
+app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapBeraterEndpoints();
-app.MapLoeschEndpunkt();
+app.MapAdvisorEndpoints();
+app.MapErasureEndpoint();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;
