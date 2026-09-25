@@ -7,14 +7,14 @@
  * und der Mensch kann damit nichts anfangen.
  */
 export type Schreibgrund =
-  | "keinAnbieter"
-  | "zeitueberschreitung"
-  | "anbieterAblehnung"
-  | "anbieterLeer"
-  | "schrittJetztNicht"
-  | "anbieterAntwortet";
+  | "noProvider"
+  | "timeout"
+  | "providerRejected"
+  | "providerEmpty"
+  | "stepNotNow"
+  | "providerNotWriting";
 
-export type Schreibschluessel = `entwurfs.${Schreibgrund}`;
+export type Schreibschluessel = `drafts.${Schreibgrund}`;
 
 export function schreibgrund(error: string | null | undefined): Schreibgrund {
   const err = (error ?? "").trim();
@@ -24,32 +24,32 @@ export function schreibgrund(error: string | null | undefined): Schreibgrund {
     /no writing-help provider/i.test(err) ||
     /kein Anbieter/i.test(err)
   ) {
-    return "keinAnbieter";
+    return "noProvider";
   }
   if (/Zeitüberschreitung|Zeitueberschreitung|timeout/i.test(err)) {
-    return "zeitueberschreitung";
+    return "timeout";
   }
   if (/leeren Text|unbrauchbare Antwort|empty (text|response)/i.test(err)) {
-    return "anbieterLeer";
+    return "providerEmpty";
   }
   if (/kann nicht (geschrieben|geändert|überarbeitet) werden/i.test(err)) {
-    return "schrittJetztNicht";
+    return "stepNotNow";
   }
   if (/antwortet mit \d+/i.test(err) || /\b[45]\d{2}\b/.test(err)) {
-    return "anbieterAblehnung";
+    return "providerRejected";
   }
-  return "anbieterAntwortet";
+  return "providerNotWriting";
 }
 
 export function schreibschluessel(error: string | null | undefined): Schreibschluessel {
-  return `entwurfs.${schreibgrund(error)}`;
+  return `drafts.${schreibgrund(error)}`;
 }
 
 export function leerBriefHinweisSchluessel(
   error: string | null | undefined,
-): "entwurfs.leerBriefHinweis" | Schreibschluessel | "entwurfs.leerBriefStart" {
+): "drafts.emptyLetterHint" | Schreibschluessel | "drafts.emptyLetterStart" {
   const grund = schreibgrund(error);
-  if (grund === "keinAnbieter") return "entwurfs.leerBriefHinweis";
-  if (grund === "anbieterAntwortet") return "entwurfs.leerBriefStart";
-  return `entwurfs.${grund}`;
+  if (grund === "noProvider") return "drafts.emptyLetterHint";
+  if (grund === "providerNotWriting") return "drafts.emptyLetterStart";
+  return `drafts.${grund}`;
 }

@@ -45,7 +45,7 @@ export function InvitationPage() {
       setLage({
         art: "abgelehnt",
         brauchtKonto: false,
-        meldung: t("einladung.fehltLink"),
+        meldung: t("invitation.linkMissing"),
       });
       return;
     }
@@ -70,10 +70,10 @@ export function InvitationPage() {
   if (state.art === "laeuft") {
     return (
       <AuthCard
-        title={t("einladung.laeuftTitel")}
-        lead={t("einladung.zusage")}
+        title={t("invitation.inProgressTitle")}
+        lead={t("invitation.promise")}
       >
-        <LoadingBlock label={t("einladung.laeuftText")} />
+        <LoadingBlock label={t("invitation.inProgressText")} />
       </AuthCard>
     );
   }
@@ -81,19 +81,19 @@ export function InvitationPage() {
   if (state.art === "dabei") {
     return (
       <AuthCard
-        title={t("einladung.willkommen", { name: state.name })}
-        lead={t("einladung.zusage")}
+        title={t("invitation.welcome", { name: state.name })}
+        lead={t("invitation.promise")}
       >
         <Typography sx={{ mb: 2 }}>
           {t(
             state.rolle === "admin"
-              ? "einladung.alsAdmin"
-              : "einladung.alsMitglied",
+              ? "invitation.asAdmin"
+              : "invitation.asMember",
           )}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="einladung.wechselHinweis"
+            i18nKey="invitation.switchHint"
             components={{ 1: <Link component={RouterLink} to="/" /> }}
           />
         </Typography>
@@ -103,8 +103,8 @@ export function InvitationPage() {
 
   return (
     <AuthCard
-      title={t("einladung.abgelehntTitel")}
-      lead={t("einladung.zusage")}
+      title={t("invitation.declinedTitle")}
+      lead={t("invitation.promise")}
     >
       <Alert severity="error" sx={{ mb: 2 }}>
         {state.meldung}
@@ -113,7 +113,7 @@ export function InvitationPage() {
         {state.brauchtKonto ? (
           <Typography variant="body2">
             <Trans
-              i18nKey="einladung.brauchtKonto"
+              i18nKey="invitation.needsAccount"
               components={{
                 1: <Link component={RouterLink} to="/login" />,
                 3: <Link component={RouterLink} to="/register" />,
@@ -122,7 +122,7 @@ export function InvitationPage() {
           </Typography>
         ) : (
           <Link component={RouterLink} to="/" variant="body2">
-            {t("einladung.zurStartseite")}
+            {t("invitation.toHome")}
           </Link>
         )}
       </Box>

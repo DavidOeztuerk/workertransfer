@@ -66,10 +66,10 @@ export function CompanyApplicationPage() {
 
   if (!fuerFirma || !id) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
+      <PageShell title={t("companyApplications.title")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("firmenbewerbung.nurFirma")}</Typography>
+            <Typography>{t("companyApplications.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -78,15 +78,15 @@ export function CompanyApplicationPage() {
 
   if (bewerbung.pending && e === null) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
-        <LoadingBlock label={t("firmenbewerbung.laden")} />
+      <PageShell title={t("companyApplications.title")} narrow>
+        <LoadingBlock label={t("companyApplications.loading")} />
       </PageShell>
     );
   }
 
   if (bewerbung.data !== null && !bewerbung.data.ok) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
+      <PageShell title={t("companyApplications.title")} narrow>
         <Alert severity="error">{bewerbung.data.error.detail}</Alert>
       </PageShell>
     );
@@ -94,10 +94,10 @@ export function CompanyApplicationPage() {
 
   if (!e) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
+      <PageShell title={t("companyApplications.title")} narrow>
         <EmptyBlock
-          title={t("firmenbewerbung.nichtGefunden")}
-          hint={t("firmenbewerbung.nichtGefundenHinweis")}
+          title={t("companyApplications.notFound")}
+          hint={t("companyApplications.notFoundHint")}
         />
       </PageShell>
     );
@@ -105,26 +105,26 @@ export function CompanyApplicationPage() {
 
   const cv = lebenslauf.data?.ok ? lebenslauf.data.value : null;
   const reiter: { key: string; label: string }[] = [
-    { key: "letter", label: t("firmenbewerbung.tabAnschreiben") },
+    { key: "letter", label: t("companyApplications.tabCoverLetter") },
   ];
   if (e.shares_resume && cv) {
-    reiter.push({ key: "resume", label: t("firmenbewerbung.tabLebenslauf") });
+    reiter.push({ key: "resume", label: t("companyApplications.tabResume") });
   }
   for (const docId of e.documents) {
-    reiter.push({ key: `doc-${docId}`, label: t("firmenbewerbung.tabUnterlage") });
+    reiter.push({ key: `doc-${docId}`, label: t("companyApplications.tabDocument") });
   }
 
-  const aktuell = reiter[tab] ?? reiter[0] ?? { key: "letter", label: t("firmenbewerbung.tabAnschreiben") };
+  const aktuell = reiter[tab] ?? reiter[0] ?? { key: "letter", label: t("companyApplications.tabCoverLetter") };
 
   return (
-    <PageShell title={stelle.data?.title ?? t("firmenbewerbung.titel")}>
+    <PageShell title={stelle.data?.title ?? t("companyApplications.title")}>
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {profil.data?.headline || t("firmenbewerbung.ohneUeberschrift")}
+            {profil.data?.headline || t("companyApplications.noHeadline")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {stelle.data?.title ?? t("firmenbewerbung.stelleUnbekannt")}
+            {stelle.data?.title ?? t("companyApplications.jobUnknown")}
           </Typography>
         </CardContent>
       </Card>
@@ -205,7 +205,7 @@ function Unterlagenansicht({
   }, [subjectId, documentId]);
 
   if (url === null) {
-    return <LoadingBlock label={t("firmenbewerbung.laden")} />;
+    return <LoadingBlock label={t("companyApplications.loading")} />;
   }
 
   if (typ.startsWith("image/")) {
@@ -223,7 +223,7 @@ function Unterlagenansicht({
     <Box
       component="iframe"
       src={url}
-      title={t("firmenbewerbung.tabUnterlage")}
+      title={t("companyApplications.tabDocument")}
       sx={{ width: "100%", height: "70vh", border: 0 }}
     />
   );

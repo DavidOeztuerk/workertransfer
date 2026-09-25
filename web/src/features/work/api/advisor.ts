@@ -112,8 +112,8 @@ export type Zugergebnis =
 
 const SCHWEIGT: Deutung<"unavailable"> = {
   reason: "unavailable",
-  titel: "fehler.ledgerSchweigt",
-  text: "fehler.spaeterErneut",
+  titel: "errors.ledgerSilent",
+  text: "errors.tryLater",
 };
 
 /**
@@ -129,7 +129,7 @@ export async function ladeMandat(signal?: AbortSignal): Promise<MandatErgebnis> 
     ADVISOR_BASE_URL,
     "/advisor/me/mandate",
     { signal },
-    "fehler.mandatNichtAbrufbar"
+    "errors.mandateUnavailable"
   );
 
   if (answer.ok) return { ok: true, mandat: answer.value };
@@ -142,7 +142,7 @@ export async function schreibeMandat(eingabe: MandatEingabe): Promise<SchreibErg
     ADVISOR_BASE_URL,
     "/advisor/me/mandate",
     { method: "PUT", body: eingabe },
-    "fehler.mandatNichtGespeichert"
+    "errors.mandateNotSaved"
   );
 
   if (answer.ok) return { ok: true, mandat: answer.value };
@@ -150,11 +150,11 @@ export async function schreibeMandat(eingabe: MandatEingabe): Promise<SchreibErg
   return deuten<"unauthenticated" | "invalid" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "fehler.sitzungAbgelaufen",
-        text: "fehler.erneutAnmelden",
+        titel: "errors.sessionExpired",
+        text: "errors.signInAgain",
       },
       503: SCHWEIGT,
     },
@@ -167,7 +167,7 @@ export async function ladeMeineGespraeche(signal?: AbortSignal): Promise<MeineLi
     ADVISOR_BASE_URL,
     "/advisor/me/conversations",
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
@@ -182,7 +182,7 @@ export async function ladeFirmengespraeche(signal?: AbortSignal): Promise<Firmen
     ADVISOR_BASE_URL,
     "/advisor/conversations",
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
@@ -192,8 +192,8 @@ export async function ladeFirmengespraeche(signal?: AbortSignal): Promise<Firmen
     {
       403: {
         reason: "no-company",
-        titel: "fehler.nurFirmenFragen",
-        text: "fehler.firmaWaehlen",
+        titel: "errors.onlyCompaniesAsk",
+        text: "errors.chooseCompany",
       },
       503: SCHWEIGT,
     },
@@ -212,7 +212,7 @@ async function stufenzug(id: string, pfad: string, stage: number): Promise<Stufe
     ADVISOR_BASE_URL,
     `/advisor/me/conversations/${id}/${pfad}`,
     { method: "POST", body: { stage } },
-    "fehler.stufeNichtGeaendert"
+    "errors.stageNotChanged"
   );
 
   if (answer.ok) return { ok: true, stage: answer.value?.stage ?? 0 };
@@ -220,9 +220,9 @@ async function stufenzug(id: string, pfad: string, stage: number): Promise<Stufe
   return deuten<"gone" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       // `404` sagt bewusst nicht, ob es das Gespraech gibt.
-      404: { reason: "gone", titel: "fehler.gespraechFort" },
+      404: { reason: "gone", titel: "errors.conversationGone" },
       503: SCHWEIGT,
     },
     "offline"
@@ -237,7 +237,7 @@ async function zug(pfad: string): Promise<Zugergebnis> {
     ADVISOR_BASE_URL,
     pfad,
     { method: "POST" },
-    "fehler.gespraechNichtGeaendert"
+    "errors.conversationStepFailed"
   );
 
   if (answer.ok) return { ok: true };
@@ -245,11 +245,11 @@ async function zug(pfad: string): Promise<Zugergebnis> {
   return deuten<"gone" | "conflict" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
-      404: { reason: "gone", titel: "fehler.gespraechFort" },
+      0: { reason: "offline", titel: "errors.noConnection" },
+      404: { reason: "gone", titel: "errors.conversationGone" },
       // `409` kommt mit dem Satz des Servers: sein Problemdokument weiss ueber
       // diesen Uebergang mehr als eine Tabelle hier.
-      409: { reason: "conflict", titel: "fehler.schrittNichtMoeglich" },
+      409: { reason: "conflict", titel: "errors.stepNotPossible" },
       503: SCHWEIGT,
     },
     "offline"
@@ -267,7 +267,7 @@ export async function eroeffne(subjectId: string, note: string): Promise<Zugerge
     ADVISOR_BASE_URL,
     "/advisor/conversations",
     { method: "POST", body: { subject_id: subjectId, note } },
-    "fehler.gespraechNichtEroeffnet"
+    "errors.conversationNotOpened"
   );
 
   if (answer.ok) return { ok: true };
@@ -275,12 +275,12 @@ export async function eroeffne(subjectId: string, note: string): Promise<Zugerge
   return deuten<"gone" | "conflict" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
-      403: { reason: "conflict", titel: "fehler.nurFirmenFragen", text: "fehler.firmaWaehlen" },
+      0: { reason: "offline", titel: "errors.noConnection" },
+      403: { reason: "conflict", titel: "errors.onlyCompaniesAsk", text: "errors.chooseCompany" },
       // `404` heisst: diese Person hat diesem Unternehmen nichts freigegeben —
       // oder sie hat es ausgeschlossen, oder es gibt sie nicht. Die drei sind
       // ununterscheidbar, und die Oberflaeche bastelt daraus keine Auskunft.
-      404: { reason: "gone", titel: "fehler.personNichtAnfragbar" },
+      404: { reason: "gone", titel: "errors.personNotRequestable" },
       503: SCHWEIGT,
     },
     "offline"

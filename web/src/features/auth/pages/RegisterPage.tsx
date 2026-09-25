@@ -124,7 +124,7 @@ export function RegisterPage() {
   if (abgeschickt) return <FastGeschafft email={email} />;
 
   return (
-    <AuthCard title={t("registrierung.titel")} lead={t("registrierung.lead")}>
+    <AuthCard title={t("register.title")} lead={t("register.lead")}>
       <AuthModeTabs current="register" />
 
       <Box
@@ -135,7 +135,7 @@ export function RegisterPage() {
       >
         <FormControl component="fieldset" sx={{ display: "grid", gap: 1 }}>
           <FormLabel component="legend" sx={{ mb: 0.5 }}>
-            {t("registrierung.wofuer")}
+            {t("register.purpose")}
           </FormLabel>
           <RadioGroup
             name="art"
@@ -152,7 +152,7 @@ export function RegisterPage() {
                     slotProps={{ input: { "aria-describedby": personHinweis } }}
                   />
                 }
-                label={t("registrierung.fuerMich")}
+                label={t("register.forMe")}
               />
               <Typography
                 id={personHinweis}
@@ -160,7 +160,7 @@ export function RegisterPage() {
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                {t("registrierung.fuerMichHinweis")}
+                {t("register.forMeHint")}
               </Typography>
             </Box>
             <Box sx={{ mt: 1 }}>
@@ -171,7 +171,7 @@ export function RegisterPage() {
                     slotProps={{ input: { "aria-describedby": firmaHinweis } }}
                   />
                 }
-                label={t("registrierung.fuerFirma")}
+                label={t("register.forCompany")}
               />
               <Typography
                 id={firmaHinweis}
@@ -179,14 +179,14 @@ export function RegisterPage() {
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                {t("registrierung.fuerFirmaHinweis")}
+                {t("register.forCompanyHint")}
               </Typography>
             </Box>
           </RadioGroup>
         </FormControl>
 
         <TextField
-          label={t("registrierung.email")}
+          label={t("register.email")}
           type="email"
           autoComplete="username"
           error={emailProblem !== null}
@@ -194,8 +194,8 @@ export function RegisterPage() {
             emailProblem !== null
               ? t(emailProblem)
               : art === "company"
-                ? t("registrierung.emailHinweisFirma")
-                : t("registrierung.emailHinweisPerson")
+                ? t("register.emailHintCompany")
+                : t("register.emailHintPerson")
           }
           value={email}
           onChange={(event) => setEmail(event.target.value)}
@@ -205,9 +205,9 @@ export function RegisterPage() {
 
         {art === "company" ? (
           <TextField
-            label={t("registrierung.firmenname")}
+            label={t("register.companyName")}
             autoComplete="organization"
-            helperText={t("registrierung.firmennameHinweis")}
+            helperText={t("register.companyNameHint")}
             value={unternehmensname}
             onChange={(event) => setUnternehmensname(event.target.value)}
             required
@@ -216,19 +216,19 @@ export function RegisterPage() {
 
         {freemail ? (
           <Alert severity="warning">
-            {t("registrierung.freemail")}
+            {t("register.freemail")}
           </Alert>
         ) : null}
 
         <TextField
-          label={t("registrierung.passwort")}
+          label={t("register.password")}
           type="password"
           autoComplete="new-password"
           error={passwortProblem !== null}
           helperText={
             passwortProblem !== null
               ? t(passwortProblem, { mindestens: PASSWORT_MINDESTLAENGE })
-              : t("registrierung.passwortHinweis")
+              : t("register.passwordHint")
           }
           value={passwort}
           onChange={(event) => setPasswort(event.target.value)}
@@ -236,29 +236,29 @@ export function RegisterPage() {
           required
         />
         <TextField
-          label={t("registrierung.anzeigename")}
+          label={t("register.displayName")}
           autoComplete="nickname"
-          helperText={t("registrierung.anzeigenameHinweis")}
+          helperText={t("register.displayNameHint")}
           value={anzeigename}
           onChange={(event) => setAnzeigename(event.target.value)}
           required
         />
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
           <TextField
-            label={t("zivil.vorname")}
+            label={t("civilIdentity.firstName")}
             autoComplete="given-name"
             value={vorname}
             onChange={(event) => setVorname(event.target.value)}
           />
           <TextField
-            label={t("zivil.nachname")}
+            label={t("civilIdentity.lastName")}
             autoComplete="family-name"
             value={nachname}
             onChange={(event) => setNachname(event.target.value)}
           />
         </Box>
         <Typography variant="body2" color="text.secondary">
-          {t("zivil.klarnameHinweis")}
+          {t("civilIdentity.legalNameHint")}
         </Typography>
 
         <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
@@ -278,7 +278,7 @@ export function RegisterPage() {
             || passwortFehler(passwort) !== null
           }
         >
-          {running ? t("registrierung.laeuft") : t("registrierung.knopf")}
+          {running ? t("register.inProgress") : t("register.button")}
         </Button>
       </Box>
     </AuthCard>
@@ -314,17 +314,17 @@ function FastGeschafft({ email }: { email: string }) {
 
   return (
     <AuthCard
-      title={t("registrierung.fastGeschafft")}
-      lead={t("registrierung.fastGeschafftLead")}
+      title={t("register.almostDone")}
+      lead={t("register.almostDoneLead")}
     >
       <Box sx={{ display: "grid", gap: 2 }}>
         <Button variant="outlined" onClick={erneutSenden} disabled={running}>
-          {running ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
+          {running ? t("register.resending") : t("register.resend")}
         </Button>
 
         {gescheitert ? (
           <Alert severity="error">
-            {t("registrierung.erneutGescheitert")}
+            {t("register.resendFailed")}
           </Alert>
         ) : null}
 
@@ -334,13 +334,13 @@ function FastGeschafft({ email }: { email: string }) {
             role="status"
             severity="success"
           >
-            {t("registrierung.erneutGesendet")}
+            {t("register.resent")}
           </Alert>
         ) : null}
 
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="registrierung.schonBestaetigt"
+            i18nKey="register.alreadyVerified"
             components={{ 1: <Link component={RouterLink} to="/login" /> }}
           />
         </Typography>

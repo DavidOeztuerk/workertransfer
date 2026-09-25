@@ -55,25 +55,25 @@ export function useVorlieben(): {
   const darstellungsWahl: Wahlmoeglichkeit<ColorPreference>[] = [
     {
       wert: "system",
-      name: t("darstellung.system"),
-      hinweis: t("darstellung.systemHinweis"),
+      name: t("appearance.system"),
+      hinweis: t("appearance.systemHint"),
       symbol: <DesktopWindowsOutlinedIcon fontSize="small" />,
     },
-    { wert: "light", name: t("darstellung.hell"), symbol: <LightModeOutlinedIcon fontSize="small" /> },
-    { wert: "dark", name: t("darstellung.dunkel"), symbol: <DarkModeOutlinedIcon fontSize="small" /> },
+    { wert: "light", name: t("appearance.light"), symbol: <LightModeOutlinedIcon fontSize="small" /> },
+    { wert: "dark", name: t("appearance.dark"), symbol: <DarkModeOutlinedIcon fontSize="small" /> },
   ];
 
   const sprachWahl: Wahlmoeglichkeit<Sprachvorliebe>[] = [
     {
       wert: "system",
-      name: t("sprache.system"),
-      hinweis: t("darstellung.systemHinweis"),
+      name: t("language.system"),
+      hinweis: t("appearance.systemHint"),
       symbol: <LanguageOutlinedIcon fontSize="small" />,
     },
     // Der Name der Sprache steht in dieser Sprache.
     ...SPRACHEN.map((wert) => ({
       wert: wert as Sprachvorliebe,
-      name: t(`sprache.${wert}`),
+      name: t(`language.${wert}`),
       symbol: (
         <Box component="span" aria-hidden sx={{ fontSize: "1.1rem", lineHeight: 1 }}>
           {FAHNEN[wert]}
@@ -97,8 +97,8 @@ export function useVorlieben(): {
 
   return {
     darstellung: {
-      ueberschrift: t("darstellung.titel"),
-      beschreibung: t("darstellung.lead"),
+      ueberschrift: t("appearance.title"),
+      beschreibung: t("appearance.lead"),
       wert: preference,
       name: jetztDarstellung?.name ?? "",
       symbol: jetztDarstellung?.symbol,
@@ -106,8 +106,8 @@ export function useVorlieben(): {
       waehle: setPreference,
     },
     sprache: {
-      ueberschrift: t("sprache.titel"),
-      beschreibung: t("sprache.lead"),
+      ueberschrift: t("language.title"),
+      beschreibung: t("language.lead"),
       wert: gewaehlteSprache,
       name: jetztSprache?.name ?? "",
       symbol: <LanguageOutlinedIcon fontSize="small" />,

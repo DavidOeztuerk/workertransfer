@@ -62,18 +62,18 @@ export function CompanyAssessmentsPage() {
 
   if (laedt) {
     return (
-      <PageShell title={t("probe.firmaTitel")} narrow>
-        <LoadingBlock label={t("probe.laden")} />
+      <PageShell title={t("assessments.companyTitle")} narrow>
+        <LoadingBlock label={t("assessments.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn || !fuerFirma) {
     return (
-      <PageShell title={t("probe.firmaTitel")} narrow>
+      <PageShell title={t("assessments.companyTitle")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("probe.firmaNurFirma")}</Typography>
+            <Typography>{t("assessments.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -81,23 +81,23 @@ export function CompanyAssessmentsPage() {
   }
 
   return (
-    <PageShell title={t("probe.firmaTitel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("probe.firmaLead")}</Typography>
+    <PageShell title={t("assessments.companyTitle")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("assessments.companyLead")}</Typography>
 
       <Stellformular fertig={() => vorgaenge.reload()} />
 
-      {vorgaenge.pending && <LoadingBlock label={t("probe.laden")} />}
+      {vorgaenge.pending && <LoadingBlock label={t("assessments.loading")} />}
 
       {vorgaenge.data?.ok === false && (
         <Alert severity="warning" sx={{ mt: 3 }}>
           {vorgaenge.data.reason === "no-company"
-            ? t("probe.firmaNurFirma")
-            : t("fehler.ledgerSchweigt")}
+            ? t("assessments.companyOnly")
+            : t("errors.ledgerSilent")}
         </Alert>
       )}
 
       {vorgaenge.data?.ok === true && vorgaenge.data.items.length === 0 && (
-        <EmptyBlock title={t("probe.firmaLeer")} hint={t("probe.firmaLeerHinweis")} />
+        <EmptyBlock title={t("assessments.companyEmpty")} hint={t("assessments.companyEmptyHint")} />
       )}
 
       <Stack spacing={2} sx={{ mt: 3 }}>
@@ -163,7 +163,7 @@ function Stellformular({ fertig }: { fertig: () => void }) {
     <Card>
       <CardContent>
         <Typography variant="h3" sx={{ mb: 2 }}>
-          {t("probe.stellen")}
+          {t("assessments.setTask")}
         </Typography>
 
         {fehler !== null && (
@@ -174,20 +174,20 @@ function Stellformular({ fertig }: { fertig: () => void }) {
 
         <Stack spacing={2}>
           <TextField
-            label={t("probe.wer")}
-            helperText={t("probe.werHinweis")}
+            label={t("assessments.recipient")}
+            helperText={t("assessments.recipientHint")}
             value={wer}
             onChange={(event) => setWer(event.target.value)}
             fullWidth
           />
           <TextField
-            label={t("probe.ueberschrift")}
+            label={t("assessments.headline")}
             value={titel}
             onChange={(event) => setTitel(event.target.value)}
             fullWidth
           />
           <TextField
-            label={t("probe.aufgabe")}
+            label={t("assessments.task")}
             value={aufgabe}
             onChange={(event) => setAufgabe(event.target.value)}
             multiline
@@ -195,10 +195,10 @@ function Stellformular({ fertig }: { fertig: () => void }) {
             fullWidth
           />
           <TextField
-            label={t("probe.umfangFeld")}
+            label={t("assessments.effortField")}
             // Required, with an upper bound, and the hint says WHY — not "please
             // fill in" but what eight hours mean.
-            helperText={t("probe.umfangHinweis", { max: HOECHSTER_UMFANG })}
+            helperText={t("assessments.effortHint", { max: HOECHSTER_UMFANG })}
             value={stunden}
             onChange={(event) => setStunden(event.target.value)}
             type="number"
@@ -208,8 +208,8 @@ function Stellformular({ fertig }: { fertig: () => void }) {
             fullWidth
           />
           <TextField
-            label={t("probe.fristFeld")}
-            helperText={t("probe.fristHinweis", { tage: MINDESTFRIST_TAGE })}
+            label={t("assessments.deadlineField")}
+            helperText={t("assessments.deadlineHint", { tage: MINDESTFRIST_TAGE })}
             value={frist}
             onChange={(event) => setFrist(event.target.value)}
             type="date"
@@ -222,7 +222,7 @@ function Stellformular({ fertig }: { fertig: () => void }) {
               disabled={laeuft || !vollstaendig}
               onClick={() => void stellen()}
             >
-              {t("probe.stellenKnopf")}
+              {t("assessments.setTaskButton")}
             </Button>
           </Stack>
         </Stack>
@@ -257,9 +257,9 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Chip label={t(`probe.stand_${vorgang.state}`)} size="small" />
+          <Chip label={t(`assessments.state_${vorgang.state}`)} size="small" />
           <Chip
-            label={t("probe.umfang", { stunden: vorgang.hours })}
+            label={t("assessments.effort", { stunden: vorgang.hours })}
             size="small"
             variant="outlined"
           />
@@ -276,7 +276,7 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
         {vorgang.submission !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2">{t("probe.eingereicht")}</Typography>
+            <Typography variant="subtitle2">{t("assessments.submitted")}</Typography>
             {vorgang.submission.text.length > 0 && (
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                 {vorgang.submission.text}
@@ -300,7 +300,7 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2">
-              {t(`probe.ausgang_${vorgang.evaluation.outcome}`)}
+              {t(`assessments.outcome_${vorgang.evaluation.outcome}`)}
             </Typography>
             <Typography sx={{ whiteSpace: "pre-wrap" }}>{vorgang.evaluation.text}</Typography>
           </>
@@ -318,7 +318,7 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
 
             <Stack spacing={2}>
               <FormControl>
-                <FormLabel>{t("probe.ausgangFrage")}</FormLabel>
+                <FormLabel>{t("assessments.outcomeQuestion")}</FormLabel>
                 <RadioGroup
                   row
                   value={ausgang}
@@ -327,12 +327,12 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
                   <FormControlLabel
                     value="accepted"
                     control={<Radio />}
-                    label={t("probe.ausgang_accepted")}
+                    label={t("assessments.outcome_accepted")}
                   />
                   <FormControlLabel
                     value="rejected"
                     control={<Radio />}
-                    label={t("probe.ausgang_rejected")}
+                    label={t("assessments.outcome_rejected")}
                   />
                 </RadioGroup>
               </FormControl>
@@ -340,8 +340,8 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
               <TextField
                 // ONE field, and it is the same one the person reads. No
                 // internal note beside it, no mark, no scale (ADR-0042 §1).
-                label={t("probe.rueckmeldungFeld")}
-                helperText={t("probe.rueckmeldungHinweis")}
+                label={t("assessments.feedbackField")}
+                helperText={t("assessments.feedbackHint")}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 multiline
@@ -355,7 +355,7 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
                   disabled={laeuft || text.trim().length === 0}
                   onClick={() => void bewerten()}
                 >
-                  {t("probe.bewerten")}
+                  {t("assessments.sendFeedback")}
                 </Button>
               </Stack>
             </Stack>

@@ -51,7 +51,7 @@ export const loadSession = createAppThunk<Session | null>(
       API_BASE_URL,
       "/auth/session",
       { ohneErneuerung: true },
-      "fehler.sitzungNichtGeprueft"
+      "errors.sessionNotChecked"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
 
@@ -67,7 +67,7 @@ export const loadSession = createAppThunk<Session | null>(
         API_BASE_URL,
         "/auth/session",
         { ohneErneuerung: true },
-        "fehler.sitzungNichtGeprueft"
+        "errors.sessionNotChecked"
       );
       if (!erneut.ok) return rejectWithValue(erneut.error);
       return erneut.value?.user ? toSession(erneut.value.user) : null;
@@ -90,7 +90,7 @@ export const erneuern = createAppThunk<boolean>(
       API_BASE_URL,
       "/auth/refresh",
       { method: "POST", ohneErneuerung: true },
-      "fehler.sitzungNichtGeprueft"
+      "errors.sessionNotChecked"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return true;
@@ -104,7 +104,7 @@ export const login = createAppThunk<Session | null, { email: string; password: s
       API_BASE_URL,
       "/auth/login",
       { method: "POST", body: { email: eingabe.email, password: eingabe.password } },
-      "fehler.anmeldungFehlgeschlagen"
+      "errors.signInFailed"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
 
@@ -119,7 +119,7 @@ export const logout = createAppThunk<void>("auth/logout", async (_arg, { rejectW
     API_BASE_URL,
     "/auth/logout",
     { method: "POST" },
-    "fehler.abmeldungFehlgeschlagen"
+    "errors.signOutFailed"
   );
   if (!answer.ok) return rejectWithValue(answer.error);
 });
@@ -131,7 +131,7 @@ export const loadMemberships = createAppThunk<Membership[]>(
       API_BASE_URL,
       "/me/companies",
       {},
-      "fehler.firmenNichtGeladen"
+      "errors.companiesNotLoaded"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return answer.value ?? [];
@@ -153,7 +153,7 @@ export const actForCompany = createAppThunk<Session | null, string>(
       API_BASE_URL,
       `/auth/company/${tenantId}`,
       { method: "POST" },
-      "fehler.wechselFehlgeschlagen"
+      "errors.switchFailed"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return await dispatch(loadSession()).unwrap();
@@ -176,7 +176,7 @@ export const spracheSpeichern = createAppThunk<null, string>(
       API_BASE_URL,
       "/account/language",
       { method: "PUT", body: { language: language } },
-      "fehler.einstellungenNichtGespeichert"
+      "errors.settingsNotSaved"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
     return null;

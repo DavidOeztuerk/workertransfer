@@ -23,10 +23,10 @@ export function CompanyApplicationsPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title={t("firmenbewerbung.listeTitel")} narrow>
+      <PageShell title={t("companyApplications.listTitle")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("firmenbewerbung.nurFirma")}</Typography>
+            <Typography>{t("companyApplications.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -36,15 +36,15 @@ export function CompanyApplicationsPage() {
   const items = liste.data?.ok ? liste.data.items : [];
 
   return (
-    <PageShell title={t("firmenbewerbung.listeTitel")} narrow lead={t("firmenbewerbung.listeLead")}>
+    <PageShell title={t("companyApplications.listTitle")} narrow lead={t("companyApplications.listLead")}>
       <Card>
         <CardContent>
-          {liste.pending ? <LoadingBlock label={t("firmenbewerbung.laden")} /> : null}
+          {liste.pending ? <LoadingBlock label={t("companyApplications.loading")} /> : null}
           {liste.data !== null && !liste.data.ok ? (
             <Alert severity="error">{liste.data.error.detail}</Alert>
           ) : null}
           {liste.data?.ok && items.length === 0 ? (
-            <EmptyBlock title={t("firmenbewerbung.listeLeer")} />
+            <EmptyBlock title={t("companyApplications.listEmpty")} />
           ) : null}
           <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 1.5 }}>
             {items.map((zeile) => (
@@ -55,7 +55,7 @@ export function CompanyApplicationsPage() {
                   <Box>
                     <Typography variant="h4">{zeile.job_title}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {t(`bewerbungen.stand${zeile.status.charAt(0).toUpperCase()}${zeile.status.slice(1)}`)}
+                      {t(`applications.status${zeile.status.charAt(0).toUpperCase()}${zeile.status.slice(1)}`)}
                     </Typography>
                   </Box>
                   <Button
@@ -64,7 +64,7 @@ export function CompanyApplicationsPage() {
                     variant="contained"
                     size="small"
                   >
-                    {t("firmenbewerbung.oeffnen")}
+                    {t("companyApplications.open")}
                   </Button>
                 </CardContent>
               </Card>

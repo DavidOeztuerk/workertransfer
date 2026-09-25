@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import de from "../../core/i18n/kataloge/de";
+import de from "../../core/i18n/catalogs/de";
 import {
   BERUFSFELDER,
   belegartenFuer,
@@ -9,7 +9,7 @@ import {
   zeigtGitHub,
 } from "./berufsfelder";
 
-/** Ein Katalogschlüssel wie `beleg.meisterbrief`, aufgelöst am deutschen Katalog. */
+/** Ein Katalogschlüssel wie `credentials.masterCraftsmanCertificate`, aufgelöst am deutschen Katalog. */
 function katalogHat(schluessel: string): boolean {
   return schluessel
     .split(".")
@@ -58,9 +58,9 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
     for (const feld of BERUFSFELDER) {
       const schluessel = belegartenFuer(feld).map((art) => art.schluessel);
 
-      expect(schluessel, feld).toContain("beleg.arbeitszeugnis");
-      expect(schluessel, feld).toContain("beleg.zertifikat");
-      expect(schluessel, feld).toContain("beleg.referenz");
+      expect(schluessel, feld).toContain("credentials.employmentReference");
+      expect(schluessel, feld).toContain("credentials.certificate");
+      expect(schluessel, feld).toContain("credentials.reference");
     }
   });
 
@@ -74,9 +74,9 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
 
   it("bietet ohne Berufsfeld nur die allgemeinen Belege an", () => {
     expect(belegartenFuer(null).map((art) => art.schluessel)).toEqual([
-      "beleg.arbeitszeugnis",
-      "beleg.zertifikat",
-      "beleg.referenz",
+      "credentials.employmentReference",
+      "credentials.certificate",
+      "credentials.reference",
     ]);
   });
 
@@ -84,17 +84,17 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
     // Nennbar, weil Arbeitgeber danach fragen — und nie hochladbar.
     expect(
       belegartenFuer("gesundheit_pflege").map((art) => art.schluessel),
-    ).toContain("beleg.fuehrungszeugnis");
+    ).toContain("credentials.policeClearance");
     expect(
       hochladbareBelege("gesundheit_pflege").map((art) => art.schluessel),
-    ).not.toContain("beleg.fuehrungszeugnis");
+    ).not.toContain("credentials.policeClearance");
 
     expect(
       belegartenFuer("gastronomie_hotel").map((art) => art.schluessel),
-    ).toContain("beleg.gesundheitszeugnis");
+    ).toContain("credentials.healthCertificate");
     expect(
       hochladbareBelege("gastronomie_hotel").map((art) => art.schluessel),
-    ).not.toContain("beleg.gesundheitszeugnis");
+    ).not.toContain("credentials.healthCertificate");
   });
 
   it("hat für jeden Beleg einen Text im Katalog", () => {
@@ -108,7 +108,7 @@ describe("Berufsfelder und ihre Belege (ADR-0039)", () => {
 
   it("hat für jedes Berufsfeld einen Namen im Katalog", () => {
     for (const feld of BERUFSFELDER) {
-      expect(katalogHat(`beruf.feld.${feld}`), feld).toBe(true);
+      expect(katalogHat(`occupation.field.${feld}`), feld).toBe(true);
     }
   });
 });

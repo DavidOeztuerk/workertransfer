@@ -16,7 +16,7 @@ import {
 describe("die Formprüfung des Anmeldeformulars", () => {
   it("weist eine Zeichenkette ohne @ ab", () => {
     expect(siehtNachAdresseAus("bus")).toBe(false);
-    expect(emailFehler("bus")).toBe("registrierung.emailUngueltig");
+    expect(emailFehler("bus")).toBe("register.emailInvalid");
   });
 
   it.each([
@@ -54,12 +54,12 @@ describe("die Formprüfung des Anmeldeformulars", () => {
 
     const knapp = "ä".repeat(PASSWORT_HOECHSTBYTES / 2);
     expect(passwortFehler(knapp)).toBeNull();
-    expect(passwortFehler(`${knapp}a`)).toBe("registrierung.passwortZuLang");
+    expect(passwortFehler(`${knapp}a`)).toBe("register.passwordTooLong");
   });
 
   it("nennt die Mindestlänge, bevor jemand abschickt", () => {
     expect(passwortFehler("a".repeat(PASSWORT_MINDESTLAENGE - 1))).toBe(
-      "registrierung.passwortZuKurz",
+      "register.passwordTooShort",
     );
     expect(passwortFehler("a".repeat(PASSWORT_MINDESTLAENGE))).toBeNull();
   });

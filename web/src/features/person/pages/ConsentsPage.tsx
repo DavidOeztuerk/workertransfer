@@ -134,7 +134,7 @@ export function ConsentsPage() {
         // Der Grund wird nur beim Widerruf gelesen — beim Erteilen fragt
         // niemand danach (ADR-0027: eine Entziehung muss erklärbar sein, eine
         // Erteilung nicht).
-        t("freigaben.widerrufsgrund"),
+        t("consents.revokeReason"),
       );
       setzeBeschaeftigt(false);
       setzeFehler(antwort.ok ? null : antwort.error);
@@ -178,7 +178,7 @@ export function ConsentsPage() {
         subjectId,
         capability,
         false,
-        t("freigaben.widerrufsgrund"),
+        t("consents.revokeReason"),
       );
       setzeBeschaeftigt(false);
       setzeFehler(result.ok ? null : result.error);
@@ -189,7 +189,7 @@ export function ConsentsPage() {
 
   if (unbekannt) {
     return (
-      <PageShell title={t("freigaben.titel")} narrow>
+      <PageShell title={t("consents.title")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -198,41 +198,41 @@ export function ConsentsPage() {
   if (subjectId === null) {
     return (
       <AnmeldungNoetig
-        titel={t("freigaben.titel")}
-        satz="freigaben.anmelden"
+        titel={t("consents.title")}
+        satz="consents.signInRequired"
       />
     );
   }
 
   return (
     <PageShell
-      title={t("freigaben.titel")}
+      title={t("consents.title")}
       narrow
-      lead={t("freigaben.lead")}
+      lead={t("consents.lead")}
     >
       {fehler !== null ? <ErrorBlock error={fehler} /> : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 0.5 }}>
-            {t("freigaben.sichtbarTitel")}
+            {t("consents.visibleTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-            {t("freigaben.sichtbarLead")}
+            {t("consents.visibleLead")}
           </Typography>
 
           <Box sx={{ display: "grid", gap: 2.5 }}>
             <ConsentSwitch
-              label={t("freigaben.schalterProfil")}
-              hint={t("freigaben.schalterProfilHinweis")}
+              label={t("consents.switchProfile")}
+              hint={t("consents.switchProfileHint")}
               checked={gilt(PROFILE_VISIBILITY)}
               disabled={busy || freigaben.laedt}
               onChange={(an) => void schalten(PROFILE_VISIBILITY, an)}
             />
 
             <ConsentSwitch
-              label={t("freigaben.schalterArbeiten")}
-              hint={t("freigaben.schalterArbeitenHinweis")}
+              label={t("consents.switchPortfolio")}
+              hint={t("consents.switchPortfolioHint")}
               checked={gilt(PORTFOLIO_VISIBILITY)}
               disabled={busy || freigaben.laedt}
               onChange={(an) => void schalten(PORTFOLIO_VISIBILITY, an)}
@@ -240,13 +240,13 @@ export function ConsentsPage() {
 
             <Box>
               <ConsentSwitch
-                label={t("freigaben.schalterGithub")}
+                label={t("consents.switchGithub")}
                 hint={
                   githubNachgewiesen
-                    ? t("freigaben.schalterGithubHinweis")
+                    ? t("consents.switchGithubHint")
                     : verbindung === null
-                      ? t("freigaben.githubFehlt")
-                      : t("freigaben.githubUnbestaetigt")
+                      ? t("consents.githubMissing")
+                      : t("consents.githubUnverified")
                 }
                 checked={gilt(GITHUB_VISIBILITY)}
                 disabled={busy || freigaben.laedt || !githubNachgewiesen}
@@ -260,8 +260,8 @@ export function ConsentsPage() {
                   sx={{ display: "inline-block", mt: 0.5 }}
                 >
                   {verbindung === null
-                    ? t("freigaben.zumGithub")
-                    : t("freigaben.zumGithubNachweis")}
+                    ? t("consents.toGithub")
+                    : t("consents.toGithubProof")}
                 </Link>
               )}
             </Box>
@@ -272,13 +272,13 @@ export function ConsentsPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 0.5 }}>
-            {t("freigaben.einzelnTitel")}
+            {t("consents.individualTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {t("freigaben.einzelnLead")}
+            {t("consents.individualLead")}
           </Typography>
           {freigaben.laedt ? (
-            <LoadingBlock label={t("freigaben.laden")} />
+            <LoadingBlock label={t("consents.loading")} />
           ) : null}
 
           {result !== undefined && !result.ok ? (
@@ -287,8 +287,8 @@ export function ConsentsPage() {
 
           {nichtsFreigegeben ? (
             <EmptyBlock
-              title={t("freigaben.leerTitel")}
-              hint={t("freigaben.leerHinweis")}
+              title={t("consents.emptyTitle")}
+              hint={t("consents.emptyHint")}
             />
           ) : null}
 
@@ -315,13 +315,13 @@ export function ConsentsPage() {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="h3" sx={{ mb: 1 }}>
-            {t("freigaben.ohneSchalterTitel")}
+            {t("consents.noSwitchTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {t("freigaben.ohneSchalterText")}
+            {t("consents.noSwitchText")}
           </Typography>
           <Link component={RouterLink} to="/resume" variant="body2">
-            {t("freigaben.zumLebenslauf")}
+            {t("consents.toResume")}
           </Link>
         </CardContent>
       </Card>
@@ -329,13 +329,13 @@ export function ConsentsPage() {
       <Card variant="outlined" sx={{ mt: 2 }}>
         <CardContent>
           <Typography variant="h3" sx={{ mb: 1 }}>
-            {t("freigaben.bewerbungTitel")}
+            {t("consents.applicationTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {t("freigaben.bewerbungText")}
+            {t("consents.applicationText")}
           </Typography>
           <Link component={RouterLink} to="/applications" variant="body2">
-            {t("freigaben.zuBewerbungen")}
+            {t("consents.toApplications")}
           </Link>
         </CardContent>
       </Card>
@@ -369,10 +369,10 @@ function ConsentZeile({
   // wörtlich dastehen — sonst weiss niemand, was er da zurückzieht.
   const was = parts.area === null ? consent.capability : t(parts.area);
   const wer = parts.public
-    ? t("freigaben.alleUnternehmen")
+    ? t("consents.allCompanies")
     : parts.tenantId !== null
-      ? (firmenname ?? t("freigaben.einUnternehmen"))
-      : t("freigaben.empfaengerUnbekannt");
+      ? (firmenname ?? t("consents.oneCompany"))
+      : t("consents.recipientUnknown");
 
   return (
     <ListItem
@@ -391,11 +391,11 @@ function ConsentZeile({
           {was} · {wer}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {t("freigaben.freigegebenAm", { datum: freigegebenAm })}
+          {t("consents.releasedOn", { datum: freigegebenAm })}
         </Typography>
       </Box>
       <Button variant="text" onClick={onWithdraw} disabled={busy}>
-        {t("allgemein.zurueckziehen")}
+        {t("common.withdraw")}
       </Button>
     </ListItem>
   );

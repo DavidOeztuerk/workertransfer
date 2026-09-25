@@ -13,7 +13,7 @@ export async function speichereBerufsfeld(
     API_BASE_URL,
     "/account/occupational-field",
     { method: "PUT", body: { occupational_field: feld } },
-    "fehler.berufsfeldNichtGespeichert",
+    "errors.occupationNotSaved",
   );
 
   return answer.ok ? { ok: true } : { ok: false, detail: answer.error.detail };

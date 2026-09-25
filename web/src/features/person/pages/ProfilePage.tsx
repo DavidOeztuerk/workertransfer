@@ -335,7 +335,7 @@ export function ProfilePage() {
 
   if (unbekannt) {
     return (
-      <PageShell title={t("profil.titel")} narrow>
+      <PageShell title={t("profile.title")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -343,7 +343,7 @@ export function ProfilePage() {
 
   if (subjectId === null) {
     return (
-      <AnmeldungNoetig titel={t("profil.titel")} satz="profil.anmelden" />
+      <AnmeldungNoetig titel={t("profile.title")} satz="profile.signInRequired" />
     );
   }
 
@@ -351,8 +351,8 @@ export function ProfilePage() {
     // Kein leeres Formular, das sich nachträglich füllt: wer in der Zwischenzeit
     // zu tippen anfängt, verliert seine Eingabe, sobald die Antwort eintrifft.
     return (
-      <PageShell title={t("profil.titel")} narrow>
-        <LoadingBlock label={t("profil.laden")} />
+      <PageShell title={t("profile.title")} narrow>
+        <LoadingBlock label={t("profile.loading")} />
       </PageShell>
     );
   }
@@ -363,7 +363,7 @@ export function ProfilePage() {
     // leer. Der Ladezustand ist dann vorbei, die Seite sähe aus wie „noch
     // nichts eingetragen".
     return (
-      <PageShell title={t("profil.titel")} narrow>
+      <PageShell title={t("profile.title")} narrow>
         <ErrorBlock error={loaded.error} />
       </PageShell>
     );
@@ -382,25 +382,25 @@ export function ProfilePage() {
 
   return (
     <PageShell
-      title={t("profil.titel")}
+      title={t("profile.title")}
       narrow
-      lead={t("profil.lead")}
+      lead={t("profile.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <ConsentSwitch
-            label={t("profil.freigabeLabel")}
+            label={t("profile.releaseLabel")}
             checked={freigegeben}
             disabled={!hatProfil || toggling || ledgerUnbekannt}
             hint={
               ledgerSchweigt
-                ? t("profil.freigabeSchweigt")
+                ? t("profile.releaseSilent")
                 : freigabe.laedt
-                  ? t("profil.freigabePruefung")
+                  ? t("profile.releaseChecking")
                   : t(
                       hatProfil
-                        ? "profil.freigabeWirkt"
-                        : "profil.freigabeOhneProfil",
+                        ? "profile.releaseEffective"
+                        : "profile.releaseWithoutProfile",
                     )
             }
             onChange={(naechster) => void toggle(naechster)}
@@ -419,8 +419,8 @@ export function ProfilePage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label={t("profil.ueberschrift")}
-              helperText={t("profil.ueberschriftHinweis")}
+              label={t("profile.headline")}
+              helperText={t("profile.headlineHint")}
               value={form.headline}
               onChange={(event) =>
                 change("headline", event.target.value)
@@ -430,8 +430,8 @@ export function ProfilePage() {
               fullWidth
             />
             <TextField
-              label={t("profil.ueberMich")}
-              helperText={t("profil.ueberMichHinweis")}
+              label={t("profile.aboutMe")}
+              helperText={t("profile.aboutMeHint")}
               multiline
               rows={6}
               value={form.bio}
@@ -444,8 +444,8 @@ export function ProfilePage() {
               hasText={form.bio.trim().length > 0}
             />
             <TextField
-              label={t("profil.ort")}
-              helperText={t("profil.ortHinweis")}
+              label={t("profile.location")}
+              helperText={t("profile.locationHint")}
               value={form.location}
               onChange={(event) =>
                 change("location", event.target.value)
@@ -459,11 +459,11 @@ export function ProfilePage() {
             />
 
             <TextField
-              label={t("profil.faehigkeiten")}
+              label={t("profile.skills")}
               // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern
               // „PostgreSQL" wird. Ohne ihn sähe es aus, als hätte die Seite
               // etwas an der Eingabe verändert, ohne zu fragen.
-              helperText={t("profil.faehigkeitenHinweis")}
+              helperText={t("profile.skillsHint")}
               value={form.skills}
               onChange={(event) => change("skills", event.target.value)}
               fullWidth
@@ -474,14 +474,14 @@ export function ProfilePage() {
                 {vorschlaege.length > 0 ? (
                   <>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                      {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
+                      {t(github ? "profile.suggestionsTitle" : "profile.suggestionsTitleOwn")}
                     </Typography>
                     <Typography
                       variant="caption"
                       color="text.secondary"
                       sx={{ display: "block", mb: 1 }}
                     >
-                      {t(github ? "profil.vorschlaegeHinweis" : "profil.vorschlaegeHinweisEigen")}
+                      {t(github ? "profile.suggestionsHint" : "profile.suggestionsHintOwn")}
                     </Typography>
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
                       {vorschlaege.map((wort) => (
@@ -492,7 +492,7 @@ export function ProfilePage() {
                           variant="outlined"
                           icon={<AddIcon />}
                           onClick={() => uebernimm(wort)}
-                          aria-label={t("profil.vorschlagUebernehmen", { wort })}
+                          aria-label={t("profile.suggestionAdopt", { wort })}
                         />
                       ))}
                     </Box>
@@ -518,7 +518,7 @@ export function ProfilePage() {
                   }
                 />
               }
-              label={t("profil.remote")}
+              label={t("profile.remote")}
             />
 
             <TextField
@@ -528,30 +528,30 @@ export function ProfilePage() {
               // purpose — "said nothing" is a state, not an omission, and it
               // must be revocable.
               select
-              label={t("profil.pendeln")}
-              helperText={t("profil.pendelnHinweis")}
+              label={t("profile.commute")}
+              helperText={t("profile.commuteHint")}
               value={form.commute_km}
               onChange={(event) => change("commute_km", event.target.value)}
             >
-              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
+              <MenuItem value="">{t("profile.notStated")}</MenuItem>
               {PENDELSTUFEN.map((stufe) => (
                 <MenuItem key={stufe} value={stufe}>
-                  {t(`profil.pendeln_${stufe}`)}
+                  {t(`profile.commute_${stufe}`)}
                 </MenuItem>
               ))}
             </TextField>
 
             <TextField
               select
-              label={t("profil.umzug")}
-              helperText={t("profil.umzugHinweis")}
+              label={t("profile.relocate")}
+              helperText={t("profile.relocateHint")}
               value={form.relocation}
               onChange={(event) => change("relocation", event.target.value)}
             >
-              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
+              <MenuItem value="">{t("profile.notStated")}</MenuItem>
               {UMZUGSWERTE.map((wert) => (
                 <MenuItem key={wert} value={wert}>
-                  {t(`profil.umzug_${wert}`)}
+                  {t(`profile.relocate_${wert}`)}
                 </MenuItem>
               ))}
             </TextField>
@@ -564,15 +564,15 @@ export function ProfilePage() {
                 // MUI's Alert would otherwise set role="alert".
                 role="status"
               >
-                {t("profil.gespeichert")}
+                {t("profile.saved")}
               </Alert>
             ) : null}
 
             <Box>
               <Button type="submit" variant="contained" disabled={saving}>
                 {saving
-                  ? t("allgemein.speichernLaeuft")
-                  : t("allgemein.speichern")}
+                  ? t("common.saving")
+                  : t("common.save")}
               </Button>
             </Box>
           </Box>

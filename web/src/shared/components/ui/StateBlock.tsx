@@ -14,7 +14,7 @@ export function LoadingBlock({ label }: { label?: string }) {
   return (
     <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", py: 4 }} role="status">
       <CircularProgress size={18} />
-      <Typography color="text.secondary">{label ?? t("allgemein.laden")}</Typography>
+      <Typography color="text.secondary">{label ?? t("common.loading")}</Typography>
     </Box>
   );
 }
@@ -38,7 +38,7 @@ export function ErrorBlock({ error, title }: { error: ApiError; title?: string }
           component="p"
           sx={{ mt: 1, mb: 0, fontSize: "0.8125rem", opacity: 0.8, fontFamily: "monospace" }}
         >
-          {t("allgemein.kennung")}: {error.correlationId}
+          {t("common.reference")}: {error.correlationId}
         </Box>
       ) : null}
     </Alert>

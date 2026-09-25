@@ -49,7 +49,7 @@ export async function ladeEinstellungen(
     API_BASE_URL,
     "/account/settings",
     { signal },
-    "fehler.einstellungenNichtAbrufbar"
+    "errors.settingsUnavailable"
   );
   return answer.ok && answer.value !== undefined ? zuAnsicht(answer.value) : null;
 }
@@ -75,7 +75,7 @@ export async function speichereEinstellungen(
         ai_audit_log: wahl.auditLog,
       },
     },
-    "fehler.einstellungenNichtGespeichert"
+    "errors.settingsNotSaved"
   );
 
   return answer.ok && answer.value !== undefined
@@ -94,7 +94,7 @@ export async function speichereSchluessel(klartext: string): Promise<boolean> {
     API_BASE_URL,
     "/account/ai-key",
     { method: "PUT", body: { key: klartext } },
-    "fehler.einstellungenNichtGespeichert"
+    "errors.settingsNotSaved"
   );
   return answer.ok;
 }

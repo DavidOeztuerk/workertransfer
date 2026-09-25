@@ -76,22 +76,22 @@ export function ImprintPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.impressumTitel")} narrow lead={t("recht.impressumLead")}>
+    <PageShell title={t("legal.imprintTitle")} narrow lead={t("legal.imprintLead")}>
       <Alert severity="warning" sx={{ mb: 2.5 }}>
-        <AlertTitle>{t("recht.impressumOffenTitel")}</AlertTitle>
-        {t("recht.impressumOffenText")}
+        <AlertTitle>{t("legal.imprintIncompleteTitle")}</AlertTitle>
+        {t("legal.imprintIncompleteText")}
       </Alert>
 
-      <Abschnitt titel={t("recht.impressumVerantwortlich")}>
-        <Absatz>{t("recht.dsKontaktText")}</Absatz>
+      <Abschnitt titel={t("legal.imprintResponsible")}>
+        <Absatz>{t("legal.privacyContactText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.impressumStreit")}>
-        <Absatz>{t("recht.impressumStreitText")}</Absatz>
+      <Abschnitt titel={t("legal.imprintDisputes")}>
+        <Absatz>{t("legal.imprintDisputesText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.impressumDaten")}>
-        <Absatz>{t("recht.impressumDatenText")}</Absatz>
+      <Abschnitt titel={t("legal.imprintData")}>
+        <Absatz>{t("legal.imprintDataText")}</Absatz>
       </Abschnitt>
     </PageShell>
   );
@@ -102,36 +102,36 @@ export function PrivacyPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.datenschutzTitel")} narrow lead={t("recht.datenschutzLead")}>
-      <Abschnitt titel={t("recht.dsGrundsatzTitel")}>
-        <Absatz>{t("recht.dsGrundsatzText")}</Absatz>
+    <PageShell title={t("legal.privacyTitle")} narrow lead={t("legal.privacyLead")}>
+      <Abschnitt titel={t("legal.privacyPrincipleTitle")}>
+        <Absatz>{t("legal.privacyPrincipleText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.dsWasTitel")}>
-        <Absatz>{t("recht.dsWasText")}</Absatz>
+      <Abschnitt titel={t("legal.privacyStoredTitle")}>
+        <Absatz>{t("legal.privacyStoredText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.dsNichtTitel")}>
+      <Abschnitt titel={t("legal.privacyNotTitle")}>
         <Punkte
           punkte={[
-            t("recht.dsNicht1"),
-            t("recht.dsNicht2"),
-            t("recht.dsNicht3"),
-            t("recht.dsNicht4"),
+            t("legal.privacyNot1"),
+            t("legal.privacyNot2"),
+            t("legal.privacyNot3"),
+            t("legal.privacyNot4"),
           ]}
         />
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.dsKiTitel")}>
-        <Absatz>{t("recht.dsKiText")}</Absatz>
+      <Abschnitt titel={t("legal.privacyAiTitle")}>
+        <Absatz>{t("legal.privacyAiText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.dsRechteTitel")}>
-        <Absatz>{t("recht.dsRechteText")}</Absatz>
+      <Abschnitt titel={t("legal.privacyRightsTitle")}>
+        <Absatz>{t("legal.privacyRightsText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.dsKontaktTitel")}>
-        <Absatz>{t("recht.dsKontaktText")}</Absatz>
+      <Abschnitt titel={t("legal.privacyContactTitle")}>
+        <Absatz>{t("legal.privacyContactText")}</Absatz>
       </Abschnitt>
     </PageShell>
   );
@@ -142,15 +142,15 @@ export function TermsPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.agbTitel")} narrow lead={t("recht.agbLead")}>
+    <PageShell title={t("legal.termsTitle")} narrow lead={t("legal.termsLead")}>
       <Alert severity="warning" sx={{ mb: 2.5 }}>
-        <AlertTitle>{t("recht.agbOffenTitel")}</AlertTitle>
-        {t("recht.agbOffenText")}
+        <AlertTitle>{t("legal.termsIncompleteTitle")}</AlertTitle>
+        {t("legal.termsIncompleteText")}
       </Alert>
 
-      <Abschnitt titel={t("recht.agbSchonTitel")}>
+      <Abschnitt titel={t("legal.termsAlreadyTitle")}>
         <Punkte
-          punkte={[t("recht.agb1"), t("recht.agb2"), t("recht.agb3"), t("recht.agb4")]}
+          punkte={[t("legal.terms1"), t("legal.terms2"), t("legal.terms3"), t("legal.terms4")]}
         />
       </Abschnitt>
     </PageShell>
@@ -162,19 +162,19 @@ export function AccessibilityPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.a11yTitel")} narrow lead={t("recht.a11yLead")}>
-      <Abschnitt titel={t("recht.a11yStandTitel")}>
-        <Absatz>{t("recht.a11yStandText")}</Absatz>
+    <PageShell title={t("legal.a11yTitle")} narrow lead={t("legal.a11yLead")}>
+      <Abschnitt titel={t("legal.a11yStatusTitle")}>
+        <Absatz>{t("legal.a11yStatusText")}</Absatz>
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.a11yTunTitel")}>
+      <Abschnitt titel={t("legal.a11yAppliesTitle")}>
         <Punkte
-          punkte={[t("recht.a11y1"), t("recht.a11y2"), t("recht.a11y3"), t("recht.a11y4")]}
+          punkte={[t("legal.a11y1"), t("legal.a11y2"), t("legal.a11y3"), t("legal.a11y4")]}
         />
       </Abschnitt>
 
-      <Abschnitt titel={t("recht.a11yLueckenTitel")}>
-        <Absatz>{t("recht.a11yLuecken")}</Absatz>
+      <Abschnitt titel={t("legal.a11yGapsTitle")}>
+        <Absatz>{t("legal.a11yGaps")}</Absatz>
       </Abschnitt>
     </PageShell>
   );

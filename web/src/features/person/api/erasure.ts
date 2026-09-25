@@ -17,7 +17,7 @@ export async function loeschungVerlangen(signal?: AbortSignal): Promise<Loescher
     API_BASE_URL,
     "/account/erasure",
     { method: "POST", signal },
-    "fehler.loeschungNichtAngenommen"
+    "errors.deletionNotAccepted"
   );
 
   return answer.ok ? { ok: true } : { ok: false, error: answer.error };

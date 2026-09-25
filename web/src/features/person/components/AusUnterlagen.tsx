@@ -53,14 +53,14 @@ export function AusUnterlagen({
   return (
     <Box sx={{ mt: 1 }}>
       <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-        {t("profil.unterlagenTitel")}
+        {t("profile.documentsTitle")}
       </Typography>
       <Typography
         variant="caption"
         color="text.secondary"
         sx={{ display: "block", mb: 1 }}
       >
-        {t("profil.unterlagenHinweis")}
+        {t("profile.documentsHint")}
       </Typography>
 
       <Button
@@ -69,7 +69,7 @@ export function AusUnterlagen({
         onClick={onLesen}
         disabled={laeuft}
       >
-        {t(laeuft ? "profil.unterlagenLiest" : "profil.unterlagenLesen")}
+        {t(laeuft ? "profile.documentsReading" : "profile.documentsRead")}
       </Button>
 
       {fehler !== null ? (
@@ -84,7 +84,7 @@ export function AusUnterlagen({
           color="text.secondary"
           sx={{ display: "block", mt: 1 }}
         >
-          {t("profil.unterlagenNichtsGefunden")}
+          {t("profile.documentsNothingFound")}
         </Typography>
       ) : null}
 
@@ -95,7 +95,7 @@ export function AusUnterlagen({
           color="text.secondary"
           sx={{ display: "block", mt: 1 }}
         >
-          {t("profil.unterlagenOhneText", { name: fund.name })}
+          {t("profile.documentsNoText", { name: fund.name })}
         </Typography>
       ))}
     </Box>

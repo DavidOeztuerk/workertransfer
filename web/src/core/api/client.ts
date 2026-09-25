@@ -1,6 +1,6 @@
 import type { ApiError } from "../store/thunkHelpers";
 import { i18n } from "../i18n/i18n";
-import type { Fehlerschluessel } from "../../shared/api/fehler";
+import type { ErrorKey } from "../../shared/api/fehler";
 import { brauchtKeineErneuerung, erneuereEinmal } from "./refreshGate";
 
 /**
@@ -38,8 +38,8 @@ export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ApiError
 function netzfehler(): ApiError {
   return {
     status: 0,
-    title: i18n.t("fehler.keineVerbindungKurz"),
-    detail: i18n.t("fehler.dienstNichtErreichbar"),
+    title: i18n.t("errors.noConnectionShort"),
+    detail: i18n.t("errors.serviceUnreachable"),
   };
 }
 
@@ -52,7 +52,7 @@ function netzfehler(): ApiError {
  */
 async function problem(
   response: Response,
-  fallbackSchluessel: Fehlerschluessel
+  fallbackSchluessel: ErrorKey
 ): Promise<ApiError> {
   // Übersetzt bei der ANTWORT, nicht beim Aufbau der Aufrufstelle: die
   // Vorgabewerte stehen in Signaturen und entstünden beim Laden des Moduls.
@@ -99,7 +99,7 @@ export async function request<T>(
   baseUrl: string,
   path: string,
   options: RequestOptions = {},
-  fallbackMessage: Fehlerschluessel = "fehler.anfrageFehlgeschlagen"
+  fallbackMessage: ErrorKey = "errors.requestFailed"
 ): Promise<ApiResult<T>> {
   return senden(baseUrl, path, options, fallbackMessage, false);
 }
@@ -108,7 +108,7 @@ async function senden<T>(
   baseUrl: string,
   path: string,
   options: RequestOptions,
-  fallbackMessage: Fehlerschluessel,
+  fallbackMessage: ErrorKey,
   schonErneuert: boolean
 ): Promise<ApiResult<T>> {
   const { method = "GET", body, signal, ohneErneuerung } = options;

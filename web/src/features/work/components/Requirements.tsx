@@ -84,7 +84,7 @@ export function Requirements({
     <Box sx={{ mt: 1.5 }}>
       {match !== null ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-          {t("stellen.duHast", {
+          {t("jobs.youHave", {
             treffer: match.have.length,
             gesamt: listed.length,
           })}
@@ -93,7 +93,7 @@ export function Requirements({
       {mine !== null && mine.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
           <Trans
-            i18nKey="stellen.keineFaehigkeiten"
+            i18nKey="jobs.noSkills"
             components={{ 1: <RouterLink to="/profile" /> }}
           />
         </Typography>
@@ -145,7 +145,7 @@ export function Requirements({
               <Box component="span">{skill}</Box>
               {state !== "unknown" ? (
                 <NurVorgelesen>
-                  {t(state === "have" ? "stellen.hastDu" : "stellen.fehltDir")}
+                  {t(state === "have" ? "jobs.have" : "jobs.missing")}
                 </NurVorgelesen>
               ) : null}
             </Box>

@@ -28,7 +28,7 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     API_BASE_URL,
     "/invitations/accept",
     { method: "POST", body: { token }, signal },
-    "fehler.einladungNichtAngenommen"
+    "errors.invitationNotAccepted"
   );
 
   if (answer.ok) {
@@ -39,7 +39,7 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
     return {
       ok: false,
       brauchtKonto: true,
-      meldung: i18n.t("fehler.eingeladeneAdresse"),
+      meldung: i18n.t("errors.invitedAddress"),
     };
   }
 
@@ -50,6 +50,6 @@ export async function nimmAn(token: string, signal?: AbortSignal): Promise<Einla
   return {
     ok: false,
     brauchtKonto: false,
-    meldung: i18n.t("fehler.einladungUngueltig"),
+    meldung: i18n.t("errors.invitationInvalid"),
   };
 }

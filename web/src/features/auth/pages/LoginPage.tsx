@@ -77,21 +77,21 @@ export function LoginPage() {
       }
       // Angemeldet, aber die Sitzung kam leer zurück. Das ist kein Erfolg, und
       // stillschweigend auf der Seite stehen zu bleiben erklärt es niemandem.
-      setStummerFehlschlag(t("anmeldung.sitzungUnlesbar"));
+      setStummerFehlschlag(t("login.sessionUnreadable"));
       return;
     }
 
     // `payload` gesetzt heisst: der Slice zeigt den Fehler des Servers. Nur der
     // andere Fall braucht hier einen eigenen Satz.
     if (result.payload === undefined) {
-      setStummerFehlschlag(t("anmeldung.fehlgeschlagen"));
+      setStummerFehlschlag(t("login.failed"));
     }
   }
 
   return (
     <AuthCard
-      title={t("anmeldung.titel")}
-      lead={t("anmeldung.lead")}
+      title={t("login.title")}
+      lead={t("login.lead")}
     >
       <AuthModeTabs current="login" />
 
@@ -102,7 +102,7 @@ export function LoginPage() {
         sx={{ display: "grid", gap: 2 }}
       >
         <TextField
-          label={t("anmeldung.email")}
+          label={t("login.email")}
           type="email"
           // Ohne `autoComplete` kann kein Passwortmanager füllen — der Browser
           // mahnt es in der Konsole selbst an.
@@ -112,7 +112,7 @@ export function LoginPage() {
           required
         />
         <TextField
-          label={t("anmeldung.passwort")}
+          label={t("login.password")}
           type="password"
           autoComplete="current-password"
           value={passwort}
@@ -131,7 +131,7 @@ export function LoginPage() {
           size="large"
           disabled={pending}
         >
-          {pending ? t("anmeldung.laeuft") : t("anmeldung.knopf")}
+          {pending ? t("login.inProgress") : t("login.button")}
         </Button>
       </Box>
     </AuthCard>

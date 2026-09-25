@@ -43,7 +43,7 @@ export async function ladeAnschrift(signal?: AbortSignal): Promise<Anschrift | n
     API_BASE_URL,
     "/account/address",
     { signal },
-    "fehler.einstellungenNichtAbrufbar",
+    "errors.settingsUnavailable",
   );
   return answer.ok && answer.value !== undefined ? zuAnsicht(answer.value) : null;
 }
@@ -65,7 +65,7 @@ export async function speichereAnschrift(
         phone: anschrift.phone,
       },
     },
-    "fehler.einstellungenNichtGespeichert",
+    "errors.settingsNotSaved",
   );
   if (!answer.ok || answer.value === undefined) {
     return { ok: false, detail: answer.ok ? "" : answer.error.detail };
@@ -84,7 +84,7 @@ export async function speichereKlarname(
       method: "PUT",
       body: { given_name: givenName, family_name: familyName },
     },
-    "fehler.einstellungenNichtGespeichert",
+    "errors.settingsNotSaved",
   );
   return answer.ok ? { ok: true } : { ok: false, detail: answer.error.detail };
 }

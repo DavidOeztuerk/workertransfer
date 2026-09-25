@@ -365,7 +365,7 @@ describe("JobsPage", () => {
    *
    * `setFortschritt` wurde an genau einer Stelle gerufen — im `finally`, mit
    * `null` —, die Leiste las einen Wert, den niemand setzte, und der
-   * Katalogschlüssel `stellen.fortschritt` stand in drei Sprachen ohne Leser
+   * Katalogschlüssel `jobs.progress` stand in drei Sprachen ohne Leser
    * (PBI-8.1). Dieser Test ist der Grund, dass das nicht wieder unbemerkt
    * abreisst: er verlangt die Zwischenzahl, nicht nur das Ende.
    *
@@ -491,7 +491,7 @@ describe("JobsPage", () => {
    *
    * Der Test, der gefehlt hat. Er prüft nicht, dass irgendetwas dasteht,
    * sondern dass die drei Angaben AUS DEM DRAHT übersetzt ankommen — und dass
-   * kein Katalogschlüssel durchschlägt. `stelle.remoteundefined` wäre für
+   * kein Katalogschlüssel durchschlägt. `job.remoteundefined` wäre für
    * `getByText` sonst genauso ein Treffer wie „Hybrid".
    */
   it("zeigt Ort, Arbeitsform und Beschäftigung übersetzt", async () => {
@@ -506,7 +506,7 @@ describe("JobsPage", () => {
     expect(zeile).toHaveTextContent("Hybrid");
     expect(zeile).toHaveTextContent("Vollzeit");
     // Kein roher Schlüssel — weder als „undefined" noch als Punktpfad.
-    expect(zeile.textContent ?? "").not.toContain("stelle.");
+    expect(zeile.textContent ?? "").not.toContain("job.");
     expect(zeile.textContent ?? "").not.toContain("undefined");
   });
 

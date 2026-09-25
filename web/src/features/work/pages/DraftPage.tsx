@@ -170,27 +170,27 @@ export function DraftPage() {
 
   if (sitzungLaedt) {
     return (
-      <PageShell title={t("entwurfs.titel")} narrow>
-        <LoadingBlock label={t("entwurfs.laden")} />
+      <PageShell title={t("drafts.title")} narrow>
+        <LoadingBlock label={t("drafts.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn || !id) {
-    return <AnmeldungNoetig titel={t("entwurfs.titel")} satz="entwurfs.anmelden" />;
+    return <AnmeldungNoetig titel={t("drafts.title")} satz="drafts.signInRequired" />;
   }
 
   if (entwurf.pending && !e) {
     return (
-      <PageShell title={t("entwurfs.titel")} narrow>
-        <LoadingBlock label={t("entwurfs.laden")} />
+      <PageShell title={t("drafts.title")} narrow>
+        <LoadingBlock label={t("drafts.loading")} />
       </PageShell>
     );
   }
 
   if (entwurf.data !== null && !entwurf.data.ok) {
     return (
-      <PageShell title={t("entwurfs.titel")} narrow>
+      <PageShell title={t("drafts.title")} narrow>
         {entwurf.data.reason === "unavailable" ? (
           <Alert severity="info">{t(schreibschluessel(entwurf.data.error.detail))}</Alert>
         ) : (
@@ -202,10 +202,10 @@ export function DraftPage() {
 
   if (!e) {
     return (
-      <PageShell title={t("entwurfs.titel")} narrow>
+      <PageShell title={t("drafts.title")} narrow>
         <EmptyBlock
-          title={t("entwurfs.nichtGefunden")}
-          hint={t("entwurfs.nichtGefundenHinweis")}
+          title={t("drafts.notFound")}
+          hint={t("drafts.notFoundHint")}
         />
       </PageShell>
     );
@@ -223,7 +223,7 @@ export function DraftPage() {
   const canEdit = !leer && e.status !== "sent" && e.status !== "generating" && !schreibt;
   const canSelfWrite = leer && e.status === "failed" && !schreibt;
   const canComment = !leer && e.status !== "generating" && e.status !== "sent" && !schreibt;
-  const titel = stelle.data?.title ?? (e.subject || t("entwurfs.titel"));
+  const titel = stelle.data?.title ?? (e.subject || t("drafts.title"));
   const entwurfsId = e.id;
 
   async function lauf(
@@ -296,10 +296,10 @@ export function DraftPage() {
   return (
     <PageShell
       title={titel}
-      lead={t(`entwurfs.standHinweis.${stand}`)}
+      lead={t(`drafts.statusHint.${stand}`)}
       actions={
         <Button variant="outlined" onClick={() => navigate("/applications/drafts")}>
-          {t("entwurfs.zurListe")}
+          {t("drafts.backToList")}
         </Button>
       }
     >
@@ -326,15 +326,15 @@ export function DraftPage() {
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, flexWrap: "wrap" }}>
               <Typography variant="h4" sx={{ flex: 1 }}>
-                {e.subject || t("entwurfs.ohneBetreff")}
+                {e.subject || t("drafts.noSubject")}
               </Typography>
               <Chip
-                label={t(`entwurfs.status.${stand}`)}
+                label={t(`drafts.status.${stand}`)}
                 color={STATUS_FARBE[stand]}
                 size="small"
               />
               <Typography variant="body2" color="text.secondary">
-                {t("entwurfs.fassung", { version: e.version })}
+                {t("drafts.version", { version: e.version })}
               </Typography>
             </Box>
 
@@ -351,12 +351,12 @@ export function DraftPage() {
             {bearbeiten ? (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                 <TextField
-                  label={t("entwurfs.betreff")}
+                  label={t("drafts.subject")}
                   value={betreff ?? ""}
                   onChange={(ev) => setBetreff(ev.target.value)}
                 />
                 <TextField
-                  label={t("entwurfs.text")}
+                  label={t("drafts.text")}
                   value={text ?? ""}
                   onChange={(ev) => setText(ev.target.value)}
                   multiline
@@ -372,14 +372,14 @@ export function DraftPage() {
                       )
                     }
                   >
-                    {t("allgemein.speichern")}
+                    {t("common.save")}
                   </Button>
-                  <Button onClick={() => setBearbeiten(false)}>{t("allgemein.abbrechen")}</Button>
+                  <Button onClick={() => setBearbeiten(false)}>{t("common.cancel")}</Button>
                 </Box>
               </Box>
             ) : leer && !schreibt ? (
               <EmptyBlock
-                title={t("entwurfs.leerBrief")}
+                title={t("drafts.emptyLetter")}
                 hint={t(leerBriefHinweisSchluessel(e.error))}
                 action={
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center" }}>
@@ -394,12 +394,12 @@ export function DraftPage() {
                           ) : null
                         }
                       >
-                        {t("entwurfs.generieren")}
+                        {t("drafts.generate")}
                       </Button>
                     ) : null}
                     {canSelfWrite ? (
                       <Button variant="outlined" onClick={() => setBearbeiten(true)}>
-                        {t("entwurfs.selbstSchreiben")}
+                        {t("drafts.writeYourself")}
                       </Button>
                     ) : null}
                   </Box>
@@ -409,7 +409,7 @@ export function DraftPage() {
               <Briefbogen
                 betreff={e.subject}
                 text={e.body}
-                leerHinweis={schreibt ? t("entwurfs.schreibtJetzt") : t("entwurfs.leerBrief")}
+                leerHinweis={schreibt ? t("drafts.writingNow") : t("drafts.emptyLetter")}
                 kopf={kopfAusSitzung(session, anschrift.data)}
                 empfaenger={empfaengerAusFirma(firma.data, stelle.data)}
               />
@@ -426,7 +426,7 @@ export function DraftPage() {
                       laeuft === "write" ? <CircularProgress color="inherit" size={16} /> : null
                     }
                   >
-                    {t("entwurfs.nochmal")}
+                    {t("drafts.retry")}
                   </Button>
                 ) : null}
                 {canRevise ? (
@@ -435,7 +435,7 @@ export function DraftPage() {
                     disabled={laeuft !== null}
                     onClick={() => void lauf("revise", () => reviseDraft(e.id))}
                   >
-                    {t("entwurfs.ueberarbeiten")}
+                    {t("drafts.revise")}
                   </Button>
                 ) : null}
                 {canApprove ? (
@@ -444,7 +444,7 @@ export function DraftPage() {
                     disabled={laeuft !== null}
                     onClick={() => void lauf("approve", () => approveDraft(e.id))}
                   >
-                    {t("entwurfs.freigeben")}
+                    {t("drafts.approve")}
                   </Button>
                 ) : null}
                 {canSend ? (
@@ -453,12 +453,12 @@ export function DraftPage() {
                     disabled={laeuft !== null}
                     onClick={() => void lauf("send", () => sendDraft(e.id))}
                   >
-                    {t("entwurfs.senden")}
+                    {t("drafts.send")}
                   </Button>
                 ) : null}
                 {canEdit ? (
                   <Button variant="outlined" onClick={() => setBearbeiten(true)}>
-                    {t("entwurfs.bearbeiten")}
+                    {t("drafts.edit")}
                   </Button>
                 ) : null}
                 {canDelete ? (
@@ -471,7 +471,7 @@ export function DraftPage() {
                       )
                     }
                   >
-                    {t("allgemein.zurueckziehen")}
+                    {t("common.withdraw")}
                   </Button>
                 ) : null}
               </Box>
@@ -487,13 +487,13 @@ export function DraftPage() {
                     )
                   }
                 >
-                  {t("allgemein.zurueckziehen")}
+                  {t("common.withdraw")}
                 </Button>
               </Box>
             ) : null}
             {e.status === "review" || e.status === "approved" ? (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                {t("entwurfs.schritte")}
+                {t("drafts.steps")}
               </Typography>
             ) : null}
           </CardContent>
@@ -503,10 +503,10 @@ export function DraftPage() {
           <Card>
             <CardContent>
               <Typography variant="h5" sx={{ mb: 2 }}>
-                {t("entwurfs.beilagen")}
+                {t("drafts.enclosures")}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {t("entwurfs.lebenslaufImmer")}
+                {t("drafts.resumeAlways")}
               </Typography>
               {(() => {
                 const alle = unterlagen.data?.ok ? unterlagen.data.value : [];
@@ -527,12 +527,12 @@ export function DraftPage() {
                       <FormControlLabel
                         sx={{ flex: 1, mr: 0, minWidth: 0 }}
                         control={<Checkbox checked disabled />}
-                        label={`${doc.name} · ${t("entwurfs.lebenslaufGehtMit")}`}
+                        label={`${doc.name} · ${t("drafts.resumeIncluded")}`}
                       />
                       <IconButton
                         size="small"
                         onClick={() => void handlePreview(doc.id)}
-                        aria-label={t("lebenslauf.dateiAnsehen")}
+                        aria-label={t("resume.viewFile")}
                       >
                         <ViewIcon />
                       </IconButton>
@@ -544,21 +544,21 @@ export function DraftPage() {
                       variant="outlined"
                       onClick={() => navigate("/resume", { state: { weg: "datei" } })}
                     >
-                      {t("entwurfs.lebenslaufAnpassen")}
+                      {t("drafts.resumeEdit")}
                     </Button>
                     <Button
                       size="small"
                       variant="outlined"
                       onClick={() => navigate("/resume", { state: { weg: "datei" } })}
                     >
-                      {t("entwurfs.lebenslaufErsetzen")}
+                      {t("drafts.resumeReplace")}
                     </Button>
                   </Box>
                 </Box>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {hatFormular ? t("entwurfs.lebenslaufVorhanden") : t("entwurfs.lebenslaufFehlt")}
+                    {hatFormular ? t("drafts.resumePresent") : t("drafts.resumeMissing")}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                     <Button
@@ -566,14 +566,14 @@ export function DraftPage() {
                       variant={hatFormular ? "outlined" : "contained"}
                       onClick={() => navigate("/resume", { state: { weg: "manuell" } })}
                     >
-                      {hatFormular ? t("entwurfs.lebenslaufAnpassen") : t("entwurfs.lebenslaufAnlegen")}
+                      {hatFormular ? t("drafts.resumeEdit") : t("drafts.resumeCreate")}
                     </Button>
                     <Button
                       size="small"
                       variant="outlined"
                       onClick={() => navigate("/resume", { state: { weg: "datei" } })}
                     >
-                      {t("entwurfs.lebenslaufHochladen")}
+                      {t("drafts.resumeUpload")}
                     </Button>
                   </Box>
                 </Box>
@@ -605,7 +605,7 @@ export function DraftPage() {
                     <IconButton
                       size="small"
                       onClick={() => void handlePreview(doc.id)}
-                      aria-label={t("lebenslauf.dateiAnsehen")}
+                      aria-label={t("resume.viewFile")}
                     >
                       <ViewIcon />
                     </IconButton>
@@ -614,7 +614,7 @@ export function DraftPage() {
                       color="error"
                       onClick={() => setZuLoeschen(doc.id)}
                       disabled={laeuft !== null || schreibt}
-                      aria-label={t("lebenslauf.unterlageLoeschen")}
+                      aria-label={t("resume.documentDelete")}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -622,7 +622,7 @@ export function DraftPage() {
                 ))}
                 {unterlagen.data?.ok && beilagen.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    {t("entwurfs.keineUnterlagen")}
+                    {t("drafts.noDocuments")}
                   </Typography>
                 ) : null}
               </Box>
@@ -634,7 +634,7 @@ export function DraftPage() {
                   disabled={uploading !== null || schreibt}
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  {t("lebenslauf.unterlageHinzufuegen")}
+                  {t("resume.addDocument")}
                   <input
                     type="file"
                     hidden
@@ -657,22 +657,22 @@ export function DraftPage() {
                     </Typography>
                     <TextField
                       size="small"
-                      label={t("lebenslauf.unterlageName")}
+                      label={t("resume.documentName")}
                       value={dateiname}
                       onChange={(ev) => setDateiname(ev.target.value)}
                     />
                     <TextField
                       select
                       size="small"
-                      label={t("lebenslauf.unterlageArt")}
+                      label={t("resume.documentKind")}
                       value={dateiart}
                       onChange={(ev) =>
                         setDateiart(ev.target.value as "zeugnis" | "zertifikat" | "sonstiges")
                       }
                     >
-                      <MenuItem value="zeugnis">{t("lebenslauf.unterlageArtZeugnis")}</MenuItem>
-                      <MenuItem value="zertifikat">{t("lebenslauf.unterlageArtZertifikat")}</MenuItem>
-                      <MenuItem value="sonstiges">{t("lebenslauf.unterlageArtSonstiges")}</MenuItem>
+                      <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
+                      <MenuItem value="zertifikat">{t("resume.documentKindCertificate")}</MenuItem>
+                      <MenuItem value="sonstiges">{t("resume.documentKindOther")}</MenuItem>
                     </TextField>
                     <Button
                       variant="contained"
@@ -681,13 +681,13 @@ export function DraftPage() {
                       disabled={uploading !== null}
                       sx={{ alignSelf: "flex-start" }}
                     >
-                      {t("lebenslauf.unterlageHochladen")}
+                      {t("resume.documentUpload")}
                     </Button>
                   </>
                 ) : null}
                 {uploading ? (
                   <Alert severity="info" role="status">
-                    {t("lebenslauf.hochladenLaeuft", { name: uploading })}
+                    {t("resume.uploading", { name: uploading })}
                   </Alert>
                 ) : null}
               </Box>
@@ -700,7 +700,7 @@ export function DraftPage() {
           <Card>
             <CardContent>
               <Typography variant="h5" sx={{ mb: 2 }}>
-                {t("entwurfs.anmerkungenTitel")}
+                {t("drafts.commentsTitle")}
               </Typography>
               {canComment ? (
                 <>
@@ -708,15 +708,15 @@ export function DraftPage() {
                     multiline
                     minRows={3}
                     fullWidth
-                    label={t("entwurfs.kommentarHinzufuegen")}
-                    placeholder={t("entwurfs.kommentarPlatzhalter")}
+                    label={t("drafts.commentAdd")}
+                    placeholder={t("drafts.commentPlaceholder")}
                     value={kommentar}
                     onChange={(ev) => setKommentar(ev.target.value)}
                     sx={{ mb: 1 }}
                   />
                   {zitat ? (
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      {t("entwurfs.markiertesZitat")} „{zitat}“
+                      {t("drafts.markedQuote")} „{zitat}“
                     </Alert>
                   ) : null}
                   <Button
@@ -734,12 +734,12 @@ export function DraftPage() {
                       );
                     }}
                   >
-                    {t("entwurfs.kommentieren")}
+                    {t("drafts.comment")}
                   </Button>
                 </>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  {t("entwurfs.kommentarErstNachText")}
+                  {t("drafts.commentNeedsText")}
                 </Typography>
               )}
 
@@ -773,23 +773,23 @@ export function DraftPage() {
         aria-describedby="entwurf-unterlage-loeschen-text"
       >
         <DialogTitle id="entwurf-unterlage-loeschen-titel">
-          {t("lebenslauf.unterlageLoeschenTitel")}
+          {t("resume.documentDeleteTitle")}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="entwurf-unterlage-loeschen-text">
-            {t("lebenslauf.unterlageLoeschenBestaetigen")}
+            {t("resume.documentDeleteConfirm")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setZuLoeschen(null)}>
-            {t("allgemein.abbrechen")}
+            {t("common.cancel")}
           </Button>
           <Button
             color="error"
             variant="contained"
             onClick={() => void handleDeleteDocument()}
           >
-            {t("lebenslauf.unterlageLoeschen")}
+            {t("resume.documentDelete")}
           </Button>
         </DialogActions>
       </Dialog>

@@ -115,7 +115,7 @@ export async function registriere(eingabe: RegistrierEingabe): Promise<Registrie
           : {}),
       },
     },
-    "fehler.registrierungFehlgeschlagen"
+    "errors.registrationFailed"
   );
 
   return answer.ok ? { ok: true } : { ok: false, meldung: answer.error.detail };
@@ -139,7 +139,7 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
     API_BASE_URL,
     "/auth/verify-email",
     { method: "POST", body: { token } },
-    "fehler.bestaetigungslinkUngueltig"
+    "errors.verificationLinkInvalid"
   );
 
   if (answer.ok) {
@@ -161,8 +161,8 @@ export async function bestaetigeEmail(token: string): Promise<BestaetigungsErgeb
     ok: false,
     abgelaufen,
     meldung: abgelaufen
-      ? i18n.t("fehler.bestaetigungslinkAbgelaufen")
-      : i18n.t("fehler.bestaetigungslinkUngueltig"),
+      ? i18n.t("errors.verificationLinkExpired")
+      : i18n.t("errors.verificationLinkInvalid"),
   };
 }
 
@@ -183,7 +183,7 @@ export async function sendeBestaetigungErneut(email: string): Promise<VersandErg
     API_BASE_URL,
     "/auth/resend-verification",
     { method: "POST", body: { email } },
-    "fehler.mailNichtAngefordert"
+    "errors.mailNotRequested"
   );
   return answer.ok ? { ok: true } : { ok: false };
 }

@@ -71,16 +71,16 @@ import { zeigtGitHub } from "../../lib/berufsfelder";
  * ansieht (die schmale).
  */
 const WEGE: { pfad: string; schluessel: string; immer: boolean }[] = [
-  { pfad: "/jobs", schluessel: "kopf.stellen", immer: true },
-  { pfad: "/overview", schluessel: "kopf.uebersicht", immer: false },
-  { pfad: "/market", schluessel: "kopf.marktstatus", immer: false },
-  { pfad: "/transfers", schluessel: "kopf.gespraeche", immer: false },
+  { pfad: "/jobs", schluessel: "header.jobs", immer: true },
+  { pfad: "/overview", schluessel: "header.overview", immer: false },
+  { pfad: "/market", schluessel: "header.marketStatus", immer: false },
+  { pfad: "/transfers", schluessel: "header.conversations", immer: false },
   // Der Berater (ADR-0037). Er steht bei den Wegen der PERSON: das Mandat
   // gehoert ihr, nicht dem Unternehmen, fuer das sie gerade handelt.
-  { pfad: "/advisor", schluessel: "kopf.berater", immer: false },
+  { pfad: "/advisor", schluessel: "header.advisor", immer: false },
   // Die Arbeitsprobe (ADR-0042). Auch sie steht bei den Wegen der PERSON:
   // die Bewertung gehoert dem Vorgang, und lesen darf sie, um wen es geht.
-  { pfad: "/assessments", schluessel: "kopf.arbeitsproben", immer: false },
+  { pfad: "/assessments", schluessel: "header.assessments", immer: false },
 ];
 
 export function SiteHeader() {
@@ -120,7 +120,7 @@ export function SiteHeader() {
             // Hiding without a replacement is not responsive behaviour but a
             // missing page.
             onClick={() => setSchublade(true)}
-            aria-label={t("kopf.menueOeffnen")}
+            aria-label={t("header.openMenu")}
             size="small"
             edge="start"
             sx={{ display: { xs: "inline-flex", md: "none" }, mr: 0.5 }}
@@ -177,7 +177,7 @@ export function SiteHeader() {
             sx={{ fontWeight: 660, letterSpacing: "0.06em", textTransform: "uppercase" }}
             color="text.secondary"
           >
-            {t("kopf.navigation")}
+            {t("header.navigation")}
           </Typography>
         </Box>
         <List sx={{ px: 1 }}>
@@ -272,12 +272,12 @@ function AccountMenu() {
 
   return (
     <>
-      <Tooltip title={t("kopf.meinKonto")}>
+      <Tooltip title={t("header.myAccount")}>
         <IconButton
           onClick={(event) => setAnker(event.currentTarget)}
           aria-haspopup="menu"
           aria-expanded={anker !== null}
-          aria-label={t("kopf.meinKonto")}
+          aria-label={t("header.myAccount")}
           size="small"
           sx={{ ml: 0.5, p: 0.25 }}
         >
@@ -317,35 +317,35 @@ function AccountMenu() {
         ) : (
         <MenuList sx={{ py: 0.5 }}>
         <Eintrag to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.profil")}
+          {t("header.profile")}
         </Eintrag>
         <Eintrag to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.lebenslauf")}
+          {t("header.resume")}
         </Eintrag>
         <Eintrag to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.arbeiten")}
+          {t("header.portfolio")}
         </Eintrag>
         {github ? (
           <Eintrag to="/github" icon={<GitHubIcon fontSize="small" />} onFertig={schliessen}>
-            {t("kopf.github")}
+            {t("header.github")}
           </Eintrag>
         ) : null}
         <Eintrag to="/applications" icon={<SendOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.bewerbungen")}
+          {t("header.applications")}
         </Eintrag>
         <Eintrag to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.entwuerfe")}
+          {t("header.drafts")}
         </Eintrag>
 
         <Divider />
         <Eintrag to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.freigaben")}
+          {t("header.consents")}
         </Eintrag>
         <Eintrag to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.meineDaten")}
+          {t("header.myData")}
         </Eintrag>
         <Eintrag to="/settings" icon={<SettingsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.einstellungen")}
+          {t("header.settings")}
         </Eintrag>
 
         <Divider />
@@ -366,7 +366,7 @@ function AccountMenu() {
           icon={<LogoutOutlinedIcon fontSize="small" />}
           onFertig={schliessen}
         >
-          {t("kopf.abmelden")}
+          {t("header.signOut")}
         </Eintrag>
         </MenuList>
         )}
@@ -386,12 +386,12 @@ function BesucherMenu() {
 
   return (
     <>
-      <Tooltip title={t("kopf.besucherMenue")}>
+      <Tooltip title={t("header.visitorMenu")}>
         <IconButton
           onClick={(event) => setAnker(event.currentTarget)}
           aria-haspopup="menu"
           aria-expanded={anker !== null}
-          aria-label={t("kopf.besucherMenue")}
+          aria-label={t("header.visitorMenu")}
           size="small"
           sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
         >
@@ -424,14 +424,14 @@ function BesucherMenu() {
               icon={<LoginOutlinedIcon fontSize="small" />}
               onFertig={schliessen}
             >
-              {t("kopf.anmelden")}
+              {t("header.signIn")}
             </Eintrag>
             <Eintrag
               to="/register"
               icon={<PersonAddOutlinedIcon fontSize="small" />}
               onFertig={schliessen}
             >
-              {t("kopf.registrieren")}
+              {t("header.register")}
             </Eintrag>
 
             <Divider />
@@ -481,15 +481,15 @@ function FirmenMenu() {
         onClick={() => setAnker(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <Eintrag to="/scout">{t("kopf.kandidaten")}</Eintrag>
-        <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
-        <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
-        <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
-        <Eintrag to="/company/advisor">{t("kopf.unsereBerater")}</Eintrag>
-        <Eintrag to="/company/assessments">{t("kopf.unsereProben")}</Eintrag>
+        <Eintrag to="/scout">{t("header.candidates")}</Eintrag>
+        <Eintrag to="/company/jobs">{t("header.ourJobs")}</Eintrag>
+        <Eintrag to="/company/applications">{t("header.receivedApplications")}</Eintrag>
+        <Eintrag to="/company/transfers">{t("header.ourConversations")}</Eintrag>
+        <Eintrag to="/company/advisor">{t("header.ourAdvisor")}</Eintrag>
+        <Eintrag to="/company/assessments">{t("header.ourAssessments")}</Eintrag>
         <Divider />
-        <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>
-        <Eintrag to="/company/team">{t("kopf.team")}</Eintrag>
+        <Eintrag to="/company/profile">{t("header.companyProfile")}</Eintrag>
+        <Eintrag to="/company/team">{t("header.team")}</Eintrag>
       </Menu>
     </>
   );

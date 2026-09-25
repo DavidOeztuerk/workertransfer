@@ -65,8 +65,8 @@ export function PortfolioPage() {
   if (status === "anonymous" || subjectId === null) {
     return (
       <AnmeldungNoetig
-        titel={t("arbeiten.titel")}
-        satz="arbeiten.anmelden"
+        titel={t("portfolio.title")}
+        satz="portfolio.signInRequired"
       />
     );
   }
@@ -86,7 +86,7 @@ export function PortfolioPage() {
       subjectId as string,
       PORTFOLIO_VISIBILITY,
       neu,
-      t("arbeiten.widerrufsgrund"),
+      t("portfolio.revokeReason"),
     );
     setSchaltet(false);
 
@@ -100,36 +100,36 @@ export function PortfolioPage() {
   }
 
   const hint = ledgerSchweigt
-    ? t("arbeiten.freigabeSchweigt")
+    ? t("portfolio.releaseSilent")
     : freigabe.laedt
-      ? t("arbeiten.freigabePruefung")
+      ? t("portfolio.releaseChecking")
       : t(
           hatArbeiten
-            ? "arbeiten.freigabeWirkt"
-            : "arbeiten.freigabeOhneArbeit",
+            ? "portfolio.releaseEffective"
+            : "portfolio.releaseWithoutItem",
         );
 
   return (
     <PageShell
-      title={t("arbeiten.titel")}
+      title={t("portfolio.title")}
       narrow
-      lead={t("arbeiten.lead")}
+      lead={t("portfolio.lead")}
     >
       {fehler !== null ? (
         <ErrorBlock
           error={{
             status: 0,
-            title: t("arbeiten.freigabeFehlschlag"),
+            title: t("portfolio.releaseFailed"),
             detail: fehler,
           }}
-          title={t("arbeiten.freigabeFehlschlag")}
+          title={t("portfolio.releaseFailed")}
         />
       ) : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <ConsentSwitch
-            label={t("arbeiten.freigabeLabel")}
+            label={t("portfolio.releaseLabel")}
             hint={hint}
             checked={freigabe.value === true}
             disabled={!hatArbeiten || toggling || ledgerUnbekannt}
@@ -141,7 +141,7 @@ export function PortfolioPage() {
       <Card>
         <CardContent>
           {showcase.laedt ? (
-            <LoadingBlock label={t("arbeiten.laden")} />
+            <LoadingBlock label={t("portfolio.loading")} />
           ) : null}
 
           {showcase.value && !showcase.value.ok ? (
@@ -150,15 +150,15 @@ export function PortfolioPage() {
 
           {!showcase.laedt && showcase.value?.ok && !hatArbeiten ? (
             <EmptyBlock
-              title={t("arbeiten.leerTitel")}
-              hint={t("arbeiten.leerHinweis")}
+              title={t("portfolio.emptyTitle")}
+              hint={t("portfolio.emptyHint")}
               action={
                 <Button
                   component={RouterLink}
                   to="/portfolio/new"
                   variant="contained"
                 >
-                  {t("arbeiten.hinzufuegen")}
+                  {t("portfolio.add")}
                 </Button>
               }
             />
@@ -194,7 +194,7 @@ export function PortfolioPage() {
                       <Box>
                         <Typography variant="h4">{arbeit.title}</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {summaryLine(arbeit, t("arbeiten.mitDatei"))}
+                          {summaryLine(arbeit, t("portfolio.withFile"))}
                         </Typography>
                       </Box>
                       <Box
@@ -211,7 +211,7 @@ export function PortfolioPage() {
                           size="small"
                           variant="text"
                         >
-                          {t("arbeiten.bearbeiten")}
+                          {t("portfolio.edit")}
                         </Button>
                         {arbeit.attachment !== null ? (
                           <Link
@@ -220,7 +220,7 @@ export function PortfolioPage() {
                             rel="noreferrer noopener"
                             variant="body2"
                           >
-                            {t("arbeiten.dateiAnsehen")}
+                            {t("portfolio.viewFile")}
                           </Link>
                         ) : null}
                       </Box>
@@ -233,7 +233,7 @@ export function PortfolioPage() {
                 to="/portfolio/new"
                 variant="contained"
               >
-                {t("arbeiten.hinzufuegen")}
+                {t("portfolio.add")}
               </Button>
             </>
           ) : null}

@@ -57,7 +57,7 @@ export function VerifyPage() {
       setZustand({
         phase: "gescheitert",
         abgelaufen: false,
-        meldung: t("bestaetigung.fehltLink"),
+        meldung: t("verify.linkMissing"),
       });
       return;
     }
@@ -77,11 +77,11 @@ export function VerifyPage() {
   if (state.phase === "laeuft") {
     return (
       <AuthCard
-        title={t("bestaetigung.laeuftTitel")}
-        lead={t("bestaetigung.lead")}
+        title={t("verify.inProgressTitle")}
+        lead={t("verify.lead")}
       >
         <Typography role="status" color="text.secondary">
-          {t("bestaetigung.laeuftText")}
+          {t("verify.inProgressText")}
         </Typography>
       </AuthCard>
     );
@@ -104,27 +104,27 @@ export function VerifyPage() {
       // second attempt: the token is spent and there is no "create a company"
       // button.
       <AuthCard
-        title={t("bestaetigung.fertigTitel")}
+        title={t("verify.doneTitle")}
         lead={
           state.unternehmen !== undefined
-            ? t("bestaetigung.fertigMitFirma", { name: state.unternehmen })
-            : t("bestaetigung.fertigOhneFirma")
+            ? t("verify.doneWithCompany", { name: state.unternehmen })
+            : t("verify.doneWithoutCompany")
         }
       >
         <Box sx={{ display: "grid", gap: 2 }}>
           {state.unternehmenFehler === "domain_already_claimed" ? (
             <Alert severity="warning">
-              {t("bestaetigung.domainVergeben")}
+              {t("verify.domainTaken")}
             </Alert>
           ) : state.unternehmenFehler !== undefined ? (
             <Alert severity="warning">
-              {t("bestaetigung.firmaGescheitert")}
+              {t("verify.companyFailed")}
             </Alert>
           ) : null}
 
           <Typography variant="body2">
             <Link component={RouterLink} to="/login">
-              {t("bestaetigung.zurAnmeldung")}
+              {t("verify.toLogin")}
             </Link>
           </Typography>
         </Box>
@@ -168,8 +168,8 @@ function Gescheitert({
 
   return (
     <AuthCard
-      title={t("bestaetigung.gescheitertTitel")}
-      lead={t("bestaetigung.lead")}
+      title={t("verify.failedTitle")}
+      lead={t("verify.lead")}
     >
       <Box sx={{ display: "grid", gap: 2 }}>
         <Alert severity="error">{meldung}</Alert>
@@ -182,23 +182,23 @@ function Gescheitert({
             sx={{ display: "grid", gap: 2 }}
           >
             <TextField
-              label={t("bestaetigung.email")}
+              label={t("verify.email")}
               type="email"
               autoComplete="username"
-              helperText={t("bestaetigung.emailHinweis")}
+              helperText={t("verify.emailHint")}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
             />
             <Button type="submit" variant="contained" disabled={running}>
               {running
-                ? t("bestaetigung.neuerLinkLaeuft")
-                : t("bestaetigung.neuerLink")}
+                ? t("verify.newLinkSending")
+                : t("verify.newLink")}
             </Button>
 
             {gescheitert ? (
               <Alert severity="error">
-                {t("bestaetigung.neuerLinkGescheitert")}
+                {t("verify.newLinkFailed")}
               </Alert>
             ) : null}
             {gesendet ? (
@@ -207,7 +207,7 @@ function Gescheitert({
                 role="status"
                 severity="success"
               >
-                {t("bestaetigung.neuerLinkGesendet")}
+                {t("verify.newLinkSent")}
               </Alert>
             ) : null}
           </Box>

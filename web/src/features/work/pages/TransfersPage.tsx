@@ -27,13 +27,13 @@ import {
 
 /** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const TITEL: Record<Transfer["status"], string> = {
-  interested: "gespraeche.standInterested",
-  talking: "gespraeche.standTalking",
-  offered: "gespraeche.standOffered",
-  accepted: "gespraeche.standAccepted",
-  completed: "gespraeche.standCompleted",
-  declined: "gespraeche.standDeclined",
-  withdrawn: "gespraeche.standWithdrawn",
+  interested: "transfers.statusInterested",
+  talking: "transfers.statusTalking",
+  offered: "transfers.statusOffered",
+  accepted: "transfers.statusAccepted",
+  completed: "transfers.statusCompleted",
+  declined: "transfers.statusDeclined",
+  withdrawn: "transfers.statusWithdrawn",
 };
 
 /**
@@ -62,12 +62,12 @@ export function TransfersPage() {
 
   if (!signedIn) {
     return (
-      <PageShell title={t("gespraeche.titel")} narrow>
+      <PageShell title={t("transfers.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="gespraeche.anmelden"
+                i18nKey="transfers.signInRequired"
                 components={{ 1: <Link component={RouterLink} to="/login" /> }}
               />
             </Typography>
@@ -89,10 +89,10 @@ export function TransfersPage() {
   const list = gespraeche.data?.ok ? gespraeche.data.transfers : [];
 
   return (
-    <PageShell title={t("gespraeche.titel")} narrow lead="">
+    <PageShell title={t("transfers.title")} narrow lead="">
       <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "62ch" }}>
         <Trans
-          i18nKey="gespraeche.einleitung"
+          i18nKey="transfers.intro"
           components={{ 1: <Link component={RouterLink} to="/market" /> }}
         />
       </Typography>
@@ -106,7 +106,7 @@ export function TransfersPage() {
       {gespraeche.pending ? (
         <Card>
           <CardContent>
-            <LoadingBlock label={t("gespraeche.laden")} />
+            <LoadingBlock label={t("transfers.loading")} />
           </CardContent>
         </Card>
       ) : null}
@@ -116,7 +116,7 @@ export function TransfersPage() {
       ) : null}
 
       {gespraeche.data?.ok && list.length === 0 ? (
-        <EmptyBlock title={t("gespraeche.leer")} />
+        <EmptyBlock title={t("transfers.empty")} />
       ) : null}
 
       <Box
@@ -182,19 +182,19 @@ function Gespraechskarte({
             }}
           >
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.angebot")}
+              {t("transfers.offer")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {gespraech.offer_note === "" ? "—" : gespraech.offer_note}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.start")}
+              {t("transfers.start")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {gespraech.offer_start_on ?? "—"}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.abloese")}
+              {t("transfers.fee")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {euro(gespraech.offer_fee_cents)}
@@ -205,7 +205,7 @@ function Gespraechskarte({
         {gespraech.status === "accepted" && brauchtFreigabe ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             <Trans
-              i18nKey="gespraeche.freigabeFehlt"
+              i18nKey="transfers.releaseMissing"
               components={{ 1: <strong /> }}
             />
           </Alert>
@@ -218,7 +218,7 @@ function Gespraechskarte({
               onClick={() => onZug("accept-talk")}
               disabled={locked}
             >
-              {t("gespraeche.gespraechAnnehmen")}
+              {t("transfers.acceptConversation")}
             </Button>
           ) : null}
           {gespraech.status === "offered" ? (
@@ -227,7 +227,7 @@ function Gespraechskarte({
               onClick={() => onZug("accept-offer")}
               disabled={locked}
             >
-              {t("gespraeche.angebotAnnehmen")}
+              {t("transfers.acceptOffer")}
             </Button>
           ) : null}
           {gespraech.status === "accepted" && brauchtFreigabe ? (
@@ -236,7 +236,7 @@ function Gespraechskarte({
               onClick={() => onZug("confirm-release")}
               disabled={locked}
             >
-              {t("gespraeche.freigabeBestaetigen")}
+              {t("transfers.confirmRelease")}
             </Button>
           ) : null}
           {laeuftNoch ? (
@@ -245,7 +245,7 @@ function Gespraechskarte({
               onClick={() => onZug("decline")}
               disabled={locked}
             >
-              {t("allgemein.ablehnen")}
+              {t("common.decline")}
             </Button>
           ) : null}
         </Box>

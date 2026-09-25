@@ -8,7 +8,7 @@ import { TRANSFER_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
 import {
   type Deutung,
-  type Fehlerschluessel,
+  type ErrorKey,
   type Fehlschlag,
   deuten,
 } from "../../../shared/api/fehler";
@@ -79,26 +79,26 @@ export function euro(cents: number | null): string {
 const UEBERGANGSFEHLER: Partial<
   Record<number, Deutung<TransferFehler>>
 > = {
-  0: { reason: "offline", titel: "fehler.keineVerbindung" },
+  0: { reason: "offline", titel: "errors.noConnection" },
   // Kein Status, keine Freigabe, „gerade nicht", fremder Vorgang — vom Server
   // bewusst nicht unterschieden. Die Oberfläche unterscheidet sie auch nicht.
-  404: { reason: "not-available", titel: "fehler.geradeNichtMoeglich" },
+  404: { reason: "not-available", titel: "errors.notPossibleNow" },
   403: {
     reason: "no-company",
-    titel: "fehler.aktivesUnternehmenNoetig",
-    text: "fehler.firmaWaehlenKurz",
+    titel: "errors.activeCompanyRequired",
+    text: "errors.chooseCompanyShort",
   },
   503: {
     reason: "unavailable",
-    titel: "fehler.ledgerSchweigt",
-    text: "fehler.spaeterErneut",
+    titel: "errors.ledgerSilent",
+    text: "errors.tryLater",
   },
 };
 
 async function move(
   path: string,
   body?: unknown,
-  fallback: Fehlerschluessel = "fehler.schrittFehlgeschlagen"
+  fallback: ErrorKey = "errors.stepFailed"
 ): Promise<TransferErgebnis> {
   const answer = await request<Transfer>(TRANSFER_BASE_URL, path, { method: "POST", body }, fallback);
   if (answer.ok) return { ok: true, transfer: answer.value };
@@ -112,7 +112,7 @@ export function expressInterest(subjectId: string, message: string): Promise<Tra
   return move(
     "/transfers",
     { subject_id: subjectId, message },
-    "fehler.interesseNichtHinterlegt"
+    "errors.interestNotRecorded"
   );
 }
 
@@ -130,7 +130,7 @@ export function makeOffer(transferId: string, input: OfferInput): Promise<Transf
   return move(
     `/transfers/${transferId}/offer`,
     { note: input.note, start_on: input.start_on, fee_cents: input.fee_cents },
-    "fehler.angebotNichtGemacht"
+    "errors.offerNotMade"
   );
 }
 
@@ -139,14 +139,14 @@ async function listTransfers(path: string, signal?: AbortSignal): Promise<Transf
     TRANSFER_BASE_URL,
     path,
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
   if (answer.ok) return { ok: true, transfers: answer.value ?? [] };
   // Nicht als leere Liste zeigen: „keine Vorgänge" ist eine Aussage, und sie
   // wäre falsch.
   return deuten<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
+    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }

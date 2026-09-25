@@ -86,7 +86,7 @@ export async function getMyMarketStatus(signal?: AbortSignal): Promise<StatusErg
     TRANSFER_BASE_URL,
     "/market/me",
     { signal },
-    "fehler.marktstatusNichtAbrufbar"
+    "errors.marketStatusUnavailable"
   );
   if (answer.ok) return { ok: true, status: answer.value };
   return {
@@ -94,8 +94,8 @@ export async function getMyMarketStatus(signal?: AbortSignal): Promise<StatusErg
     reason: "unavailable",
     error: {
       ...answer.error,
-      title: i18n.t("fehler.marktstatusNichtAbrufbar"),
-      detail: i18n.t("fehler.marktstatusUnveraenderbar"),
+      title: i18n.t("errors.marketStatusUnavailable"),
+      detail: i18n.t("errors.marketStatusUnchangeable"),
     },
   };
 }
@@ -109,17 +109,17 @@ export async function saveMyMarketStatus(input: MarketStatusInput): Promise<Spei
       // Genau die drei Felder des Vertrags.
       body: { availability: input.availability, employed: input.employed, note: input.note },
     },
-    "fehler.marktstatusNichtGespeichert"
+    "errors.marketStatusNotSaved"
   );
   if (answer.ok) return { ok: true, status: answer.value };
   return deuten<"unauthenticated" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "fehler.sitzungAbgelaufen",
-        text: "fehler.erneutAnmelden",
+        titel: "errors.sessionExpired",
+        text: "errors.signInAgain",
       },
     },
     "invalid"
@@ -128,20 +128,20 @@ export async function saveMyMarketStatus(input: MarketStatusInput): Promise<Spei
 
 const ANFRAGEFEHLER: Partial<Record<number, Deutung<AnfrageFehler>>> =
   {
-    0: { reason: "offline", titel: "fehler.keineVerbindung" },
-    409: { reason: "already-asked", titel: "fehler.bereitsGefragt" },
+    0: { reason: "offline", titel: "errors.noConnection" },
+    409: { reason: "already-asked", titel: "errors.alreadyAsked" },
     403: {
       reason: "no-company",
-      titel: "fehler.nurFirmenFragen",
-      text: "fehler.firmaWaehlen",
+      titel: "errors.onlyCompaniesAsk",
+      text: "errors.chooseCompany",
     },
     // `404` sagt bewusst nicht, ob es die Person gibt — die Oberfläche darf
     // daraus keine Auskunft basteln, die der Server gerade verweigert hat.
-    404: { reason: "not-available", titel: "fehler.personNichtAnfragbar" },
+    404: { reason: "not-available", titel: "errors.personNotRequestable" },
     503: {
       reason: "unavailable",
-      titel: "fehler.ledgerSchweigt",
-      text: "fehler.spaeterErneut",
+      titel: "errors.ledgerSilent",
+      text: "errors.tryLater",
     },
   };
 
@@ -150,7 +150,7 @@ export async function requestMarketStatus(subjectId: string): Promise<AnfrageErg
     TRANSFER_BASE_URL,
     `/market/${subjectId}/requests`,
     { method: "POST" },
-    "fehler.anfrageNichtGestellt"
+    "errors.requestNotSent"
   );
   if (answer.ok) return { ok: true, request: answer.value };
   return deuten<AnfrageFehler>(answer.error, ANFRAGEFEHLER, "offline");
@@ -161,17 +161,17 @@ async function post(path: string): Promise<AnfrageErgebnis> {
     TRANSFER_BASE_URL,
     path,
     { method: "POST" },
-    "fehler.anfrageNichtBeantwortet"
+    "errors.requestNotAnswered"
   );
   if (answer.ok) return { ok: true, request: answer.value };
   return deuten<AnfrageFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       503: {
         reason: "unavailable",
-        titel: "fehler.ledgerSchweigt",
-        text: "fehler.nichtsGeaendert",
+        titel: "errors.ledgerSilent",
+        text: "errors.nothingChanged",
       },
     },
     "offline"
@@ -193,7 +193,7 @@ async function listRequests(path: string, signal?: AbortSignal): Promise<Anfrage
     TRANSFER_BASE_URL,
     path,
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
   if (answer.ok) return { ok: true, requests: answer.value ?? [] };
   // `503` NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
@@ -201,8 +201,8 @@ async function listRequests(path: string, signal?: AbortSignal): Promise<Anfrage
   return deuten<"unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "fehler.keineVerbindung" },
-      503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" },
+      0: { reason: "unavailable", titel: "errors.noConnection" },
+      503: { reason: "unavailable", titel: "errors.ledgerSilent" },
     },
     "unavailable"
   );
@@ -231,13 +231,13 @@ export async function getMarketStatus(
     TRANSFER_BASE_URL,
     `/market/${subjectId}`,
     { signal },
-    "fehler.marktstatusNichtGeladen"
+    "errors.marketStatusNotLoaded"
   );
   if (answer.ok) return { ok: true, status: answer.value ?? null };
   if (answer.error.status === 404) return { ok: true, status: null };
   return deuten<"unavailable">(
     answer.error,
-    { 503: { reason: "unavailable", titel: "fehler.ledgerSchweigt" } },
+    { 503: { reason: "unavailable", titel: "errors.ledgerSilent" } },
     "unavailable"
   );
 }

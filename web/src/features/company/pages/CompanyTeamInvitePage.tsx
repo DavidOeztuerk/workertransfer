@@ -51,12 +51,12 @@ export function CompanyTeamInvitePage() {
 
   const back = (
     <Link component={RouterLink} to="/company/team" variant="body2">
-      {t("mannschaft.zurueck")}
+      {t("team.back")}
     </Link>
   );
 
   const rahmen = (content: React.ReactNode) => (
-    <PageShell title={t("mannschaft.einladen")} narrow>
+    <PageShell title={t("team.invite")} narrow>
       <Box sx={{ mb: 2 }}>{back}</Box>
       <Card>
         <CardContent>{content}</CardContent>
@@ -67,13 +67,13 @@ export function CompanyTeamInvitePage() {
   if (!fuerFirma) {
     return rahmen(
       <Typography>
-        {t("mannschaft.einladenOhneFirma")}
+        {t("team.inviteWithoutCompany")}
       </Typography>,
     );
   }
 
   if (mitglieder.pending) {
-    return rahmen(<LoadingBlock label={t("mannschaft.mitgliederLaden")} />);
+    return rahmen(<LoadingBlock label={t("team.membersLoading")} />);
   }
 
   const list = mitglieder.data?.ok ? mitglieder.data.members : [];
@@ -84,7 +84,7 @@ export function CompanyTeamInvitePage() {
   if (!istAdmin) {
     return rahmen(
       <Typography>
-        {t("mannschaft.einladenNurAdmin")}
+        {t("team.inviteAdminOnly")}
       </Typography>,
     );
   }
@@ -119,9 +119,9 @@ export function CompanyTeamInvitePage() {
       }}
     >
       <TextField
-        label={t("mannschaft.email")}
+        label={t("team.email")}
         type="email"
-        helperText={t("mannschaft.emailHinweis")}
+        helperText={t("team.emailHint")}
         value={email}
         onChange={(e) => {
           setEmail(e.target.value);
@@ -133,13 +133,13 @@ export function CompanyTeamInvitePage() {
 
       <TextField
         select
-        label={t("mannschaft.rolle")}
+        label={t("team.role")}
         value={rolle}
         onChange={(e) => setRolle(e.target.value as Role)}
         fullWidth
       >
-        <MenuItem value="member">{t("mannschaft.rolleMitglied")}</MenuItem>
-        <MenuItem value="admin">{t("mannschaft.rolleAdmin")}</MenuItem>
+        <MenuItem value="member">{t("team.roleMember")}</MenuItem>
+        <MenuItem value="admin">{t("team.roleAdmin")}</MenuItem>
       </TextField>
 
       {fehler !== null ? (
@@ -150,12 +150,12 @@ export function CompanyTeamInvitePage() {
 
       {sent ? (
         <Alert severity="success" role="status" sx={{ alignSelf: "stretch" }}>
-          {t("mannschaft.verschickt")}
+          {t("team.sent")}
         </Alert>
       ) : null}
 
       <Button type="submit" variant="contained" disabled={running}>
-        {running ? t("mannschaft.verschicktLaeuft") : t("mannschaft.einladen")}
+        {running ? t("team.sending") : t("team.invite")}
       </Button>
     </Box>,
   );

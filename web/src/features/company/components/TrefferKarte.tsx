@@ -21,9 +21,9 @@ import { eroeffne } from "../../work/api/advisor";
 
 /** Als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const ANSPRECHBARKEIT: Record<string, string> = {
-  open: "kandidaten.ansprechbarOpen",
-  listening: "kandidaten.ansprechbarListening",
-  unavailable: "kandidaten.ansprechbarUnavailable",
+  open: "scout.approachableOpen",
+  listening: "scout.approachableListening",
+  unavailable: "scout.approachableUnavailable",
 };
 
 /**
@@ -62,8 +62,8 @@ export function TrefferKarte({
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           {treffer.location !== ""
             ? treffer.location
-            : t("kandidaten.ortFehlt")}
-          {treffer.remote_ok ? t("kandidaten.remoteMoeglich") : null}
+            : t("scout.locationMissing")}
+          {treffer.remote_ok ? t("scout.remotePossible") : null}
         </Typography>
 
         {treffer.bio !== "" ? (
@@ -116,7 +116,7 @@ function Haekchenliste({ haken }: { haken: Haken[] }) {
       // „Faehigkeiten" steht schon am Suchfeld dieser Seite, und ein zweites
       // Element mit demselben Namensbestandteil macht `getByLabel` mehrdeutig.
       // Gemessen: sechs E2E-Reisen fielen an genau dieser Zeile.
-      aria-label={t("kandidaten.haken")}
+      aria-label={t("scout.ticks")}
       sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", listStyle: "none", p: 0, mb: 1.5 }}
     >
       {haken.map((eintrag) => (
@@ -131,8 +131,8 @@ function Haekchenliste({ haken }: { haken: Haken[] }) {
           label={`${eintrag.word} ${eintrag.named ? "✓" : "✗"}`}
           aria-label={
             eintrag.named
-              ? t("kandidaten.hakenGenannt", { wort: eintrag.word })
-              : t("kandidaten.hakenFehlt", { wort: eintrag.word })
+              ? t("scout.tickNamed", { wort: eintrag.word })
+              : t("scout.tickMissing", { wort: eintrag.word })
           }
         />
       ))}
@@ -164,11 +164,11 @@ function Erreichbarkeitshaken({ treffer }: { treffer: Treffer }) {
   const gesagt = [
     treffer.reach_commute === null
       ? null
-      : t("kandidaten.reachSagt", { stufe: t(`profil.pendeln_${treffer.reach_commute}`) }),
+      : t("scout.reachStated", { stufe: t(`profile.commute_${treffer.reach_commute}`) }),
     treffer.reach_attendance === null
       ? null
-      : t("kandidaten.reachStelle", {
-          anwesenheit: t(`kandidaten.anwesenheit_${treffer.reach_attendance}`),
+      : t("scout.reachJob", {
+          anwesenheit: t(`scout.attendance_${treffer.reach_attendance}`),
         }),
   ].filter((teil) => teil !== null);
 
@@ -178,8 +178,8 @@ function Erreichbarkeitshaken({ treffer }: { treffer: Treffer }) {
         size="small"
         variant={treffer.reach === "reachable" ? "filled" : "outlined"}
         color={treffer.reach === "reachable" ? "success" : "default"}
-        label={`${t("kandidaten.reach")} ${zeichen}`}
-        aria-label={t(`kandidaten.reach_${treffer.reach}`)}
+        label={`${t("scout.reach")} ${zeichen}`}
+        aria-label={t(`scout.reach_${treffer.reach}`)}
       />
       {gesagt.length > 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -204,9 +204,9 @@ function Belegliste({ belege, stand }: { belege: Beleg[]; stand: Treffer["eviden
 
   const hinweis: Record<Treffer["evidence_state"], string | null> = {
     complete: null,
-    partial: t("kandidaten.belegeUnvollstaendig"),
-    none_released: t("kandidaten.belegeKeine"),
-    unavailable: t("kandidaten.belegeUnerreichbar"),
+    partial: t("scout.evidenceIncomplete"),
+    none_released: t("scout.evidenceNone"),
+    unavailable: t("scout.evidenceUnavailable"),
   };
 
   const satz = hinweis[stand];
@@ -214,7 +214,7 @@ function Belegliste({ belege, stand }: { belege: Beleg[]; stand: Treffer["eviden
   return (
     <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
       <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        {t("kandidaten.belege")}
+        {t("scout.evidence")}
       </Typography>
 
       {belege.length > 0 ? (
@@ -235,8 +235,8 @@ function Belegliste({ belege, stand }: { belege: Beleg[]; stand: Treffer["eviden
               // beides wie eine Aussage ueber die Person.
               title={t(
                 beleg.origin === "topic"
-                  ? "kandidaten.belegTopic"
-                  : "kandidaten.belegSprache",
+                  ? "scout.evidenceTopic"
+                  : "scout.evidenceLanguage",
                 { projekt: beleg.project },
               )}
             />
@@ -278,7 +278,7 @@ function Gespraechseroeffnung({ subjectId }: { subjectId: string }) {
   if (fertig) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {t("berater.eroeffnet")}
+        {t("advisor.opened")}
       </Typography>
     );
   }
@@ -296,7 +296,7 @@ function Gespraechseroeffnung({ subjectId }: { subjectId: string }) {
         disabled={running}
         onClick={() => {
           setLaeuft(true);
-          void eroeffne(subjectId, t("kandidaten.interesseText")).then((result) => {
+          void eroeffne(subjectId, t("scout.interestText")).then((result) => {
             setLaeuft(false);
             if (result.ok) {
               setMeldung(null);
@@ -307,7 +307,7 @@ function Gespraechseroeffnung({ subjectId }: { subjectId: string }) {
           });
         }}
       >
-        {running ? t("kandidaten.wirdGefragt") : t("berater.eroeffnen")}
+        {running ? t("scout.requesting") : t("advisor.open")}
       </Button>
     </Box>
   );
@@ -330,7 +330,7 @@ function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
   if (asked) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {t("kandidaten.lebenslaufGefragt")}
+        {t("scout.resumeRequested")}
       </Typography>
     );
   }
@@ -359,7 +359,7 @@ function Lebenslaufanfrage({ subjectId }: { subjectId: string }) {
           });
         }}
       >
-        {running ? t("kandidaten.wirdGefragt") : t("kandidaten.lebenslaufAnfragen")}
+        {running ? t("scout.requesting") : t("scout.requestResume")}
       </Button>
     </Box>
   );
@@ -417,25 +417,25 @@ function Marktzugang({
             });
           }}
         >
-          {running ? t("kandidaten.wirdGefragt") : t("kandidaten.marktAnfragen")}
+          {running ? t("scout.requesting") : t("scout.requestMarket")}
         </Button>
       ) : null}
 
       {anfrage?.status === "PENDING" ? (
         <Typography variant="body2" color="text.secondary">
-          {t("kandidaten.marktAngefragt")}
+          {t("scout.marketRequested")}
         </Typography>
       ) : null}
 
       {anfrage?.status === "DECLINED" ? (
         <Typography variant="body2" color="text.secondary">
-          {t("kandidaten.marktAbgelehnt")}
+          {t("scout.marketDeclined")}
         </Typography>
       ) : null}
 
       {erteilt && status === null && !current.pending ? (
         <Typography variant="body2" color="text.secondary">
-          {t("kandidaten.marktNichtEinsehbar")}
+          {t("scout.marketUnavailable")}
         </Typography>
       ) : null}
 
@@ -443,7 +443,7 @@ function Marktzugang({
         <>
           <Typography variant="body2" color="text.secondary">
             {t(ANSPRECHBARKEIT[status.availability] ?? status.availability)}
-            {status.employed ? t("kandidaten.arbeitetGerade") : null}
+            {status.employed ? t("scout.currentlyEmployed") : null}
           </Typography>
           {status.note !== "" ? (
             <Typography sx={{ mt: 0.5 }}>{status.note}</Typography>
@@ -458,13 +458,13 @@ function Marktzugang({
                 setLaeuft(true);
                 void expressInterest(
                   subjectId,
-                  t("kandidaten.interesseText"),
+                  t("scout.interestText"),
                 ).then(
                   (result: Awaited<ReturnType<typeof expressInterest>>) => {
                     setLaeuft(false);
                     setMeldung(
                       result.ok
-                        ? t("kandidaten.interesseHinterlegt")
+                        ? t("scout.interestRecorded")
                         : result.error.detail,
                     );
                   },
@@ -472,8 +472,8 @@ function Marktzugang({
               }}
             >
               {running
-                ? t("kandidaten.interesseLaeuft")
-                : t("kandidaten.interesseZeigen")}
+                ? t("scout.interestInProgress")
+                : t("scout.showInterest")}
             </Button>
           ) : null}
         </>

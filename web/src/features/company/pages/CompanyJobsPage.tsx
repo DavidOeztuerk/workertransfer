@@ -24,9 +24,9 @@ import {
 
 /** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const STAND: Record<string, string> = {
-  draft: "firmenstellen.standDraft",
-  published: "firmenstellen.standPublished",
-  closed: "firmenstellen.standClosed",
+  draft: "companyJobs.statusDraft",
+  published: "companyJobs.statusPublished",
+  closed: "companyJobs.statusClosed",
 };
 
 /**
@@ -56,11 +56,11 @@ export function CompanyJobsPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title={t("firmenstellen.titel")} narrow>
+      <PageShell title={t("companyJobs.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("firmenstellen.nurFirma")}
+              {t("companyJobs.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -83,16 +83,16 @@ export function CompanyJobsPage() {
 
   return (
     <PageShell
-      title={t("firmenstellen.titel")}
+      title={t("companyJobs.title")}
       narrow
-      lead={t("firmenstellen.lead")}
+      lead={t("companyJobs.lead")}
       actions={
         <Button
           component={RouterLink}
           to="/company/jobs/new"
           variant="contained"
         >
-          {t("firmenstellen.neu")}
+          {t("companyJobs.new")}
         </Button>
       }
     >
@@ -109,7 +109,7 @@ export function CompanyJobsPage() {
               // Its own branch, before error and empty: the empty sentence needs
               // a successful answer, so without this branch the card stayed
               // completely empty while loading.
-              label={t("firmenstellen.laden")}
+              label={t("companyJobs.loading")}
             />
           ) : null}
 
@@ -119,14 +119,14 @@ export function CompanyJobsPage() {
 
           {result?.ok && list.length === 0 ? (
             <EmptyBlock
-              title={t("firmenstellen.leer")}
+              title={t("companyJobs.empty")}
               action={
                 <Button
                   component={RouterLink}
                   to="/company/jobs/new"
                   variant="contained"
                 >
-                  {t("firmenstellen.neu")}
+                  {t("companyJobs.new")}
                 </Button>
               }
             />
@@ -171,7 +171,7 @@ export function CompanyJobsPage() {
                             onClick={() => void schalten(stelle.id, true)}
                             disabled={running}
                           >
-                            {t("firmenstellen.veroeffentlichen")}
+                            {t("companyJobs.publish")}
                           </Button>
                         ) : null}
                         <Button
@@ -180,7 +180,7 @@ export function CompanyJobsPage() {
                           onClick={() => void schalten(stelle.id, false)}
                           disabled={running}
                         >
-                          {t("firmenstellen.schliessen")}
+                          {t("companyJobs.close")}
                         </Button>
                       </Box>
                     ) : null}

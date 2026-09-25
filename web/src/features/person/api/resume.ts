@@ -100,7 +100,7 @@ export async function ladeUnterlagenfunde(
     RESUME_BASE_URL,
     "/resumes/me/documents/terms",
     { signal },
-    "fehler.unterlagenNichtGeladen"
+    "errors.documentsNotLoaded"
   );
 
   return answer.ok
@@ -122,7 +122,7 @@ export async function leseUnterlagen(
     RESUME_BASE_URL,
     "/resumes/me/documents/read",
     { method: "POST", signal },
-    "fehler.unterlagenNichtGelesen"
+    "errors.documentsNotRead"
   );
 
   return answer.ok
@@ -168,7 +168,7 @@ export async function ladeMeinen(signal?: AbortSignal): Promise<Antwort<Lebensla
     RESUME_BASE_URL,
     "/resumes/me",
     { signal },
-    "fehler.lebenslaufNichtAbrufbar"
+    "errors.resumeUnavailable"
   );
 
   if (answer.ok) return { ok: true, value: answer.value ?? null };
@@ -184,7 +184,7 @@ export async function speichereMeinen(
     RESUME_BASE_URL,
     "/resumes/me",
     { method: "PUT", body: eingabe, signal },
-    "fehler.lebenslaufNichtGespeichert"
+    "errors.resumeNotSaved"
   );
 
   return answer.ok
@@ -197,7 +197,7 @@ export async function getMyDocuments(signal?: AbortSignal): Promise<Antwort<Unte
     RESUME_BASE_URL,
     "/resumes/me/documents",
     { signal },
-    "fehler.unterlagenNichtGeladen"
+    "errors.documentsNotLoaded"
   );
 
   return answer.ok
@@ -221,17 +221,17 @@ export async function uploadDocument(
     RESUME_BASE_URL,
     "/resumes/me/documents",
     { method: "POST", body: formData, signal },
-    "fehler.unterlageNichtHochgeladen"
+    "errors.documentNotUploaded"
   );
 
   if (answer.ok) return { ok: true, value: answer.value };
   const gedeutet = deuten<"invalid" | "too-large" | "too-many" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
-      413: { reason: "too-large", titel: "fehler.dateiZuGross" },
-      415: { reason: "invalid", titel: "fehler.dateiNichtAngenommen" },
-      422: { reason: "too-many", titel: "fehler.dateiNichtAngenommen" },
+      0: { reason: "offline", titel: "errors.noConnection" },
+      413: { reason: "too-large", titel: "errors.fileTooLarge" },
+      415: { reason: "invalid", titel: "errors.fileNotAccepted" },
+      422: { reason: "too-many", titel: "errors.fileNotAccepted" },
     },
     "invalid"
   );
@@ -274,8 +274,8 @@ async function holeInhalt(
         ok: false,
         error: {
           status: response.status,
-          title: i18n.t("fehler.unterlagenNichtGeladen"),
-          detail: i18n.t("fehler.unterlagenNichtGeladen"),
+          title: i18n.t("errors.documentsNotLoaded"),
+          detail: i18n.t("errors.documentsNotLoaded"),
         },
       };
     }
@@ -289,8 +289,8 @@ async function holeInhalt(
       ok: false,
       error: {
         status: 0,
-        title: i18n.t("fehler.keineVerbindungKurz"),
-        detail: i18n.t("fehler.dienstNichtErreichbar"),
+        title: i18n.t("errors.noConnectionShort"),
+        detail: i18n.t("errors.serviceUnreachable"),
       },
     };
   }
@@ -305,7 +305,7 @@ export async function ladeSichtbaren(
     RESUME_BASE_URL,
     `/resumes/${subjectId}`,
     { signal },
-    "fehler.lebenslaufNichtAbrufbar"
+    "errors.resumeUnavailable"
   );
   if (answer.ok) return { ok: true, value: answer.value ?? null };
   if (answer.error.status === 404) return { ok: true, value: null };
@@ -320,7 +320,7 @@ export async function ladeSichtbareUnterlagen(
     RESUME_BASE_URL,
     `/resumes/${subjectId}/documents`,
     { signal },
-    "fehler.unterlagenNichtGeladen"
+    "errors.documentsNotLoaded"
   );
   return answer.ok
     ? { ok: true, value: answer.value ?? [] }
@@ -336,7 +336,7 @@ export async function alsLebenslauf(
     RESUME_BASE_URL,
     `/resumes/me/documents/${documentId}/as-cv`,
     { method: "PUT", signal },
-    "fehler.unterlageNichtHochgeladen"
+    "errors.documentNotUploaded"
   );
 
   return answer.ok
@@ -353,7 +353,7 @@ export async function deleteDocument(
     RESUME_BASE_URL,
     `/resumes/me/documents/${documentId}`,
     { method: "DELETE", signal },
-    "fehler.unterlageNichtGeloescht"
+    "errors.documentNotDeleted"
   );
 
   return answer.ok
@@ -370,7 +370,7 @@ export async function setTemplate(
     RESUME_BASE_URL,
     "/resumes/me/template",
     { method: "PUT", body: { template }, signal },
-    "fehler.vorlageNichtGesetzt"
+    "errors.templateNotSet"
   );
 
   return answer.ok
@@ -386,7 +386,7 @@ export async function ladeMeineAnfragen(
     RESUME_BASE_URL,
     "/resumes/me/requests",
     { signal },
-    "fehler.anfragenNichtAbrufbar"
+    "errors.requestsUnavailable"
   );
 
   return answer.ok
@@ -407,7 +407,7 @@ async function handeln(path: string, signal?: AbortSignal): Promise<Antwort<Lebe
     RESUME_BASE_URL,
     path,
     { method: "POST", signal },
-    "fehler.anfrageNichtBeantwortet"
+    "errors.requestNotAnswered"
   );
 
   if (!answer.ok && answer.error.status === 503) {
@@ -415,7 +415,7 @@ async function handeln(path: string, signal?: AbortSignal): Promise<Antwort<Lebe
       ok: false,
       error: {
         ...answer.error,
-        detail: i18n.t("fehler.ledgerSchweigtOhneAenderung"),
+        detail: i18n.t("errors.ledgerSilentNothingChanged"),
       },
     };
   }

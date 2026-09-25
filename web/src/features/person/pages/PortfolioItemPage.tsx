@@ -124,16 +124,16 @@ export function PortfolioItemPage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel={t("arbeiten.einzelTitel")}
-        satz="arbeiten.anmelden"
+        titel={t("portfolio.itemTitle")}
+        satz="portfolio.signInRequired"
       />
     );
   }
 
   if (showcase.laedt) {
     return (
-      <PageShell title={t("arbeiten.einzelTitel")} narrow>
-        <LoadingBlock label={t("arbeiten.einzelLaden")} />
+      <PageShell title={t("portfolio.itemTitle")} narrow>
+        <LoadingBlock label={t("portfolio.itemLoading")} />
       </PageShell>
     );
   }
@@ -142,13 +142,13 @@ export function PortfolioItemPage() {
   // zweiten Tab, oder wenn jemand die Zahl von Hand ändert.
   if (!neu && !vorhanden) {
     return (
-      <PageShell title={t("arbeiten.einzelFehltTitel")} narrow>
+      <PageShell title={t("portfolio.itemMissingTitle")} narrow>
         <EmptyBlock
-          title={t("arbeiten.einzelFehltTitel")}
-          hint={t("arbeiten.einzelFehltHinweis")}
+          title={t("portfolio.itemMissingTitle")}
+          hint={t("portfolio.itemMissingHint")}
           action={
             <Button component={RouterLink} to="/portfolio" variant="contained">
-              {t("arbeiten.zurueck")}
+              {t("portfolio.back")}
             </Button>
           }
         />
@@ -197,22 +197,22 @@ export function PortfolioItemPage() {
   // The local file name is NOT shown: it never travels to the server, and the
   // UI may only say what is true — that a file is attached.
   const dateiSatz =
-    draft.attachment !== null ? "arbeiten.dateiHaengtAn" : "arbeiten.keineDatei";
+    draft.attachment !== null ? "portfolio.fileAttached" : "portfolio.noFile";
 
   return (
     <PageShell
       title={
         neu
-          ? t("arbeiten.einzelNeu")
+          ? t("portfolio.itemNew")
           : draft.title !== ""
             ? draft.title
-            : t("arbeiten.einzelTitel")
+            : t("portfolio.itemTitle")
       }
       narrow
     >
       <Box sx={{ mb: 2 }}>
         <Link component={RouterLink} to="/portfolio" variant="body2">
-          {t("arbeiten.zurueck")}
+          {t("portfolio.back")}
         </Link>
       </Box>
 
@@ -233,39 +233,39 @@ export function PortfolioItemPage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label={t("arbeiten.feldTitel")}
+              label={t("portfolio.fieldTitle")}
               value={draft.title}
               onChange={(e) => change({ title: e.target.value })}
               required
             />
             <TextField
-              label={t("arbeiten.feldWorum")}
+              label={t("portfolio.fieldAbout")}
               value={draft.summary}
               onChange={(e) => change({ summary: e.target.value })}
-              helperText={t("arbeiten.feldWorumHinweis")}
+              helperText={t("portfolio.fieldAboutHint")}
               multiline
               minRows={3}
             />
             <TextField
-              label={t("arbeiten.feldLink")}
+              label={t("portfolio.fieldLink")}
               value={draft.url}
               onChange={(e) => change({ url: e.target.value })}
-              helperText={t("arbeiten.feldLinkHinweis")}
+              helperText={t("portfolio.fieldLinkHint")}
             />
             <TextField
-              label={t("arbeiten.feldRolle")}
+              label={t("portfolio.fieldRole")}
               value={draft.role}
               onChange={(e) => change({ role: e.target.value })}
             />
             <TextField
-              label={t("arbeiten.feldJahr")}
+              label={t("portfolio.fieldYear")}
               value={draft.year}
               onChange={(e) => change({ year: e.target.value })}
             />
 
             <Box>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                {t("arbeiten.datei")}
+                {t("portfolio.file")}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 {t(dateiSatz)}
@@ -276,7 +276,7 @@ export function PortfolioItemPage() {
                 size="small"
                 disabled={running}
               >
-                {t("arbeiten.dateiWaehlen")}
+                {t("portfolio.chooseFile")}
                 <input
                   type="file"
                   hidden
@@ -296,15 +296,15 @@ export function PortfolioItemPage() {
                 color="text.secondary"
                 sx={{ display: "block", mt: 1 }}
               >
-                {t("arbeiten.dateiHinweis")}
+                {t("portfolio.fileHint")}
               </Typography>
             </Box>
 
             <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
               <Button type="submit" variant="contained" disabled={running}>
                 {running
-                  ? t("allgemein.speichernLaeuft")
-                  : t("allgemein.speichern")}
+                  ? t("common.saving")
+                  : t("common.save")}
               </Button>
               {!neu ? (
                 <Button
@@ -314,8 +314,8 @@ export function PortfolioItemPage() {
                   disabled={running}
                 >
                   {running
-                    ? t("arbeiten.entfernenLaeuft")
-                    : t("arbeiten.entfernen")}
+                    ? t("portfolio.removing")
+                    : t("portfolio.remove")}
                 </Button>
               ) : null}
             </Box>

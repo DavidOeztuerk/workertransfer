@@ -41,7 +41,7 @@ export function CompanySwitcher() {
       // `inputLabel.shrink`: ein natives Feld zeigt seinen Wert sofort, die
       // schwebende Beschriftung laege sonst darueber.
       size="small"
-      label={t("kopf.handelnAls")}
+      label={t("header.actingAs")}
       value={tenantId ?? ""}
       onChange={(event) => {
         const chosen = event.target.value;
@@ -50,7 +50,7 @@ export function CompanySwitcher() {
       sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
     >
       <MenuItem value="" disabled>
-        {t("kopf.ichSelbst")}
+        {t("header.myself")}
       </MenuItem>
       {memberships.map((firma) => (
         <MenuItem key={firma.id} value={firma.id}>

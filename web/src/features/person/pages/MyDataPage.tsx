@@ -141,8 +141,8 @@ export function MyDataPage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel={t("meineDaten.titel")}
-        satz="meineDaten.anmelden"
+        titel={t("myData.title")}
+        satz="myData.signInRequired"
       />
     );
   }
@@ -169,19 +169,19 @@ export function MyDataPage() {
 
   return (
     <PageShell
-      title={t("meineDaten.titel")}
+      title={t("myData.title")}
       narrow
-      lead={t("meineDaten.lead")}
+      lead={t("myData.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           {auskunft.laedt ? (
-            <LoadingBlock label={t("meineDaten.laden")} />
+            <LoadingBlock label={t("myData.loading")} />
           ) : null}
 
           {missing.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("meineDaten.unvollstaendig", { teile: missing.join(", ") })}
+              {t("myData.incomplete", { teile: missing.join(", ") })}
             </Alert>
           ) : null}
 
@@ -217,8 +217,8 @@ export function MyDataPage() {
                     >
                       {t(
                         entry.status === "ok"
-                          ? "meineDaten.enthalten"
-                          : "meineDaten.fehlt",
+                          ? "myData.included"
+                          : "myData.missing",
                       )}
                     </Typography>
                   </Box>
@@ -226,7 +226,7 @@ export function MyDataPage() {
               </Box>
 
               <Button variant="contained" onClick={herunterladen}>
-                {t("meineDaten.herunterladen")}
+                {t("myData.download")}
               </Button>
             </>
           ) : null}
@@ -236,10 +236,10 @@ export function MyDataPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1 }}>
-            {t("meineDaten.loeschenTitel")}
+            {t("myData.deleteTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("meineDaten.loeschenText")}
+            {t("myData.deleteText")}
           </Typography>
           <Button
             component={RouterLink}
@@ -247,7 +247,7 @@ export function MyDataPage() {
             variant="outlined"
             color="error"
           >
-            {t("kopf.kontoLoeschen")}
+            {t("header.deleteAccount")}
           </Button>
         </CardContent>
       </Card>

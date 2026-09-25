@@ -76,7 +76,7 @@ export function HomePage() {
                 mb: 2,
               }}
             >
-              {t("start.auge")}
+              {t("home.eyebrow")}
             </Typography>
             <Typography
               id={heldId}
@@ -91,14 +91,14 @@ export function HomePage() {
                 mb: 3,
               }}
             >
-              {t("start.titel")}
+              {t("home.title")}
             </Typography>
             <Typography
               variant="body1"
               color="text.secondary"
               sx={{ fontSize: "1.0625rem", mb: 4 }}
             >
-              {t("start.text")}
+              {t("home.text")}
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
               <Button
@@ -107,7 +107,7 @@ export function HomePage() {
                 variant="contained"
                 size="large"
               >
-                {t("start.alsPerson")}
+                {t("home.asPerson")}
               </Button>
               <Button
                 component={RouterLink}
@@ -121,7 +121,7 @@ export function HomePage() {
                 variant="outlined"
                 size="large"
               >
-                {t("start.alsUnternehmen")}
+                {t("home.asCompany")}
               </Button>
             </Box>
           </Box>
@@ -140,14 +140,14 @@ export function HomePage() {
               mb: 1.5,
             }}
           >
-            {t("start.grundlagenAuge")}
+            {t("home.principlesEyebrow")}
           </Typography>
           <Typography
             id={grundlagenId}
             variant="h2"
             sx={{ maxWidth: "26ch", mb: { xs: 4, md: 6 } }}
           >
-            {t("start.grundlagenTitel")}
+            {t("home.principlesTitle")}
           </Typography>
 
           <Box
@@ -173,10 +173,10 @@ export function HomePage() {
                     0{number}
                   </Typography>
                   <Typography variant="h3" sx={{ mb: 1 }}>
-                    {t(`start.grundlage${number}Titel`)}
+                    {t(`home.principle${number}Title`)}
                   </Typography>
                   <Typography color="text.secondary">
-                    {t(`start.grundlage${number}Text`)}
+                    {t(`home.principle${number}Text`)}
                   </Typography>
                 </CardContent>
               </Card>
@@ -208,14 +208,14 @@ export function HomePage() {
                   mb: 1.5,
                 }}
               >
-                {t("start.wegAuge")}
+                {t("home.roadmapEyebrow")}
               </Typography>
               <Typography id={wegId} variant="h2">
-                {t("start.wegTitel")}
+                {t("home.roadmapTitle")}
               </Typography>
             </Box>
             <Typography color="text.secondary" sx={{ maxWidth: "58ch" }}>
-              {t("start.wegText")}
+              {t("home.roadmapText")}
             </Typography>
           </Box>
         </Container>

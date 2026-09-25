@@ -39,5 +39,5 @@ export function LogoutPage() {
     return <Navigate to="/" replace />;
   }
 
-  return <LoadingBlock label={t("abmeldung.laeuft")} />;
+  return <LoadingBlock label={t("logout.inProgress")} />;
 }

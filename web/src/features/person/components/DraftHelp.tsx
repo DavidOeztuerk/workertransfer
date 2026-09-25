@@ -54,8 +54,8 @@ export function DraftHelp({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <TextField
-        label={t(hasText ? "entwurf.labelUmformulieren" : "entwurf.labelNeu")}
-        helperText={t("entwurf.hinweis")}
+        label={t(hasText ? "draftHelp.labelRephrase" : "draftHelp.labelNew")}
+        helperText={t("draftHelp.hint")}
         value={wish}
         onChange={(event) => setzeWunsch(event.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
@@ -72,8 +72,8 @@ export function DraftHelp({
           disabled={running}
         >
           {running
-            ? t("entwurf.laeuft")
-            : t(hasText ? "entwurf.knopfErsetzt" : "entwurf.knopfNeu")}
+            ? t("draftHelp.inProgress")
+            : t(hasText ? "draftHelp.buttonReplaces" : "draftHelp.buttonNew")}
         </Button>
       </Box>
     </Box>

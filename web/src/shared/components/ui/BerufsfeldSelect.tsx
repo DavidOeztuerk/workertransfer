@@ -27,8 +27,8 @@ export function BerufsfeldSelect({
   return (
     <TextField
       select
-      label={label ?? t("beruf.label")}
-      helperText={helperText ?? t("beruf.hinweis")}
+      label={label ?? t("occupation.label")}
+      helperText={helperText ?? t("occupation.hint")}
       value={wert ?? ""}
       disabled={disabled}
       onChange={(event) => {
@@ -38,10 +38,10 @@ export function BerufsfeldSelect({
       }}
       slotProps={{ select: { displayEmpty: true } }}
     >
-      <MenuItem value="">{t("beruf.keins")}</MenuItem>
+      <MenuItem value="">{t("occupation.none")}</MenuItem>
       {BERUFSFELDER.map((feld) => (
         <MenuItem key={feld} value={feld}>
-          {t(`beruf.feld.${feld}`)}
+          {t(`occupation.field.${feld}`)}
         </MenuItem>
       ))}
     </TextField>

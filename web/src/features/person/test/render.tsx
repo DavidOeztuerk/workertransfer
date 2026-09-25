@@ -61,7 +61,7 @@ export const ANGEMELDET: AuthVorgabe = { status: "authenticated", session: PERSO
 /**
  * The catalogues belong in the test host: without `I18nextProvider`
  * `useTranslation` returns the key instead of the text, and a test looking for
- * `sprache.label` then says nothing about the UI. German is pinned, like in the
+ * `language.label` then says nothing about the UI. German is pinned, like in the
  * Playwright configuration and for the same reason (ADR-0031).
  */
 export function renderMitStore(

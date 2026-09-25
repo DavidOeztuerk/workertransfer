@@ -99,7 +99,7 @@ export function PaginationControls({
           role="status"
           sx={{ whiteSpace: "nowrap" }}
         >
-          {t("blaettern.bereich", { von, bis, gesamt: totalItems })}
+          {t("pagination.range", { von, bis, gesamt: totalItems })}
         </Typography>
 
         {totalPages > 1 ? (
@@ -114,10 +114,10 @@ export function PaginationControls({
             size={schmal ? "small" : "medium"}
             getItemAriaLabel={(typ, seite) =>
               typ === "previous"
-                ? t("blaettern.vorige")
+                ? t("pagination.previous")
                 : typ === "next"
-                  ? t("blaettern.naechste")
-                  : t("blaettern.seite", { nummer: seite })
+                  ? t("pagination.next")
+                  : t("pagination.page", { nummer: seite })
             }
           />
         ) : null}
@@ -143,7 +143,7 @@ export function PaginationControls({
           color="text.secondary"
           sx={{ whiteSpace: "nowrap" }}
         >
-          {t("blaettern.proSeite")}
+          {t("pagination.perPage")}
         </Typography>
 
         <TextField

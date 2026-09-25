@@ -48,7 +48,7 @@ export function Lebenslaufblatt({
   const { t, i18n } = useTranslation();
 
   function monat(wert: string | null): string {
-    if (wert === null || wert === "") return t("lebenslauf.heute");
+    if (wert === null || wert === "") return t("resume.today");
     const datum = new Date(`${wert}-01`);
     if (Number.isNaN(datum.getTime())) return wert;
     return datum.toLocaleDateString(i18n.language, { month: "short", year: "numeric" });
@@ -57,7 +57,7 @@ export function Lebenslaufblatt({
   const kopf = (
     <Box sx={{ mb: 3, pb: 2, borderBottom: 2, borderColor: "divider" }}>
       <Typography variant="h3" sx={{ mb: 0.5, fontWeight: 700 }}>
-        {daten.headline || t("lebenslauf.keineUeberschrift")}
+        {daten.headline || t("resume.noHeadline")}
       </Typography>
       {daten.location ? (
         <Typography variant="body2" color="text.secondary">
@@ -65,21 +65,21 @@ export function Lebenslaufblatt({
         </Typography>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          {t("lebenslauf.ortFehlt")}
+          {t("resume.locationMissing")}
         </Typography>
       )}
     </Box>
   );
 
   const bio = daten.bio ? (
-    <Abschnitt titel={t("lebenslauf.ueberMich")} template={template}>
+    <Abschnitt titel={t("resume.aboutMe")} template={template}>
       <Typography sx={{ whiteSpace: "pre-wrap" }}>{daten.bio}</Typography>
     </Abschnitt>
   ) : null;
 
   const faehigkeiten =
     daten.skills.length > 0 ? (
-      <Abschnitt titel={t("lebenslauf.faehigkeiten")} template={template}>
+      <Abschnitt titel={t("resume.skills")} template={template}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
           {daten.skills.map((skill) => (
             <Chip key={skill} label={skill} size="small" variant="outlined" />
@@ -87,16 +87,16 @@ export function Lebenslaufblatt({
         </Box>
       </Abschnitt>
     ) : (
-      <Abschnitt titel={t("lebenslauf.faehigkeiten")} template={template}>
+      <Abschnitt titel={t("resume.skills")} template={template}>
         <Typography variant="body2" color="text.secondary">
-          {t("lebenslauf.faehigkeitenFehlen")}
+          {t("resume.skillsMissing")}
         </Typography>
       </Abschnitt>
     );
 
   const stationen =
     daten.positions.length > 0 ? (
-      <Abschnitt titel={t("lebenslauf.stationen")} template={template}>
+      <Abschnitt titel={t("resume.experience")} template={template}>
         {daten.positions.map((pos, i) => (
           <Box key={i} sx={{ mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -119,9 +119,9 @@ export function Lebenslaufblatt({
         ))}
       </Abschnitt>
     ) : (
-      <Abschnitt titel={t("lebenslauf.stationen")} template={template}>
+      <Abschnitt titel={t("resume.experience")} template={template}>
         <Typography variant="body2" color="text.secondary">
-          {t("lebenslauf.stationenFehlen")}
+          {t("resume.experienceMissing")}
         </Typography>
       </Abschnitt>
     );
@@ -131,7 +131,7 @@ export function Lebenslaufblatt({
 
   const ausbildung =
     lehren.length > 0 ? (
-      <Abschnitt titel={t("lebenslauf.ausbildung")} template={template}>
+      <Abschnitt titel={t("resume.training")} template={template}>
         {lehren.map((edu, i) => (
           <Box key={i} sx={{ mb: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -144,16 +144,16 @@ export function Lebenslaufblatt({
         ))}
       </Abschnitt>
     ) : (
-      <Abschnitt titel={t("lebenslauf.ausbildung")} template={template}>
+      <Abschnitt titel={t("resume.training")} template={template}>
         <Typography variant="body2" color="text.secondary">
-          {t("lebenslauf.ausbildungFehlt")}
+          {t("resume.trainingMissing")}
         </Typography>
       </Abschnitt>
     );
 
   const schule =
     schulen.length > 0 ? (
-      <Abschnitt titel={t("lebenslauf.schule")} template={template}>
+      <Abschnitt titel={t("resume.school")} template={template}>
         {schulen.map((edu, i) => (
           <Box key={i} sx={{ mb: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>

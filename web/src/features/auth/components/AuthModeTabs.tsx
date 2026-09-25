@@ -22,19 +22,19 @@ export function AuthModeTabs({ current }: { current: "login" | "register" }) {
       value={current}
       variant="fullWidth"
       sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
-      aria-label={t("anmeldung.reiterBeschriftung")}
+      aria-label={t("login.tabsLabel")}
     >
       <Tab
         component={RouterLink}
         to="/login"
         value="login"
-        label={t("anmeldung.reiterAnmelden")}
+        label={t("login.tabSignIn")}
       />
       <Tab
         component={RouterLink}
         to="/register"
         value="register"
-        label={t("anmeldung.reiterRegistrieren")}
+        label={t("login.tabRegister")}
       />
     </Tabs>
   );

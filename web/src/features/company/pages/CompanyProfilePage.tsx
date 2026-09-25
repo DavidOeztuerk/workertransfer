@@ -94,11 +94,11 @@ export function CompanyProfilePage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title={t("firmenprofil.titel")} narrow>
+      <PageShell title={t("companyProfile.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("firmenprofil.nurFirma")}
+              {t("companyProfile.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -133,14 +133,14 @@ export function CompanyProfilePage() {
 
   return (
     <PageShell
-      title={t("firmenprofil.titel")}
+      title={t("companyProfile.title")}
       narrow
-      lead={t("firmenprofil.lead")}
+      lead={t("companyProfile.lead")}
     >
       <Card>
         <CardContent>
           {profile.pending ? (
-            <LoadingBlock label={t("firmenprofil.laden")} />
+            <LoadingBlock label={t("companyProfile.loading")} />
           ) : null}
 
           {fehler !== null ? (
@@ -151,7 +151,7 @@ export function CompanyProfilePage() {
 
           {saved ? (
             <Alert severity="success" role="status" sx={{ mb: 2 }}>
-              {t("firmenprofil.gespeichert")}
+              {t("companyProfile.saved")}
             </Alert>
           ) : null}
 
@@ -164,8 +164,8 @@ export function CompanyProfilePage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label={t("firmenprofil.anzeigename")}
-              helperText={t("firmenprofil.anzeigenameHinweis")}
+              label={t("companyProfile.displayName")}
+              helperText={t("companyProfile.displayNameHint")}
               value={draft.display_name}
               onChange={(e) => {
                 setEntwurf({ ...draft, display_name: e.target.value });
@@ -174,8 +174,8 @@ export function CompanyProfilePage() {
               required
             />
             <TextField
-              label={t("firmenprofil.ueberUns")}
-              helperText={t("firmenprofil.ueberUnsHinweis")}
+              label={t("companyProfile.aboutUs")}
+              helperText={t("companyProfile.aboutUsHint")}
               value={draft.about}
               onChange={(e) => {
                 setEntwurf({ ...draft, about: e.target.value });
@@ -185,8 +185,8 @@ export function CompanyProfilePage() {
               minRows={4}
             />
             <TextField
-              label={t("firmenprofil.website")}
-              helperText={t("firmenprofil.websiteHinweis")}
+              label={t("companyProfile.website")}
+              helperText={t("companyProfile.websiteHint")}
               value={draft.website}
               onChange={(e) => {
                 setEntwurf({ ...draft, website: e.target.value });
@@ -194,8 +194,8 @@ export function CompanyProfilePage() {
               }}
             />
             <TextField
-              label={t("firmenprofil.standorte")}
-              helperText={t("firmenprofil.standorteHinweis")}
+              label={t("companyProfile.locations")}
+              helperText={t("companyProfile.locationsHint")}
               value={draft.locations}
               onChange={(e) => {
                 setEntwurf({ ...draft, locations: e.target.value });
@@ -203,8 +203,8 @@ export function CompanyProfilePage() {
               }}
             />
             <TextField
-              label={t("firmenprofil.strasse")}
-              helperText={t("firmenprofil.strasseHinweis")}
+              label={t("companyProfile.street")}
+              helperText={t("companyProfile.streetHint")}
               value={draft.line1}
               onChange={(e) => {
                 setEntwurf({ ...draft, line1: e.target.value });
@@ -213,7 +213,7 @@ export function CompanyProfilePage() {
             />
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
               <TextField
-                label={t("firmenprofil.plz")}
+                label={t("companyProfile.postalCode")}
                 value={draft.postal_code}
                 onChange={(e) => {
                   setEntwurf({ ...draft, postal_code: e.target.value });
@@ -221,7 +221,7 @@ export function CompanyProfilePage() {
                 }}
               />
               <TextField
-                label={t("firmenprofil.ort")}
+                label={t("companyProfile.city")}
                 value={draft.city}
                 onChange={(e) => {
                   setEntwurf({ ...draft, city: e.target.value });
@@ -229,7 +229,7 @@ export function CompanyProfilePage() {
                 }}
               />
               <TextField
-                label={t("firmenprofil.land")}
+                label={t("companyProfile.country")}
                 value={draft.country}
                 onChange={(e) => {
                   setEntwurf({ ...draft, country: e.target.value });
@@ -239,7 +239,7 @@ export function CompanyProfilePage() {
               />
             </Box>
             <TextField
-              label={t("firmenprofil.telefon")}
+              label={t("companyProfile.phone")}
               value={draft.phone}
               onChange={(e) => {
                 setEntwurf({ ...draft, phone: e.target.value });
@@ -247,8 +247,8 @@ export function CompanyProfilePage() {
               }}
             />
             <TextField
-              label={t("firmenprofil.leistungen")}
-              helperText={t("firmenprofil.leistungenHinweis")}
+              label={t("companyProfile.benefits")}
+              helperText={t("companyProfile.benefitsHint")}
               value={draft.benefits}
               onChange={(e) => {
                 setEntwurf({ ...draft, benefits: e.target.value });
@@ -259,8 +259,8 @@ export function CompanyProfilePage() {
             <Box>
               <Button type="submit" variant="contained" disabled={running}>
                 {running
-                  ? t("allgemein.speichernLaeuft")
-                  : t("allgemein.speichern")}
+                  ? t("common.saving")
+                  : t("common.save")}
               </Button>
             </Box>
           </Box>

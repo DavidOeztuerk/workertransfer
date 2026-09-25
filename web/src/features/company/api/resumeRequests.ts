@@ -37,27 +37,27 @@ export async function requestResume(subjectId: string): Promise<AnfrageErgebnis>
     RESUME_BASE_URL,
     `/resumes/${subjectId}/requests`,
     { method: "POST" },
-    "fehler.anfrageNichtGestellt"
+    "errors.requestNotSent"
   );
   if (answer.ok) return { ok: true, request: answer.value };
   return deuten<AnfrageFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
-      409: { reason: "already-asked", titel: "fehler.bereitsGefragt" },
+      0: { reason: "offline", titel: "errors.noConnection" },
+      409: { reason: "already-asked", titel: "errors.alreadyAsked" },
       403: {
         reason: "no-company",
-        titel: "fehler.nurFirmenLebenslauf",
-        text: "fehler.firmaWaehlen",
+        titel: "errors.onlyCompaniesRequestResume",
+        text: "errors.chooseCompany",
       },
       // Fragen setzt die PROFIL-Freigabe voraus, nie die Existenz eines
       // Lebenslaufs: „hat schon einen geschrieben" ist eine Tatsache über die
       // Person, nach der niemand tasten können soll.
-      404: { reason: "not-available", titel: "fehler.personNichtAnfragbar" },
+      404: { reason: "not-available", titel: "errors.personNotRequestable" },
       503: {
         reason: "unavailable",
-        titel: "fehler.ledgerSchweigt",
-        text: "fehler.spaeterErneut",
+        titel: "errors.ledgerSilent",
+        text: "errors.tryLater",
       },
     },
     "offline"

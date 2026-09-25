@@ -70,13 +70,13 @@ export function Zivilidentitaet() {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t("zivil.titel")}
+          {t("civilIdentity.title")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {t("zivil.zweck")}
+          {t("civilIdentity.purpose")}
         </Typography>
 
-        {anschrift.laedt ? <LoadingBlock label={t("allgemein.laden")} /> : null}
+        {anschrift.laedt ? <LoadingBlock label={t("common.loading")} /> : null}
 
         <Box
           component="form"
@@ -88,14 +88,14 @@ export function Zivilidentitaet() {
         >
           <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
             <TextField
-              label={t("zivil.vorname")}
+              label={t("civilIdentity.firstName")}
               autoComplete="given-name"
               value={vorname}
               onChange={(event) => setVorname(event.target.value)}
               fullWidth
             />
             <TextField
-              label={t("zivil.nachname")}
+              label={t("civilIdentity.lastName")}
               autoComplete="family-name"
               value={nachname}
               onChange={(event) => setNachname(event.target.value)}
@@ -103,18 +103,18 @@ export function Zivilidentitaet() {
             />
           </Box>
           <Typography variant="body2" color="text.secondary">
-            {t("zivil.klarnameHinweis")}
+            {t("civilIdentity.legalNameHint")}
           </Typography>
 
           <TextField
-            label={t("zivil.strasse")}
+            label={t("civilIdentity.street")}
             autoComplete="address-line1"
             value={form.line1}
             onChange={(event) => setForm({ ...form, line1: event.target.value })}
             fullWidth
           />
           <TextField
-            label={t("zivil.zusatz")}
+            label={t("civilIdentity.addressLine2")}
             autoComplete="address-line2"
             value={form.line2}
             onChange={(event) => setForm({ ...form, line2: event.target.value })}
@@ -122,19 +122,19 @@ export function Zivilidentitaet() {
           />
           <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
             <TextField
-              label={t("zivil.plz")}
+              label={t("civilIdentity.postalCode")}
               autoComplete="postal-code"
               value={form.postalCode}
               onChange={(event) => setForm({ ...form, postalCode: event.target.value })}
             />
             <TextField
-              label={t("zivil.ort")}
+              label={t("civilIdentity.city")}
               autoComplete="address-level2"
               value={form.city}
               onChange={(event) => setForm({ ...form, city: event.target.value })}
             />
             <TextField
-              label={t("zivil.land")}
+              label={t("civilIdentity.country")}
               autoComplete="country"
               value={form.country}
               onChange={(event) => setForm({ ...form, country: event.target.value })}
@@ -142,9 +142,9 @@ export function Zivilidentitaet() {
             />
           </Box>
           <TextField
-            label={t("zivil.telefon")}
+            label={t("civilIdentity.phone")}
             autoComplete="tel"
-            helperText={t("zivil.telefonHinweis")}
+            helperText={t("civilIdentity.phoneHint")}
             value={form.phone}
             onChange={(event) => setForm({ ...form, phone: event.target.value })}
             fullWidth
@@ -153,12 +153,12 @@ export function Zivilidentitaet() {
           {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
           {saved ? (
             <Alert severity="success" role="status">
-              {t("zivil.gespeichert")}
+              {t("civilIdentity.saved")}
             </Alert>
           ) : null}
 
           <Button type="submit" variant="contained" disabled={saving}>
-            {saving ? t("allgemein.speichernLaeuft") : t("zivil.speichern")}
+            {saving ? t("common.saving") : t("civilIdentity.save")}
           </Button>
         </Box>
       </CardContent>

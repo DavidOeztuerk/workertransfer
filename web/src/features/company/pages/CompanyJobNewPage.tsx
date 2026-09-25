@@ -68,18 +68,18 @@ export function CompanyJobNewPage() {
 
   const back = (
     <Link component={RouterLink} to="/company/jobs" variant="body2">
-      {t("firmenstellen.zurueck")}
+      {t("companyJobs.back")}
     </Link>
   );
 
   if (!fuerFirma) {
     return (
-      <PageShell title={t("firmenstellen.neu")} narrow>
+      <PageShell title={t("companyJobs.new")} narrow>
         <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
             <Typography>
-              {t("firmenstellen.neuNurFirma")}
+              {t("companyJobs.newCompanyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -105,7 +105,7 @@ export function CompanyJobNewPage() {
   }
 
   return (
-    <PageShell title={t("firmenstellen.neu")} narrow>
+    <PageShell title={t("companyJobs.new")} narrow>
       <Box sx={{ mb: 2 }}>{back}</Box>
 
       <Card>
@@ -125,7 +125,7 @@ export function CompanyJobNewPage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label={t("firmenstellen.feldTitel")}
+              label={t("companyJobs.fieldTitle")}
               value={draft.title}
               onChange={(e) =>
                 setEntwurf({ ...draft, title: e.target.value })
@@ -133,7 +133,7 @@ export function CompanyJobNewPage() {
               required
             />
             <TextField
-              label={t("firmenstellen.beschreibung")}
+              label={t("companyJobs.description")}
               value={draft.description}
               onChange={(e) =>
                 setEntwurf({ ...draft, description: e.target.value })
@@ -146,12 +146,12 @@ export function CompanyJobNewPage() {
                 // The postcode stands BEFORE the place and is narrower — that is
                 // how an address is written, and it shows at a glance that the
                 // two belong together.
-                label={t("firmenstellen.plz")}
+                label={t("companyJobs.postalCode")}
                 // Optional and still important: without it the advert drops out
                 // of every radius search whose place name is ambiguous. The hint
                 // says so instead of forcing it as a required field — a company
                 // with only "nationwide" to give must still be able to post.
-                helperText={t("firmenstellen.plzHinweis")}
+                helperText={t("companyJobs.postalCodeHint")}
                 value={draft.postalCode}
                 slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
                 onChange={(e) =>
@@ -159,8 +159,8 @@ export function CompanyJobNewPage() {
                 }
               />
               <TextField
-                label={t("firmenstellen.ort")}
-                helperText={t("firmenstellen.ortHinweis")}
+                label={t("companyJobs.location")}
+                helperText={t("companyJobs.locationHint")}
                 value={draft.location}
                 onChange={(e) =>
                   setEntwurf({ ...draft, location: e.target.value })
@@ -169,7 +169,7 @@ export function CompanyJobNewPage() {
             </Box>
             <TextField
               select
-              label={t("firmenstellen.arbeitsform")}
+              label={t("companyJobs.workMode")}
               value={draft.remote}
               onChange={(e) =>
                 setEntwurf({ ...draft, remote: e.target.value as RemoteMode })
@@ -183,7 +183,7 @@ export function CompanyJobNewPage() {
             </TextField>
             <TextField
               select
-              label={t("firmenstellen.beschaeftigung")}
+              label={t("companyJobs.employment")}
               value={draft.employment}
               onChange={(e) =>
                 setEntwurf({
@@ -199,8 +199,8 @@ export function CompanyJobNewPage() {
               ))}
             </TextField>
             <TextField
-              label={t("firmenstellen.faehigkeiten")}
-              helperText={t("firmenstellen.faehigkeitenHinweis")}
+              label={t("companyJobs.skills")}
+              helperText={t("companyJobs.skillsHint")}
               value={draft.skills}
               onChange={(e) =>
                 setEntwurf({ ...draft, skills: e.target.value })
@@ -217,8 +217,8 @@ export function CompanyJobNewPage() {
             <Box>
               <Button type="submit" variant="contained" disabled={running}>
                 {running
-                  ? t("firmenstellen.anlegenLaeuft")
-                  : t("firmenstellen.anlegen")}
+                  ? t("companyJobs.creating")
+                  : t("companyJobs.create")}
               </Button>
             </Box>
           </Box>
@@ -259,9 +259,9 @@ function Formulierungshilfe({
     <Box sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
       <TextField
         label={t(
-          hatText ? "firmenstellen.hilfeUmformulieren" : "firmenstellen.hilfeNeu",
+          hatText ? "companyJobs.helpRephrase" : "companyJobs.helpNew",
         )}
-        helperText={t("firmenstellen.hilfeHinweis")}
+        helperText={t("companyJobs.helpHint")}
         value={wish}
         onChange={(e) => setWunsch(e.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
@@ -299,11 +299,11 @@ function Formulierungshilfe({
         }}
       >
         {running
-          ? t("firmenstellen.hilfeLaeuft")
+          ? t("companyJobs.helpInProgress")
           : t(
               hatText
-                ? "firmenstellen.hilfeKnopfErsetzt"
-                : "firmenstellen.hilfeKnopf",
+                ? "companyJobs.helpButtonReplaces"
+                : "companyJobs.helpButton",
             )}
       </Button>
     </Box>

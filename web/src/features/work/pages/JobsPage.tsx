@@ -298,7 +298,7 @@ export function JobsPage() {
   }, [signedIn, selectedJobs, navigate, clearSelection]);
 
   return (
-    <PageShell title={t("stellen.titel")}>
+    <PageShell title={t("jobs.title")}>
       {bulkFehler ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {bulkFehler}
@@ -332,15 +332,15 @@ export function JobsPage() {
 
         <Box>
       {list.pending && list.items.length === 0 ? (
-        <LoadingBlock label={t("stellen.wirdGesucht")} />
+        <LoadingBlock label={t("jobs.searching")} />
       ) : null}
 
       {list.fehler !== null ? <ErrorBlock error={list.fehler.error} /> : null}
 
       {!list.pending && list.fehler === null && list.items.length === 0 ? (
         <EmptyBlock
-          title={t("stellen.leerTitel")}
-          hint={t("stellen.leerHinweis")}
+          title={t("jobs.emptyTitle")}
+          hint={t("jobs.emptyHint")}
         />
       ) : null}
 
@@ -354,7 +354,7 @@ export function JobsPage() {
           icon={false}
           sx={{ mb: 2 }}
         >
-          {t("stellen.ohneOrt", { count: list.omitted })}
+          {t("jobs.withoutLocation", { count: list.omitted })}
         </Alert>
       ) : null}
 
@@ -386,7 +386,7 @@ export function JobsPage() {
                           checked={selectedJobs.has(job.id)}
                           disabled={offeneEntwuerfe.has(job.id) || creatingDrafts || laeuftJob !== null}
                           onChange={() => toggleJob(job.id)}
-                          slotProps={{ input: { "aria-label": t("stellen.auswaehlen") } }}
+                          slotProps={{ input: { "aria-label": t("jobs.select") } }}
                           sx={{ mt: 0.5 }}
                         />
                       )}
@@ -402,7 +402,7 @@ export function JobsPage() {
                         >
                           {job.location !== ""
                             ? job.location
-                            : t("stellen.ortFehlt")}{" "}
+                            : t("jobs.locationMissing")}{" "}
                           · {remoteLabel(job.remote)} · {employmentLabel(job.employment)}
                         </Typography>
                         <Typography sx={{ whiteSpace: "pre-line" }}>
@@ -415,7 +415,7 @@ export function JobsPage() {
                     {laedt ? null : signedIn ? (
                       schonGesendet.has(job.id) ? (
                         <Button variant="contained" disabled sx={{ mt: 2 }}>
-                          {t("stellen.bereitsBeworben")}
+                          {t("jobs.alreadyApplied")}
                         </Button>
                       ) : offeneEntwuerfe.has(job.id) ? (
                         <Button
@@ -424,7 +424,7 @@ export function JobsPage() {
                           variant="contained"
                           sx={{ mt: 2 }}
                         >
-                          {t("stellen.entwurfOeffnen")}
+                          {t("jobs.openDraft")}
                         </Button>
                       ) : (
                       <Button
@@ -438,7 +438,7 @@ export function JobsPage() {
                           ) : null
                         }
                       >
-                        {t("stellen.bewerben")}
+                        {t("jobs.apply")}
                       </Button>
                       )
                     ) : (
@@ -460,7 +460,7 @@ export function JobsPage() {
                         sx={{ mt: 2 }}
                         onClick={() => void navigate("/login")}
                       >
-                        {t("stellen.bewerben")}
+                        {t("jobs.apply")}
                       </Button>
                     )}
                   </CardContent>
@@ -491,11 +491,11 @@ export function JobsPage() {
             >
               <Typography variant="body1">
                 {fortschritt
-                  ? t("stellen.fortschritt", {
+                  ? t("jobs.progress", {
                       fertig: fortschritt.fertig,
                       gesamt: fortschritt.gesamt,
                     })
-                  : t("stellen.ausgewaehlt", { count: selectedJobs.size })}
+                  : t("jobs.selected", { count: selectedJobs.size })}
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button
@@ -503,7 +503,7 @@ export function JobsPage() {
                   onClick={clearSelection}
                   disabled={creatingDrafts}
                 >
-                  {t("stellen.auswahlAufheben")}
+                  {t("jobs.clearSelection")}
                 </Button>
                 <Button
                   variant="contained"
@@ -512,8 +512,8 @@ export function JobsPage() {
                   startIcon={creatingDrafts ? <Box sx={{ width: 16, height: 16 }} /> : null}
                 >
                   {creatingDrafts
-                    ? t("stellen.entwuerfeErstellen")
-                    : t("stellen.fuerAlleBewerben")}
+                    ? t("jobs.createDrafts")
+                    : t("jobs.applyToAll")}
                 </Button>
               </Box>
             </Box>
@@ -554,7 +554,7 @@ function Hiring({ profile }: { profile: CompanyProfile | null | undefined }) {
         <>
           {" · "}
           <Link href={profile.website} target="_blank" rel="noreferrer noopener">
-            {t("stellen.website")}
+            {t("jobs.website")}
           </Link>
         </>
       ) : null}

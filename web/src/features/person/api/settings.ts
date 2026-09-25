@@ -67,7 +67,7 @@ export async function ladeWahl(signal?: AbortSignal): Promise<Benachrichtigungsw
     API_BASE_URL,
     PFAD,
     { signal },
-    "fehler.einstellungenNichtAbrufbar"
+    "errors.settingsUnavailable"
   );
 
   return answer.ok ? (answer.value ?? null) : null;
@@ -86,7 +86,7 @@ export async function speichereWahl(
     API_BASE_URL,
     PFAD,
     { method: "PUT", body: choice, signal },
-    "fehler.einstellungenNichtGespeichert"
+    "errors.settingsNotSaved"
   );
 
   return answer.ok ? { ok: true, choice: answer.value ?? choice } : { ok: false, error: answer.error };

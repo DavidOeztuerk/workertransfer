@@ -1,7 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { GITHUB_BASE_URL } from "../../../env";
-import type { Fehlerschluessel } from "../../../shared/api/fehler";
+import type { ErrorKey } from "../../../shared/api/fehler";
 
 /**
  * Die eigene, nachgewiesene GitHub-Verbindung.
@@ -70,7 +70,7 @@ export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindun
     GITHUB_BASE_URL,
     "/github/me",
     { signal },
-    "fehler.verbindungNichtAbrufbar"
+    "errors.connectionUnavailable"
   );
 
   if (answer.ok) return { ok: true, value: answer.value ?? null };
@@ -81,7 +81,7 @@ export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindun
 async function handeln(
   path: string,
   optionen: Parameters<typeof request>[2],
-  fallback: Fehlerschluessel
+  fallback: ErrorKey
 ): Promise<Antwort<Verbindung>> {
   const answer = await request<Verbindung>(GITHUB_BASE_URL, path, optionen, fallback);
 
@@ -95,7 +95,7 @@ export const nenneKonto = (login: string, signal?: AbortSignal) =>
   handeln(
     "/github/me",
     { method: "POST", body: { login }, signal },
-    "fehler.kontoNichtAngenommen"
+    "errors.accountNotAccepted"
   );
 
 /**
@@ -109,7 +109,7 @@ export const pruefeNachweis = (signal?: AbortSignal) =>
   handeln(
     "/github/me/verify",
     { method: "POST", signal },
-    "fehler.nachweisNichtGeprueft"
+    "errors.proofNotChecked"
   );
 
 /**
@@ -167,11 +167,11 @@ export const anmeldungAbschliessen = (
   handeln(
     "/github/me/oauth/finish",
     { method: "POST", body: { code, state }, signal },
-    "fehler.nachweisNichtGeprueft"
+    "errors.proofNotChecked"
   );
 
 export const holeNeu = (signal?: AbortSignal) =>
-  handeln("/github/me/refresh", { method: "POST", signal }, "fehler.nichtsGeholt");
+  handeln("/github/me/refresh", { method: "POST", signal }, "errors.nothingFetched");
 
 /** Die Verbindung trennen. */
 export async function trenne(signal?: AbortSignal): Promise<boolean> {
@@ -179,7 +179,7 @@ export async function trenne(signal?: AbortSignal): Promise<boolean> {
     GITHUB_BASE_URL,
     "/github/me",
     { method: "DELETE", signal },
-    "fehler.verbindungNichtGetrennt"
+    "errors.disconnectFailed"
   );
 
   return answer.ok;

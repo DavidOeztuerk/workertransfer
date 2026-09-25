@@ -48,18 +48,18 @@ export function CompanyAdvisorPage() {
 
   if (laedt) {
     return (
-      <PageShell title={t("berater.firmaTitel")} narrow>
-        <LoadingBlock label={t("berater.laden")} />
+      <PageShell title={t("advisor.companyTitle")} narrow>
+        <LoadingBlock label={t("advisor.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn || !fuerFirma) {
     return (
-      <PageShell title={t("berater.firmaTitel")} narrow>
+      <PageShell title={t("advisor.companyTitle")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("berater.firmaNurFirma")}</Typography>
+            <Typography>{t("advisor.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -77,8 +77,8 @@ export function CompanyAdvisorPage() {
   }
 
   return (
-    <PageShell title={t("berater.firmaTitel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("berater.firmaLead")}</Typography>
+    <PageShell title={t("advisor.companyTitle")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("advisor.companyLead")}</Typography>
 
       {fehler !== null && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -88,22 +88,22 @@ export function CompanyAdvisorPage() {
 
       {fertig && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          {t("berater.uebergebenFertig")}
+          {t("advisor.handOverDone")}
         </Alert>
       )}
 
-      {gespraeche.pending && <LoadingBlock label={t("berater.laden")} />}
+      {gespraeche.pending && <LoadingBlock label={t("advisor.loading")} />}
 
       {gespraeche.data?.ok === false && (
         <Alert severity="warning">
           {gespraeche.data.reason === "no-company"
-            ? t("berater.firmaNurFirma")
-            : t("fehler.ledgerSchweigt")}
+            ? t("advisor.companyOnly")
+            : t("errors.ledgerSilent")}
         </Alert>
       )}
 
       {gespraeche.data?.ok === true && gespraeche.data.items.length === 0 && (
-        <EmptyBlock title={t("berater.firmaLeer")} hint={t("berater.firmaLeerHinweis")} />
+        <EmptyBlock title={t("advisor.companyEmpty")} hint={t("advisor.companyEmptyHint")} />
       )}
 
       <Stack spacing={2}>
@@ -138,10 +138,10 @@ function Firmenkarte({
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-          <Chip label={t(`berater.stand_${gespraech.state}`)} size="small" />
+          <Chip label={t(`advisor.state_${gespraech.state}`)} size="small" />
           <Chip
-            label={t("berater.firmaStufe", {
-              stand: t(`berater.stufe${gespraech.stage}Kurz`),
+            label={t("advisor.companyStage", {
+              stand: t(`advisor.stage${gespraech.stage}Short`),
             })}
             size="small"
             variant="outlined"
@@ -186,12 +186,12 @@ function Firmenkarte({
               // indistinguishable, and that is exactly the promise.
               variant="body2"
             >
-              {t("berater.eintritt")}: {gespraech.entry_month}
+              {t("advisor.earliestStart")}: {gespraech.entry_month}
             </Typography>
           )}
           {gespraech.workload_percent !== undefined && (
             <Typography variant="body2">
-              {t("berater.pensum")}: {gespraech.workload_percent}
+              {t("advisor.workload")}: {gespraech.workload_percent}
             </Typography>
           )}
           {(gespraech.salary_min !== undefined || gespraech.salary_max !== undefined) && (
@@ -201,19 +201,19 @@ function Firmenkarte({
               variant="body2"
             >
               {gespraech.salary_min !== undefined && gespraech.salary_max !== undefined
-                ? t("berater.spanne", {
+                ? t("advisor.salaryRange", {
                     von: gespraech.salary_min,
                     bis: gespraech.salary_max,
                   })
                 : gespraech.salary_min !== undefined
-                  ? t("berater.bisOffen", { von: gespraech.salary_min })
-                  : t("berater.vonOffen", { bis: gespraech.salary_max })}
+                  ? t("advisor.salaryFromOnly", { von: gespraech.salary_min })
+                  : t("advisor.salaryToOnly", { bis: gespraech.salary_max })}
             </Typography>
           )}
         </Stack>
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.uebergebenHinweis")}
+          {t("advisor.handOverHint")}
         </Typography>
 
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
@@ -224,13 +224,13 @@ function Firmenkarte({
               disabled={laeuft}
               onClick={() => zug("hand-over")}
             >
-              {t("berater.uebergeben")}
+              {t("advisor.handOver")}
             </Button>
           )}
 
           {offen && (
             <Button size="small" color="error" disabled={laeuft} onClick={() => zug("end")}>
-              {t("berater.beenden")}
+              {t("advisor.end")}
             </Button>
           )}
         </Stack>

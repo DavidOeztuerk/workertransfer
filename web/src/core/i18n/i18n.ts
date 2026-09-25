@@ -2,9 +2,9 @@ import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 
 import { aufgeloest, type Sprachvorliebe } from "../store/preferencesSlice";
-import de from "./kataloge/de";
-import en from "./kataloge/en";
-import fr from "./kataloge/fr";
+import de from "./catalogs/de";
+import en from "./catalogs/en";
+import fr from "./catalogs/fr";
 
 /**
  * Die Kataloge, und wer entscheidet, welcher gilt.

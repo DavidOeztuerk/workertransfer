@@ -118,11 +118,11 @@ export function ScoutPage() {
   // Protokollen des Ledgers.
   if (!fuerFirma) {
     return (
-      <PageShell title={t("kandidaten.titel")} narrow>
+      <PageShell title={t("scout.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("kandidaten.nurFirma")}
+              {t("scout.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -132,8 +132,8 @@ export function ScoutPage() {
 
   return (
     <PageShell
-      title={t("kandidaten.titel")}
-      lead={t("kandidaten.lead")}
+      title={t("scout.title")}
+      lead={t("scout.lead")}
     >
       {seiten.fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -164,18 +164,18 @@ export function ScoutPage() {
             }}
           >
             <TextField
-              label={t("kandidaten.faehigkeiten")}
-              helperText={t("kandidaten.faehigkeitenHinweis")}
-              placeholder={t("kandidaten.faehigkeitenBeispiel")}
+              label={t("scout.skills")}
+              helperText={t("scout.skillsHint")}
+              placeholder={t("scout.skillsExample")}
               value={draft.skills}
               onChange={(e) =>
                 setEntwurf((now) => ({ ...now, skills: e.target.value }))
               }
             />
             <TextField
-              label={t("kandidaten.ort")}
-              helperText={t("kandidaten.ortHinweis")}
-              placeholder={t("kandidaten.ortBeispiel")}
+              label={t("scout.location")}
+              helperText={t("scout.locationHint")}
+              placeholder={t("scout.locationExample")}
               value={draft.location}
               onChange={(e) =>
                 setEntwurf((now) => ({ ...now, location: e.target.value }))
@@ -197,10 +197,10 @@ export function ScoutPage() {
                     }
                   />
                 }
-                label={t("kandidaten.nurRemote")}
+                label={t("scout.remoteOnly")}
               />
               <Typography variant="body2" color="text.secondary">
-                {t("kandidaten.nurRemoteHinweis")}
+                {t("scout.remoteOnlyHint")}
               </Typography>
             </Box>
 
@@ -210,12 +210,12 @@ export function ScoutPage() {
                 // ADR-0041: the advert's attendance and place meet the person's
                 // willingness to commute, and that becomes a TICK per hit. NOT a
                 // filter — the list never gets shorter from it.
-                label={t("kandidaten.gegenStelle")}
-                helperText={t("kandidaten.gegenStelleHinweis")}
+                label={t("scout.againstJob")}
+                helperText={t("scout.againstJobHint")}
                 value={stelle}
                 onChange={(event) => setStelle(event.target.value)}
                 >
-                <MenuItem value="">{t("kandidaten.ohneStelle")}</MenuItem>
+                <MenuItem value="">{t("scout.noJob")}</MenuItem>
                 {stellen.map((anzeige) => (
                   <MenuItem key={anzeige.id} value={anzeige.id}>
                     {anzeige.title}
@@ -226,7 +226,7 @@ export function ScoutPage() {
 
             <Box sx={{ display: "flex", gap: 1.5 }}>
               <Button type="submit" variant="contained">
-                {t("kandidaten.suchen")}
+                {t("scout.search")}
               </Button>
               {hatFilter ? (
                 <Button
@@ -236,7 +236,7 @@ export function ScoutPage() {
                     setFilter(OHNE_FILTER);
                   }}
                 >
-                  {t("kandidaten.filterZuruecksetzen")}
+                  {t("scout.filterReset")}
                 </Button>
               ) : null}
             </Box>
@@ -247,7 +247,7 @@ export function ScoutPage() {
       {seiten.pending && seiten.items.length === 0 ? (
         <Card>
           <CardContent>
-            <LoadingBlock label={t("kandidaten.laden")} />
+            <LoadingBlock label={t("scout.loading")} />
           </CardContent>
         </Card>
       ) : null}
@@ -279,11 +279,11 @@ export function ScoutPage() {
       seiten.fehler === null &&
       seiten.items.length === 0 ? (
         hatFilter ? (
-          <EmptyBlock title={t("kandidaten.leerMitFilter")} />
+          <EmptyBlock title={t("scout.emptyWithFilter")} />
         ) : (
           <EmptyBlock
-            title={t("kandidaten.leerTitel")}
-            hint={t("kandidaten.leerHinweis")}
+            title={t("scout.emptyTitle")}
+            hint={t("scout.emptyHint")}
           />
         )
       ) : null}
@@ -295,7 +295,7 @@ export function ScoutPage() {
             onClick={seiten.weiter}
             disabled={seiten.pending}
           >
-            {seiten.pending ? t("allgemein.laden") : t("kandidaten.mehrLaden")}
+            {seiten.pending ? t("common.loading") : t("scout.loadMore")}
           </Button>
         </Box>
       ) : null}

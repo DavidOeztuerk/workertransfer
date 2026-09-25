@@ -57,11 +57,11 @@ export function CompanyTeamPage() {
 
   if (!fuerFirma) {
     return (
-      <PageShell title={t("mannschaft.titel")} narrow>
+      <PageShell title={t("team.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("mannschaft.nurFirma")}
+              {t("team.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -95,9 +95,9 @@ export function CompanyTeamPage() {
 
   return (
     <PageShell
-      title={t("mannschaft.titel")}
+      title={t("team.title")}
       narrow
-      lead={t("mannschaft.lead")}
+      lead={t("team.lead")}
       actions={
         istAdmin ? (
           <Button
@@ -105,7 +105,7 @@ export function CompanyTeamPage() {
             to="/company/team/invite"
             variant="contained"
           >
-            {t("mannschaft.einladen")}
+            {t("team.invite")}
           </Button>
         ) : undefined
       }
@@ -119,14 +119,14 @@ export function CompanyTeamPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("mannschaft.mitglieder")}
+            {t("team.members")}
           </Typography>
 
           {mitglieder.pending ? (
             <LoadingBlock
               // Its own branch: without it the card stays empty while the
               // members are in flight.
-              label={t("mannschaft.mitgliederLaden")}
+              label={t("team.membersLoading")}
             />
           ) : null}
 
@@ -152,8 +152,8 @@ export function CompanyTeamPage() {
                   titel={entry.display_name}
                   meta={t(
                     entry.role === "admin"
-                      ? "mannschaft.rolleAdmin"
-                      : "mannschaft.rolleMitglied",
+                      ? "team.roleAdmin"
+                      : "team.roleMember",
                   )}
                   action={
                     istAdmin ? (
@@ -165,8 +165,8 @@ export function CompanyTeamPage() {
                       >
                         {t(
                           entry.user_id === subjectId
-                            ? "mannschaft.verlassen"
-                            : "mannschaft.entfernen",
+                            ? "team.leave"
+                            : "team.remove",
                         )}
                       </Button>
                     ) : undefined
@@ -181,11 +181,11 @@ export function CompanyTeamPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("mannschaft.einladungen")}
+            {t("team.invitations")}
           </Typography>
 
           {einladungen.pending ? (
-            <LoadingBlock label={t("mannschaft.einladungenLaden")} />
+            <LoadingBlock label={t("team.invitationsLoading")} />
           ) : null}
 
           {einladungen.data !== null && !einladungen.data.ok ? (
@@ -193,7 +193,7 @@ export function CompanyTeamPage() {
           ) : null}
 
           {einladungen.data?.ok && offene.length === 0 ? (
-            <EmptyBlock title={t("mannschaft.einladungenLeer")} />
+            <EmptyBlock title={t("team.invitationsEmpty")} />
           ) : null}
 
           {offene.length > 0 ? (
@@ -207,8 +207,8 @@ export function CompanyTeamPage() {
                   titel={entry.email}
                   meta={t(
                     entry.role === "admin"
-                      ? "mannschaft.rolleAdmin"
-                      : "mannschaft.rolleMitglied",
+                      ? "team.roleAdmin"
+                      : "team.roleMember",
                   )}
                   action={
                     istAdmin ? (
@@ -218,7 +218,7 @@ export function CompanyTeamPage() {
                         onClick={() => void zurueckziehen(entry.id)}
                         disabled={running}
                       >
-                        {t("allgemein.zurueckziehen")}
+                        {t("common.withdraw")}
                       </Button>
                     ) : undefined
                   }

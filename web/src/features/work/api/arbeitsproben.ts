@@ -15,7 +15,7 @@ import { request } from "../../../core/api/client";
 import { ASSESSMENT_BASE_URL } from "../../../env";
 import {
   type Deutung,
-  type Fehlerschluessel,
+  type ErrorKey,
   type Fehlschlag,
   deuten,
 } from "../../../shared/api/fehler";
@@ -114,8 +114,8 @@ export type Zugergebnis =
 
 const SCHWEIGT: Deutung<"unavailable"> = {
   reason: "unavailable",
-  titel: "fehler.ledgerSchweigt",
-  text: "fehler.spaeterErneut",
+  titel: "errors.ledgerSilent",
+  text: "errors.tryLater",
 };
 
 /**
@@ -131,7 +131,7 @@ export async function ladeMeineVorgaenge(signal?: AbortSignal): Promise<Liste> {
     ASSESSMENT_BASE_URL,
     "/assessments/me",
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
@@ -145,7 +145,7 @@ export async function ladeFirmenvorgaenge(signal?: AbortSignal): Promise<Liste> 
     ASSESSMENT_BASE_URL,
     "/assessments",
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
@@ -157,8 +157,8 @@ export async function ladeFirmenvorgaenge(signal?: AbortSignal): Promise<Liste> 
     {
       403: {
         reason: "no-company",
-        titel: "fehler.nurFirmenFragen",
-        text: "fehler.firmaWaehlen",
+        titel: "errors.onlyCompaniesAsk",
+        text: "errors.chooseCompany",
       },
       503: SCHWEIGT,
     },
@@ -180,7 +180,7 @@ export async function ladeVorgang(id: string, signal?: AbortSignal): Promise<Ein
     ASSESSMENT_BASE_URL,
     `/assessments/${id}`,
     { signal },
-    "fehler.vorgangNichtGeladen"
+    "errors.assessmentNotLoaded"
   );
 
   if (answer.ok && answer.value != null) return { ok: true, vorgang: answer.value };
@@ -188,7 +188,7 @@ export async function ladeVorgang(id: string, signal?: AbortSignal): Promise<Ein
   return deuten<"gone" | "unavailable">(
     answer.ok ? LEERE_ANTWORT : answer.error,
     // `404` sagt bewusst nicht, WARUM. Vier Lagen, eine Antwort.
-    { 404: { reason: "gone", titel: "fehler.vorgangFort" }, 503: SCHWEIGT },
+    { 404: { reason: "gone", titel: "errors.assessmentGone" }, 503: SCHWEIGT },
     "unavailable"
   );
 }
@@ -196,7 +196,7 @@ export async function ladeVorgang(id: string, signal?: AbortSignal): Promise<Ein
 async function schicke(
   pfad: string,
   body: unknown,
-  schluessel: Fehlerschluessel
+  schluessel: ErrorKey
 ): Promise<Zugergebnis> {
   const answer = await request<Vorgang>(
     ASSESSMENT_BASE_URL,
@@ -210,12 +210,12 @@ async function schicke(
   return deuten<"gone" | "conflict" | "invalid" | "unavailable" | "offline">(
     answer.ok ? LEERE_ANTWORT : answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       // `404` heisst: diese Person hat diesem Unternehmen nichts freigegeben —
       // oder es gibt den Vorgang nicht, oder er gehoert jemand anderem. Die
       // Oberflaeche bastelt daraus keine Auskunft.
-      404: { reason: "gone", titel: "fehler.vorgangFort" },
-      409: { reason: "conflict", titel: "fehler.schrittNichtMoeglich" },
+      404: { reason: "gone", titel: "errors.assessmentGone" },
+      409: { reason: "conflict", titel: "errors.stepNotPossible" },
       503: SCHWEIGT,
     },
     // `422` steht ABSICHTLICH nicht in der Tabelle, und das ist hier mehr als
@@ -233,11 +233,11 @@ async function schicke(
 
 /** Eine Aufgabe stellen. Umfang und Frist sind Pflicht — der Server denkt sich keine aus. */
 export const stelleAufgabe = (eingabe: Aufgabeneingabe) =>
-  schicke("/assessments", eingabe, "fehler.aufgabeNichtGestellt");
+  schicke("/assessments", eingabe, "errors.taskNotSet");
 
 /** Einreichen. Text, Adresse, oder beides — aber nicht nichts. */
 export const reicheEin = (id: string, text: string, url: string | null) =>
-  schicke(`/assessments/${id}/submission`, { text, url }, "fehler.nichtEingereicht");
+  schicke(`/assessments/${id}/submission`, { text, url }, "errors.notSubmitted");
 
 /**
  * Bewerten.
@@ -247,4 +247,4 @@ export const reicheEin = (id: string, text: string, url: string | null) =>
  * Knopf deshalb gar nicht erst scharf: Ablehnen und Begründen sind ein Schritt.
  */
 export const bewerte = (id: string, outcome: Ausgang, text: string) =>
-  schicke(`/assessments/${id}/evaluation`, { outcome, text }, "fehler.nichtBewertet");
+  schicke(`/assessments/${id}/evaluation`, { outcome, text }, "errors.evaluationNotSent");

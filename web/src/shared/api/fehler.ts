@@ -1,6 +1,6 @@
 import type { ApiError } from "../../core/store/thunkHelpers";
 import { i18n } from "../../core/i18n/i18n";
-import type { Katalog } from "../../core/i18n/kataloge/de";
+import type { Catalog } from "../../core/i18n/catalogs/de";
 
 /**
  * Aus einem Statuscode einen Grund und einen Satz machen — an EINER Stelle.
@@ -27,20 +27,20 @@ import type { Katalog } from "../../core/i18n/kataloge/de";
  */
 
 /**
- * Ein Schlüssel aus dem Fehlerbereich des Katalogs — kein Satz.
+ * A key from the catalogue's `errors` section — never a sentence.
  *
- * Der Typ ist das eigentliche Werkzeug: i18next gibt einen unbekannten
- * Schlüssel unverändert zurück, ein liegengebliebener deutscher Satz sähe in
- * der Oberfläche also RICHTIG aus und wäre in keiner anderen Sprache
- * übersetzt. So ist er ein Übersetzungsfehler.
+ * The type is the actual tool: i18next hands an unknown key back unchanged, so
+ * a German sentence left behind here would look RIGHT in the UI and be
+ * translated into no other language. With this type it is a compile error.
+ * It is derived from the catalogue, so a renamed or deleted key is one too.
  */
-export type Fehlerschluessel = `fehler.${keyof Katalog["fehler"] & string}`;
+export type ErrorKey = `errors.${keyof Catalog["errors"] & string}`;
 
 export interface Deutung<R extends string> {
   reason: R;
-  titel: Fehlerschluessel;
+  titel: ErrorKey;
   /** Fehlt er, trägt der Titel allein. */
-  text?: Fehlerschluessel;
+  text?: ErrorKey;
 }
 
 export interface Fehlschlag<R extends string> {

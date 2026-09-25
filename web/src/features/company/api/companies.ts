@@ -93,13 +93,13 @@ export async function getOwnCompanyProfile(
     COMPANIES_BASE_URL,
     "/companies/me/profile",
     { signal },
-    "fehler.profilNichtAbrufbar"
+    "errors.profileUnavailable"
   );
   if (answer.ok) return { ok: true, profile: answer.value ?? null };
   return deuten<"unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "fehler.profilNichtAbrufbar" },
+      0: { reason: "unavailable", titel: "errors.profileUnavailable" },
     },
     "unavailable"
   );
@@ -114,14 +114,14 @@ export async function saveCompanyProfile(
     // Kein `tenant_id`: das Unternehmen steht im Token und wird gegen die
     // Mitgliedschaft geprüft.
     { method: "PUT", body: input },
-    "fehler.profilNichtGespeichert"
+    "errors.profileNotSaved"
   );
   if (answer.ok) return { ok: true, profile: answer.value };
   return deuten<"no-company" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
-      403: { reason: "no-company", titel: "fehler.firmaWaehlenHandelnd" },
+      0: { reason: "offline", titel: "errors.noConnection" },
+      403: { reason: "no-company", titel: "errors.chooseCompanyToActFor" },
     },
     "invalid"
   );
@@ -149,7 +149,7 @@ export async function getCompanyBySlug(
     COMPANIES_BASE_URL,
     `/companies/by-slug/${encodeURIComponent(slug)}`,
     { signal },
-    "fehler.seiteNichtAbrufbar"
+    "errors.pageUnavailable"
   );
   if (answer.ok && answer.value !== undefined && answer.value !== null) {
     return { ok: true, profile: answer.value };
@@ -160,18 +160,18 @@ export async function getCompanyBySlug(
       reason: "unavailable",
       error: {
         status: 0,
-        title: i18n.t("fehler.seiteNichtAbrufbar"),
-        detail: i18n.t("fehler.seiteNichtAbrufbar"),
+        title: i18n.t("errors.pageUnavailable"),
+        detail: i18n.t("errors.pageUnavailable"),
       },
     };
   }
   return deuten<"not-found" | "unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "fehler.keineVerbindung" },
+      0: { reason: "unavailable", titel: "errors.noConnection" },
       404: {
         reason: "not-found",
-        titel: "fehler.keineFirmaUnterAdresse",
+        titel: "errors.noCompanyAtAddress",
       },
     },
     "unavailable"

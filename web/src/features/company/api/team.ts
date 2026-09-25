@@ -54,13 +54,13 @@ export async function listMembers(
     API_BASE_URL,
     `/companies/${tenantId}/members`,
     { signal },
-    "fehler.mannschaftNichtGeladen"
+    "errors.teamNotLoaded"
   );
   if (answer.ok) return { ok: true, members: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, members: [] };
   return deuten<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
+    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -73,13 +73,13 @@ export async function listInvitations(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
     { signal },
-    "fehler.einladungenNichtGeladen"
+    "errors.invitationsNotLoaded"
   );
   if (answer.ok) return { ok: true, invitations: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, invitations: [] };
   return deuten<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
+    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -95,18 +95,18 @@ export async function inviteMember(
     // Kein Unternehmen im Rumpf: es steht im Pfad und wird gegen die
     // Mitgliedschaft des Aufrufers geprüft.
     { method: "POST", body: { email, role } },
-    "fehler.einladungNichtAngelegt"
+    "errors.invitationNotCreated"
   );
   if (answer.ok) return { ok: true, invitation: answer.value };
   return deuten<"not-admin" | "not-yours" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       403: {
         reason: "not-admin",
-        titel: "fehler.nurAdminEinladen",
+        titel: "errors.onlyAdminInvites",
       },
-      404: { reason: "not-yours", titel: "fehler.fuerDieseFirmaNichtEinladen" },
+      404: { reason: "not-yours", titel: "errors.cannotInviteForCompany" },
     },
     "invalid"
   );
@@ -122,12 +122,12 @@ export async function withdrawInvitation(
     API_BASE_URL,
     `/companies/${tenantId}/invitations/${invitationId}`,
     { method: "DELETE" },
-    "fehler.einladungNichtZurueckgezogen"
+    "errors.invitationNotWithdrawn"
   );
   if (answer.ok) return { ok: true };
   return deuten<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "fehler.keineVerbindung" } },
+    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -148,21 +148,21 @@ export async function removeMember(
     API_BASE_URL,
     `/companies/${tenantId}/members/${memberId}`,
     { method: "DELETE" },
-    "fehler.mitgliedNichtEntfernt"
+    "errors.memberNotRemoved"
   );
   if (answer.ok) return { ok: true };
   return deuten<"last-admin" | "not-admin" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       409: {
         reason: "last-admin",
-        titel: "fehler.mindestensEinAdmin",
-        text: "fehler.zuerstAdminMachen",
+        titel: "errors.atLeastOneAdmin",
+        text: "errors.makeAdminFirst",
       },
       403: {
         reason: "not-admin",
-        titel: "fehler.nurAdminEntfernen",
+        titel: "errors.onlyAdminRemoves",
       },
     },
     "offline"

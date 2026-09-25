@@ -65,7 +65,7 @@ export async function getMyProfile(signal?: AbortSignal): Promise<ProfileLoad> {
     PROFILE_BASE_URL,
     "/profiles/me",
     { signal },
-    "fehler.eigenesProfilNichtGeladen"
+    "errors.ownProfileNotLoaded"
   );
   // 404 heisst hier „noch keins" — bei der EIGENEN Ressource gibt es die
   // Doppeldeutigkeit „versteckt oder nicht vorhanden" nicht, die ADR-0020 für
@@ -100,7 +100,7 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
         relocation: input.relocation,
       },
     },
-    "fehler.profilNichtGespeichert"
+    "errors.profileNotSaved"
   );
   if (!answer.ok) return { ok: false, error: answer.error };
   return { ok: true, profile: answer.value };
@@ -126,22 +126,22 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     PROFILE_BASE_URL,
     "/profiles/me/draft",
     { method: "POST", body: { wish } },
-    "fehler.entwurfNichtVerfuegbar"
+    "errors.draftHelpUnavailable"
   );
   if (!answer.ok) {
     // ÜBERSETZT, nicht durchgereicht. `message` ist hier ein fertiger Satz für
     // die Oberfläche und kein Schlüssel — anders als in den `deuten`-Tabellen,
     // die `deuten()` selbst auflöst. Der Unterschied ist einmal übersehen
-    // worden, und dann stand `fehler.entwurfNichtVerfuegbarLang` wörtlich im
+    // worden, und dann stand `errors.draftHelpUnavailableLong` wörtlich im
     // Warnkasten: i18next gibt einen Schlüssel unverändert zurück, wenn ihn
     // niemand nachschlägt.
     if (answer.error.status === 401) {
-      return { ok: false, message: i18n.t("fehler.sitzungAbgelaufenLang") };
+      return { ok: false, message: i18n.t("errors.sessionExpiredLong") };
     }
     // 503 heisst „nicht eingerichtet ODER Anbieter still" — von aussen dasselbe,
     // und beides heisst „später noch einmal", nicht „falsch gemacht". Gemeldet
     // wird die Art des Fehlschlags, nie der Inhalt.
-    return { ok: false, message: i18n.t("fehler.entwurfNichtVerfuegbarLang") };
+    return { ok: false, message: i18n.t("errors.draftHelpUnavailableLong") };
   }
   return { ok: true, draft: answer.value?.draft ?? "" };
 }
@@ -156,6 +156,6 @@ export function setVisibility(subjectId: string, granted: boolean): Promise<Cons
     subjectId,
     PROFILE_VISIBILITY,
     granted,
-    i18n.t("fehler.widerrufProfilEinstellungen")
+    i18n.t("errors.revokedInProfileSettings")
   );
 }

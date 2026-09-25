@@ -115,37 +115,37 @@ export interface ApplicantContact {
  const SCHREIBFEHLER: Partial<
    Record<number, Deutung<BewerbungFehler>>
  > = {
-   0: { reason: "offline", titel: "fehler.keineVerbindung" },
+   0: { reason: "offline", titel: "errors.noConnection" },
    401: {
      reason: "unauthenticated",
-     titel: "fehler.kontoZumBewerben",
-     text: "fehler.anmelden",
+     titel: "errors.accountToApply",
+     text: "errors.signIn",
    },
-   404: { reason: "gone", titel: "fehler.stelleGeschlossen" },
+   404: { reason: "gone", titel: "errors.jobClosed" },
    // Weder abgelehnt noch angenommen: wir wissen es gerade nicht, und eine
    // Absage, die niemand ausgesprochen hat, wäre die schlimmere Antwort.
    503: {
      reason: "unavailable",
-     titel: "fehler.dienstSchweigt",
-     text: "fehler.spaeterErneut",
+     titel: "errors.serviceSilent",
+     text: "errors.tryLater",
    },
  };
  
  const ENTWURF_FEHLER: Partial<
    Record<number, Deutung<DraftFehler>>
  > = {
-   0: { reason: "offline", titel: "fehler.keineVerbindung" },
+   0: { reason: "offline", titel: "errors.noConnection" },
    401: {
      reason: "unauthenticated",
-     titel: "fehler.kontoZumBewerben",
-     text: "fehler.anmelden",
+     titel: "errors.accountToApply",
+     text: "errors.signIn",
    },
-   404: { reason: "not_found", titel: "fehler.entwurfNichtGefunden" },
-   409: { reason: "conflict", titel: "fehler.schrittNichtErlaubt" },
+   404: { reason: "not_found", titel: "errors.draftNotFound" },
+   409: { reason: "conflict", titel: "errors.stepNotAllowed" },
    503: {
      reason: "unavailable",
-     titel: "fehler.keinAnbieter",
-     text: "fehler.entwurfAnbieterFehlt",
+     titel: "errors.noProvider",
+     text: "errors.draftProviderMissing",
    },
  };
  
@@ -154,7 +154,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      path,
      { method: "POST", body },
-     "fehler.bewerbungNichtGesendet"
+     "errors.applicationNotSent"
    );
    if (answer.ok) return { ok: true, application: answer.value };
    // `409` behält den Satz des Servers: der Zustand passt nicht, und die Person
@@ -170,7 +170,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      path,
      { method, body },
-     "fehler.entwurfNichtGespeichert"
+     "errors.draftNotSaved"
    );
    if (answer.ok) return { ok: true, draft: alsEntwurf(answer.value) };
    if (answer.error.status === 409) {
@@ -190,7 +190,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      path,
      { method: "POST" },
-     "fehler.entwurfSchrittFehlgeschlagen"
+     "errors.draftStepFailed"
    );
    if (answer.ok) return { ok: true, draft: alsEntwurf(answer.value) };
    if (answer.error.status === 409) {
@@ -222,7 +222,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      path,
      { signal },
-     "fehler.listeNichtGeladen"
+     "errors.listNotLoaded"
    );
    if (answer.ok) return { ok: true, applications: answer.value ?? [] };
    // Kein Konto bzw. kein aktives Unternehmen: ein behebbarer Zustand, kein
@@ -232,7 +232,7 @@ export interface ApplicantContact {
    }
    return deuten<"fehlgeschlagen" | "offline">(
      answer.error,
-     { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+     { 0: { reason: "offline", titel: "errors.noConnection" } },
      "fehlgeschlagen"
    );
  }
@@ -256,28 +256,28 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      `/applications/${applicationId}`,
      { signal },
-     "fehler.unternehmensbewerbungNichtGeladen"
+     "errors.companyApplicationNotLoaded"
    );
    if (answer.ok) return { ok: true, application: answer.value };
    return deuten<BewerbungFehler>(
      answer.error,
      {
-       0: { reason: "offline", titel: "fehler.keineVerbindung" },
+       0: { reason: "offline", titel: "errors.noConnection" },
        401: {
          reason: "unauthenticated",
-         titel: "fehler.kontoZumBewerben",
-         text: "fehler.anmelden",
+         titel: "errors.accountToApply",
+         text: "errors.signIn",
        },
        403: {
          reason: "gone",
-         titel: "fehler.fuerFirmaHandelnNoetig",
-         text: "fehler.firmaWaehlen",
+         titel: "errors.actForCompanyRequired",
+         text: "errors.chooseCompany",
        },
-       404: { reason: "gone", titel: "fehler.ausschreibungFehlt" },
+       404: { reason: "gone", titel: "errors.jobMissing" },
        503: {
          reason: "unavailable",
-         titel: "fehler.dienstSchweigt",
-         text: "fehler.spaeterErneut",
+         titel: "errors.serviceSilent",
+         text: "errors.tryLater",
        },
      },
      "invalid"
@@ -290,13 +290,13 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      "/applications/drafts",
      { method: "POST", body: { job_ids: jobIds } },
-     "fehler.entwuerfeNichtAngelegt"
+     "errors.draftsNotCreated"
    ).then((answer) =>
      answer.ok
        ? { ok: true, drafts: (answer.value ?? []).map(alsEntwurf) }
        : deuten<"fehlgeschlagen" | "offline">(
            answer.error,
-           { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+           { 0: { reason: "offline", titel: "errors.noConnection" } },
            "fehlgeschlagen"
          )
    );
@@ -311,13 +311,13 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      "/applications/drafts",
      { signal },
-     "fehler.entwuerfeNichtGeladen"
+     "errors.draftsNotLoaded"
    ).then((answer) =>
      answer.ok
        ? { ok: true, drafts: (answer.value ?? []).map(alsEntwurf) }
        : deuten<"fehlgeschlagen" | "offline">(
            answer.error,
-           { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+           { 0: { reason: "offline", titel: "errors.noConnection" } },
            "fehlgeschlagen"
          )
    );
@@ -328,7 +328,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      `/applications/drafts/${draftId}`,
      { signal },
-     "fehler.entwurfNichtGeladen"
+     "errors.draftNotLoaded"
    ).then((answer) =>
      answer.ok
        ? { ok: true, draft: alsEntwurf(answer.value) }
@@ -372,7 +372,7 @@ export interface ApplicantContact {
      APPLICATIONS_BASE_URL,
      `/applications/drafts/${draftId}`,
      { method: "DELETE" },
-     "fehler.entwurfNichtGeloescht"
+     "errors.draftNotDeleted"
    ).then((answer) =>
      answer.ok
        ? { ok: true }

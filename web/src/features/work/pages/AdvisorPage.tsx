@@ -99,20 +99,20 @@ export function AdvisorPage() {
 
   if (laedt) {
     return (
-      <PageShell title={t("berater.titel")} narrow>
-        <LoadingBlock label={t("berater.laden")} />
+      <PageShell title={t("advisor.title")} narrow>
+        <LoadingBlock label={t("advisor.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn) {
     return (
-      <PageShell title={t("berater.titel")} narrow>
+      <PageShell title={t("advisor.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="berater.nurAngemeldet"
+                i18nKey="advisor.signedInOnly"
                 components={{ 1: <Link component={RouterLink} to="/login" /> }}
               />
             </Typography>
@@ -165,8 +165,8 @@ export function AdvisorPage() {
   }
 
   return (
-    <PageShell title={t("berater.titel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("berater.lead")}</Typography>
+    <PageShell title={t("advisor.title")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("advisor.lead")}</Typography>
 
       {fehler !== null && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -177,13 +177,13 @@ export function AdvisorPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1 }}>
-            {t("berater.mandatTitel")}
+            {t("advisor.mandateTitle")}
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            {t("berater.mandatLead")}
+            {t("advisor.mandateLead")}
           </Typography>
 
-          {mandat.pending && <LoadingBlock label={t("berater.laden")} />}
+          {mandat.pending && <LoadingBlock label={t("advisor.loading")} />}
 
           {!mandat.pending && mandat.data !== null && !mandat.data.ok && (
             <Alert
@@ -191,15 +191,15 @@ export function AdvisorPage() {
               // touches something and saves silently erases their own entries.
               severity="warning"
             >
-              {t("berater.mandatNichtAbrufbar")}
+              {t("advisor.mandateUnavailable")}
             </Alert>
           )}
 
           {mandat.data?.ok === true && (
             <Stack spacing={2}>
               <TextField
-                label={t("berater.eintritt")}
-                helperText={t("berater.eintrittHinweis")}
+                label={t("advisor.earliestStart")}
+                helperText={t("advisor.earliestStartHint")}
                 value={eintritt}
                 placeholder="2026-11"
                 onChange={(event) => setEintritt(event.target.value)}
@@ -207,33 +207,33 @@ export function AdvisorPage() {
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
-                  label={t("berater.gehaltVon")}
+                  label={t("advisor.salaryFrom")}
                   value={von}
                   inputMode="numeric"
                   onChange={(event) => setVon(event.target.value)}
                   fullWidth
                 />
                 <TextField
-                  label={t("berater.gehaltBis")}
+                  label={t("advisor.salaryTo")}
                   value={bis}
                   inputMode="numeric"
                   onChange={(event) => setBis(event.target.value)}
                   fullWidth
                 />
               </Stack>
-              <Typography variant="caption">{t("berater.gehaltHinweis")}</Typography>
+              <Typography variant="caption">{t("advisor.salaryHint")}</Typography>
 
               <TextField
-                label={t("berater.pensum")}
-                helperText={t("berater.pensumHinweis")}
+                label={t("advisor.workload")}
+                helperText={t("advisor.workloadHint")}
                 value={pensum}
                 inputMode="numeric"
                 onChange={(event) => setPensum(event.target.value)}
               />
 
               <TextField
-                label={t("berater.ausschluss")}
-                helperText={t("berater.ausschlussHinweis")}
+                label={t("advisor.excluded")}
+                helperText={t("advisor.excludedHint")}
                 value={ausschluss}
                 placeholder="arbeitgeber.de"
                 onChange={(event) => setAusschluss(event.target.value)}
@@ -244,14 +244,14 @@ export function AdvisorPage() {
                 // BEFORE the decision, not behind it.
                 severity="info"
               >
-                {t("berater.ausschlussWarnung")}
+                {t("advisor.excludedWarning")}
               </Alert>
 
-              {gespeichert && <Alert severity="success">{t("berater.gespeichert")}</Alert>}
+              {gespeichert && <Alert severity="success">{t("advisor.saved")}</Alert>}
 
               <Box>
                 <Button variant="contained" onClick={speichern} disabled={laeuft}>
-                  {laeuft ? t("berater.speichert") : t("berater.speichern")}
+                  {laeuft ? t("advisor.saving") : t("advisor.save")}
                 </Button>
               </Box>
             </Stack>
@@ -260,22 +260,22 @@ export function AdvisorPage() {
       </Card>
 
       <Typography variant="h2" sx={{ mb: 1 }}>
-        {t("berater.gespraecheTitel")}
+        {t("advisor.conversationsTitle")}
       </Typography>
       <Typography variant="body2" sx={{ mb: 2 }}>
-        {t("berater.gespraecheLead")}
+        {t("advisor.conversationsLead")}
       </Typography>
 
-      {gespraeche.pending && <LoadingBlock label={t("berater.laden")} />}
+      {gespraeche.pending && <LoadingBlock label={t("advisor.loading")} />}
 
       {gespraeche.data?.ok === false && (
-        <Alert severity="warning">{t("fehler.ledgerSchweigt")}</Alert>
+        <Alert severity="warning">{t("errors.ledgerSilent")}</Alert>
       )}
 
       {gespraeche.data?.ok === true && gespraeche.data.items.length === 0 && (
         <EmptyBlock
-          title={t("berater.keineGespraeche")}
-          hint={t("berater.keineGespraecheHinweis")}
+          title={t("advisor.noConversations")}
+          hint={t("advisor.noConversationsHint")}
         />
       )}
 
@@ -321,9 +321,9 @@ function Gespraechskarte({
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-          <Chip label={t(`berater.stand_${gespraech.state}`)} size="small" />
+          <Chip label={t(`advisor.state_${gespraech.state}`)} size="small" />
           <Chip
-            label={t(`berater.stufe${gespraech.stage}Kurz`)}
+            label={t(`advisor.stage${gespraech.stage}Short`)}
             size="small"
             color={gespraech.stage > 0 ? "primary" : "default"}
             variant={gespraech.stage > 0 ? "filled" : "outlined"}
@@ -335,19 +335,19 @@ function Gespraechskarte({
         )}
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.eroeffnetAm", {
+          {t("advisor.openedOn", {
             datum: new Date(gespraech.opened_at).toLocaleDateString(),
           })}
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 2 }}>
-          {t(`berater.stufe${Math.min(gespraech.stage + 1, 3)}`)}
+          {t(`advisor.stage${Math.min(gespraech.stage + 1, 3)}`)}
         </Typography>
 
         <Divider sx={{ mb: 2 }} />
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.wirkungSofort")}
+          {t("advisor.effectImmediate")}
         </Typography>
 
         {gespraech.stage > 0 && (
@@ -360,7 +360,7 @@ function Gespraechskarte({
             variant="caption"
             sx={{ display: "block", mb: 1 }}
           >
-            {t("berater.zurueckHinweis")}
+            {t("advisor.backHint")}
           </Typography>
         )}
 
@@ -372,7 +372,7 @@ function Gespraechskarte({
               disabled={laeuft}
               onClick={() => aufStufe(true, naechste)}
             >
-              {t("berater.freigeben", { nummer: naechste })}
+              {t("advisor.releaseStage", { nummer: naechste })}
             </Button>
           )}
 
@@ -386,27 +386,27 @@ function Gespraechskarte({
               onClick={() => aufStufe(false, gespraech.stage)}
             >
               {gespraech.stage === 1
-                ? t("berater.zuruecknehmen")
-                : t("berater.zurueckAuf", { nummer: gespraech.stage - 1 })}
+                ? t("advisor.withdrawRelease")
+                : t("advisor.backToStage", { nummer: gespraech.stage - 1 })}
             </Button>
           )}
 
           {gespraech.state === "talking" && (
             <Button size="small" disabled={laeuft} onClick={() => zug("agree")}>
-              {t("berater.zustimmen")}
+              {t("advisor.agree")}
             </Button>
           )}
 
           {offen && (
             <Button size="small" color="error" disabled={laeuft} onClick={() => zug("end")}>
-              {t("berater.beenden")}
+              {t("advisor.end")}
             </Button>
           )}
         </Stack>
 
         {gespraech.state === "agreed" && (
           <Alert severity="success" sx={{ mt: 2 }}>
-            {t("berater.zugestimmt")}
+            {t("advisor.agreed")}
           </Alert>
         )}
       </CardContent>

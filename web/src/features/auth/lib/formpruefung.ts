@@ -46,14 +46,14 @@ export function emailFehler(email: string): string | null {
   // Ein leeres Feld ist noch kein Fehler.
   if (email.trim().length === 0) return null;
 
-  return siehtNachAdresseAus(email) ? null : "registrierung.emailUngueltig";
+  return siehtNachAdresseAus(email) ? null : "register.emailInvalid";
 }
 
 /** Der Katalogschlüssel für das, was am Passwort nicht stimmt — oder `null`. */
 export function passwortFehler(passwort: string): string | null {
   if (passwort.length === 0) return null;
-  if (passwort.length < PASSWORT_MINDESTLAENGE) return "registrierung.passwortZuKurz";
-  if (passwortBytes(passwort) > PASSWORT_HOECHSTBYTES) return "registrierung.passwortZuLang";
+  if (passwort.length < PASSWORT_MINDESTLAENGE) return "register.passwordTooShort";
+  if (passwortBytes(passwort) > PASSWORT_HOECHSTBYTES) return "register.passwordTooLong";
 
   return null;
 }

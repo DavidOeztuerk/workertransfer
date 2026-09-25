@@ -34,10 +34,10 @@ import {
 } from "../api/market";
 
 /** Nur die Werte — Beschriftung und Hinweis stehen in den Katalogen. */
-const WAHLEN: { value: Availability; name: string }[] = [
-  { value: "open", name: "Open" },
-  { value: "listening", name: "Listening" },
-  { value: "unavailable", name: "Unavailable" },
+const WAHLEN: { value: Availability; label: string; hint: string }[] = [
+  { value: "open", label: "market.choiceOpen", hint: "market.choiceOpenHint" },
+  { value: "listening", label: "market.choiceListening", hint: "market.choiceListeningHint" },
+  { value: "unavailable", label: "market.choiceUnavailable", hint: "market.choiceUnavailableHint" },
 ];
 
 /**
@@ -88,12 +88,12 @@ export function MarketPage() {
 
   if (!signedIn) {
     return (
-      <PageShell title={t("markt.titel")} narrow>
+      <PageShell title={t("market.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="markt.anmelden"
+                i18nKey="market.signInRequired"
                 components={{
                   1: <Link component={RouterLink} to="/login" />,
                 }}
@@ -144,9 +144,9 @@ export function MarketPage() {
 
   return (
     <PageShell
-      title={t("markt.titel")}
+      title={t("market.title")}
       narrow
-      lead={t("markt.lead")}
+      lead={t("market.lead")}
     >
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -157,11 +157,11 @@ export function MarketPage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("markt.anfragen")}
+            {t("market.requests")}
           </Typography>
 
           {anfragen.pending ? (
-            <LoadingBlock label={t("markt.anfragenLaden")} />
+            <LoadingBlock label={t("market.requestsLoading")} />
           ) : null}
 
           {anfragen.data !== null && !anfragen.data.ok ? (
@@ -169,7 +169,7 @@ export function MarketPage() {
           ) : null}
 
           {anfragen.data?.ok && list.length === 0 ? (
-            <EmptyBlock title={t("markt.anfragenLeer")} />
+            <EmptyBlock title={t("market.requestsEmpty")} />
           ) : null}
 
           {list.length > 0 ? (
@@ -203,16 +203,16 @@ export function MarketPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("markt.ansprechbar")}
+            {t("market.approachable")}
           </Typography>
 
           {current.pending ? (
-            <LoadingBlock label={t("markt.standLaden")} />
+            <LoadingBlock label={t("market.statusLoading")} />
           ) : null}
 
           {saved ? (
             <Alert severity="success" sx={{ mb: 2 }} role="status">
-              {t("markt.gespeichert")}
+              {t("market.saved")}
             </Alert>
           ) : null}
 
@@ -224,7 +224,7 @@ export function MarketPage() {
             }}
           >
             <FormControl sx={{ mb: 2 }}>
-              <FormLabel id="markt-status">{t("markt.status")}</FormLabel>
+              <FormLabel id="markt-status">{t("market.status")}</FormLabel>
               <RadioGroup
                 aria-labelledby="markt-status"
                 // A shared `name` is what makes the arrow keys move the focus
@@ -241,14 +241,14 @@ export function MarketPage() {
                     <FormControlLabel
                       value={choice.value}
                       control={<Radio />}
-                      label={t(`markt.wahl${choice.name}`)}
+                      label={t(choice.label)}
                     />
                     <Typography
                       variant="body2"
                       color="text.secondary"
                       sx={{ ml: 4 }}
                     >
-                      {t(`markt.wahl${choice.name}Hinweis`)}
+                      {t(choice.hint)}
                     </Typography>
                   </Box>
                 ))}
@@ -270,25 +270,25 @@ export function MarketPage() {
                   }}
                 />
               }
-              label={t("markt.beschaeftigt")}
+              label={t("market.employed")}
               sx={{ mb: 2, display: "block" }}
             />
 
             <TextField
-              label={t("markt.notiz")}
+              label={t("market.note")}
               value={notiz}
               onChange={(event) => {
                 setGespeichert(false);
                 setNotiz(event.target.value);
               }}
-              helperText={t("markt.notizHinweis")}
+              helperText={t("market.noteHint")}
               multiline
               minRows={3}
               sx={{ mb: 2 }}
             />
 
             <Button type="submit" variant="contained" disabled={running}>
-              {running ? t("markt.speichernLaeuft") : t("markt.speichern")}
+              {running ? t("market.saving") : t("market.save")}
             </Button>
           </Box>
         </CardContent>
@@ -319,13 +319,13 @@ function Anfragezeile({
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
   const current = open
-    ? t("markt.standOffen")
+    ? t("market.statusOpen")
     : anfrage.status === "DECLINED"
-      ? t("markt.standAbgelehnt")
+      ? t("market.statusDeclined")
       : t(
           haeltZugriff
-            ? "markt.standFreigegeben"
-            : "markt.standZurueckgezogen",
+            ? "market.statusReleased"
+            : "market.statusWithdrawn",
         );
 
   return (
@@ -341,7 +341,7 @@ function Anfragezeile({
       >
         <Box>
           <Typography variant="h4">
-            {t("markt.anfrageTitel")}
+            {t("market.requestTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {current}
@@ -357,7 +357,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(true)}
                 disabled={locked}
               >
-                {t("allgemein.freigeben")}
+                {t("common.release")}
               </Button>
               <Button
                 variant="text"
@@ -365,7 +365,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(false)}
                 disabled={locked}
               >
-                {t("allgemein.ablehnen")}
+                {t("common.decline")}
               </Button>
             </>
           ) : null}
@@ -376,7 +376,7 @@ function Anfragezeile({
               onClick={onZurueck}
               disabled={locked}
             >
-              {t("allgemein.zurueckziehen")}
+              {t("common.withdraw")}
             </Button>
           ) : null}
         </Box>

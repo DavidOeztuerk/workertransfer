@@ -44,16 +44,17 @@ import {
  */
 const SCHALTER: {
   key: keyof Benachrichtigungswahl;
-  name: string;
+  label: string;
+  hint: string;
 }[] = [
-  { key: "market_request", name: "markt" },
-  { key: "resume_request", name: "lebenslauf" },
-  { key: "transfer_update", name: "transfer" },
-  { key: "application_update", name: "bewerbung" },
-  { key: "application_received", name: "eingang" },
-  { key: "profile_discovered", name: "entdeckt" },
-  { key: "advisor_conversation", name: "berater" },
-  { key: "assessment_update", name: "probe" },
+  { key: "market_request", label: "settings.marketLabel", hint: "settings.marketHint" },
+  { key: "resume_request", label: "settings.resumeLabel", hint: "settings.resumeHint" },
+  { key: "transfer_update", label: "settings.transferLabel", hint: "settings.transferHint" },
+  { key: "application_update", label: "settings.applicationLabel", hint: "settings.applicationHint" },
+  { key: "application_received", label: "settings.receivedLabel", hint: "settings.receivedHint" },
+  { key: "profile_discovered", label: "settings.discoveredLabel", hint: "settings.discoveredHint" },
+  { key: "advisor_conversation", label: "settings.advisorLabel", hint: "settings.advisorHint" },
+  { key: "assessment_update", label: "settings.assessmentLabel", hint: "settings.assessmentHint" },
 ];
 
 /**
@@ -87,8 +88,8 @@ export function SettingsPage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel={t("einstellungen.titel")}
-        satz="einstellungen.anmelden"
+        titel={t("settings.title")}
+        satz="settings.signInRequired"
       />
     );
   }
@@ -120,14 +121,14 @@ export function SettingsPage() {
 
   return (
     <PageShell
-      title={t("einstellungen.titel")}
+      title={t("settings.title")}
       narrow
-      lead={t("einstellungen.lead")}
+      lead={t("settings.lead")}
     >
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("einstellungen.benachrichtigungen")}
+            {t("settings.notifications")}
           </Typography>
 
           {fehler !== null ? (
@@ -137,12 +138,12 @@ export function SettingsPage() {
           ) : null}
 
           {choice.laedt ? (
-            <LoadingBlock label={t("einstellungen.laden")} />
+            <LoadingBlock label={t("settings.loading")} />
           ) : null}
 
           {choice.value === null && !choice.laedt ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("einstellungen.nichtAbrufbar")}
+              {t("settings.unavailable")}
             </Alert>
           ) : null}
 
@@ -150,8 +151,8 @@ export function SettingsPage() {
             {SCHALTER.map((entry) => (
               <ConsentSwitch
                 key={entry.key}
-                label={t(`einstellungen.${entry.name}Label`)}
-                hint={t(`einstellungen.${entry.name}Hinweis`)}
+                label={t(entry.label)}
+                hint={t(entry.hint)}
                 checked={werte[entry.key]}
                 disabled={saving || unbekannt}
                 onChange={(neu) => void umschalten(entry.key, neu)}
@@ -160,7 +161,7 @@ export function SettingsPage() {
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-            {t("einstellungen.takt")}
+            {t("settings.rate")}
           </Typography>
         </CardContent>
       </Card>
@@ -185,7 +186,7 @@ function Darstellungsblock() {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 2.5 }}>
-          {t("einstellungen.darstellungTitel")}
+          {t("settings.appearanceTitle")}
         </Typography>
         <DarstellungsAbschnitte />
       </CardContent>
@@ -214,34 +215,34 @@ function Datenschutzblock() {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 2 }}>
-          {t("einstellungen.datenschutz")}
+          {t("settings.privacy")}
         </Typography>
 
-        {stand.laedt ? <LoadingBlock label={t("einstellungen.laden")} /> : null}
+        {stand.laedt ? <LoadingBlock label={t("settings.loading")} /> : null}
 
         {einstellungen !== null ? (
           <>
             <TextField
               select
-              label={t("einstellungen.verfall")}
+              label={t("settings.expiry")}
               value={String(einstellungen.deleteAfterMonths ?? "")}
-              helperText={t("einstellungen.verfallHinweis")}
+              helperText={t("settings.expiryHint")}
               onChange={(event) =>
                 void setze(event.target.value === "" ? null : Number(event.target.value))
               }
               sx={{ maxWidth: 360 }}
             >
-              <MenuItem value="">{t("einstellungen.verfallNie")}</MenuItem>
+              <MenuItem value="">{t("settings.expiryNever")}</MenuItem>
               {[6, 12, 24, 36].map((monate) => (
                 <MenuItem key={monate} value={monate}>
-                  {t("einstellungen.verfallMonate", { count: monate })}
+                  {t("settings.expiryMonths", { count: monate })}
                 </MenuItem>
               ))}
             </TextField>
 
             {saved ? (
               <Alert severity="success" role="status" sx={{ mt: 2 }}>
-                {t("einstellungen.gespeichertKurz")}
+                {t("settings.savedShort")}
               </Alert>
             ) : null}
           </>
@@ -295,35 +296,35 @@ function KiBlock() {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t("einstellungen.ki")}
+          {t("settings.ai")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {t("einstellungen.kiLead")}
+          {t("settings.aiLead")}
         </Typography>
 
-        {stand.laedt ? <LoadingBlock label={t("einstellungen.laden")} /> : null}
+        {stand.laedt ? <LoadingBlock label={t("settings.loading")} /> : null}
 
         {einstellungen !== null ? (
           <Box sx={{ display: "grid", gap: 2.5 }}>
             <TextField
               select
-              label={t("einstellungen.anbieter")}
+              label={t("settings.provider")}
               value={einstellungen.provider ?? "none"}
-              helperText={t("einstellungen.anbieterHinweis")}
+              helperText={t("settings.providerHint")}
               onChange={(event) => void setze({ provider: event.target.value as KiAnbieter })}
             >
-              <MenuItem value="none">{t("einstellungen.anbieterKeiner")}</MenuItem>
+              <MenuItem value="none">{t("settings.providerNone")}</MenuItem>
               <MenuItem value="openai_compatible">
-                {t("einstellungen.anbieterOllama")}
+                {t("settings.providerOllama")}
               </MenuItem>
-              <MenuItem value="anthropic">{t("einstellungen.anbieterAnthropic")}</MenuItem>
+              <MenuItem value="anthropic">{t("settings.providerAnthropic")}</MenuItem>
             </TextField>
 
             {einstellungen.provider !== "none" ? (
               <>
                 <TextField
-                  label={t("einstellungen.adresse")}
-                  helperText={t("einstellungen.adresseHinweis")}
+                  label={t("settings.address")}
+                  helperText={t("settings.addressHint")}
                   value={einstellungen.baseUrl ?? ""}
                   onChange={(event) =>
                     stand.setze({ ...einstellungen, baseUrl: event.target.value })
@@ -331,8 +332,8 @@ function KiBlock() {
                   onBlur={() => void setze({ baseUrl: einstellungen.baseUrl ?? "" })}
                 />
                 <TextField
-                  label={t("einstellungen.modell")}
-                  helperText={t("einstellungen.modellHinweis")}
+                  label={t("settings.model")}
+                  helperText={t("settings.modelHint")}
                   value={einstellungen.model ?? ""}
                   onChange={(event) =>
                     stand.setze({ ...einstellungen, model: event.target.value })
@@ -343,29 +344,29 @@ function KiBlock() {
                 {!eigenerServer ? (
                   <Box>
                     <TextField
-                      label={t("einstellungen.schluessel")}
+                      label={t("settings.key")}
                       type="password"
                       autoComplete="off"
                       value={schluessel}
                       onChange={(event) => setSchluessel(event.target.value)}
-                      helperText={t("einstellungen.schluesselHinweis")}
+                      helperText={t("settings.keyHint")}
                     />
                     <Box sx={{ display: "flex", gap: 1.5, mt: 1.5, alignItems: "center" }}>
                       <Button variant="outlined" onClick={() => void speichereDenSchluessel()}>
-                        {t("einstellungen.schluesselSpeichern")}
+                        {t("settings.keySave")}
                       </Button>
                       <Typography variant="body2" color="text.secondary">
                         {einstellungen.keyPresent
-                          ? t("einstellungen.schluesselDa", { endung: einstellungen.keyTail })
-                          : t("einstellungen.schluesselKeiner")}
+                          ? t("settings.keyStored", { endung: einstellungen.keyTail })
+                          : t("settings.keyNone")}
                       </Typography>
                     </Box>
                   </Box>
                 ) : null}
 
                 <ConsentSwitch
-                  label={t("einstellungen.kiProtokoll")}
-                  hint={t("einstellungen.kiProtokollHinweis")}
+                  label={t("settings.aiLog")}
+                  hint={t("settings.aiLogHint")}
                   checked={einstellungen.auditLog === true}
                   onChange={(next) => void setze({ auditLog: next })}
                 />
@@ -374,7 +375,7 @@ function KiBlock() {
 
             {saved ? (
               <Alert severity="success" role="status">
-                {t("einstellungen.gespeichertKurz")}
+                {t("settings.savedShort")}
               </Alert>
             ) : null}
           </Box>
@@ -397,17 +398,17 @@ function Nachweisblock() {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t("einstellungen.nachweise")}
+          {t("settings.records")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {t("einstellungen.nachweiseLead")}
+          {t("settings.recordsLead")}
         </Typography>
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
           <Button component={RouterLink} to="/consents" variant="outlined">
-            {t("einstellungen.nachweiseFreigaben")}
+            {t("settings.recordsConsents")}
           </Button>
           <Button component={RouterLink} to="/my-data" variant="outlined">
-            {t("einstellungen.nachweiseDaten")}
+            {t("settings.recordsData")}
           </Button>
           <Button
             component={RouterLink}
@@ -417,12 +418,12 @@ function Nachweisblock() {
             variant="outlined"
             color="error"
           >
-            {t("kopf.kontoLoeschen")}
+            {t("header.deleteAccount")}
           </Button>
         </Box>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-          <strong>{t("einstellungen.firma")}.</strong> {t("einstellungen.firmaLead")}
+          <strong>{t("settings.company")}.</strong> {t("settings.companyLead")}
         </Typography>
       </CardContent>
     </Card>

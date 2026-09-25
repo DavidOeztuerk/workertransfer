@@ -7,7 +7,7 @@ import { LoadingBlock } from "../ui";
  *  Modulaufbau stünde die Sprache fest, bevor jemand sie wählen konnte. */
 function Seitenladefeld() {
   const { t } = useTranslation();
-  return <LoadingBlock label={t("allgemein.seiteLaedt")} />;
+  return <LoadingBlock label={t("common.pageLoading")} />;
 }
 
 /**

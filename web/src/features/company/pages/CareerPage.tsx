@@ -89,10 +89,10 @@ export function CareerPage() {
 
   if (unternehmen.pending) {
     return (
-      <PageShell title={t("karriere.titel")} narrow>
+      <PageShell title={t("careers.title")} narrow>
         <Card>
           <CardContent>
-            <LoadingBlock label={t("karriere.laden")} />
+            <LoadingBlock label={t("careers.loading")} />
           </CardContent>
         </Card>
       </PageShell>
@@ -104,9 +104,9 @@ export function CareerPage() {
     unternehmen.data.reason === "unavailable"
   ) {
     return (
-      <PageShell title={t("karriere.titel")} narrow>
+      <PageShell title={t("careers.title")} narrow>
         <Alert severity="warning">
-          {unternehmen.data.error.detail} {t("karriere.nichtAbrufbar")}
+          {unternehmen.data.error.detail} {t("careers.unavailable")}
         </Alert>
       </PageShell>
     );
@@ -114,12 +114,12 @@ export function CareerPage() {
 
   if (profile === undefined) {
     return (
-      <PageShell title={t("karriere.keineFirmaTitel")} narrow>
+      <PageShell title={t("careers.noCompanyTitle")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="karriere.keineFirma"
+                i18nKey="careers.noCompany"
                 components={{ 1: <Link component={RouterLink} to="/jobs" /> }}
               />
             </Typography>
@@ -148,7 +148,7 @@ export function CareerPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>
-              {t("karriere.ueberUns")}
+              {t("careers.aboutUs")}
             </Typography>
             <Typography>{profile.about}</Typography>
           </CardContent>
@@ -160,7 +160,7 @@ export function CareerPage() {
           <CardContent>
             {profile.locations.length > 0 ? (
               <Typography sx={{ mb: profile.benefits.length > 0 ? 1.5 : 0 }}>
-                {t("karriere.standorte", {
+                {t("careers.locations", {
                   orte: profile.locations.join(", "),
                 })}
               </Typography>
@@ -181,7 +181,7 @@ export function CareerPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("karriere.offeneStellen")}
+            {t("careers.openJobs")}
           </Typography>
 
           {bewerbungsfehler !== null ? (
@@ -191,17 +191,17 @@ export function CareerPage() {
           ) : null}
 
           {stellen.pending ? (
-            <LoadingBlock label={t("karriere.stellenLaden")} />
+            <LoadingBlock label={t("careers.jobsLoading")} />
           ) : null}
 
           {abrufGescheitert ? (
             <Alert severity="warning">
-              {t("karriere.stellenNichtAbrufbar")}
+              {t("careers.jobsUnavailable")}
             </Alert>
           ) : null}
 
           {!stellen.pending && !abrufGescheitert && list.length === 0 ? (
-            <EmptyBlock title={t("karriere.leer")} />
+            <EmptyBlock title={t("careers.empty")} />
           ) : null}
 
           {list.length > 0 ? (
@@ -232,7 +232,7 @@ export function CareerPage() {
                       <Typography variant="body2" color="text.secondary">
                         {stelle.location !== ""
                           ? stelle.location
-                          : t("karriere.ortFehlt")}{" "}
+                          : t("careers.locationMissing")}{" "}
                         · {remoteLabel(stelle.remote)}
                       </Typography>
                     </Box>
@@ -249,7 +249,7 @@ export function CareerPage() {
                         ) : null
                       }
                     >
-                      {t("karriere.bewerben")}
+                      {t("careers.apply")}
                     </Button>
                   </CardContent>
                 </Card>

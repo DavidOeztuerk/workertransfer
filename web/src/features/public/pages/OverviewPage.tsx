@@ -37,7 +37,7 @@ function eintraegeFuerMich(current: Aufgabenstand): Eintrag[] {
 
   if (current.marktanfragen > 0) {
     eintraege.push({
-      key: "uebersicht.marktanfragen",
+      key: "overview.marketRequests",
       anzahl: current.marktanfragen,
       ziel: "/market",
     });
@@ -45,7 +45,7 @@ function eintraegeFuerMich(current: Aufgabenstand): Eintrag[] {
 
   if (current.lebenslaufanfragen > 0) {
     eintraege.push({
-      key: "uebersicht.lebenslaufanfragen",
+      key: "overview.resumeRequests",
       anzahl: current.lebenslaufanfragen,
       ziel: "/resume",
     });
@@ -53,7 +53,7 @@ function eintraegeFuerMich(current: Aufgabenstand): Eintrag[] {
 
   if (current.eigeneGespraeche > 0) {
     eintraege.push({
-      key: "uebersicht.gespraeche",
+      key: "overview.conversations",
       anzahl: current.eigeneGespraeche,
       ziel: "/transfers",
     });
@@ -66,7 +66,7 @@ function eintraegeFuerDieFirma(current: Aufgabenstand): Eintrag[] {
   if (current.firmenvorgaenge === 0) return [];
   return [
     {
-      key: "uebersicht.firmenvorgaenge",
+      key: "overview.companyTransfers",
       anzahl: current.firmenvorgaenge,
       ziel: "/company/transfers",
     },
@@ -143,7 +143,7 @@ export function OverviewPage() {
 
   if (status === "unknown") {
     return (
-      <PageShell title={t("uebersicht.titel")} narrow>
+      <PageShell title={t("overview.title")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -157,35 +157,35 @@ export function OverviewPage() {
 
   return (
     <PageShell
-      title={t("uebersicht.titel")}
+      title={t("overview.title")}
       narrow
-      lead={t("uebersicht.lead")}
+      lead={t("overview.lead")}
     >
       {current === null ? <LoadingBlock /> : null}
 
       {current?.unvollstaendig === true ? (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          {t("uebersicht.unvollstaendig")}
+          {t("overview.incomplete")}
         </Alert>
       ) : null}
 
       {current !== null && nichts && !current.unvollstaendig ? (
         <EmptyBlock
-          title={t("uebersicht.leerTitel")}
-          hint={t("uebersicht.leerHinweis")}
+          title={t("overview.emptyTitle")}
+          hint={t("overview.emptyHint")}
           action={
             <Button component={RouterLink} to="/consents" variant="outlined">
-              {t("uebersicht.leerKnopf")}
+              {t("overview.emptyButton")}
             </Button>
           }
         />
       ) : null}
 
       {meine.length > 0 ? (
-        <Liste titel={t("uebersicht.fuerDich")} eintraege={meine} />
+        <Liste titel={t("overview.forYou")} eintraege={meine} />
       ) : null}
       {firmen.length > 0 ? (
-        <Liste titel={t("uebersicht.fuerDieFirma")} eintraege={firmen} />
+        <Liste titel={t("overview.forCompany")} eintraege={firmen} />
       ) : null}
     </PageShell>
   );

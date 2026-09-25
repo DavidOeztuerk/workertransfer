@@ -129,10 +129,10 @@ export function JobFilterSidebar({
   const hinweis =
     ortung.fehler ??
     (hatStandort
-      ? t("stellen.standortGerundet")
+      ? t("jobs.locationRounded")
       : ortung.moeglich
         ? null
-        : t("standort.nichtMoeglich"));
+        : t("geolocation.unsupported"));
 
   return (
     <Paper
@@ -158,7 +158,7 @@ export function JobFilterSidebar({
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
         <TuneIcon fontSize="small" color="action" />
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          {t("stellen.filter")}
+          {t("jobs.filter")}
         </Typography>
         {anzahl > 0 ? (
           <Button
@@ -167,7 +167,7 @@ export function JobFilterSidebar({
             startIcon={<ClearIcon fontSize="small" />}
             onClick={onReset}
           >
-            {t("stellen.filterZuruecksetzen")}
+            {t("jobs.filterReset")}
           </Button>
         ) : null}
       </Box>
@@ -178,7 +178,7 @@ export function JobFilterSidebar({
           color="text.secondary"
           sx={{ display: "block", mb: 2 }}
         >
-          {t("stellen.aktiveFilter", { count: anzahl })}
+          {t("jobs.activeFilters", { count: anzahl })}
         </Typography>
       ) : null}
 
@@ -186,8 +186,8 @@ export function JobFilterSidebar({
 
       <Box sx={{ display: "grid", gap: 2.5 }}>
         <TextField
-          label={t("stellen.suchbegriff")}
-          placeholder={t("stellen.suchbegriffBeispiel")}
+          label={t("jobs.searchTerm")}
+          placeholder={t("jobs.searchTermExample")}
           value={entwurf.q}
           onChange={(ereignis) =>
             onChange({ ...entwurf, q: ereignis.target.value })
@@ -195,11 +195,11 @@ export function JobFilterSidebar({
         />
 
         <TextField
-          label={t("stellen.faehigkeiten")}
+          label={t("jobs.skills")}
           // No helper text below the field: the placeholder says the same thing
           // shorter, and three lines under one of six fields turn a filter bar
           // into a manual.
-          placeholder={t("stellen.faehigkeitenBeispiel")}
+          placeholder={t("jobs.skillsExample")}
           value={entwurf.skills}
           onChange={(ereignis) =>
             onChange({ ...entwurf, skills: ereignis.target.value })
@@ -208,7 +208,7 @@ export function JobFilterSidebar({
 
         <TextField
           select
-          label={t("stellen.arbeitsform")}
+          label={t("jobs.workMode")}
           value={entwurf.remote}
           onChange={(ereignis) => {
             const gewaehlt = ereignis.target.value as RemoteMode | "";
@@ -223,7 +223,7 @@ export function JobFilterSidebar({
             });
           }}
         >
-          <MenuItem value="">{t("stellen.egal")}</MenuItem>
+          <MenuItem value="">{t("jobs.any")}</MenuItem>
           {REMOTE_MODES.map((wert) => (
             <MenuItem key={wert} value={wert}>
               {remoteLabel(wert)}
@@ -233,7 +233,7 @@ export function JobFilterSidebar({
 
         <TextField
           select
-          label={t("stellen.beschaeftigungsart")}
+          label={t("jobs.employmentType")}
           value={entwurf.employment}
           onChange={(ereignis) =>
             onChange({
@@ -242,7 +242,7 @@ export function JobFilterSidebar({
             })
           }
         >
-          <MenuItem value="">{t("stellen.egal")}</MenuItem>
+          <MenuItem value="">{t("jobs.any")}</MenuItem>
           {EMPLOYMENT_TYPES.map((wert) => (
             <MenuItem key={wert} value={wert}>
               {employmentLabel(wert)}
@@ -257,7 +257,7 @@ export function JobFilterSidebar({
           sx={{ display: "grid", gap: 1.25 }}
         >
           <TextField
-            label={t("stellen.ort")}
+            label={t("jobs.location")}
             value={entwurf.location}
             onChange={(ereignis) =>
               onChange({ ...entwurf, location: ereignis.target.value })
@@ -270,7 +270,7 @@ export function JobFilterSidebar({
                 <TextField
                   select
                   sx={{ flexGrow: 1 }}
-                  label={t("stellen.entfernung")}
+                  label={t("jobs.distance")}
                   value={entwurf.radius}
                   // OHNE Mitte ist dieses Feld tot, und das ist ehrlicher als
                   // eine Auswahl, die man treffen kann und die dann nichts tut:
@@ -281,10 +281,10 @@ export function JobFilterSidebar({
                     onChange({ ...entwurf, radius: ereignis.target.value })
                   }
                 >
-                  <MenuItem value="">{t("stellen.egal")}</MenuItem>
+                  <MenuItem value="">{t("jobs.any")}</MenuItem>
                   {ENTFERNUNGEN.map((km) => (
                     <MenuItem key={km} value={String(km)}>
-                      {t("stellen.kilometer", { km })}
+                      {t("jobs.kilometers", { km })}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -292,8 +292,8 @@ export function JobFilterSidebar({
                 <Tooltip
                   title={
                     hatStandort
-                      ? t("stellen.standortVergessen")
-                      : t("stellen.standortHolenHinweis")
+                      ? t("jobs.forgetLocation")
+                      : t("jobs.useLocationHint")
                   }
                 >
                   <Box
@@ -305,8 +305,8 @@ export function JobFilterSidebar({
                     <IconButton
                       aria-label={
                         hatStandort
-                          ? t("stellen.standortVergessen")
-                          : t("stellen.standortHolen")
+                          ? t("jobs.forgetLocation")
+                          : t("jobs.useLocation")
                       }
                       color={hatStandort ? "primary" : "default"}
                       disabled={!ortung.moeglich || ortung.laedt}
@@ -344,7 +344,7 @@ export function JobFilterSidebar({
         </Box>
 
         <Button type="submit" variant="contained" fullWidth>
-          {t("stellen.suchen")}
+          {t("jobs.search")}
         </Button>
       </Box>
     </Paper>

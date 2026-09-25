@@ -31,7 +31,7 @@ export async function getCandidateProfile(
     PROFILE_BASE_URL,
     `/profiles/${subjectId}`,
     { signal },
-    "fehler.profilNichtAbrufbar"
+    "errors.profileUnavailable"
   );
   if (answer.ok) return answer.value ?? null;
   return null;

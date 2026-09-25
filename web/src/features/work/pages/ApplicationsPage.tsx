@@ -25,11 +25,11 @@ import {
 
 /** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const STAND: Record<ApplicationStatus, string> = {
-  submitted: "bewerbungen.standSubmitted",
-  reviewing: "bewerbungen.standReviewing",
-  rejected: "bewerbungen.standRejected",
-  withdrawn: "bewerbungen.standWithdrawn",
-  hired: "bewerbungen.standHired",
+  submitted: "applications.statusSubmitted",
+  reviewing: "applications.statusReviewing",
+  rejected: "applications.statusRejected",
+  withdrawn: "applications.statusWithdrawn",
+  hired: "applications.statusHired",
 };
 
 /** Läuft die Bewerbung noch — also sieht das Unternehmen gerade etwas? */
@@ -46,9 +46,9 @@ function freigegeben(
   bewerbung: Application,
   t: (key: string) => string,
 ): string {
-  const parts = [t("bewerbungen.teilProfil")];
-  if (bewerbung.shares_resume) parts.push(t("bewerbungen.teilLebenslauf"));
-  if (bewerbung.shares_portfolio) parts.push(t("bewerbungen.teilArbeiten"));
+  const parts = [t("applications.partProfile")];
+  if (bewerbung.shares_resume) parts.push(t("applications.partResume"));
+  if (bewerbung.shares_portfolio) parts.push(t("applications.partPortfolio"));
   return parts.join(", ");
 }
 
@@ -78,12 +78,12 @@ export function ApplicationsPage() {
 
   if (!signedIn) {
     return (
-      <PageShell title={t("bewerbungen.titel")} narrow>
+      <PageShell title={t("applications.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="bewerbungen.anmelden"
+                i18nKey="applications.signInRequired"
                 components={{ 1: <Link component={RouterLink} to="/login" /> }}
               />
             </Typography>
@@ -107,13 +107,13 @@ export function ApplicationsPage() {
 
   return (
     <PageShell
-      title={t("bewerbungen.titel")}
+      title={t("applications.title")}
       narrow
-      lead={t("bewerbungen.lead")}
+      lead={t("applications.lead")}
     >
       <Typography variant="body2" sx={{ mb: 2 }}>
         <Link component={RouterLink} to="/applications/drafts">
-          {t("bewerbungen.zuEntwuerfen")}
+          {t("applications.toDrafts")}
         </Link>
       </Typography>
       {fehler !== null ? (
@@ -128,7 +128,7 @@ export function ApplicationsPage() {
             <LoadingBlock
               // Its own branch, before error and empty: without it no branch
               // matched while the list was in flight and the card stayed empty.
-              label={t("bewerbungen.laden")}
+              label={t("applications.loading")}
             />
           ) : null}
 
@@ -138,10 +138,10 @@ export function ApplicationsPage() {
 
           {result?.ok && list.length === 0 ? (
             <EmptyBlock
-              title={t("bewerbungen.leerTitel")}
+              title={t("applications.emptyTitle")}
               action={
                 <Button component={RouterLink} to="/jobs" variant="contained">
-                  {t("bewerbungen.leerKnopf")}
+                  {t("applications.emptyButton")}
                 </Button>
               }
             />
@@ -176,10 +176,10 @@ export function ApplicationsPage() {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {running(bewerbung.status)
-                          ? t("bewerbungen.freigegeben", {
+                          ? t("applications.released", {
                               teile: freigegeben(bewerbung, t),
                             })
-                          : t("bewerbungen.nichtMehrSichtbar")}
+                          : t("applications.noLongerVisible")}
                       </Typography>
                     </Box>
 
@@ -191,7 +191,7 @@ export function ApplicationsPage() {
                         disabled={laeuftGerade}
                         sx={{ flexShrink: 0 }}
                       >
-                        {t("allgemein.zurueckziehen")}
+                        {t("common.withdraw")}
                       </Button>
                     ) : null}
                   </CardContent>

@@ -61,7 +61,7 @@ export interface Job {
  *
  * Sichtbar wurde es erst, als aus der Nachschlagetabelle eine Funktion wurde:
  * `REMOTE_LABEL[undefined]` ergibt `undefined` und zeichnet nichts,
- * `remoteLabel(undefined)` ergibt `stelle.remoteundefined` und steht in der
+ * `remoteLabel(undefined)` ergibt `job.remoteundefined` und steht in der
  * Karte. Dieselbe Klasse Fehler wie bei den vier Benachrichtigungssprüngen —
  * ein Name, der auf beiden Seiten anders heisst, und niemand merkt es.
  */
@@ -184,7 +184,7 @@ export const EMPLOYMENT_TYPES: EmploymentType[] = [
 
 export function remoteLabel(value: RemoteMode): string {
   const key = { none: "None", hybrid: "Hybrid", full: "Full" } as const;
-  return i18n.t(`stelle.remote${key[value]}`);
+  return i18n.t(`job.remote${key[value]}`);
 }
 
 export function employmentLabel(value: EmploymentType): string {
@@ -194,7 +194,7 @@ export function employmentLabel(value: EmploymentType): string {
     contract: "Contract",
     internship: "Internship",
   } as const;
-  return i18n.t(`stelle.employment${key[value]}`);
+  return i18n.t(`job.employment${key[value]}`);
 }
 
 export function suchAnfrage(filters: SearchFilters, page = 1, pageSize?: number): string {
@@ -268,12 +268,12 @@ export async function searchJobs(
     JOBS_BASE_URL,
     `/jobs${suchAnfrage(filters, page, pageSize)}`,
     { signal },
-    "fehler.sucheFehlgeschlagen"
+    "errors.searchFailed"
   );
   if (!answer.ok) {
     return deuten<SucheFehler>(
       answer.error,
-      { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+      { 0: { reason: "offline", titel: "errors.noConnection" } },
       "fehlgeschlagen"
     );
   }
@@ -310,7 +310,7 @@ export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgeb
     JOBS_BASE_URL,
     "/companies/me/jobs",
     { signal },
-    "fehler.listeNichtGeladen"
+    "errors.listNotLoaded"
   );
   if (answer.ok) return { ok: true, jobs: (answer.value ?? []).map(zurAnzeige) };
   // Kein aktives Unternehmen ist ein behebbarer Zustand, kein Fehler. Die Seite
@@ -319,20 +319,20 @@ export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgeb
   if (answer.error.status === 403) return { ok: true, jobs: [] };
   return deuten<SucheFehler>(
     answer.error,
-    { 0: { reason: "offline", titel: "fehler.keineVerbindung" } },
+    { 0: { reason: "offline", titel: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
 
 const SCHREIBFEHLER: Partial<Record<number, Deutung<JobFehler>>> =
   {
-    0: { reason: "offline", titel: "fehler.keineVerbindung" },
+    0: { reason: "offline", titel: "errors.noConnection" },
     403: {
       reason: "no-company",
-      titel: "fehler.nurFirmaAusschreiben",
-      text: "fehler.firmaWaehlen",
+      titel: "errors.onlyCompanyPublishes",
+      text: "errors.chooseCompany",
     },
-    404: { reason: "not-found", titel: "fehler.ausschreibungFehlt" },
+    404: { reason: "not-found", titel: "errors.jobMissing" },
   };
 
 async function schreiben(
@@ -344,7 +344,7 @@ async function schreiben(
     JOBS_BASE_URL,
     path,
     { method, body },
-    "fehler.ausschreibungNichtGespeichert"
+    "errors.jobNotSaved"
   );
   if (answer.ok) return { ok: true, job: zurAnzeige(answer.value) };
   // `409` bleibt beim Satz des Servers: die Eingabe ist in Ordnung, der Zustand
@@ -395,13 +395,13 @@ export async function draftJobText(input: {
     JOBS_BASE_URL,
     "/jobs/draft",
     { method: "POST", body: input },
-    "fehler.entwurfNichtVerfuegbarLang"
+    "errors.draftHelpUnavailableLong"
   );
   if (answer.ok) return { ok: true, draft: answer.value?.draft ?? "" };
   return deuten<"no-company" | "unavailable">(
     answer.error,
     {
-      403: { reason: "no-company", titel: "fehler.fuerFirmaHandelnNoetig" },
+      403: { reason: "no-company", titel: "errors.actForCompanyRequired" },
     },
     "unavailable"
   );

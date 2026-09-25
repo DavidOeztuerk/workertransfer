@@ -35,10 +35,10 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t("beleg.titel")}
+          {t("credentials.title")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t("beleg.lead")}
+          {t("credentials.lead")}
         </Typography>
 
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 2.5 }}>
@@ -54,7 +54,7 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
 
         {nurGenannt.length > 0 ? (
           <Alert severity="info" sx={{ mb: 2.5 }}>
-            {t("beleg.nurGenannt", {
+            {t("credentials.nameOnly", {
               belege: nurGenannt.map((art) => t(art.schluessel)).join(", "),
             })}
           </Alert>
@@ -62,10 +62,10 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
 
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
           <Button component={RouterLink} to="/resume" variant="outlined">
-            {t("beleg.zuUnterlagen")}
+            {t("credentials.toDocuments")}
           </Button>
           <Button component={RouterLink} to="/portfolio" variant="outlined">
-            {t("beleg.zuArbeiten")}
+            {t("credentials.toPortfolio")}
           </Button>
         </Box>
       </CardContent>

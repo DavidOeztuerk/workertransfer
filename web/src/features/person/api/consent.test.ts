@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import de from "../../../core/i18n/kataloge/de";
+import de from "../../../core/i18n/catalogs/de";
 import { parseCapability } from "./consent";
 
 /**
@@ -20,25 +20,25 @@ import { parseCapability } from "./consent";
  * Tippfehler stünde also roh auf genau der Seite, um die es hier geht.
  */
 const ALLE_BEREICHE = [
-  ["profile", "bereichProfile"],
-  ["resume", "bereichResume"],
-  ["portfolio", "bereichPortfolio"],
-  ["market", "bereichMarket"],
-  ["github", "bereichGithub"],
+  ["profile", "areaProfile"],
+  ["resume", "areaResume"],
+  ["portfolio", "areaPortfolio"],
+  ["market", "areaMarket"],
+  ["github", "areaGithub"],
 ] as const;
 
 describe("parseCapability", () => {
   it.each(ALLE_BEREICHE)("nennt für %s einen Katalogschlüssel", (raw, name) => {
-    const key = `freigaben.${name}`;
+    const key = `consents.${name}`;
     expect(parseCapability(`${raw}.visibility:public`).area).toBe(key);
-    expect(de.freigaben).toHaveProperty(name);
+    expect(de.consents).toHaveProperty(name);
   });
 
   it("nennt den Mandanten, wenn die Freigabe einem Unternehmen gilt", () => {
     const id = "7d9d3890-eccb-47f7-b793-514ce6283fdf";
 
     expect(parseCapability(`market.visibility:tenant:${id}`)).toEqual({
-      area: "freigaben.bereichMarket",
+      area: "consents.areaMarket",
       tenantId: id,
       public: false,
     });
@@ -46,7 +46,7 @@ describe("parseCapability", () => {
 
   it("erkennt eine Freigabe an alle", () => {
     expect(parseCapability("profile.visibility:public")).toEqual({
-      area: "freigaben.bereichProfile",
+      area: "consents.areaProfile",
       tenantId: null,
       public: true,
     });

@@ -59,7 +59,7 @@ export function useGeolocation(): Ortung {
 
   const frage = useCallback(() => {
     if (!moeglich) {
-      setFehler(t("standort.nichtMoeglich"));
+      setFehler(t("geolocation.unsupported"));
       return;
     }
 
@@ -82,10 +82,10 @@ export function useGeolocation(): Ortung {
         // Ratschlag „nochmal versuchen" schlicht falsch.
         setFehler(
           ausfall.code === ausfall.PERMISSION_DENIED
-            ? t("standort.abgelehnt")
+            ? t("geolocation.denied")
             : ausfall.code === ausfall.TIMEOUT
-              ? t("standort.zuLange")
-              : t("standort.unbekannt")
+              ? t("geolocation.timeout")
+              : t("geolocation.unknown")
         );
         setLaedt(false);
       },

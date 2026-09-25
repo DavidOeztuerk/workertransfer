@@ -175,8 +175,8 @@ export function ResumePage() {
   if (status === "anonymous") {
     return (
       <AnmeldungNoetig
-        titel={t("lebenslauf.titel")}
-        satz="lebenslauf.anmelden"
+        titel={t("resume.title")}
+        satz="resume.signInRequired"
       />
     );
   }
@@ -300,9 +300,9 @@ export function ResumePage() {
 
   return (
     <PageShell
-      title={t("lebenslauf.titel")}
+      title={t("resume.title")}
       narrow
-      lead={t("lebenslauf.lead")}
+      lead={t("resume.lead")}
     >
       {fehler !== null ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFehler(null)}>
@@ -313,11 +313,11 @@ export function ResumePage() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("lebenslauf.anfragen")}
+            {t("resume.requests")}
           </Typography>
 
           {anfragen.laedt ? (
-            <LoadingBlock label={t("lebenslauf.anfragenLaden")} />
+            <LoadingBlock label={t("resume.requestsLoading")} />
           ) : null}
 
           {anfragen.value && !anfragen.value.ok ? (
@@ -325,7 +325,7 @@ export function ResumePage() {
           ) : null}
 
           {anfragen.value?.ok && anfragen.value.value.length === 0 ? (
-            <EmptyBlock title={t("lebenslauf.anfragenLeer")} />
+            <EmptyBlock title={t("resume.requestsEmpty")} />
           ) : null}
 
           {anfragen.value?.ok && anfragen.value.value.length > 0 ? (
@@ -359,9 +359,9 @@ export function ResumePage() {
       {weg === "wahl" ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.wegwahlTitel")}</Typography>
+            <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.pathChoiceTitle")}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {t("lebenslauf.wegwahlLead")}
+              {t("resume.pathChoiceLead")}
             </Typography>
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
               <Card variant="outlined">
@@ -376,9 +376,9 @@ export function ResumePage() {
                   }}
                 >
                 <CardContent>
-                  <Typography variant="h4">{t("lebenslauf.wegManuell")}</Typography>
+                  <Typography variant="h4">{t("resume.pathManual")}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {t("lebenslauf.wegManuellHinweis")}
+                    {t("resume.pathManualHint")}
                   </Typography>
                 </CardContent>
                 </CardActionArea>
@@ -386,9 +386,9 @@ export function ResumePage() {
               <Card variant="outlined">
                 <CardActionArea onClick={() => setWeg("datei")}>
                   <CardContent>
-                    <Typography variant="h4">{t("lebenslauf.wegDatei")}</Typography>
+                    <Typography variant="h4">{t("resume.pathFile")}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {t("lebenslauf.wegDateiHinweis")}
+                      {t("resume.pathFileHint")}
                     </Typography>
                   </CardContent>
                 </CardActionArea>
@@ -409,8 +409,8 @@ export function ResumePage() {
             }}
           >
             {weg === "datei"
-              ? t("lebenslauf.wegWechselnZuManuell")
-              : t("lebenslauf.wegWechselnZuDatei")}
+              ? t("resume.switchToManual")
+              : t("resume.switchToFile")}
           </Button>
         </Box>
       )}
@@ -418,13 +418,13 @@ export function ResumePage() {
       {weg === "datei" ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.cvDatei")}</Typography>
+            <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.cvFile")}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {t("lebenslauf.dateiLead")}
+              {t("resume.fileLead")}
             </Typography>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
               <Button variant="outlined" component="label" startIcon={<DocIcon />} disabled={uploading !== null}>
-                {t("lebenslauf.unterlageHinzufuegen")}
+                {t("resume.addDocument")}
                 <input
                   type="file"
                   accept=".png,.jpg,.jpeg,.pdf"
@@ -446,7 +446,7 @@ export function ResumePage() {
                     {cvDatei.name}
                   </Typography>
                   <TextField
-                    label={t("lebenslauf.unterlageName")}
+                    label={t("resume.documentName")}
                     value={cvName}
                     onChange={(event) => setCvName(event.target.value)}
                   />
@@ -457,19 +457,19 @@ export function ResumePage() {
                     }}
                     disabled={uploading !== null}
                   >
-                    {t("lebenslauf.unterlageHochladen")}
+                    {t("resume.documentUpload")}
                   </Button>
                 </>
               ) : null}
               {uploading ? (
                 <Alert severity="info" role="status">
-                  {t("lebenslauf.hochladenLaeuft", { name: uploading })}
+                  {t("resume.uploading", { name: uploading })}
                 </Alert>
               ) : null}
             </Box>
             {cvUnterlagen.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                {t("lebenslauf.keineUnterlagen")}
+                {t("resume.noDocuments")}
               </Typography>
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -481,7 +481,7 @@ export function ResumePage() {
                         <Box>
                           <Typography variant="body1">{doc.name}</Typography>
                           <Typography variant="body2" color="text.secondary">
-                            {t("lebenslauf.unterlageArtLebenslauf")} · {Math.round(doc.size_bytes / 1024)} KB
+                            {t("resume.documentKindResume")} · {Math.round(doc.size_bytes / 1024)} KB
                           </Typography>
                         </Box>
                       </Box>
@@ -489,7 +489,7 @@ export function ResumePage() {
                         <IconButton
                           size="small"
                           onClick={() => void handlePreview(doc.id)}
-                          aria-label={t("lebenslauf.dateiAnsehen")}
+                          aria-label={t("resume.viewFile")}
                         >
                           <ViewIcon />
                         </IconButton>
@@ -498,7 +498,7 @@ export function ResumePage() {
                           color="error"
                           onClick={() => setZuLoeschen(doc.id)}
                           disabled={running}
-                          aria-label={t("lebenslauf.unterlageLoeschen")}
+                          aria-label={t("resume.documentDelete")}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -515,13 +515,13 @@ export function ResumePage() {
       {weg === "datei" ? (
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.unterlagen")}</Typography>
+          <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.documents")}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.unterlagenLead")}
+            {t("resume.documentsLead")}
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
             <Button variant="outlined" component="label" startIcon={<DocIcon />} disabled={uploading !== null}>
-              {t("lebenslauf.unterlageHinzufuegen")}
+              {t("resume.addDocument")}
               <input
                 type="file"
                 accept=".png,.jpg,.jpeg,.pdf"
@@ -546,21 +546,21 @@ export function ResumePage() {
                   {datei.name}
                 </Typography>
                 <TextField
-                  label={t("lebenslauf.unterlageName")}
+                  label={t("resume.documentName")}
                   value={dateiname}
                   onChange={(event) => setDateiname(event.target.value)}
                 />
                 <TextField
                   select
-                  label={t("lebenslauf.unterlageArt")}
+                  label={t("resume.documentKind")}
                   value={dateiart}
                   onChange={(event) =>
                     setDateiart(event.target.value as "zeugnis" | "zertifikat" | "sonstiges")
                   }
                 >
-                  <MenuItem value="zeugnis">{t("lebenslauf.unterlageArtZeugnis")}</MenuItem>
-                  <MenuItem value="zertifikat">{t("lebenslauf.unterlageArtZertifikat")}</MenuItem>
-                  <MenuItem value="sonstiges">{t("lebenslauf.unterlageArtSonstiges")}</MenuItem>
+                  <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
+                  <MenuItem value="zertifikat">{t("resume.documentKindCertificate")}</MenuItem>
+                  <MenuItem value="sonstiges">{t("resume.documentKindOther")}</MenuItem>
                 </TextField>
                 <Button
                   variant="contained"
@@ -569,19 +569,19 @@ export function ResumePage() {
                   }}
                   disabled={uploading !== null}
                 >
-                  {t("lebenslauf.unterlageHochladen")}
+                  {t("resume.documentUpload")}
                 </Button>
               </>
             ) : null}
             {uploading ? (
               <Alert severity="info" role="status">
-                {t("lebenslauf.hochladenLaeuft", { name: uploading })}
+                {t("resume.uploading", { name: uploading })}
               </Alert>
             ) : null}
           </Box>
 
           {meineUnterlagen.laedt ? (
-            <LoadingBlock label={t("lebenslauf.unterlagenLaden")} />
+            <LoadingBlock label={t("resume.documentsLoading")} />
           ) : null}
 
           {meineUnterlagen.value && !meineUnterlagen.value.ok ? (
@@ -589,7 +589,7 @@ export function ResumePage() {
           ) : null}
 
           {meineUnterlagen.value?.ok && beilagen.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">{t("lebenslauf.keineUnterlagen")}</Typography>
+            <Typography variant="body2" color="text.secondary">{t("resume.noDocuments")}</Typography>
           ) : null}
 
           {beilagen.length > 0 && (
@@ -604,25 +604,25 @@ export function ResumePage() {
                         <Typography variant="body2" color="text.secondary">
                           {t(
                             doc.kind === "zeugnis"
-                              ? "lebenslauf.unterlageArtZeugnis"
+                              ? "resume.documentKindReference"
                               : doc.kind === "zertifikat"
-                                ? "lebenslauf.unterlageArtZertifikat"
-                                : "lebenslauf.unterlageArtSonstiges",
+                                ? "resume.documentKindCertificate"
+                                : "resume.documentKindOther",
                           )}{" "}
-                          · {Math.round(doc.size_bytes / 1024)} KB · {t("lebenslauf.hochgeladenAm", { datum: new Date(doc.uploaded_at).toLocaleDateString("de-DE") })}
+                          · {Math.round(doc.size_bytes / 1024)} KB · {t("resume.uploadedOn", { datum: new Date(doc.uploaded_at).toLocaleDateString("de-DE") })}
                         </Typography>
                       </Box>
                     </Box>
                     <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
                       {doc.kind !== "lebenslauf" ? (
                         <Button size="small" onClick={() => void handleAlsLebenslauf(doc.id)}>
-                          {t("entwurfs.alsLebenslauf")}
+                          {t("drafts.useAsResume")}
                         </Button>
                       ) : null}
                       <IconButton
                         size="small"
                         onClick={() => void handlePreview(doc.id)}
-                        aria-label={t("lebenslauf.dateiAnsehen")}
+                        aria-label={t("resume.viewFile")}
                       >
                         <ViewIcon />
                       </IconButton>
@@ -631,7 +631,7 @@ export function ResumePage() {
                         color="error"
                         onClick={() => setZuLoeschen(doc.id)}
                         disabled={running}
-                        aria-label={t("lebenslauf.unterlageLoeschen")}
+                        aria-label={t("resume.documentDelete")}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -655,7 +655,7 @@ export function ResumePage() {
         }}
       >
       {lebenslauf.laedt ? (
-        <LoadingBlock label={t("lebenslauf.laden")} />
+        <LoadingBlock label={t("resume.loading")} />
       ) : null}
 
       {lebenslauf.value && !lebenslauf.value.ok ? (
@@ -664,21 +664,21 @@ export function ResumePage() {
 
       {saved ? (
         <Alert severity="success" sx={{ mb: 2 }} role="status">
-          {t("lebenslauf.gespeichert")}
+          {t("resume.saved")}
         </Alert>
       ) : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.stationen")}</Typography>
+          <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.experience")}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.berufeLead")}
+            {t("resume.experienceLead")}
           </Typography>
           {rows.map((row, index) => (
             <Box key={index} sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
                 <Typography variant="h3">
-                  {t("lebenslauf.station", { nummer: index + 1 })}
+                  {t("resume.positionNumber", { nummer: index + 1 })}
                 </Typography>
                 <IconButton
                   size="small"
@@ -686,48 +686,48 @@ export function ResumePage() {
                     setZeilen((before) => before.filter((_, i) => i !== index));
                     setGespeichert(false);
                   }}
-                  aria-label={t("lebenslauf.eintragEntfernen")}
+                  aria-label={t("resume.removeEntry")}
                 >
                   <DeleteIcon />
                 </IconButton>
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <TextField
-                  label={t("lebenslauf.arbeitgeber")}
+                  label={t("resume.employer")}
                   value={row.employer}
                   onChange={(e) => change(index, { employer: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.position")}
+                  label={t("resume.jobTitle")}
                   value={row.title}
                   onChange={(e) => change(index, { title: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.von")}
+                  label={t("resume.from")}
                   type="month"
                   value={row.started_on}
                   onChange={(e) => change(index, { started_on: e.target.value })}
-                  helperText={t("lebenslauf.vonHinweis")}
+                  helperText={t("resume.fromHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
                 <TextField
-                  label={t("lebenslauf.bis")}
+                  label={t("resume.to")}
                   type="month"
                   value={row.ended_on ?? ""}
                   onChange={(e) => change(index, { ended_on: normaliseEnd(e.target.value) })}
-                  helperText={t("lebenslauf.bisHinweis")}
+                  helperText={t("resume.toHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
                 <TextField
-                  label={t("lebenslauf.beschreibung")}
+                  label={t("resume.description")}
                   value={row.description}
                   onChange={(e) => change(index, { description: e.target.value })}
                   multiline
                   minRows={2}
                 />
                 <TextField
-                  label={t("lebenslauf.technologien")}
-                  helperText={t("lebenslauf.technologienHinweis")}
+                  label={t("resume.technologies")}
+                  helperText={t("resume.technologiesHint")}
                   value={row.technologies.join(", ")}
                   onChange={(e) => change(index, { technologies: parseSkills(e.target.value) })}
                 />
@@ -739,22 +739,22 @@ export function ResumePage() {
             variant="outlined"
             onClick={() => setZeilen((before) => [...before, { ...LEERE_STATION }])}
           >
-            {t("lebenslauf.stationHinzufuegen")}
+            {t("resume.addPosition")}
           </Button>
         </CardContent>
       </Card>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.ausbildung")}</Typography>
+          <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.training")}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.ausbildungLead")}
+            {t("resume.trainingLead")}
           </Typography>
           {lehren.map((row, index) => (
             <Box key={index} sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
                 <Typography variant="h3">
-                  {t("lebenslauf.ausbildungNummer", { nummer: index + 1 })}
+                  {t("resume.trainingNumber", { nummer: index + 1 })}
                 </Typography>
                 <IconButton
                   size="small"
@@ -762,36 +762,36 @@ export function ResumePage() {
                     setLehren((before) => before.filter((_, i) => i !== index));
                     setGespeichert(false);
                   }}
-                  aria-label={t("lebenslauf.eintragEntfernen")}
+                  aria-label={t("resume.removeEntry")}
                 >
                   <DeleteIcon />
                 </IconButton>
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <TextField
-                  label={t("lebenslauf.einrichtung")}
+                  label={t("resume.institution")}
                   value={row.institution}
                   onChange={(e) => aendereBildung(setLehren, index, { institution: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.abschluss")}
+                  label={t("resume.qualification")}
                   value={row.qualification}
                   onChange={(e) => aendereBildung(setLehren, index, { qualification: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.von")}
+                  label={t("resume.from")}
                   type="month"
                   value={row.started_on}
                   onChange={(e) => aendereBildung(setLehren, index, { started_on: e.target.value })}
-                  helperText={t("lebenslauf.vonHinweis")}
+                  helperText={t("resume.fromHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
                 <TextField
-                  label={t("lebenslauf.bis")}
+                  label={t("resume.to")}
                   type="month"
                   value={row.ended_on ?? ""}
                   onChange={(e) => aendereBildung(setLehren, index, { ended_on: normaliseEnd(e.target.value) })}
-                  helperText={t("lebenslauf.bisHinweis")}
+                  helperText={t("resume.toHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Box>
@@ -802,22 +802,22 @@ export function ResumePage() {
             variant="outlined"
             onClick={() => setLehren((before) => [...before, { ...LEERE_BILDUNG }])}
           >
-            {t("lebenslauf.ausbildungHinzufuegen")}
+            {t("resume.addTraining")}
           </Button>
         </CardContent>
       </Card>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.schule")}</Typography>
+          <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.school")}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.schuleLead")}
+            {t("resume.schoolLead")}
           </Typography>
           {schulen.map((row, index) => (
             <Box key={index} sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
                 <Typography variant="h3">
-                  {t("lebenslauf.schuleNummer", { nummer: index + 1 })}
+                  {t("resume.schoolNumber", { nummer: index + 1 })}
                 </Typography>
                 <IconButton
                   size="small"
@@ -825,36 +825,36 @@ export function ResumePage() {
                     setSchulen((before) => before.filter((_, i) => i !== index));
                     setGespeichert(false);
                   }}
-                  aria-label={t("lebenslauf.eintragEntfernen")}
+                  aria-label={t("resume.removeEntry")}
                 >
                   <DeleteIcon />
                 </IconButton>
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <TextField
-                  label={t("lebenslauf.schuleName")}
+                  label={t("resume.schoolName")}
                   value={row.institution}
                   onChange={(e) => aendereBildung(setSchulen, index, { institution: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.schuleAbschluss")}
+                  label={t("resume.schoolQualification")}
                   value={row.qualification}
                   onChange={(e) => aendereBildung(setSchulen, index, { qualification: e.target.value })}
                 />
                 <TextField
-                  label={t("lebenslauf.von")}
+                  label={t("resume.from")}
                   type="month"
                   value={row.started_on}
                   onChange={(e) => aendereBildung(setSchulen, index, { started_on: e.target.value })}
-                  helperText={t("lebenslauf.vonHinweis")}
+                  helperText={t("resume.fromHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
                 <TextField
-                  label={t("lebenslauf.bis")}
+                  label={t("resume.to")}
                   type="month"
                   value={row.ended_on ?? ""}
                   onChange={(e) => aendereBildung(setSchulen, index, { ended_on: normaliseEnd(e.target.value) })}
-                  helperText={t("lebenslauf.bisHinweis")}
+                  helperText={t("resume.toHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Box>
@@ -865,15 +865,15 @@ export function ResumePage() {
             variant="outlined"
             onClick={() => setSchulen((before) => [...before, { ...LEERE_BILDUNG }])}
           >
-            {t("lebenslauf.schuleHinzufuegen")}
+            {t("resume.addSchool")}
           </Button>
         </CardContent>
       </Card>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 2 }}>{t("lebenslauf.vorlage")}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t("lebenslauf.vorlageLead")}</Typography>
+          <Typography variant="h2" sx={{ mb: 2 }}>{t("resume.template")}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t("resume.templateLead")}</Typography>
           <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
             {TEMPLATES.map((templ) => (
               <Card
@@ -891,10 +891,10 @@ export function ResumePage() {
                 >
                   <CardContent>
                     <Typography variant="h4">
-                      {t(`lebenslauf.vorlage${templ.charAt(0).toUpperCase()}${templ.slice(1)}`)}
+                      {t(`resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}`)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {t(`lebenslauf.vorlage${templ.charAt(0).toUpperCase()}${templ.slice(1)}Hinweis`)}
+                      {t(`resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}Hint`)}
                     </Typography>
                   </CardContent>
                 </CardActionArea>
@@ -904,10 +904,10 @@ export function ResumePage() {
 
           <Divider sx={{ my: 3 }} />
           <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {t("lebenslauf.vorschau")}
+            {t("resume.preview")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.vorschauLead")}
+            {t("resume.previewLead")}
           </Typography>
           <Lebenslaufblatt
             // The preview IS the promise (ADR-0035: the same rendering the
@@ -950,20 +950,20 @@ export function ResumePage() {
 
       <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 3 }}>
         <Button type="submit" variant="contained" disabled={running}>
-          {running ? t("allgemein.speichernLaeuft") : t("allgemein.speichern")}
+          {running ? t("common.saving") : t("common.save")}
         </Button>
       </Box>
       </Box>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h2" sx={{ mb: 1 }}>{t("lebenslauf.unterlagen")}</Typography>
+          <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.documents")}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("lebenslauf.unterlagenLead")}
+            {t("resume.documentsLead")}
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
             <Button variant="outlined" component="label" startIcon={<DocIcon />} disabled={uploading !== null}>
-              {t("lebenslauf.unterlageHinzufuegen")}
+              {t("resume.addDocument")}
               <input
                 type="file"
                 accept=".png,.jpg,.jpeg,.pdf"
@@ -983,21 +983,21 @@ export function ResumePage() {
               <>
                 <Typography variant="body2" color="text.secondary">{datei.name}</Typography>
                 <TextField
-                  label={t("lebenslauf.unterlageName")}
+                  label={t("resume.documentName")}
                   value={dateiname}
                   onChange={(event) => setDateiname(event.target.value)}
                 />
                 <TextField
                   select
-                  label={t("lebenslauf.unterlageArt")}
+                  label={t("resume.documentKind")}
                   value={dateiart}
                   onChange={(event) =>
                     setDateiart(event.target.value as "zeugnis" | "zertifikat" | "sonstiges")
                   }
                 >
-                  <MenuItem value="zeugnis">{t("lebenslauf.unterlageArtZeugnis")}</MenuItem>
-                  <MenuItem value="zertifikat">{t("lebenslauf.unterlageArtZertifikat")}</MenuItem>
-                  <MenuItem value="sonstiges">{t("lebenslauf.unterlageArtSonstiges")}</MenuItem>
+                  <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
+                  <MenuItem value="zertifikat">{t("resume.documentKindCertificate")}</MenuItem>
+                  <MenuItem value="sonstiges">{t("resume.documentKindOther")}</MenuItem>
                 </TextField>
                 <Button
                   variant="contained"
@@ -1006,13 +1006,13 @@ export function ResumePage() {
                   }}
                   disabled={uploading !== null}
                 >
-                  {t("lebenslauf.unterlageHochladen")}
+                  {t("resume.documentUpload")}
                 </Button>
               </>
             ) : null}
           </Box>
           {beilagen.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">{t("lebenslauf.keineUnterlagen")}</Typography>
+            <Typography variant="body2" color="text.secondary">{t("resume.noDocuments")}</Typography>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {beilagen.map((doc) => (
@@ -1020,10 +1020,10 @@ export function ResumePage() {
                   <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Typography variant="body1">{doc.name}</Typography>
                     <Box>
-                      <IconButton size="small" onClick={() => void handlePreview(doc.id)} aria-label={t("lebenslauf.dateiAnsehen")}>
+                      <IconButton size="small" onClick={() => void handlePreview(doc.id)} aria-label={t("resume.viewFile")}>
                         <ViewIcon />
                       </IconButton>
-                      <IconButton size="small" color="error" onClick={() => setZuLoeschen(doc.id)} aria-label={t("lebenslauf.unterlageLoeschen")}>
+                      <IconButton size="small" color="error" onClick={() => setZuLoeschen(doc.id)} aria-label={t("resume.documentDelete")}>
                         <DeleteIcon />
                       </IconButton>
                     </Box>
@@ -1044,23 +1044,23 @@ export function ResumePage() {
         aria-describedby="unterlage-loeschen-text"
       >
         <DialogTitle id="unterlage-loeschen-titel">
-          {t("lebenslauf.unterlageLoeschenTitel")}
+          {t("resume.documentDeleteTitle")}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="unterlage-loeschen-text">
-            {t("lebenslauf.unterlageLoeschenBestaetigen")}
+            {t("resume.documentDeleteConfirm")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setZuLoeschen(null)}>
-            {t("allgemein.abbrechen")}
+            {t("common.cancel")}
           </Button>
           <Button
             color="error"
             variant="contained"
             onClick={() => void handleDeleteDocument()}
           >
-            {t("lebenslauf.unterlageLoeschen")}
+            {t("resume.documentDelete")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1092,13 +1092,13 @@ function Anfragezeile({
   const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
 
   const current = open
-    ? t("lebenslauf.standOffen")
+    ? t("resume.statusOpen")
     : anfrage.status === "DECLINED"
-      ? t("lebenslauf.standAbgelehnt")
+      ? t("resume.statusDeclined")
       : t(
           haeltZugriff
-            ? "lebenslauf.standFreigegeben"
-            : "lebenslauf.standZurueckgezogen",
+            ? "resume.statusReleased"
+            : "resume.statusWithdrawn",
         );
 
   return (
@@ -1114,7 +1114,7 @@ function Anfragezeile({
       >
         <Box>
           <Typography variant="h4">
-            {t("lebenslauf.anfrageTitel")}
+            {t("resume.requestTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {current}
@@ -1130,7 +1130,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(true)}
                 disabled={locked}
               >
-                {t("allgemein.freigeben")}
+                {t("common.release")}
               </Button>
               <Button
                 variant="text"
@@ -1138,7 +1138,7 @@ function Anfragezeile({
                 onClick={() => onAntwort(false)}
                 disabled={locked}
               >
-                {t("allgemein.ablehnen")}
+                {t("common.decline")}
               </Button>
             </>
           ) : null}
@@ -1149,7 +1149,7 @@ function Anfragezeile({
               onClick={onZurueck}
               disabled={locked}
             >
-              {t("allgemein.zurueckziehen")}
+              {t("common.withdraw")}
             </Button>
           ) : null}
         </Box>

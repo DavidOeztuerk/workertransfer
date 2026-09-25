@@ -73,7 +73,7 @@ export function DeleteAccountPage() {
   // ZUERST. Siehe oben — nach dem Löschen gibt es keinen Prinzipal mehr.
   if (angenommen) {
     return (
-      <PageShell title={t("loeschung.titel")} narrow>
+      <PageShell title={t("deleteAccount.title")} narrow>
         <Card>
           <CardContent>
             <Alert
@@ -83,14 +83,14 @@ export function DeleteAccountPage() {
               sx={{ mb: 2 }}
               role="status"
             >
-              <strong>{t("loeschung.angenommenTitel")}</strong>{" "}
+              <strong>{t("deleteAccount.acceptedTitle")}</strong>{" "}
               <Trans
-                i18nKey="loeschung.angenommenText"
+                i18nKey="deleteAccount.acceptedText"
                 components={{ 1: <strong /> }}
               />
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              {t("loeschung.angenommenWarum")}
+              {t("deleteAccount.acceptedWhy")}
             </Typography>
           </CardContent>
         </Card>
@@ -101,8 +101,8 @@ export function DeleteAccountPage() {
   if (status !== "authenticated") {
     return (
       <AnmeldungNoetig
-        titel={t("loeschung.titel")}
-        satz="loeschung.anmelden"
+        titel={t("deleteAccount.title")}
+        satz="deleteAccount.signInRequired"
       />
     );
   }
@@ -131,68 +131,68 @@ export function DeleteAccountPage() {
 
   return (
     <PageShell
-      title={t("loeschung.titel")}
+      title={t("deleteAccount.title")}
       narrow
-      lead={t("loeschung.lead")}
+      lead={t("deleteAccount.lead")}
     >
-      <Abschnitt titel={t("loeschung.wasTitel")}>
+      <Abschnitt titel={t("deleteAccount.deletedTitle")}>
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
           {WAS_VERSCHWINDET.map((number) => (
             <Typography component="li" key={number} sx={{ mb: 0.5 }}>
-              {t(`loeschung.was${number}`)}
+              {t(`deleteAccount.deleted${number}`)}
             </Typography>
           ))}
         </Box>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="loeschung.nichtsBleibt"
+            i18nKey="deleteAccount.nothingRemains"
             components={[<strong key="a" />, <strong key="b" />]}
           />
         </Typography>
       </Abschnitt>
 
-      <Abschnitt titel={t("loeschung.bleibtTitel")}>
+      <Abschnitt titel={t("deleteAccount.remainsTitle")}>
         <Typography variant="body2" color="text.secondary">
-          <Trans i18nKey="loeschung.bleibtText" components={{ 1: <em /> }} />
+          <Trans i18nKey="deleteAccount.remainsText" components={{ 1: <em /> }} />
         </Typography>
       </Abschnitt>
 
       {firmen.length > 0 ? (
-        <Abschnitt titel={t("loeschung.firmenTitel")}>
+        <Abschnitt titel={t("deleteAccount.companiesTitle")}>
           <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
             {firmen.map((firma) => (
               <Typography component="li" key={firma.id} sx={{ mb: 0.5 }}>
                 <strong>{firma.name}</strong>{" "}
                 {firma.role === "admin" ? (
                   <Trans
-                    i18nKey="loeschung.firmaAdmin"
+                    i18nKey="deleteAccount.companyAdmin"
                     components={{ 1: <em />, 3: <strong /> }}
                   />
                 ) : (
-                  t("loeschung.firmaMitglied")
+                  t("deleteAccount.companyMember")
                 )}
               </Typography>
             ))}
           </Box>
           <Typography variant="body2" color="text.secondary">
             <Trans
-              i18nKey="loeschung.firmenHaeltNichtAuf"
+              i18nKey="deleteAccount.companiesDoNotBlock"
               components={{ 1: <strong /> }}
             />
           </Typography>
         </Abschnitt>
       ) : null}
 
-      <Abschnitt titel={t("loeschung.ablaufTitel")}>
+      <Abschnitt titel={t("deleteAccount.processTitle")}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           <Trans
-            i18nKey="loeschung.ablaufText"
+            i18nKey="deleteAccount.processText"
             components={{ 1: <strong />, 3: <strong /> }}
           />
         </Typography>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="loeschung.ablaufExport"
+            i18nKey="deleteAccount.processExport"
             components={{ 1: <Link component={RouterLink} to="/my-data" /> }}
           />
         </Typography>
@@ -209,7 +209,7 @@ export function DeleteAccountPage() {
           {fragt ? (
             <>
               <Alert severity="warning" sx={{ mb: 2 }}>
-                {t("loeschung.letzteFrage")}
+                {t("deleteAccount.lastQuestion")}
               </Alert>
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                 <Button
@@ -218,7 +218,7 @@ export function DeleteAccountPage() {
                   onClick={() => void loeschen()}
                   disabled={running}
                 >
-                  {running ? t("loeschung.laeuft") : t("loeschung.bestaetigen")}
+                  {running ? t("deleteAccount.inProgress") : t("deleteAccount.confirm")}
                 </Button>
                 <Button
                   variant="text"
@@ -228,7 +228,7 @@ export function DeleteAccountPage() {
                   }}
                   disabled={running}
                 >
-                  {t("allgemein.abbrechen")}
+                  {t("common.cancel")}
                 </Button>
               </Box>
             </>
@@ -238,7 +238,7 @@ export function DeleteAccountPage() {
               color="error"
               onClick={() => setFragt(true)}
             >
-              {t("loeschung.knopf")}
+              {t("deleteAccount.button")}
             </Button>
           )}
         </CardContent>

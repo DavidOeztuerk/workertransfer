@@ -88,14 +88,14 @@ export function DraftsPage() {
 
   if (sitzungLaedt) {
     return (
-      <PageShell title={t("entwurfs.titel")} narrow>
-        <LoadingBlock label={t("entwurfs.laden")} />
+      <PageShell title={t("drafts.title")} narrow>
+        <LoadingBlock label={t("drafts.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn) {
-    return <AnmeldungNoetig titel={t("entwurfs.titel")} satz="entwurfs.anmelden" />;
+    return <AnmeldungNoetig titel={t("drafts.title")} satz="drafts.signInRequired" />;
   }
 
   async function nochmal(entwurf: Draft) {
@@ -118,14 +118,14 @@ export function DraftsPage() {
   }
 
   return (
-    <PageShell title={t("entwurfs.titel")} lead={t("entwurfs.lead")}>
+    <PageShell title={t("drafts.title")} lead={t("drafts.lead")}>
       {schreiben === "keinAnbieter" && laeuft === null ? (
         <Alert
           severity="info"
           sx={{ mb: 2 }}
           onClose={() => navigate(".", { replace: true, state: {} })}
         >
-          {t("entwurfs.schreibenNichtGelungen")}
+          {t("drafts.writingFailed")}
         </Alert>
       ) : null}
       {fehler && laeuft === null ? (
@@ -140,18 +140,18 @@ export function DraftsPage() {
       ) : null}
 
       {entwuerfe.pending && list.length === 0 ? (
-        <LoadingBlock label={t("entwurfs.laden")} />
+        <LoadingBlock label={t("drafts.loading")} />
       ) : null}
       {entwuerfe.data !== null && !entwuerfe.data.ok ? (
         <Alert severity="error">{entwuerfe.data.error.detail}</Alert>
       ) : null}
       {entwuerfe.data?.ok && list.length === 0 ? (
         <EmptyBlock
-          title={t("entwurfs.leerTitel")}
-          hint={t("entwurfs.leerHinweis")}
+          title={t("drafts.emptyTitle")}
+          hint={t("drafts.emptyHint")}
           action={
             <Button onClick={() => navigate("/jobs")} variant="contained">
-              {t("bewerbungen.leerKnopf")}
+              {t("applications.emptyButton")}
             </Button>
           }
         />
@@ -175,26 +175,26 @@ export function DraftsPage() {
                 >
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography variant="h4">
-                      {titel[entwurf.job_id] ?? t("entwurfs.stelleUnbekannt")}
+                      {titel[entwurf.job_id] ?? t("drafts.jobUnknown")}
                     </Typography>
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5, mb: 1 }}>
                       <Chip
                         size="small"
-                        label={t(`entwurfs.status.${stand}`)}
+                        label={t(`drafts.status.${stand}`)}
                         color={STATUS_FARBE[stand]}
                       />
                       <Typography variant="body2" color="text.secondary">
-                        {t("entwurfs.fassung", { version: entwurf.version })}
+                        {t("drafts.version", { version: entwurf.version })}
                       </Typography>
                       {offen > 0 ? (
                         <Typography variant="body2" color="text.secondary">
-                          {t("entwurfs.anmerkungen", { count: offen })}
+                          {t("drafts.comments", { count: offen })}
                         </Typography>
                       ) : null}
                     </Box>
                     {stand === "review" ? (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {t("entwurfs.schreibenFertig")}
+                        {t("drafts.writingDone")}
                       </Typography>
                     ) : stand === "generating" ? (
                       <Schreibfortschritt
@@ -212,11 +212,11 @@ export function DraftsPage() {
                       variant="contained"
                       onClick={() => navigate(`/applications/drafts/${entwurf.id}`)}
                     >
-                      {t("entwurfs.oeffnen")}
+                      {t("drafts.open")}
                     </Button>
                     {entwurf.status === "failed" ? (
                       <Button size="small" onClick={() => void nochmal(entwurf)}>
-                        {t("entwurfs.nochmal")}
+                        {t("drafts.retry")}
                       </Button>
                     ) : null}
                     {entwurf.status !== "sent" ? (
@@ -226,7 +226,7 @@ export function DraftsPage() {
                         disabled={laeuft !== null}
                         onClick={() => void loeschen(entwurf.id)}
                       >
-                        {t("allgemein.zurueckziehen")}
+                        {t("common.withdraw")}
                       </Button>
                     ) : null}
                   </Box>

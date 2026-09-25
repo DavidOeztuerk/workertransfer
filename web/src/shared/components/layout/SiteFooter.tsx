@@ -55,22 +55,22 @@ export function SiteFooter() {
             </Typography>
           </Box>
 
-          <Spalte titel={t("fuss.plattform")}>
-            <Verweis to="/jobs">{t("fuss.stellen")}</Verweis>
+          <Spalte titel={t("footer.platform")}>
+            <Verweis to="/jobs">{t("footer.jobs")}</Verweis>
             {signedIn ? (
               <>
-                <Verweis to="/market">{t("fuss.marktstatus")}</Verweis>
-                <Verweis to="/consents">{t("fuss.freigaben")}</Verweis>
-                <Verweis to="/my-data">{t("fuss.meineDaten")}</Verweis>
+                <Verweis to="/market">{t("footer.marketStatus")}</Verweis>
+                <Verweis to="/consents">{t("footer.consents")}</Verweis>
+                <Verweis to="/my-data">{t("footer.myData")}</Verweis>
               </>
             ) : null}
           </Spalte>
 
-          <Spalte titel={t("fuss.rechtliches")}>
-            <Verweis to="/imprint">{t("fuss.impressum")}</Verweis>
-            <Verweis to="/privacy">{t("fuss.datenschutz")}</Verweis>
-            <Verweis to="/terms">{t("fuss.agb")}</Verweis>
-            <Verweis to="/accessibility">{t("fuss.barrierefreiheit")}</Verweis>
+          <Spalte titel={t("footer.legal")}>
+            <Verweis to="/imprint">{t("footer.imprint")}</Verweis>
+            <Verweis to="/privacy">{t("footer.privacy")}</Verweis>
+            <Verweis to="/terms">{t("footer.terms")}</Verweis>
+            <Verweis to="/accessibility">{t("footer.accessibility")}</Verweis>
           </Spalte>
 
         </Box>
@@ -87,7 +87,7 @@ export function SiteFooter() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            {t("fuss.rechte", { jahr: new Date().getFullYear() })}
+            {t("footer.copyright", { jahr: new Date().getFullYear() })}
           </Typography>
         </Box>
       </Container>

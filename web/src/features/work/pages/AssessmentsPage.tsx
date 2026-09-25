@@ -45,18 +45,18 @@ export function AssessmentsPage() {
 
   if (laedt) {
     return (
-      <PageShell title={t("probe.titel")} narrow>
-        <LoadingBlock label={t("probe.laden")} />
+      <PageShell title={t("assessments.title")} narrow>
+        <LoadingBlock label={t("assessments.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn) {
     return (
-      <PageShell title={t("probe.titel")} narrow>
+      <PageShell title={t("assessments.title")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("fehler.anmelden")}</Typography>
+            <Typography>{t("errors.signIn")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -64,8 +64,8 @@ export function AssessmentsPage() {
   }
 
   return (
-    <PageShell title={t("probe.titel")} narrow>
-      <Typography sx={{ mb: 1 }}>{t("probe.lead")}</Typography>
+    <PageShell title={t("assessments.title")} narrow>
+      <Typography sx={{ mb: 1 }}>{t("assessments.lead")}</Typography>
 
       <Alert
         // Not dismissible and no tooltip: whoever does not want to do a task
@@ -73,17 +73,17 @@ export function AssessmentsPage() {
         severity="info"
         sx={{ mb: 3 }}
       >
-        {t("probe.keinAblehnen")}
+        {t("assessments.noDecline")}
       </Alert>
 
-      {vorgaenge.pending && <LoadingBlock label={t("probe.laden")} />}
+      {vorgaenge.pending && <LoadingBlock label={t("assessments.loading")} />}
 
       {vorgaenge.data?.ok === false && (
-        <Alert severity="warning">{t("fehler.ledgerSchweigt")}</Alert>
+        <Alert severity="warning">{t("errors.ledgerSilent")}</Alert>
       )}
 
       {vorgaenge.data?.ok === true && vorgaenge.data.items.length === 0 && (
-        <EmptyBlock title={t("probe.leer")} hint={t("probe.leerHinweis")} />
+        <EmptyBlock title={t("assessments.empty")} hint={t("assessments.emptyHint")} />
       )}
 
       <Stack spacing={2}>
@@ -129,16 +129,16 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Chip label={t(`probe.stand_${vorgang.state}`)} size="small" />
+          <Chip label={t(`assessments.state_${vorgang.state}`)} size="small" />
           <Chip
             // The effort, BESIDE the state and not in the small print.
-            label={t("probe.umfang", { stunden: vorgang.hours })}
+            label={t("assessments.effort", { stunden: vorgang.hours })}
             size="small"
             color="primary"
             variant="outlined"
           />
           <Chip
-            label={t("probe.frist", { datum: datum(vorgang.due_at) })}
+            label={t("assessments.deadline", { datum: datum(vorgang.due_at) })}
             size="small"
             variant="outlined"
           />
@@ -153,7 +153,7 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
         {vorgang.submission !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2">{t("probe.deineLoesung")}</Typography>
+            <Typography variant="subtitle2">{t("assessments.yourSolution")}</Typography>
             {vorgang.submission.text.length > 0 && (
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                 {vorgang.submission.text}
@@ -177,9 +177,9 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
               severity={vorgang.evaluation.outcome === "accepted" ? "success" : "info"}
               sx={{ mb: 1 }}
             >
-              {t(`probe.ausgang_${vorgang.evaluation.outcome}`)}
+              {t(`assessments.outcome_${vorgang.evaluation.outcome}`)}
             </Alert>
-            <Typography variant="subtitle2">{t("probe.rueckmeldung")}</Typography>
+            <Typography variant="subtitle2">{t("assessments.feedback")}</Typography>
             <Typography sx={{ whiteSpace: "pre-wrap" }}>{vorgang.evaluation.text}</Typography>
           </>
         )}
@@ -196,8 +196,8 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
 
             <Stack spacing={2}>
               <TextField
-                label={t("probe.loesungText")}
-                helperText={t("probe.loesungHinweis")}
+                label={t("assessments.solutionText")}
+                helperText={t("assessments.solutionHint")}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 multiline
@@ -205,8 +205,8 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
                 fullWidth
               />
               <TextField
-                label={t("probe.loesungAdresse")}
-                helperText={t("probe.loesungAdresseHinweis")}
+                label={t("assessments.solutionLink")}
+                helperText={t("assessments.solutionLinkHint")}
                 value={adresse}
                 onChange={(event) => setAdresse(event.target.value)}
                 fullWidth
@@ -217,7 +217,7 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
                   disabled={laeuft || leer}
                   onClick={() => void abgeben()}
                 >
-                  {t("probe.abgeben")}
+                  {t("assessments.submit")}
                 </Button>
               </Stack>
             </Stack>

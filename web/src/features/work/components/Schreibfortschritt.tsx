@@ -28,10 +28,10 @@ export function Schreibfortschritt({ seit }: { seit?: string | null }) {
   return (
     <Box sx={{ mt: 1.5 }}>
       <LinearProgress sx={{ mb: 1 }} />
-      <Typography variant="body2">{t("entwurfs.schreibtJetzt")}</Typography>
+      <Typography variant="body2">{t("drafts.writingNow")}</Typography>
       {sekunden > 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {t("entwurfs.schreibtSeit", { seconds: sekunden })}
+          {t("drafts.writingSince", { seconds: sekunden })}
         </Typography>
       ) : null}
     </Box>

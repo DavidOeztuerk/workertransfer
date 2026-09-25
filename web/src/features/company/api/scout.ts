@@ -147,7 +147,7 @@ export async function sucheKandidaten(
     SCOUT_BASE_URL,
     `/scout/candidates${scoutQuery(cursor, filter, stelle)}`,
     { signal },
-    "fehler.listeNichtGeladen2"
+    "errors.listNotLoaded2"
   );
   if (answer.ok) {
     return {
@@ -159,23 +159,23 @@ export async function sucheKandidaten(
   return deuten<ScoutFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titel: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "fehler.sitzungAbgelaufen",
-        text: "fehler.erneutAnmelden",
+        titel: "errors.sessionExpired",
+        text: "errors.signInAgain",
       },
       403: {
         reason: "no-company",
-        titel: "fehler.nurFirmenProfile",
-        text: "fehler.firmaWaehlen",
+        titel: "errors.onlyCompaniesSeeProfiles",
+        text: "errors.chooseCompany",
       },
       // NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
       // freigegeben — und genau das weiß in diesem Moment niemand.
       503: {
         reason: "consent-unavailable",
-        titel: "fehler.ledgerSchweigt",
-        text: "fehler.spaeterErneut",
+        titel: "errors.ledgerSilent",
+        text: "errors.tryLater",
       },
     },
     "offline"

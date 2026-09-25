@@ -77,7 +77,7 @@ export function GitHubPage() {
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig titel={t("github.titel")} satz="github.anmelden" />
+      <AnmeldungNoetig titel={t("github.title")} satz="github.signInRequired" />
     );
   }
 
@@ -143,7 +143,7 @@ export function GitHubPage() {
     setLaeuft(false);
 
     if (ziel === null) {
-      setFehler(t("github.anmeldungFehlgeschlagen"));
+      setFehler(t("github.signInFailed"));
       return;
     }
 
@@ -174,7 +174,7 @@ export function GitHubPage() {
 
     void anmeldungAbschliessen(code, zustand).then((ergebnis) => {
       if (!ergebnis.ok) {
-        setFehler(t("github.anmeldungFehlgeschlagen"));
+        setFehler(t("github.signInFailed"));
         return;
       }
 
@@ -185,12 +185,12 @@ export function GitHubPage() {
 
   return (
     <PageShell
-      title={t("github.titel")}
+      title={t("github.title")}
       narrow
       lead={t("github.lead")}
     >
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        {t("github.nurAufBitte")}
+        {t("github.onlyOnRequest")}
       </Typography>
 
       {fehler !== null ? (
@@ -202,7 +202,7 @@ export function GitHubPage() {
       {connection.laedt ? (
         <Card>
           <CardContent>
-            <LoadingBlock label={t("github.laden")} />
+            <LoadingBlock label={t("github.loading")} />
           </CardContent>
         </Card>
       ) : null}
@@ -215,7 +215,7 @@ export function GitHubPage() {
         <Card>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1.5 }}>
-              {t("github.nachweis")}
+              {t("github.proof")}
             </Typography>
 
             {mitAnmeldung ? (
@@ -225,10 +225,10 @@ export function GitHubPage() {
                   onClick={() => void meldeAn()}
                   disabled={running}
                 >
-                  {t("github.mitGithub")}
+                  {t("github.withGithub")}
                 </Button>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  {t("github.mitGithubHinweis")}
+                  {t("github.withGithubHint")}
                 </Typography>
                 {genanntesKonto !== null ? (
                   <Box
@@ -242,7 +242,7 @@ export function GitHubPage() {
                   >
                     <Typography variant="body2">
                       <Trans
-                        i18nKey="github.genanntesKonto"
+                        i18nKey="github.namedAccount"
                         values={{ login: genanntesKonto }}
                         components={{ 1: <strong /> }}
                       />
@@ -254,7 +254,7 @@ export function GitHubPage() {
                       disabled={running}
                       sx={{ px: 0 }}
                     >
-                      {t("github.anderesKonto")}
+                      {t("github.otherAccount")}
                     </Button>
                   </Box>
                 ) : null}
@@ -265,7 +265,7 @@ export function GitHubPage() {
                   onClick={() => setVonHand((offen) => !offen)}
                   sx={{ mt: 1.5, px: 0, display: "block" }}
                 >
-                  {vonHand ? t("github.vonHandVerbergen") : t("github.vonHand")}
+                  {vonHand ? t("github.manualHide") : t("github.manual")}
                 </Button>
               </Box>
             ) : null}
@@ -289,11 +289,11 @@ export function GitHubPage() {
                     }}
                   >
                     <Typography variant="subtitle2">
-                      {t("github.kontoNennen")}
+                      {t("github.nameAccount")}
                     </Typography>
                     <TextField
-                      label={t("github.benutzername")}
-                      helperText={t("github.benutzernameHinweis")}
+                      label={t("github.username")}
+                      helperText={t("github.usernameHint")}
                       placeholder="anna"
                       value={login}
                       onChange={(e) => setLogin(e.target.value)}
@@ -301,14 +301,14 @@ export function GitHubPage() {
                       required
                     />
                     <Button type="submit" variant="contained" disabled={running}>
-                      {t("github.weiter")}
+                      {t("github.next")}
                     </Button>
                   </Box>
                 ) : (
                   <>
                     <Typography sx={{ mb: 1.5 }}>
                       <Trans
-                        i18nKey="github.nachweisAnleitung"
+                        i18nKey="github.proofInstructions"
                         components={{ 1: <strong /> }}
                       />
                     </Typography>
@@ -328,7 +328,7 @@ export function GitHubPage() {
                     </Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       <Trans
-                        i18nKey="github.nachweisErklaerung"
+                        i18nKey="github.proofExplanation"
                         values={{ login: current.login }}
                         components={{ 1: <strong /> }}
                       />
@@ -339,7 +339,7 @@ export function GitHubPage() {
                         onClick={() => void run(() => pruefeNachweis())}
                         disabled={running}
                       >
-                        {running ? t("github.nachweisLaeuft") : t("github.nachweisPruefen")}
+                        {running ? t("github.proofChecking") : t("github.proofCheck")}
                       </Button>
                       {mitAnmeldung ? null : (
                         <Button
@@ -349,7 +349,7 @@ export function GitHubPage() {
                           }
                           disabled={running}
                         >
-                          {t("github.anderesKonto")}
+                          {t("github.otherAccount")}
                         </Button>
                       )}
                     </Box>
@@ -369,14 +369,14 @@ export function GitHubPage() {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {current.fetched_at !== null
-                ? t("github.standVom", {
+                ? t("github.asOf", {
                     zeitpunkt: new Date(current.fetched_at).toLocaleString(
                       i18n.language,
                     ),
                   })
-                : t("github.nochNichtsGeholt")}{" "}
+                : t("github.nothingFetched")}{" "}
               <Trans
-                i18nKey="github.sichtbarkeit"
+                i18nKey="github.visibility"
                 components={{
                   1: <Link component={RouterLink} to="/consents" />,
                 }}
@@ -389,13 +389,13 @@ export function GitHubPage() {
                 severity="info"
                 sx={{ mb: 2 }}
               >
-                {t("github.sprachenUnvollstaendig")}
+                {t("github.languagesIncomplete")}
               </Alert>
             ) : null}
 
             {current.repositories.length === 0 ? (
               <Typography sx={{ mb: 2 }}>
-                {t("github.keineRepos")}
+                {t("github.noRepos")}
               </Typography>
             ) : (
               <Box component="ul" sx={{ pl: 2.5, mb: 2 }}>
@@ -420,7 +420,7 @@ export function GitHubPage() {
                         {repo.name}
                       </Link>
                       <Typography variant="body2" color="text.secondary">
-                        {repo.language ?? t("github.ohneSprache")} ·{" "}
+                        {repo.language ?? t("github.noLanguage")} ·{" "}
                         {repo.stars} ★
                         {repo.description !== "" ? ` · ${repo.description}` : ""}
                       </Typography>
@@ -453,7 +453,7 @@ export function GitHubPage() {
                     onChange={(_, an) => setUebernehmen(an)}
                   />
                 }
-                label={t("github.faehigkeitenUebernehmen")}
+                label={t("github.adoptSkills")}
               />
               <Button
                 variant="outlined"
@@ -490,8 +490,8 @@ export function GitHubPage() {
                 disabled={running}
               >
                 {running
-                  ? t("github.aktualisierenLaeuft")
-                  : t("github.aktualisieren")}
+                  ? t("github.refreshing")
+                  : t("github.refresh")}
               </Button>
               <Button
                 variant="text"
@@ -500,7 +500,7 @@ export function GitHubPage() {
                 }
                 disabled={running}
               >
-                {t("github.trennen")}
+                {t("github.disconnect")}
               </Button>
             </Box>
           </CardContent>

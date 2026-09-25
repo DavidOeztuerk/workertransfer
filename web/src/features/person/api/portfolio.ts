@@ -49,7 +49,7 @@ export async function ladeMeines(signal?: AbortSignal): Promise<Antwort<Schaufen
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { signal },
-    "fehler.arbeitenNichtAbrufbar"
+    "errors.portfolioUnavailable"
   );
 
   if (answer.ok) return { ok: true, value: answer.value ?? null };
@@ -71,7 +71,7 @@ export async function speichereMeines(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { method: "PUT", body: { items: arbeiten }, signal },
-    "fehler.arbeitenNichtGespeichert"
+    "errors.portfolioNotSaved"
   );
 
   return answer.ok
@@ -113,8 +113,8 @@ export async function haengeAn(file: File, signal?: AbortSignal): Promise<Antwor
       ok: false,
       error: {
         status: 0,
-        title: i18n.t("fehler.keineVerbindungKurz"),
-        detail: i18n.t("fehler.keineVerbindung"),
+        title: i18n.t("errors.noConnectionShort"),
+        detail: i18n.t("errors.noConnection"),
       },
     };
   }
@@ -124,8 +124,8 @@ export async function haengeAn(file: File, signal?: AbortSignal): Promise<Antwor
       ok: false,
       error: {
         status: answer.status,
-        title: i18n.t("fehler.dateiAbgelehnt"),
-        detail: i18n.t("fehler.dateiNichtAngenommen"),
+        title: i18n.t("errors.fileRejected"),
+        detail: i18n.t("errors.fileNotAccepted"),
       },
     };
   }
