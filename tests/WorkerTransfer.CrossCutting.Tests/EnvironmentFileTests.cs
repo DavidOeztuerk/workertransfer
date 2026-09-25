@@ -62,18 +62,53 @@ public sealed class EnvironmentFileTests
             ".env.example has to know every key docker-compose.yml expects");
     }
 
+    /// <summary>What reads as a secret by its name: a secret, a key, a token.</summary>
+    private static readonly Regex SecretName = new(
+        "(SECRET|SECRETS_KEY|PRIVATE_KEY|PUBLIC_KEY|TOKEN|API_KEY)$",
+        RegexOptions.None,
+        TimeSpan.FromSeconds(5));
+
+    /// <summary>Every secret the template names — derived, not listed.</summary>
+    /// <remarks>
+    /// A hand-written list stood here, with four names, while the template had
+    /// grown to nine secrets: the master key and the evidence secret, both
+    /// required, were never checked. A list of what to guard goes stale exactly
+    /// when something new needs guarding.
+    /// </remarks>
+    private static string[] SecretNames() =>
+        [.. FromTemplate().Where(name => SecretName.IsMatch(name))];
+
+    /// <summary>The secrets <c>make env</c> rolls, and without which the stack does not start.</summary>
+    private static readonly string[] RequiredSecretNames =
+    [
+        "WORKERTRANSFER_JWT_PRIVATE_KEY",
+        "WORKERTRANSFER_JWT_PUBLIC_KEY",
+        "WORKERTRANSFER_NOTIFY_SECRET",
+        "WORKERTRANSFER_ERASURE_SECRET",
+        "WORKERTRANSFER_SECRETS_KEY",
+        "WORKERTRANSFER_EVIDENCE_SECRET"
+    ];
+
+    public static TheoryData<string> Secrets => new(SecretNames());
+
+    public static TheoryData<string> RequiredSecrets => new(RequiredSecretNames);
+
+    [Fact]
+    public void The_secrets_are_found_at_all() =>
+        SecretNames().Should().Contain(
+            RequiredSecretNames,
+            "otherwise the name pattern no longer finds the secrets and the two theories below check nothing");
+
     /// <summary>
-    /// The three secrets stand in the template <strong>empty</strong>.
+    /// Every secret stands in the template <strong>empty</strong>.
     /// </summary>
     /// <remarks>
     /// The core of H2: a built-in default <em>is</em> the secret, and it
-    /// therefore lies in git. <c>make env</c> rolls them at creation time.
+    /// therefore lies in git. <c>make env</c> rolls the required ones at
+    /// creation time; the optional ones stay empty until somebody sets them.
     /// </remarks>
     [Theory]
-    [InlineData("WORKERTRANSFER_JWT_PRIVATE_KEY")]
-    [InlineData("WORKERTRANSFER_JWT_PUBLIC_KEY")]
-    [InlineData("WORKERTRANSFER_NOTIFY_SECRET")]
-    [InlineData("WORKERTRANSFER_ERASURE_SECRET")]
+    [MemberData(nameof(Secrets))]
     public void No_secret_carries_a_value(string name)
     {
         var row = File.ReadAllLines(Path.Combine(Root(), ".env.example"))
@@ -85,29 +120,41 @@ public sealed class EnvironmentFileTests
     }
 
     /// <summary>
-    /// And in <c>docker-compose.yml</c> none of them has a default.
+    /// And in <c>docker-compose.yml</c> no secret has a default value.
     /// </summary>
     /// <remarks>
     /// The other half of the same promise. <c>${X:-default}</c> would be exactly
-    /// the built-in secret; <c>${X:?…}</c> aborts and names the name.
+    /// the built-in secret. Allowed are <c>${X:?…}</c>, which aborts and names
+    /// the name, and — for an optional secret such as the GitHub token —
+    /// <c>${X:-}</c> with an EMPTY default: empty means "not set up".
     /// </remarks>
     [Theory]
-    [InlineData("WORKERTRANSFER_JWT_PRIVATE_KEY")]
-    [InlineData("WORKERTRANSFER_JWT_PUBLIC_KEY")]
-    [InlineData("WORKERTRANSFER_NOTIFY_SECRET")]
-    [InlineData("WORKERTRANSFER_ERASURE_SECRET")]
+    [MemberData(nameof(Secrets))]
     public void Compose_holds_no_default_for_any_secret(string name)
     {
-        var raw = File.ReadAllText(Path.Combine(Root(), "docker-compose.yml"));
-        var withoutComments = string.Join(
-            "\n", raw.Split('\n').Where(line => !line.TrimStart().StartsWith('#')));
+        var withValue = new Regex(
+            $@"\$\{{{Regex.Escape(name)}:-[^}}]",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(5));
 
-        withoutComments.Should().NotContain(
-            $"${{{name}:-",
+        withValue.IsMatch(ComposeWithoutComments()).Should().BeFalse(
             $"'{name}' would then have a default value in git");
-        withoutComments.Should().Contain(
+    }
+
+    /// <summary>The required secrets abort the start and name themselves.</summary>
+    [Theory]
+    [MemberData(nameof(RequiredSecrets))]
+    public void A_required_secret_aborts_the_start_when_missing(string name) =>
+        ComposeWithoutComments().Should().Contain(
             $"${{{name}:?",
             $"'{name}' has to abort the start and name itself when it is missing");
+
+    private static string ComposeWithoutComments()
+    {
+        var raw = File.ReadAllText(Path.Combine(Root(), "docker-compose.yml"));
+
+        return string.Join(
+            "\n", raw.Split('\n').Where(line => !line.TrimStart().StartsWith('#')));
     }
 
     /// <summary>Every entry point loads the environment file, and first of all.</summary>
