@@ -38,18 +38,25 @@ Erweitere ihn, statt dich auf die Durchsicht zu verlassen.
 ## Jedes Zitat nennt, was es offenlässt
 
 ```csharp
-new Rechtsbezug(
-    Regelwerk.Dsgvo,
+new RegulatoryReference(
+    RegulatoryRegime.Gdpr,
     "Kap. V (Art. 44–49)",
-    Pflicht: "Eine Übermittlung in ein Drittland braucht eine Garantie.",
-    Leser:   "Welche Garantie dieses Ziel deckt, und ob dafür eine "
-           + "Übermittlungs-Folgenabschätzung vorliegt.");
+    Obligation: "Eine Übermittlung in ein Drittland braucht eine Garantie.",
+    Reader:     "Welche Garantie dieses Ziel deckt, und ob dafür eine "
+              + "Übermittlungs-Folgenabschätzung vorliegt.");
 ```
 
-`Leser` ist **nie leer**, und zwar als Test. Ein Zitat, das seinen eigenen
+`RegulatoryReference` ist Noelias Typ (`Noelia.Abstractions.Compliance`), und
+genau dieses Zitat bringt Noelia schon mit
+(`RegulatoryReferences.GdprThirdCountryTransfer`) — das Beispiel zeigt die Form,
+nachgebaut wird es nicht. Was Noelia nicht mitbringt, steht in
+`src/shared/WorkerTransfer.ServiceDefaults/Checks/AdditionalRegulatoryReferences.cs`.
+Bis ADR-0045 hieß der Typ bei uns `Rechtsbezug`, das letzte Feld `Leser`.
+
+`Reader` ist **nie leer**, und zwar als Test. Ein Zitat, das seinen eigenen
 Artikel erledigte, wäre genau die Anmaßung, gegen die das Vokabular existiert.
 
-In der Oberfläche steht `Leser` **in derselben Zeile** wie das Zitat, nie als
+In der Oberfläche steht `Reader` **in derselben Zeile** wie das Zitat, nie als
 Fußnote. Eine Fußnote überlebt weder einen Screenshot noch das Einfügen in eine
 fremde Tabelle.
 
@@ -65,7 +72,7 @@ taugt · ob im Prompt personenbezogene Daten stehen · ob eine Nutzung nach
 Anhang III hochriskant ist · ob menschliche Aufsicht wirksam ist.
 
 Wenn eine vorgeschlagene Prüfung die zweite Spalte bräuchte, ist sie keine
-Prüfung. Sie ist eine Frage an einen Menschen und gehört in `Leser` oder in
+Prüfung. Sie ist eine Frage an einen Menschen und gehört in `Reader` oder in
 einen Vorbehalt.
 
 ## Die Fristen, und warum sie dastehen müssen
@@ -110,4 +117,4 @@ Belege vorliegen und wer die Frage beantwortet.
 
 Keine Verordnung verlangt digitale Souveränität. Sie ist eine Entscheidung des
 Betreibers. Wo davon die Rede ist, misst der Nachweis diese Entscheidung — nicht
-die Übereinstimmung mit einer Regel. `Regelwerk` bekommt keinen Eintrag dafür.
+die Übereinstimmung mit einer Regel. `RegulatoryRegime` bekommt keinen Eintrag dafür.
