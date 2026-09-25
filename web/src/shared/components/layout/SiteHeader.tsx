@@ -472,7 +472,7 @@ function CompanyMenu() {
         aria-expanded={anchor !== null}
         sx={{ color: "text.secondary" }}
       >
-        Unternehmen
+        {t("header.company")}
       </Button>
       <Menu
         anchorEl={anchor}
