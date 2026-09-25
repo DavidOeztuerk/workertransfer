@@ -42,7 +42,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `advisor-service` | 8013 | the mandate — four values; the stages live in the ledger |
 | `assessment-service` | 8014 | the work sample — the effort in hours, and one evaluation the person always reads |
 
-The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds eight things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `Ablage` (bytes for certificates, never a PDF the server rendered), `Nachweis` (the form in which every service reports about itself — ADR-0044, and no domain model either), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model.
+The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `DocumentStore` (bytes for certificates, never a PDF the server rendered — `Ablage` until 24.09.2026), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model. The eighth, `Nachweis`, collapsed into Noelia with ADR-0045; the checks WorkerTransfer answers itself live in `ServiceDefaults/Checks`.
 
 The vision documents in [`docs/vision/`](docs/vision/) describe a much larger future state. **Treat them as intent, not description.**
 
@@ -102,8 +102,9 @@ ein Dokument oder auf eine Seite gerät.
 
 **Ausgeführt am 20.09.2026 (PR #87).** Seine Phasen 3–5 gehen im Noelia-Umstieg
 auf: `ISecurityCheck`, `Noelia.Dashboard` und `RegulatoryReference` liefern, was
-`WorkerTransfer.Nachweis` selbst gebaut hat. Vier Prüfungen bleiben, weil sie
-WorkerTransfers eigene sind.
+`WorkerTransfer.Nachweis` selbst gebaut hat. Sechs Prüfungen bleiben, weil sie
+WorkerTransfers eigene sind — fünf in `ServiceDefaults/Checks`, dazu `LedgerCheck`
+in consent-service (gezählt am 25.09.2026).
 
 ## Commands
 
@@ -119,9 +120,9 @@ make fix            # dotnet format
 make validate       # like check, but runs through and reports every red step
 make up / make down # the whole stack in docker compose
 make images         # both shipped images — the local twin of the CI job
-make routenkarte    # every endpoint × four principals, against the running stack
-make nachweis          # three dated, signed evidence documents (ADR-0044)
-make nachweis-pruefen  # every check in every service; red on an unkept promise
+make route-map      # every endpoint × four principals, against the running stack
+make evidence       # three dated, signed evidence documents (ADR-0044)
+make evidence-check # every check in every service; red on an unkept promise
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -148,23 +149,25 @@ Before that it lived in GitHub Packages, and that cost a whole evening of CI —
 
 That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Noelia does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
 
-`Umgebung.Laden()` (`ServiceDefaults`) is the **first line of every one of the fifteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all fifteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
+`EnvironmentFile.Load()` (`ServiceDefaults`) is the **first line of every one of the fifteen `Program.cs`**, before `CreateBuilder` — the configuration builder reads environment variables exactly once, when it builds, so loading afterwards means loading and nobody reading. A test pins that order in all fifteen. It never overwrites an already-set variable: in compose and in the cluster the environment comes from there, and a file left in the image must never override it.
+
+**An `.env` written before 25.09.2026 carries German variable names** — the keys were renamed in one pass (`229de78`, whose body lists the old and new names), and nobody renames a git-ignored file for you. Compose aborts on the one required variable that moved (`WORKERTRANSFER_EVIDENCE_SECRET`); the optional ones fall back **silently** — `WORKERTRANSFER_BRAKE_FACTOR` to 1, the AI targets and the GitHub redirect to their defaults. Rename them by hand; rolling a fresh `.env` also rolls `WORKERTRANSFER_SECRETS_KEY`, and whatever is encrypted under the old one stops opening.
 
 Infisical will later fill the environment. It feeds `.env`; it does not replace the mechanism, so no code changes for it.
 
 ### The stack
 
-`docker compose up` is the whole local environment; there is no companion script. Each service migrates its own schema on start (`ServiceDefaults.Wanderung`), so a fresh clone needs no manual step. Source is not bind-mounted — a code change needs `docker compose up -d --build <service>`.
+`docker compose up` is the whole local environment; there is no companion script. Each service migrates its own schema on start (`ServiceDefaults.SchemaMigration`), so a fresh clone needs no manual step. Source is not bind-mounted — a code change needs `docker compose up -d --build <service>`.
 
 **One image serves all fifteen entry points** (ADR-0028). They differ only in `SERVICE_DIR`, which `docker/dotnet-entrypoint.sh` reads from the *environment*, not from a build arg — so the image is built once, without the arg, and the container says who it is. The entrypoint finds the entry assembly as the only `*.runtimeconfig.json` under `/app/$SERVICE_DIR` (no name table to keep in sync) and **`cd`s into that directory** before starting: ASP.NET's content root is the working directory, and from `/app` no service reads its own `appsettings.json`. Measured at the first `compose up`, where only the gateway died visibly, on its missing `ocelot.json`.
 
 Adding a service is three steps and no new Dockerfile: its database in `scripts/initdb/`, its entry point in `docker/dotnet-service.Dockerfile`, a copied block in `docker-compose.yml` with three values changed — plus its route in `src/gateway/WorkerTransfer.Gateway/ocelot.json`.
 
-**`/health/ready` answers for the database, and until 21.09.2026 it answered for nothing.** The endpoint filters the registered checks by the `ready` tag; with none registered the filtered set is empty, an empty report counts as healthy, and the service reports ready over an unreachable database — the orchestrator then routes traffic to a service that answers every request with 500. `Bereitschaft.AddDatenbankbereitschaft<T>(name)` is called in all fourteen composition roots, one line next to the `AddDbContext` it belongs to. It asks `CanConnectAsync` — not a query, because a readiness probe runs on a timer and one that generates load finishes off a struggling service. **Its description names no value**: `/health/ready` answers anyone, and an Npgsql exception carries host, port and sometimes the user; the exception travels as the second field and reaches the log, not the response. `BereitschaftsreiseTests` reads the *body*, not the status — the status is green precisely when nothing is checked.
+**`/health/ready` answers for the database, and until 21.09.2026 it answered for nothing.** The endpoint filters the registered checks by the `ready` tag; with none registered the filtered set is empty, an empty report counts as healthy, and the service reports ready over an unreachable database — the orchestrator then routes traffic to a service that answers every request with 500. `Readiness.AddDatabaseReadiness<T>(serviceName)` is called in all fourteen composition roots, one line next to the `AddDbContext` it belongs to. It asks `CanConnectAsync` — not a query, because a readiness probe runs on a timer and one that generates load finishes off a struggling service. **Its description names no value**: `/health/ready` answers anyone, and an Npgsql exception carries host, port and sometimes the user; the exception travels as the second field and reaches the log, not the response. `ReadinessJourneyTests` reads the *body*, not the status — the status is green precisely when nothing is checked.
 
-**ASP.NET's own key ring lives in Postgres, encrypted under the operator's master key** (`Schluesselbund`, ADR-0046). Left alone the framework writes it into the container's filesystem and says so twice at every start — and anything protected with it stops verifying when the container is replaced. Nothing in this tree reads it *today*; it is configured anyway, because the framework registers it whether or not you want it, and a gate that stays red gets ignored. **Not `Noelia.InMemory`**: that would satisfy the check while two instances still read different rings. The table carries no `DbSet` — it belongs to no domain model, and in the EF model it would look like a `Personenzeile` to the erasure guard.
+**ASP.NET's own key ring lives in Postgres, encrypted under the operator's master key** (`KeyRing`, ADR-0046). Left alone the framework writes it into the container's filesystem and says so twice at every start — and anything protected with it stops verifying when the container is replaced. Nothing in this tree reads it *today*; it is configured anyway, because the framework registers it whether or not you want it, and a gate that stays red gets ignored. **Not `Noelia.InMemory`**: that would satisfy the check while two instances still read different rings. The table carries no `DbSet` — it belongs to no domain model, and in the EF model it would look like a `SubjectKeyedTable` to the erasure guard.
 
-**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-dienst` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
+**`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-service` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
 ### The Noelia Control Plane — an overlay, deliberately not part of `make up`
 
@@ -196,7 +199,7 @@ Three things are easy to get wrong here:
   free tier — one fleet, three services — and this fleet has fourteen.
 
 It presents the same paper as the dashboard it reads
-(`WORKERTRANSFER_NACHWEIS_SECRET`) and no second one. Empty means every service
+(`WORKERTRANSFER_EVIDENCE_SECRET`) and no second one. Empty means every service
 answers 404 and the fleet stays empty without anything being broken.
 
 ### Kubernetes — a staging environment on your own machine
@@ -221,11 +224,11 @@ Load-bearing, and easy to undo by tidying up (ADR-0028):
 
 Five paths are braked — `/auth/login` (20/min), `/auth/register` (5), `/auth/resend-verification` (3), `/auth/verify-email` (20), `/auth/refresh` (60) — per origin, per minute. The rules live in `ocelot.json` next to the routes they select from, as Noelia's own `DistributedRateLimiting` section; the middleware is **Noelia's**, and there is no hand-written brake here any more.
 
-**The three defaults are `0`, and that is the whole trick.** A limit of zero writes no counter, so only the five named paths count. Without it a default would apply to every path — and the whole UI travels through this gateway, so each asset fetch would count. `BremsenkarteTests` pins both: the five paths, and that the defaults stay at zero.
+**The three defaults are `0`, and that is the whole trick.** A limit of zero writes no counter, so only the five named paths count. Without it a default would apply to every path — and the whole UI travels through this gateway, so each asset fetch would count. `BrakeTests` pins both: the five paths, and that the defaults stay at zero.
 
-**`WORKERTRANSFER_BREMSE_FAKTOR` multiplies every limit, and it is why a measurement can look broken.** Measured 09.09.2026: six calls to `/auth/register` (limit 5) all came back `201`, and the answer carried `X-RateLimit-Limit: 200` — a number that appears nowhere in `ocelot.json`. It is `5 × 40`: `.env` sets the factor to 40 so an E2E run does not brake itself. **A factor and not a switch, deliberately** — the limiter still counts, still keys per origin, still answers with its own headers, so what is measured is the real path and not a disabled one. With the factor at `1` the promise holds exactly: three through, the fourth `429` with `X-RateLimit-Limit: 3`, `X-RateLimit-Remaining: 0`, `Retry-After: 60`, an RFC 9457 body, and the supplied correlation id in **both** header and body.
+**`WORKERTRANSFER_BRAKE_FACTOR` multiplies every limit, and it is why a measurement can look broken.** Measured 09.09.2026: six calls to `/auth/register` (limit 5) all came back `201`, and the answer carried `X-RateLimit-Limit: 200` — a number that appears nowhere in `ocelot.json`. It is `5 × 40`: `.env` sets the factor to 40 so an E2E run does not brake itself. **A factor and not a switch, deliberately** — the limiter still counts, still keys per origin, still answers with its own headers, so what is measured is the real path and not a disabled one. With the factor at `1` the promise holds exactly: three through, the fourth `429` with `X-RateLimit-Limit: 3`, `X-RateLimit-Remaining: 0`, `Retry-After: 60`, an RFC 9457 body, and the supplied correlation id in **both** header and body.
 
-Two suites, because one could not have found this: `BremsenkarteTests` asserts each braked path has a route — a statement about the *selection*. `BremsenbindungTests` binds the real `ocelot.json` to Noelia's options type and asserts what arrives — the *binding*. A configuration that never lands still has perfectly valid paths.
+Two suites, because one could not have found this: `BrakeTests` asserts each braked path has a route — a statement about the *selection*. `BrakeBindingTests` binds the real `ocelot.json` to Noelia's options type and asserts what arrives — the *binding*. A configuration that never lands still has perfectly valid paths.
 
 **Per origin, never per email address.** Keying on the address would build exactly the enumeration channel `/auth/register` closes: a braked answer would confirm the address exists. It would also let a stranger lock out anyone whose address they know. The key is path plus origin, and the brake never reads the body — a test sends five *different* addresses from one origin and requires them to share one bucket.
 
@@ -258,7 +261,7 @@ The lesson is worth more than the code: **a hand-written replacement outlives it
 
 ### github-service: the header that made it never work
 
-**Every request needs a `User-Agent`.** GitHub answers *everything* without one with `403` — not a 400, not a message naming the header. Measured 04.09.2026 against the same address: with the header `200`, without it `403`. While it was missing, this service had never worked: neither the gist proof nor the repository fetch, and both surfaced as "github unavailable", which reads exactly like an outage *at GitHub*. `HttpGitHubTests.Jede_Anfrage_traegt_eine_Benutzerkennung` pins it.
+**Every request needs a `User-Agent`.** GitHub answers *everything* without one with `403` — not a 400, not a message naming the header. Measured 04.09.2026 against the same address: with the header `200`, without it `403`. While it was missing, this service had never worked: neither the gist proof nor the repository fetch, and both surfaced as "github unavailable", which reads exactly like an outage *at GitHub*. `HttpGitHubTests.Every_request_carries_a_user_agent` pins it.
 
 **Evidence carries topics and the language SET, never the bytes.** GitHub reports a byte count per language; that is precisely what the deleted package turned into "skill" as `bytes / total_bytes` (ADR-0022 §2). The names are a fact about a repository, the numbers would be the raw material for a statement about a person — so they are not stored, and a test serialises a fetched repository to prove the numbers do not travel even as text. Topics are the strongest evidence of all because they are a *naming*: a human wrote "kubernetes" onto that repository.
 
@@ -268,7 +271,7 @@ The lesson is worth more than the code: **a hand-written replacement outlives it
 
 **OAuth needs no name typed first, and that correction was measured.** The naming step was the *gist's* requirement wearing the wrong hat: a gist search must know whose gists to look in. GitHub reports only the account that actually granted consent, so there is nothing to compare and no foreign account to slip in. Measured 05.09.2026 against a real account: the step protected nobody and locked out the person whose connection still carried an older name (the sample data's `sindresorhus`), answering 422 on a correct authorisation. So `POST /me/oauth/start` now *creates* a connection with `Login = null` — "not named yet", a state and not a gap — and `finish` writes in the login GitHub reports. **Where a name was typed it is still compared**, unchanged and for the old reason: otherwise someone names `torvalds`, authorises themselves, and walks away with a proof for a foreign account. Two tests hold the two halves apart, and the comparison has a counter-probe.
 
-`start` is a *command*, not a query, precisely because it creates that row — a query would run outside `TransaktionsBehavior` and the row would never commit. It is therefore called **on click, never on page load**: prefetching it would leave a row for everyone who merely looked at the page. What the page *may* ask on load is `GET /github/oauth` → `{"available": bool}`, a statement about this server's configuration that holds nothing personal and creates nothing.
+`start` is a *command*, not a query, precisely because it creates that row — a query would run outside `TransactionBehavior` and the row would never commit. It is therefore called **on click, never on page load**: prefetching it would leave a row for everyone who merely looked at the page. What the page *may* ask on load is `GET /github/oauth` → `{"available": bool}`, a statement about this server's configuration that holds nothing personal and creates nothing.
 
 The one-time string already on the connection is the OAuth `state`. **No scope is requested and the access token is not kept**: it is needed for a single `GET /user`, and what you do not store you cannot lose.
 
@@ -315,7 +318,7 @@ Measured locally while the workflow was being repaired: both audits are clean (7
 
 `feature → develop → main`, never a feature branch straight into main.
 
-A **hotfix** is the single exception: it branches off `main`, merges into `main`, and never passes through develop. `.github/workflows/backmerge.yml` carries it back, and its trigger is deliberately narrow — a *merged* PR into main whose head branch starts with **`hotfix/`**. The name is load-bearing: call it `fix/…` and the run never fires, so the correction silently stays out of develop. It pushes to develop only on a fast-forward; otherwise it prepares `hotfix-rueckweg/main-nach-develop` and puts a compare link in the run summary. A real conflict turns the run **red** rather than reporting green while the fix is missing.
+A **hotfix** is the single exception: it branches off `main`, merges into `main`, and never passes through develop. `.github/workflows/backmerge.yml` carries it back, and its trigger is deliberately narrow — a *merged* PR into main whose head branch starts with **`hotfix/`**. The name is load-bearing: call it `fix/…` and the run never fires, so the correction silently stays out of develop. It pushes to develop only on a fast-forward; otherwise it prepares `hotfix-backmerge/main-to-develop` and puts a compare link in the run summary. A real conflict turns the run **red** rather than reporting green while the fix is missing.
 
 ## Architecture
 
@@ -336,13 +339,13 @@ Repository *interfaces* live in Domain, implementations in Infrastructure. Comma
 
 ### CQRS
 
-Mediator via Noelia's `AddCQRS`, but with **our own `IBefehl` / `IAbfrage` markers** over MediatR's `IRequest`, defined per service in `Application/Nachrichten/`. This is deliberate: Noelia's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransaktionsBehavior` wraps **commands only** — a query has nothing to commit.
+Mediator via Noelia's `AddCQRS`, but with **our own `ICommandMessage` / `IQueryMessage` markers** over MediatR's `IRequest`, defined per service in `Application/Messages/`. This is deliberate: Noelia's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransactionBehavior` wraps **commands only** — a query has nothing to commit.
 
 ### Errors
 
 RFC 9457 problem documents, everywhere, from `ServiceDefaults.ProblemDetailsMiddleware`. Every response carries a `correlationId`. **No values in logs** — shapes, not contents. Noelia logs no values either, neither redacted nor scrubbed; do not build that back.
 
-**Girder 4.4.0 masks log properties by exact name, and here it has nothing to do — measured, not hoped.** The running stack shows `[REDACTED]` zero times. That reading would be ambiguous on its own, so `MaskierungTests` supplies the other half: `Username`, `Email` and `City` *are* redacted, `SecretName` and `TokenId` are visible again (the 4.3.0 substring bug), the comparison is exact (`Emailvorlage` survives), and our own German property names stay readable. The reason nothing goes dark is twofold — our templates are German against an English list, and Noelia's `LoggingBehavior` writes shapes anyway: `Shape of RegistrierenBefehl: {Email: string(34), …}` is a length, never an address. **Naming a log property `Email` would make it unreadable**, and that test says so.
+**Girder 4.4.0 masks log properties by exact name, and here it has nothing to do — measured, not hoped.** The running stack shows `[REDACTED]` zero times. That reading would be ambiguous on its own, so `MaskingTests` supplies the other half: `Username`, `Email` and `City` *are* redacted, `SecretName` and `TokenId` are visible again (the 4.3.0 substring bug), the comparison is exact (`EmailTemplate` survives), and every property name the log templates in `src/` actually use stays readable — the suite collects those names from the templates instead of listing a few. That last half used to rest on luck: the templates were German against an English list. Since the translation (25.09.2026) they are English, so the luck is gone and the scan is what holds. Noelia's `LoggingBehavior` writes shapes anyway: `Shape of RegisterCommand: {Email: string(34), …}` is a length, never an address. **Naming a log property `Email` would make it unreadable**, and that test says so.
 
 An endpoint filter that has already written a response must return `Results.Empty`, never `null`: with headers sent, the framework writes a JSON null after them, which tears the connection on a POST-with-body and is invisible on a GET except in the log.
 
@@ -358,11 +361,11 @@ The access token carries `sub`, `email`, `jti`, `iat`, `exp`, `iss`, `aud`, `ses
 
 That ninth claim was undocumented until it was **measured against the running stack on 03.09.2026** — this file said "eight, nothing else", the wire said nine. It stays, and the reason is Noelia's: `MapInboundClaims = false` switches off the framework's own derivation, and seventeen readers resolve the caller through that name, two of them in provider packages that cannot see Noelia's assembly. Dropping it saves seventy bytes and turns every one of those into a silent `null`.
 
-The lesson is the test, not the claim: `TokenformTests` forbade two *names* and would never have noticed a ninth. It now pins the **complete set** in both capacities — a set comparison, not a membership check. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
+The lesson is the test, not the claim: `TokenShapeTests` forbade two *names* and would never have noticed a ninth. It now pins the **complete set** in both capacities — a set comparison, not a membership check. Roles and permissions are not in the token: they are read from the membership table per operation, so the token was never authoritative.
 
-**Two suites, because one of them could not have caught it.** `TokenformTests` calls Noelia's issuer directly; `TokenformAmDrahtTests` goes the whole way — register, confirm, sign in, switch to a company — and reads the token where a browser gets it, out of the `Set-Cookie`. Between the issuer and the wire sit the service's settings, its wiring and the cookie, and a claim added by *that* layer would be invisible to the first suite. The endpoint suite also pins something the unit suite cannot: **the token never appears in a response body.** It leaves only as the `httpOnly` cookie, so no script in the browser can read it, and there is no second path to the same string for someone to log by accident. Re-measured at the running stack on 04.09.2026: nine as a person, ten for a company, both matching.
+**Two suites, because one of them could not have caught it.** `TokenShapeTests` calls Noelia's issuer directly; `TokenShapeAtTheWireTests` goes the whole way — register, confirm, sign in, switch to a company — and reads the token where a browser gets it, out of the `Set-Cookie`. Between the issuer and the wire sit the service's settings, its wiring and the cookie, and a claim added by *that* layer would be invisible to the first suite. The endpoint suite also pins something the unit suite cannot: **the token never appears in a response body.** It leaves only as the `httpOnly` cookie, so no script in the browser can read it, and there is no second path to the same string for someone to log by accident. Re-measured at the running stack on 04.09.2026: nine as a person, ten for a company, both matching.
 
-`AuthMiddleware` resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie. Any new service verifying identity tokens must accept both.
+The JWT handler resolves the principal from an `Authorization: Bearer` header **or** the `access` cookie, in that order — the cookie half is `AccessCookie.AlsoFromTheCookie()` in `ServiceDefaults`. Both carriers are needed: service-to-service and CLI callers send the header; the browser never sees the `httpOnly` token and can only replay it as a cookie. Any new service verifying identity tokens must accept both.
 
 **A company is created at registration and nowhere else.** `POST /register` takes an optional company name; the intent is stored on the pending user and redeemed by `POST /auth/verify-email`, in the same transaction. The order is forced, not chosen: creating a company requires an *active* account and derives the domain from the **confirmed** address, so it is proven before the company exists and cannot be forged (ADR-0019).
 
@@ -370,7 +373,7 @@ Two checks sit in two places on purpose. **Freemail is rejected at registration*
 
 **There is no "create a company" button and no `/company/new` route.** Someone already registered as a person joins a company by **invitation**, which is also the right answer when their domain is already claimed — they have colleagues there.
 
-**`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `Mitgliedschaftsrecht` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
+**`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `MembershipPermission` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
 
 Eight routes now demand an `admin`, and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
 
@@ -387,11 +390,11 @@ Eight routes now demand an `admin`, and the line behind them is written down onc
 
 Three of those already had the check in the *handler*; moving it to the endpoint moved it **before** the body is looked at — otherwise a stranger learns from the difference 400/403 that their body was fine.
 
-**Where the role comes from is the part that carries the design.** Not the token: a token outlives the removal, and the removal would then take effect on expiry — at exactly the operation where *immediately* is the only thing that counts. identity-service answers `GET /internal/companies/{id}/members/{sub}/role` behind the shared secret; `ServiceDefaults.Rollen.Adminrecht` asks it per protected request, with no cache, for the same reason a consent must take effect on the next read (ADR-0013). The price is one lookup per protected request, and it touches only the operations that bind a company — never the reads people use all day.
+**Where the role comes from is the part that carries the design.** Not the token: a token outlives the removal, and the removal would then take effect on expiry — at exactly the operation where *immediately* is the only thing that counts. identity-service answers `GET /internal/companies/{id}/members/{sub}/role` behind the shared secret; `ServiceDefaults.Roles.AdminPermission` asks it per protected request, with no cache, for the same reason a consent must take effect on the next read (ADR-0013). The price is one lookup per protected request, and it touches only the operations that bind a company — never the reads people use all day.
 
-**Two things that are easy to get wrong here.** The tenant comes from the **token** in the ten services (`/jobs/{id}/publish` names no company) and from the **path** in identity (`/companies/{id}/…`) — that is why there are two handlers and not one. And **a silent role lookup answers 503, never 403**: the handler can only say "yes", so it leaves a note on the `HttpContext` and `Ablehnungsgestalt` turns the refusal into 503. A 403 would read as "your right was taken away", and nobody would go looking for an outage.
+**Two things that are easy to get wrong here.** The tenant comes from the **token** in the ten services (`/jobs/{id}/publish` names no company) and from the **path** in identity (`/companies/{id}/…`) — that is why there are two handlers and not one. And **a silent role lookup answers 503, never 403**: the handler can only say "yes", so it leaves a note on the `HttpContext` and `RejectionShape` turns the refusal into 503. A 403 would read as "your right was taken away", and nobody would go looking for an outage.
 
-**`Identity__Adresse` and `Identity__Geheimnis` are therefore load-bearing configuration** in jobs, companies and transfer (applications and notification already had them). Without them every protected route answers 503 — correctly, and visibly.
+**`Identity__BaseUrl` and `Identity__Secret` are therefore load-bearing configuration** in jobs, companies and transfer (applications and notification already had them). Without them every protected route answers 503 — correctly, and visibly.
 
 Do not mistake the navigation for access control.
 
@@ -399,15 +402,15 @@ Do not mistake the navigation for access control.
 
 ### Persistence
 
-EF Core, one `DbContext` per service, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations live under `src/<service>/…Infrastructure/Persistence/Migrations` and are applied at startup by `ServiceDefaults.Wanderung`, which retries **only transient failures** for one minute. That narrowness matters: an earlier version caught everything, and a schema error became a minute of retries ending in a misleading `type … already exists`.
+EF Core, one `DbContext` per service, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations live under `src/<service>/…Infrastructure/Persistence/Migrations` and are applied at startup by `ServiceDefaults.SchemaMigration`, which retries **only transient failures** for one minute. That narrowness matters: an earlier version caught everything, and a schema error became a minute of retries ending in a misleading `type … already exists`.
 
 **Aggregates come back detached from the repositories.** A mutation reaches the database only via an explicit save. Forgetting it costs nothing at test time and silently loses the write in production.
 
 **And the save itself needs `.AsTracking()`, because every context runs `QueryTrackingBehavior.NoTracking`.** A repository that reads a row, assigns to it and relies on `SaveChanges` writes *nothing* — the row came back detached, the assignments go nowhere, and the caller still gets its `204`. Measured 09.09.2026 on `PUT /resumes/me/documents/{id}/as-cv`: 204 returned, the kind stayed `sonstiges`.
 
-**The insert path hides it**, because `Add` always tracks. So it surfaces only at the first *mutating* caller, which may arrive months after the repository was written — `EfUnterlagenSpeicher` was the only one of nineteen without `AsTracking()`, and had no mutating caller until then. When you write a `SichereAsync`, the read inside it takes `.AsTracking()`; when you review one, that is the line to look for.
+**The insert path hides it**, because `Add` always tracks. So it surfaces only at the first *mutating* caller, which may arrive months after the repository was written — `EfUnterlagenSpeicher` (today `EfDocumentRecordStore`) was the only one of nineteen without `AsTracking()`, and had no mutating caller until then. When you write a `SaveAsync`, the read inside it takes `.AsTracking()`; when you review one, that is the line to look for.
 
-`Personenzeile` is an EF annotation put on tables whose *key* is the person (`profiles`, `portfolios`, `github_connections`, `resumes`, `notification_preferences`, `market_status`). It exists so the erasure guard can recognise them: those tables have no `subject_id` column, because the id *is* the subject, and a guard looking only for column names would miss exactly the tables that hold the most.
+`SubjectKeyedTable` is an EF annotation put on tables whose *key* is the person (`profiles`, `portfolios`, `github_connections`, `resumes`, `notification_preferences`, `market_status`). It exists so the erasure guard can recognise them: those tables have no `subject_id` column, because the id *is* the subject, and a guard looking only for column names would miss exactly the tables that hold the most.
 
 ### The outbox
 
@@ -433,7 +436,7 @@ SovereignPlatform), 6 ausgelassen
 
 Our composition root takes `UseDefaults()`, adds `Principal` and `SovereignPlatform` (plus `PasswordHashing` and `TokenSessions` for identity only), and declares **six** exclusions with a reason each: `RateLimiting`, `HttpResponseCaching`, `Communication`, `Encryption`, `ResourceAuthorization`, `PermissionEnforcement`.
 
-**The chain now honours those exclusions too**, which it did not before 4.1.0. `UseWorkerTransferDefaults` used to carry a thirteen-line copy of Noelia's default chain with three lines left out — not a design, a workaround: the chain called every step unconditionally and `UseRateLimiting()` aborted startup. It reads `NoeliaComposition` now, so `app.UseNoelia(environment, dienstname)` is the whole thing and a `Without(...)` takes effect once instead of twice. The two exclusions that are real decisions are `RateLimiting` and `PermissionEnforcement`, both topology; the other four record decisions about modules that are not in the defaults anyway.
+**The chain now honours those exclusions too**, which it did not before 4.1.0. `UseWorkerTransferDefaults` used to carry a thirteen-line copy of Noelia's default chain with three lines left out — not a design, a workaround: the chain called every step unconditionally and `UseRateLimiting()` aborted startup. It reads `NoeliaComposition` now, so `app.UseNoelia(environment, serviceName)` is the whole thing and a `Without(...)` takes effect once instead of twice. The two exclusions that are real decisions are `RateLimiting` and `PermissionEnforcement`, both topology; the other four record decisions about modules that are not in the defaults anyway.
 
 `PermissionEnforcement` is new in 4.1.0 and exists because of us: `Authorization` used to be one module for two things — the policy provider that answers `[RequirePermission]`, and the middleware that refuses *everything else*. A service with a public surface had to choose between an authorization system that answers nothing and a blanket 401. We keep the provider (the company permissions hang off it) and leave the middleware out.
 
@@ -453,22 +456,22 @@ Two rules that produced most of the corrections here:
 | `AddSecurityHeaders` | **gerufen** | Setzt die Sicherheitsköpfe vor allem, was einen Rumpf schreibt. |
 | `AddHealthChecks` | **gerufen** | `/health/live` und `/health/ready` in jedem Dienst. Das Gateway hat eigene — siehe unten. |
 | `AddObservability` | **gerufen** | Ablaufverfolgung und Kennzahlen; Jaeger hängt daran. |
-| `AddPasswordHashing` | **gerufen** | Nur identity-service, über `AlsAussteller()`. BCrypt (ADR-0006). |
+| `AddPasswordHashing` | **gerufen** | Nur identity-service, über `AsIssuer()`. BCrypt (ADR-0006). |
 | `AddTokenSessions` | **gerufen** | Nur identity-service. Sitzungen, die ein Widerruf erreichen kann. |
-| `AddAuthorization` | **gerufen (identity)** | Bringt den `PermissionPolicyProvider`, der `Permission:*`-Richtliniennamen zur Laufzeit auflöst — ohne ihn beantwortet sie niemand und das Gerüst lehnt **jede** Anfrage an einen so geschützten Endpunkt ab. Seine Berechtigungsrichtlinien lesen aus **Ansprüchen**; unser Token trägt keine. Deshalb steht ein eigener Handler daneben (`Mitgliedschaftsrecht`), der die Rolle je Anfrage aus der Mitgliedschaftstabelle liest: ASP.NET führt alle Handler aus, ein `Succeed` genügt. Rechte ins Token zu legen wäre kürzer und schlechter — eine Entfernung wirkte dann erst beim Ablauf. |
-| `AddInputSanitization` | **Modul UND Middleware laufen — seit 4.1.0, und ohne die Rumpfpruefung** | Bis 4.0.2 war das die schlimmste Zeile der Tabelle: die Middleware traf das *bloesse* SQL-Wort an einer Wortgrenze, und ein Bindestrich ist eine. Gemessen **400** auf `Union-Investment` (eine echte Fondsgesellschaft), `Select-Kundenberater`, `Drop-In-Zentrum`; und weil jede Anfrage der Loeschseite `Referer: …/delete-account` trug, war **`/delete-account` vollstaendig tot** bis hin zu ihrem `/auth/session` — die Seite erfuhr nicht, wer angemeldet ist, und bat eine angemeldete Person, sich anzumelden. In JSON-Ruempfe sah sie dabei gar nicht hinein. **4.1.0 behebt beides**: erkannt wird Injektionssyntax statt Woertern, der `Referer` ist keine Eingabe, und JSON-Zeichenketten werden geprueft. `StellenreiseTests.Ein_Suchbegriff_mit_einem_SQL_Wort_wird_beantwortet` ist gruen. **Die Rumpfpruefung stellen wir trotzdem ab** (`InspectJsonBodies = false`, begruendet in `Dienstgrundlage.cs`): sie laeuft vor allem anderen und kann kein Feld benennen, also wird aus einem 422 mit Feldnamen ein blankes 400 — gemessen an fuenf Faellen in drei Diensten. Abgewiesen werden sie weiterhin, nur sagt die Antwort dem Menschen im Formular weniger. Query-String und die zwei Adresskoepfe bleiben geprueft. |
-| *(Validierung, kein Modul)* | **läuft, und seit D2 hat sie auch etwas zu tun** | `AddCQRS` hängt `ValidationBehavior` **bereits** in jede Pipeline und ruft **bereits** `AddValidatorsFromAssemblies`. Das Verhalten steigt sofort aus, wenn es keine Validatoren findet — und lange fand es keinen. **Der Satz „wir haben null `AbstractValidator` geschrieben" stimmt seit D2 nicht mehr: es sind acht Klassen in sechs Dateien** (nachgemessen am 12.09.2026) — identity sechs (`AnmeldenPruefung`, `RegistrierungPruefung`, `BestaetigungPruefung`, `ErneutSendenPruefung`, `EinladungPruefung`, `GruendungPruefung`), github eine (`VerbindenPruefung`), applications eine (`StandPruefung`). **Der Satz darunter stimmt weiterhin und ist der eigentliche Punkt:** es fehlt keine Verdrahtung, sondern der Inhalt — **elf der vierzehn Dienste haben bis heute keinen einzigen Validator**, und ihre Pipeline-Stufe steigt bei jeder Anfrage sofort wieder aus. Wer dort validiert, schreibt eine Klasse und verdrahtet nichts. Achtung beim Schreiben: `ValidationBehavior` **protokolliert die Fehlermeldungen**, eine Meldung muss deshalb die Regel nennen und nie den Wert — FluentValidations Vorgabemeldungen setzen `{PropertyValue}` ein und wären damit ein Wert im Log. |
-| `AddResilience` | **bewusst nicht** | Registriert nur `ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhuellt **keinen** HttpClient. Der alte Grund gegen `AddResilientHttpClient<T>` ist weg: seit 4.0.0 ist ein Nicht-2xx keine Ausnahme mehr, und `ResilientHttpPolicyHandler` wiederholt nur noch, was ein zweiter Versuch anders beantworten koennte (Transportfehler, Zeitueberschreitung, 408/429/5xx) — gemessen, jeder Status kam als er selbst an und **einmal**. Es bleibt draussen, weil es nichts mehr zu holen gibt: das echte Risiko lag woanders und ist behoben — **alle fuenfzehn Aufrufstellen setzen ein eigenes Zeitlimit**, sieben taten es nicht und liefen in die 100-Sekunden-Vorgabe von `HttpClient`. `ZeitlimitTests` haelt das fest. |
+| `AddAuthorization` | **gerufen (identity)** | Bringt den `PermissionPolicyProvider`, der `Permission:*`-Richtliniennamen zur Laufzeit auflöst — ohne ihn beantwortet sie niemand und das Gerüst lehnt **jede** Anfrage an einen so geschützten Endpunkt ab. Seine Berechtigungsrichtlinien lesen aus **Ansprüchen**; unser Token trägt keine. Deshalb steht ein eigener Handler daneben (`MembershipPermission`), der die Rolle je Anfrage aus der Mitgliedschaftstabelle liest: ASP.NET führt alle Handler aus, ein `Succeed` genügt. Rechte ins Token zu legen wäre kürzer und schlechter — eine Entfernung wirkte dann erst beim Ablauf. |
+| `AddInputSanitization` | **Modul UND Middleware laufen — seit 4.1.0, und ohne die Rumpfpruefung** | Bis 4.0.2 war das die schlimmste Zeile der Tabelle: die Middleware traf das *bloesse* SQL-Wort an einer Wortgrenze, und ein Bindestrich ist eine. Gemessen **400** auf `Union-Investment` (eine echte Fondsgesellschaft), `Select-Kundenberater`, `Drop-In-Zentrum`; und weil jede Anfrage der Loeschseite `Referer: …/delete-account` trug, war **`/delete-account` vollstaendig tot** bis hin zu ihrem `/auth/session` — die Seite erfuhr nicht, wer angemeldet ist, und bat eine angemeldete Person, sich anzumelden. In JSON-Ruempfe sah sie dabei gar nicht hinein. **4.1.0 behebt beides**: erkannt wird Injektionssyntax statt Woertern, der `Referer` ist keine Eingabe, und JSON-Zeichenketten werden geprueft. `JobJourneyTests.A_search_term_containing_an_SQL_word_is_answered` ist gruen. **Die Rumpfpruefung stellen wir trotzdem ab** (`InspectJsonBodies = false`, begruendet in `ServiceFoundation.cs`): sie laeuft vor allem anderen und kann kein Feld benennen, also wird aus einem 422 mit Feldnamen ein blankes 400 — gemessen an fuenf Faellen in drei Diensten. Abgewiesen werden sie weiterhin, nur sagt die Antwort dem Menschen im Formular weniger. Query-String und die zwei Adresskoepfe bleiben geprueft. |
+| *(Validierung, kein Modul)* | **läuft, und seit D2 hat sie auch etwas zu tun** | `AddCQRS` hängt `ValidationBehavior` **bereits** in jede Pipeline und ruft **bereits** `AddValidatorsFromAssemblies`. Das Verhalten steigt sofort aus, wenn es keine Validatoren findet — und lange fand es keinen. **Der Satz „wir haben null `AbstractValidator` geschrieben" stimmt seit D2 nicht mehr: es sind acht Klassen in sechs Dateien** (nachgemessen am 12.09.2026, und nach der Übersetzung am 25.09.2026 unverändert) — identity sechs (`SignInValidator`, `RegistrationValidator`, `ConfirmationValidator`, `ResendValidator`, `InvitationValidator`, `CompanyFoundingValidator`), github eine (`ConnectValidator`), applications eine (`StateValidator`). **Der Satz darunter stimmt weiterhin und ist der eigentliche Punkt:** es fehlt keine Verdrahtung, sondern der Inhalt — **elf der vierzehn Dienste haben bis heute keinen einzigen Validator**, und ihre Pipeline-Stufe steigt bei jeder Anfrage sofort wieder aus. Wer dort validiert, schreibt eine Klasse und verdrahtet nichts. Achtung beim Schreiben: `ValidationBehavior` **protokolliert die Fehlermeldungen**, eine Meldung muss deshalb die Regel nennen und nie den Wert — FluentValidations Vorgabemeldungen setzen `{PropertyValue}` ein und wären damit ein Wert im Log. |
+| `AddResilience` | **bewusst nicht** | Registriert nur `ICircuitBreakerFactory` und `IRetryPolicyFactory` — es umhuellt **keinen** HttpClient. Der alte Grund gegen `AddResilientHttpClient<T>` ist weg: seit 4.0.0 ist ein Nicht-2xx keine Ausnahme mehr, und `ResilientHttpPolicyHandler` wiederholt nur noch, was ein zweiter Versuch anders beantworten koennte (Transportfehler, Zeitueberschreitung, 408/429/5xx) — gemessen, jeder Status kam als er selbst an und **einmal**. Es bleibt draussen, weil es nichts mehr zu holen gibt: das echte Risiko lag woanders und ist behoben — **alle Aufrufstellen setzen ein eigenes Zeitlimit** (damals fuenfzehn, gezaehlt am 25.09.2026 vierunddreissig), sieben taten es nicht und liefen in die 100-Sekunden-Vorgabe von `HttpClient`. `TimeLimitTests` haelt das fest — und findet die Aufrufstellen am Aufruf `.CreateClient(`, nicht am Namen der Variablen: die alte Suche nach `fabrik.CreateClient(` verlor bei der Übersetzung sechzehn von vierunddreissig still. |
 | `AddCommunication` | **bewusst nicht — und der Umstieg ist abgesagt, nicht vertagt** | Drei gemessene Gruende, alle an 4.0.2 ohne Fremdcode. **1.** `CommunicationModule` deklariert `RequiresProvider<IEventBus>`, und `IEventBus` registriert in ganz Noelia genau eine Stelle (`Noelia.Messaging.MassTransit`) — ohne Broker stirbt der Container beim Aufloesen des Managers. **2.** `UseGateway` steht per Vorgabe auf `true`: dann geht *jeder* Aufruf an den Dienst namens `gateway`, der uebergebene `serviceName` wird fuer die Adresse nicht gelesen — Dienst-zu-Dienst-Verkehr liefe durch Ocelot und durch unsere eigene Bremse. **3.** `EnableResponseCaching` steht per Vorgabe auf `true`, Vorgabepolitik „jede GET-Antwort, fuenf Minuten"; unsere Einwilligungspruefung entkaeme dem nur durch ihre **Form** (POST), nicht durch eine Entscheidung — und ein Ledger-Ergebnis, das fuenf Minuten liegen bleibt, waere ADR-0013 ins Gesicht. **Und der Grund, der den Umstieg attraktiv machte, ist weg:** die Korrelationskennung reist seit 4.0.0 an jedem `HttpClient` der Fabrik (ueber einen echten Sprung nachgewiesen). Wir bekommen die Kette, ohne die Antwort aufzugeben. |
 | `AddDistributedRateLimiting` | **bewusst nicht — aus Topologie, nicht aus Misstrauen** | Sie ist seit 4.0.0 in Ordnung, und das ist ohne Fremdcode nachgemessen: `ClientAddress.Of` liest allein `Connection.RemoteIpAddress`, ein gefaelschtes `X-Forwarded-For: 127.0.0.1` hebt sie **nicht** mehr auf (weitergereichte Koepfe wirken nur ueber `TrustForwardedHeadersFrom`), sie zaehlt je Herkunft, kann Je-Pfad-Grenzen und setzt `X-RateLimit-*` und `Retry-After`. Draussen bleibt sie trotzdem, und der Grund ist endgueltig: **ein Dienst hinter dem Gateway sieht als Herkunft nur das Gateway** und damit alle Aufrufer als einen. Gebremst wird am Eingang — und dort ist es seit 4.2.0 genau dieses Modul, aus `Noelia.Http` statt aus einem Eigenbau. |
 | `AddCaching` | **bewusst nicht** | HTTP-Antwort-Caching plus `CacheInvalidationService`, und es verlangt einen `IDistributedCacheService`. Eine Einwilligung muss sofort wirken (das gilt, weil es richtig ist, nicht weil ein ADR es sagt) — was zwischengespeichert wird, muss deshalb einzeln entschieden werden, nicht global eingeschaltet. |
-| `AddAuditLogging` | **bewusst nicht** | Registriert `ISecurityAuditLogger`, der ins **Protokoll** schreibt; `AuditBehavior` in der Pipeline wirkt auf `IAuditableCommand`, das wir nicht umsetzen. Unsere Prüfspur ist eine **Tabelle** (`EfPruefspur`) in derselben Transaktion wie die Änderung: sie ist Beleg, Noelias ist Telemetrie. Beides kann nebeneinander stehen — nur ersetzt keins das andere. |
-| `AddEncryption` | **bewusst nicht — gemessen 12.09.2026, und der Grund ist ein anderer als der alte** | Der alte Grund („wir verschlüsseln auf Feldebene nichts; wer damit anfängt, entscheidet zuerst, wo der Hauptschlüssel liegt") war **schon bei der Niederschrift überholt**: `Geheimnisspeicher.cs` verschlüsselt den KI-Schlüssel einer Person seit den Kontoeinstellungen, und der Hauptschlüssel liegt in `WORKERTRANSFER_SECRETS_KEY`. Der neue Grund ist gemessen und ändert sich nicht: **die einzige ausgelieferte Umsetzung von `IDataEncryptionService` verschlüsselt nicht.** `Noelia.Redis` legt den Klartext base64-kodiert in eine JSON-Hülle, setzt eine Prüfsumme aus Nullbytes, meldet `Algorithm = AES256GCM, Success = true` — und ein **fremder** Schlüssel entschlüsselt dieselbe Hülle mit `IntegrityVerified = true`. Dafür verlangt es Redis (+6 Fremdpakete); einen zweiten Anbieter gibt es nicht. Noelias eigene Tests merken es nicht, weil ein Hin-und-Rückweg trivial grün ist, wenn nichts passiert. Ticket: [`bugs/verschluesselung-verschluesselt-nicht.md`](bugs/verschluesselung-verschluesselt-nicht.md), Messung: [`docs/MESSUNG-GEHEIMNISFRAGE.md`](docs/MESSUNG-GEHEIMNISFRAGE.md). |
+| `AddAuditLogging` | **bewusst nicht** | Registriert `ISecurityAuditLogger`, der ins **Protokoll** schreibt; `AuditBehavior` in der Pipeline wirkt auf `IAuditableCommand`, das wir nicht umsetzen. Unsere Prüfspur ist eine **Tabelle** (`EfAuditTrail`) in derselben Transaktion wie die Änderung: sie ist Beleg, Noelias ist Telemetrie. Beides kann nebeneinander stehen — nur ersetzt keins das andere. |
+| `AddEncryption` | **bewusst nicht — gemessen 12.09.2026, und der Grund ist ein anderer als der alte** | Der alte Grund („wir verschlüsseln auf Feldebene nichts; wer damit anfängt, entscheidet zuerst, wo der Hauptschlüssel liegt") war **schon bei der Niederschrift überholt**: `SecretStore.cs` verschlüsselt den KI-Schlüssel einer Person seit den Kontoeinstellungen, und der Hauptschlüssel liegt in `WORKERTRANSFER_SECRETS_KEY`. Der neue Grund ist gemessen und ändert sich nicht: **die einzige ausgelieferte Umsetzung von `IDataEncryptionService` verschlüsselt nicht.** `Noelia.Redis` legt den Klartext base64-kodiert in eine JSON-Hülle, setzt eine Prüfsumme aus Nullbytes, meldet `Algorithm = AES256GCM, Success = true` — und ein **fremder** Schlüssel entschlüsselt dieselbe Hülle mit `IntegrityVerified = true`. Dafür verlangt es Redis (+6 Fremdpakete); einen zweiten Anbieter gibt es nicht. Noelias eigene Tests merken es nicht, weil ein Hin-und-Rückweg trivial grün ist, wenn nichts passiert. Ticket: [`bugs/verschluesselung-verschluesselt-nicht.md`](bugs/verschluesselung-verschluesselt-nicht.md), Messung: [`docs/MESSUNG-GEHEIMNISFRAGE.md`](docs/MESSUNG-GEHEIMNISFRAGE.md). |
 | `AddSecretManagement` | **läuft — und tut nichts (gemessen 12.09.2026)** | Nicht „offen": es steht in `NoeliaModuleCatalogue.Defaults`, `UseDefaults()` holt es, und der Startbericht führt es auf. Was es registriert, ist **eine Optionsbindung** (`SecretRotationOptions` aus dem Abschnitt `SecretRotation`) — und die hat in ganz Noelia **keinen Leser**; der Hintergrunddienst, den der Kommentar ankündigt, existiert nicht. **Die H2-Frage beantwortet es nicht, sie berührt es nicht einmal:** `ISecretManager` hat in ganz Noelia **keinen Verbraucher**, und es gibt **keinen** Konfigurationsanbieter, der aus einem Geheimnisspeicher liest — gemessen: mit registriertem `ISecretManager` ändert sich an `IConfiguration` nichts, und `JWT_SECRET` liest Noelia weiter direkt aus der Umgebung. Die Zusage „Infisical füttert `.env`, es ersetzt den Mechanismus nicht" gilt also an 4.4.0 unverändert. |
 | `AddSecurityMonitoring` | **bewusst nicht** | Alarme und Bedrohungssignale, verlangt einen `IDistributedCache`. Ein Alarmweg ohne Empfänger ist ein Protokolleintrag mehr; das lohnt erst, wenn jemand ihn liest. |
-| `AddResourceAuthorization` | **bewusst nicht — gemessen 12.09.2026: es trägt nichts darüber hinaus** | Es nimmt nichts weg (der `PermissionPolicyProvider` bleibt, die Firmenrechte antworten unverändert — mit Gegenprobe), es kostet auch wenig (`Noelia.InMemory`: 2 Fremdpakete). Es trägt nur nichts: **erstens** leiten seine Handler die Ressourcenart aus einer `IResourceMap` her, und ohne registrierte Karte ist das `ResourceMap.Empty` → jede Prüfung `Fail()`; eine Karte zu schreiben wäre eine **dritte** Liste über unsere öffentliche Fläche, neben den Endpunkten und `docs/routenkarte.yml`. **Zweitens, und das trägt:** sein Speicher ist eine **Erlaubnistabelle** (`GrantPermissionAsync`/`RevokePermissionAsync` samt `expiresAt`) — eine zweite Stelle, an der eine Erlaubnis steht, während `Mitgliedschaftsrecht` die Rolle **je Anfrage ohne Zwischenspeicher** aus der Mitgliedschaftstabelle liest, damit eine Entfernung sofort wirkt. **Drittens** lesen `AdminOnly`/`SuperAdminOnly` Rollen aus Ansprüchen, und unser Token trägt keine. Nebenbei gefunden: Eigentumsprüfung gibt es in Noelia **zweimal** — `ResourceOwnerHandler` läuft über `Authorization` bei uns längst mit und ist untätig, weil keine Richtlinie seine Anforderung stellt. |
+| `AddResourceAuthorization` | **bewusst nicht — gemessen 12.09.2026: es trägt nichts darüber hinaus** | Es nimmt nichts weg (der `PermissionPolicyProvider` bleibt, die Firmenrechte antworten unverändert — mit Gegenprobe), es kostet auch wenig (`Noelia.InMemory`: 2 Fremdpakete). Es trägt nur nichts: **erstens** leiten seine Handler die Ressourcenart aus einer `IResourceMap` her, und ohne registrierte Karte ist das `ResourceMap.Empty` → jede Prüfung `Fail()`; eine Karte zu schreiben wäre eine **dritte** Liste über unsere öffentliche Fläche, neben den Endpunkten und `docs/routenkarte.yml`. **Zweitens, und das trägt:** sein Speicher ist eine **Erlaubnistabelle** (`GrantPermissionAsync`/`RevokePermissionAsync` samt `expiresAt`) — eine zweite Stelle, an der eine Erlaubnis steht, während `MembershipPermission` die Rolle **je Anfrage ohne Zwischenspeicher** aus der Mitgliedschaftstabelle liest, damit eine Entfernung sofort wirkt. **Drittens** lesen `AdminOnly`/`SuperAdminOnly` Rollen aus Ansprüchen, und unser Token trägt keine. Nebenbei gefunden: Eigentumsprüfung gibt es in Noelia **zweimal** — `ResourceOwnerHandler` läuft über `Authorization` bei uns längst mit und ist untätig, weil keine Richtlinie seine Anforderung stellt. |
 
-**Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Noelia.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransaktionsBehavior`, identity zusätzlich `VersandBehavior`) hängen daneben.
+**Nicht in dieser Tabelle, weil kein Modul:** `AddCQRS` (aus `Noelia.Application`) ruft jeder Dienst selbst, und `worker`-eigene Pipeline-Glieder (`TransactionBehavior`, identity zusätzlich `DispatchBehavior`) hängen daneben.
 
 ### `SovereignPlatform` — angenommen, und die Hosts kommen aus der Konfiguration
 
@@ -483,15 +486,15 @@ default "loopback + RFC1918"
 
 Adopted naively that is every service-to-service call gone, **in the stack and not in the tests**, because the tests use fakes rather than real clients.
 
-So the allowed hosts are **derived from configuration** and never listed in code: `Consent__Adresse`, `Jobs__Adresse`, `Auskunft__*`, `Erasure__Adressen__*` are already in the environment, and what a service calls it has said there. A second list would be the one that goes stale first — and nobody would notice, because the call is simply refused. `Draft__Adresse` and `GitHub__Adresse` therefore moved out of the source and into compose: a built-in destination abroad is exactly what a sovereignty report exists to surface.
+So the allowed hosts are **derived from configuration** and never listed in code: `Consent__BaseUrl`, `Jobs__BaseUrl`, `Lookup__*`, `Erasure__BaseUrls__*` are already in the environment, and what a service calls it has said there. A second list would be the one that goes stale first — and nobody would notice, because the call is simply refused. `Draft__BaseUrl` and `GitHub__BaseUrl` therefore moved out of the source and into compose: a built-in destination abroad is exactly what a sovereignty report exists to surface.
 
-**Und was in der DATENBANK steht, sieht sie nicht — das kostete den Anschreiben-Agenten.** The AI access a person sets up (`KiZugang`: provider, address, model) is a row, not configuration, and a local model is an intended case — `Anschreiber.cs` says so: *"gemessen an Ollama"*. Measured 10.09.2026: every cover-letter job answered `EgressDeniedException: Outbound call to 'host.docker.internal' is not allowed`, the worker started, never wrote, and **the UI showed nothing at all** — the failure died in a background worker where no one looks.
+**Und was in der DATENBANK steht, sieht sie nicht — das kostete den Anschreiben-Agenten.** The AI access a person sets up (`AiAccess`: provider, address, model) is a row, not configuration, and a local model is an intended case — `HttpCoverLetterWriter.cs` says so: *"measured against Ollama"*. Measured 10.09.2026: every cover-letter job answered `EgressDeniedException: Outbound call to 'host.docker.internal' is not allowed`, the worker started, never wrote, and **the UI showed nothing at all** — the failure died in a background worker where no one looks.
 
-So the *operator* declares where a person may point, in `Draft__ErlaubteZiele__*`, and the person chooses within it. That needs no code: the derivation takes the host from any configuration value that reads as an absolute http URL, and the guard compares hosts, not ports. It is not a concession to the boundary but its point — without such a declaration any person could send their requests to any server at all. The counter-check that this actually holds is the real path, not the absence of errors: `Modell qwen2.5-coder:7b über openai_compatible` → `erstes Bruchstück` → `Modell fertig (957 Zeichen)`.
+So the *operator* declares where a person may point, in `Draft__AllowedTargets__*`, and the person chooses within it. That needs no code: the derivation takes the host from any configuration value that reads as an absolute http URL, and the guard compares hosts, not ports. It is not a concession to the boundary but its point — without such a declaration any person could send their requests to any server at all. The counter-check that this actually holds is the real path, not the absence of errors: `Modell qwen2.5-coder:7b über openai_compatible` → `erstes Bruchstück` → `Modell fertig (957 Zeichen)`.
 
 **The gateway is exempt** — it never calls `AddWorkerTransferDefaults`, so no guard runs there and Ocelot's routing is untouched. Measured rather than assumed; otherwise the `Host`/`Port` pairs from `ocelot.json` would have had to be covered too.
 
-**Noelia's audit trail comes along and is refused, as a mechanism rather than a comment.** There is no `WithoutAuditTrail()`; the bundle is one module. Noelia's fallback sink writes to a list in the process — it survives no rollback and sits *beside* our transaction instead of inside it, so it does not satisfy ADR-0012, which `EfPruefspur` does. `VerweigerndePruefspur` is registered as the sink: never called, and whoever does call it gets a sentence saying where to go instead. A silent store that looks like an audit trail would only be noticed when somebody needs the trail and finds it empty.
+**Noelia's audit trail comes along and is refused, as a mechanism rather than a comment.** There is no `WithoutAuditTrail()`; the bundle is one module. Noelia's fallback sink writes to a list in the process — it survives no rollback and sits *beside* our transaction instead of inside it, so it does not satisfy ADR-0012, which `EfAuditTrail` does. `VerweigerndePruefspur` is registered as the sink: never called, and whoever does call it gets a sentence saying where to go instead. A silent store that looks like an audit trail would only be noticed when somebody needs the trail and finds it empty.
 
 ### Und dieselbe Frage an unseren Eigenbau
 
@@ -499,22 +502,22 @@ So the *operator* declares where a person may point, in `Draft__ErlaubteZiele__*
 |---|---|---|
 | `Bremse.cs` | **GELÖSCHT (4.2.0)** | Drei Begründungen nacheinander, jede gemessen, jede anders falsch — zuletzt „Noelias ist global, unsere selektiv". Das war schlicht unwahr: eine Grenze von `0` legt keinen Zähler an. Gehalten hat sie am Ende nur der Preis: `Noelia.Infrastructure` zieht 44 Fremdpakete für ein Gateway, das routet. `Noelia.Http` zieht null. |
 | `Korrelation.cs` (Gateway) | **GELÖSCHT (4.2.0)** | Noelias Zwischenschicht schrieb die Kennung bis 4.0.2 nur in Antwortkopf, Gepäck und `Items`; ein Reverse Proxy reicht aber nur **Anfrage**köpfe weiter. Behoben in 4.1.0, und seit 4.2.0 kostet ihr Bezug nichts mehr. |
-| `Gesundheit.cs` (Gateway) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Noelias `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
+| `HealthProbes.cs` (Gateway, bis 25.09.2026 `Gesundheit.cs`) | **ja** | Ocelot beendet die Kette, ein `MapGet` dahinter läuft nie — gemessen. Noelias `AddHealthChecks()` registriert Endpunkte, keine Middleware. |
 | `Navigation.cs` | **GELÖSCHT (11.09.2026)** | Das Gateway liefert keine Oberflaeche mehr aus (ADR-0040). |
 | `ProblemDetailsMiddleware` | **zu prüfen** | Noelia hat `GlobalExceptionHandlingMiddleware` mit eigener Fehlergestalt. Eine Gestalt über alle Dienste ist der Grund für unsere — zu belegen, dass Noelias nicht dasselbe kann. |
 | `Outbox` | **ja** | Noelia hat keine. |
-| `Wanderung`, `ZugriffsCookie`, `Skills`, `Contracts.*` | **ja** | Fachlichkeit, kein Nachbau. |
+| `SchemaMigration`, `AccessCookie`, `Skills`, `Contracts.*` | **ja** | Fachlichkeit, kein Nachbau. |
 
 ## The route map is a test, not a checklist
 
 [`docs/routenkarte.yml`](docs/routenkarte.yml) records, for every endpoint reachable through the gateway, what it answers in **four** principals: no token, a person with no company (`tenant_id` null), someone acting for a company as `member`, and the same as `admin`. The second one is the one people forget — on a transfer market a person without a company is the *normal* case, and the rows where it differs from the two on the right are exactly where ADR-0017 is doing work.
 
-**The fourth column is what made PBI-2 checkable at all.** Before it the map could not express "admin, not member", so nothing measured it — and nothing was enforced. Five rows show the difference; the three identity routes cannot, because the company id in their path does not exist and *both* company principals get 403 there, for two different reasons. `UnternehmensreiseTests` covers those three against a company that exists, and `Die_vierte_Spalte_unterscheidet_admin_von_member` pins the five by name: opening one of them is then a deliberate edit, not a silent one.
+**The fourth column is what made PBI-2 checkable at all.** Before it the map could not express "admin, not member", so nothing measured it — and nothing was enforced. Five rows show the difference; the three identity routes cannot, because the company id in their path does not exist and *both* company principals get 403 there, for two different reasons. `CompanyJourneyTests` covers those three against a company that exists, and `The_fourth_column_distinguishes_admin_from_member` pins the five by name: opening one of them is then a deliberate edit, not a silent one.
 
 Two things drive it, and they answer different questions:
 
-- **`RoutenkarteTests`** (in the gateway suite, no stack needed) asserts the map is **complete**: every route in `ocelot.json` has at least one entry. Add a route without an entry and it goes red. Without this, the map would be correct exactly until the next endpoint.
-- **`scripts/routenkarte.sh`** (`make routenkarte`, needs `make up`) drives every answer against the running stack — four columns since PBI-2, and the fourth principal is built the way a person is: registered, invited with `role: "member"`, joined. The script refuses to measure unless that account really carries the company's tenant *and* the role `member` — without that check a failed join would quietly measure a person without a company, and all eight protected rows would still look green, because 403 is the right answer there for a person too. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
+- **`RouteMapTests`** (in the gateway suite, no stack needed) asserts the map is **complete**: every route in `ocelot.json` has at least one entry. Add a route without an entry and it goes red. Without this, the map would be correct exactly until the next endpoint. The map's keys stay German (`pfad`, `ohne`, `mitglied`, `firma`, …) and the suite binds them by `[YamlMember(Alias = …)]` — rename a key and its column falls silently to 0, over a green build.
+- **`scripts/route-map.sh`** (`make route-map`, needs `make up`) drives every answer against the running stack — four columns since PBI-2, and the fourth principal is built the way a person is: registered, invited with `role: "member"`, joined. The script refuses to measure unless that account really carries the company's tenant *and* the role `member` — without that check a failed join would quietly measure a person without a company, and all eight protected rows would still look green, because 403 is the right answer there for a person too. It is a script rather than a test suite on purpose: a suite that needs a stack skips itself without one, and a skipped test looks exactly like a passing one.
 
 The reason it is a test at all: `scripts/k8s-up.sh` claimed `GET /jobs` answers 200 at a time when it answered **401**, and the script had never run, so nobody found out. (It answers 200 again today, but for a reason that was decided rather than assumed — see the map's own note.) A list nobody drives is wrong the day after it is written.
 
@@ -533,9 +536,9 @@ It was the other way round until 11.09.2026: a `Navigation` middleware rewrote a
 Two things had to come with it, and the second is the one that would have been missed:
 
 - **`CORS_ORIGINS` is set in the chart.** It never was, and it never mattered while the UI and the gateway shared an origin. A separate door makes every call cross-origin, and without the key Noelia falls back to `localhost:3000` in Development: a preflight that answers 204 with no `Access-Control-Allow-*` header at all.
-- **`Beweis 4` in `scripts/k8s-up.sh` has two halves.** That the UI answers proves the door; that the **gateway** answers a `Sec-Fetch-Dest: document` request *without* HTML proves ADR-0040 has not quietly come back. Only the second half could catch a regression, and nothing else in that script would notice it.
+- **`Proof 4` in `scripts/k8s-up.sh` has two halves.** That the UI answers proves the door; that the **gateway** answers a `Sec-Fetch-Dest: document` request *without* HTML proves ADR-0040 has not quietly come back. Only the second half could catch a regression, and nothing else in that script would notice it.
 
-Route order in `ocelot.json` is pinned by `ReihenfolgeTests` against a *reversed* fixture. A probe that merely set all priorities equal stayed green because file order happened to be right; only reversing the order exposed it, and eight routes fell.
+Route order in `ocelot.json` is pinned by `RouteOrderTests` against a *reversed* fixture. A probe that merely set all priorities equal stayed green because file order happened to be right; only reversing the order exposed it, and eight routes fell.
 
 ### Frontend
 
@@ -593,13 +596,13 @@ Certificates ride a capability of their own: `documents.visibility:tenant:<id>` 
 
 ### Erasure: the default deletes completely (ADR-0027)
 
-`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to nine recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `LoeschempfaengerTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `Personenzeile` annotation.
+`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to eleven recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`, `advisor`, `assessment` — `ErasureRecipient.Services`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `ErasureRecipientTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `SubjectKeyedTable` annotation.
 
 Three things are load-bearing:
 
-- **The default deletes everything — including hired applications and paid transfers.** The retention exception is one named constant per affected service (`Aufbewahrung.EingestellteBehalten`, `Aufbewahrung.BezahlteBehalten`), it is `false`, and it is a **constant, not a setting**: with a deletion promise, "different in production than in test" is the worst possible state. It is also `static readonly` rather than `const`, because a `const` is inlined into the calling assembly and a reverted counter-probe then goes unnoticed. Tests pin the value *and* pin that the flipped switch covers exactly two row classes. Do not widen it.
+- **The default deletes everything — including hired applications and paid transfers.** The retention exception is one named constant per affected service (`Retention.KeepHired`, `Retention.KeepPaid`), it is `false`, and it is a **constant, not a setting**: with a deletion promise, "different in production than in test" is the worst possible state. It is also `static readonly` rather than `const`, because a `const` is inlined into the calling assembly and a reverted counter-probe then goes unnoticed. Tests pin the value *and* pin that the flipped switch covers exactly two row classes. Do not widen it.
 - **The erasure delivery must be able to fail.** It raises on transport error *and* on non-2xx, where the ordinary notifier swallows both — right for a mail, and here it would make the delivery timestamp a lie. Erasure runs with **no attempt ceiling** and growing backoff. A permanently dead recipient therefore *blocks* completion — that is the point, and no timeout may "finish" it.
-- **The order is enforced, not advised:** every acknowledgement → final mail → only then the user row falls. `NochNichtException` expresses "not yet" without spending an attempt. The final notice says only *that* it is done; listing what was deleted would copy the data into an inbox that may not be the person's alone.
+- **The order is enforced, not advised:** every acknowledgement → final mail → only then the user row falls. `NotYetException` expresses "not yet" without spending an attempt. The final notice says only *that* it is done; listing what was deleted would copy the data into an inbox that may not be the person's alone.
 
 `/delete-account` is where the promise is made to a person: it states **before** the button what disappears, that it is **not immediate**, and the uncomfortable part out loud — *the application you were hired through disappears from the company's list too*. It promises no exception, because in the default there is none. Confirmation is two deliberate steps with a differently worded second button — no typed word, no cooling-off period, no re-entered password: whoever wants to delete may. Afterwards it says "läuft", never "erledigt", and shows no progress bar. One trap: the page clears the session on success, so the shell re-renders it with no principal — the accepted state must take precedence over the login prompt, or the person sees "Bitte anmelden" right after deleting their account.
 
@@ -621,7 +624,7 @@ There is deliberately no score, no percentage, no match endpoint and no match co
 
 There are **two** consumers and they are mirror images. `POST /profiles/me/draft` helps a *person* say what they want to say; `POST /jobs/draft` helps a *company* phrase **its own advert**. Neither ever says anything *about* anyone — that is what makes the second one buildable without its own weighing, where a scout, a candidate ranking or a salary recommendation would all aim at people.
 
-Each service owns its own `IEntwerfer` port and its own context type rather than sharing one prompt with branches — the profile context carries no name, no email, no subject id, no employer, no CV; the job context carries no tenant and no company name. Tests pin both field sets. A shared prompt with an `if` is exactly where "invent nothing about the person" would one day apply to an advert, or worse, the reverse.
+Each service owns its own `IDrafter` port and its own context type rather than sharing one prompt with branches — the profile context carries no name, no email, no subject id, no employer, no CV; the job context carries no tenant and no company name. Tests pin both field sets. A shared prompt with an `if` is exactly where "invent nothing about the person" would one day apply to an advert, or worse, the reverse.
 
 With no API key configured, nothing external is ever called and the UI says so. Nothing is stored — not the prompt, not the answer; the draft lives in the form until it is saved, and then it is the author's text. Errors report the failure kind, never the content. Do not add memory, a vector store, or a background suggestion — all three either store or act unasked. **There is deliberately no plan-act-reflect loop and no ledger entry**: a reflect stage means two calls to rewrite the user's own words unasked, and a ledger entry would assert a standing permission nobody gave — the button is the consent, informed and per use.
 
@@ -648,7 +651,7 @@ So the line is not "no analysis". It is the **direction of the question**: requi
 Built 11.09.2026 under ADR-0036. It replaced `GET /candidates` in
 profile-service, and **`/candidates` is gone** — endpoint, gateway route, client
 and the UI, all in the same step. `docs/routenkarte.yml` keeps the old path as a
-**dead door** (404 in all four columns) and `LandkarteTests` measures that no
+**dead door** (404 in all four columns) and `RoutingTests` measures that no
 route stands behind it any more. Two searches side by side would have been two
 truths.
 
@@ -664,7 +667,7 @@ count** (ADR-0026 — the difference to the page length would say how many
 profiles are *not* released), no filling up a short page, and the stable order
 `updated_at DESC, id DESC`.
 
-**Four conditions, each a test** (`AuflagenTests`), and each with a counter-probe
+**Four conditions, each a test** (`ConditionsTests`), and each with a counter-probe
 that was measured to fall:
 
 1. **No ordering by fit.** Two identical searches give the same order, and
@@ -673,16 +676,17 @@ that was measured to fall:
    first.
 2. **No number about a person.** A twin of `Adr0022Tests` over Domain and
    Contracts, forbidding `fit`, `score`, `rank`, `percent`, `passung`, `anzahl`
-   and their siblings — which is why the page size in this service is called
-   `Seitenlaenge`.
+   and their siblings — German and English side by side since the translation,
+   so `count`, `total` and `rating` stand there too — which is why the page size
+   in this service is called `PageLength`, never `Count`.
 3. **Only what was *named* is searchable.** Evidence (GitHub topics, language
    names) is **fetched to the hit, never used to find it**: a topic is a
    statement about an *artefact*, and searching by it would quietly make it one
-   about the person (ADR-0033). `Suchfilter` has no field for one, and evidence
+   about the person (ADR-0033). `SearchFilter` has no field for one, and evidence
    is fetched only *after* the ledger has answered — so nothing is looked up
    about someone who released nothing.
 4. **The approach is a draft.** The service has no postman, no address and no
-   send path; `AuflagenTests` scans the application assembly for one. The text
+   send path; `ConditionsTests` scans the application assembly for one. The text
    goes to the browser of whoever asked and lies in a form.
 
 **The search is an OR, and that is what makes the tick list an answer.**
@@ -726,12 +730,12 @@ approachability without asking; and the **radius** is built as
 a person states how far they will commute (10/25/50/100/egal), an advert states
 its attendance, and the two make a **tick**, never a kilometre figure and never
 a filter that removes somebody. `?stelle=<id>` on the search adds the tick and
-takes no hit away. Nothing new is stored: `Ortskunde` resolves the existing
+takes no hit away. Nothing new is stored: `PlaceLookup` resolves the existing
 free-text location at search time, so **no coordinate column on a person** was
 created.
 
 **That ADR asked for a field that already existed**, and the build found it:
-jobs-service has carried `Remotegrad` (`none`/`hybrid`/`full`) since forever,
+jobs-service has carried `RemoteMode` (`none`/`hybrid`/`full`) since forever,
 with the same argument in its own comment — *"hybrid is the commonest case and
 not an intermediate step of true"*. No second field was added; the existing
 value is read under its own words. The lesson is the older one: **search for
@@ -745,9 +749,9 @@ the ledger, availability in the market status, and a mandate table for either
 would break ADR-0020 word for word: a withdrawal would then have to take effect
 in two places, so one day it takes effect in one.
 
-`MandatZeile` and `GespraechsZeile` carry **no column whose name contains**
-`sichtbar`, `visible`, `public`, `freigabe`, `stage` or `stufe`, and
-`AuflagenTests` reads the **EF model** to say so. The last two words are the
+`MandateRow` and `ConversationRow` carry **no column whose name contains**
+`sichtbar`, `visible`, `visibility`, `public`, `freigabe`, `release`, `stage` or
+`stufe`, and `ConditionsTests` reads the **EF model** to say so. The last two words are the
 sharper half: a stage column would be visibility as a second door beside the
 ledger.
 
@@ -779,7 +783,7 @@ profile not would be a permission without a foundation.
 
 **What is not released does not exist for the other side.** Not `null`, not
 "locked", not a grey line: the field is *absent* from the JSON
-(`JsonIgnoreCondition.WhenWritingNull` on `GespraechV1`). And it is absent in
+(`JsonIgnoreCondition.WhenWritingNull` on `ConversationV1`). And it is absent in
 exactly the same way when the stage *is* released and the person never filled
 the field in — hidden and not present stay indistinguishable (ADR-0020 §1).
 A conversation at stage 0 falls out of the company's list altogether; an empty
@@ -792,7 +796,7 @@ scout" — is kept in the ledger and nowhere else.** Not a second gate in the
 scout, which would be a second place deciding about visibility. The ledger
 knows **no denial**: "visible to everyone except X" cannot be expressed in it,
 so ADR-0037 says the mode "everyone" stops existing the moment somebody names
-an X. `MandatSchreibenHandler` therefore revokes `profile.visibility:public`
+an X. `WriteMandateHandler` therefore revokes `profile.visibility:public`
 in the same step — with the person's own token, *before* saving, so a silent
 ledger leaves the mandate as it was rather than producing the half-here state.
 
@@ -813,7 +817,7 @@ that a *service* is asking, not that it *may*: the permission stands one line
 higher, in the ledger, and it is fetched **before** this call. Whoever uses
 that door for something else fetches the check along with it.
 
-`"advisor"` is in `Loeschempfaenger.Fremde` from its first table, so the
+`"advisor"` is in `ErasureRecipient.Services` from its first table, so the
 cascade is twelve rows now, not eleven — and thirteen since assessment-service
 (ADR-0042).
 
@@ -836,7 +840,8 @@ company's judgement of a person's work is exactly what ADR-0022 removed from
 this tree — the moment it leaves the process. It only has to leave once.
 
 **The measurement that set the shape:** `Bewerbungsstand` has five values and
-neither `Bewerbung` nor `BewerbungV1` carries **one field in which a company
+neither `Bewerbung` nor `BewerbungV1` (today `ApplicationState`,
+`JobApplication`, `ApplicationV1`) carries **one field in which a company
 writes anything back to the person**. For an application that is defensible — a
 company forced to justify writes boilerplate. For a work sample it is exactly
 backwards, because there the person *worked*, and an outright rejection is the
@@ -847,7 +852,7 @@ Three rules, each a mechanism rather than a paragraph:
 1. **The evaluation belongs to the process.** No number — no mark, no stars, no
    percentage. And no way out of the process: the store knows two questions
    ("this company's cases" and "my cases"), the closed endpoint set in
-   `AuflagenTests` is six, and there is no third question a company could ask
+   `ConditionsTests` is six, and there is no third question a company could ask
    about a person. The alternative — a ledger capability "my evaluations are
    visible to company Y" — was rejected because the switch would exist, and then
    the pressure to flip it would: a switch you press under pressure is not a
@@ -877,7 +882,7 @@ advisor-service either; both ask the ledger, and the ledger is the one place.
 
 The submission is **text and at most one link, never bytes** — a third file
 store would be a third place an erasure must reach. **The link is never
-fetched**: it is stored and shown, a person clicks it. `AuflagenTests` pins that
+fetched**: it is stored and shown, a person clicks it. `ConditionsTests` pins that
 exactly two types take an `IHttpClientFactory` (the ledger and notification).
 
 Erasure recipient from its first table, and **no retention case, not even for
@@ -919,8 +924,8 @@ states and they must never become two: `read_at: null` (never read),
 `has_text: true` (read, no known word). Collapsing the last two is ADR-0022 §3
 word for word — a view that does not say so lies by omission.
 
-**Found is what the vocabulary knows, and nothing else.** `Wortfund` searches the
-canonical names and spellings of `Wortschatz`: `schweissfachmann` in a reference
+**Found is what the vocabulary knows, and nothing else.** `TermFinder` searches the
+canonical names and spellings of `Vocabulary`: `schweissfachmann` in a reference
 becomes `Schweißfachmann` — a statement about *language* (ADR-0023). The obvious
 alternative is a heuristic ("capitalised words", "after `Kenntnisse:`"), and each
 one is a guess about a person drawn from the *shape* of their document. What the
@@ -946,8 +951,8 @@ read before an extension would carry its find incomplete for ever.
 that condition is the whole permission for an index over personal text to exist
 at all. It holds **names, never the wording**: a column with the text of a
 reference would be a second copy of the document, this time in the database and
-therefore in every backup (the same argument that puts the bytes in the Ablage,
-ADR-0035). The word list is a field in the row rather than its own table,
+therefore in every backup (the same argument that puts the bytes in the
+`DocumentStore`, ADR-0035). The word list is a field in the row rather than its own table,
 because a table per word could be searched *by* the word.
 
 **Both erasure paths are measured in the database, not in the answer.** After an
@@ -955,9 +960,9 @@ erasure the documents are gone too, so `/terms` answers empty anyway — a test
 reading the answer would stay green while the table still held the words from a
 deleted person's references.
 
-**Not searchable, as a mechanism.** `IFundSpeicher` has three methods — "what is
+**Not searchable, as a mechanism.** `ITermStore` has three methods — "what is
 in *this* person's documents", save, delete. "Which people carry
-‚Schweißfachmann' in their documents" does not exist, and `AuflagenTests` pins
+‚Schweißfachmann' in their documents" does not exist, and `ConditionsTests` pins
 the method set as a **set** at the interface *and* at its implementation, so a
 fourth stands out instead of riding along. Five counter-probes fell, all of them
 compiling: reading at upload; the erasure without the index; a `WerHatAsync` on
@@ -974,17 +979,17 @@ When an application arrives, company **members** get a mail of kind `application
 
 ### The evidence report: Belege, keine Konformität (ADR-0044)
 
-Every service answers seven addresses about **itself** — `/nachweis`, four
-section pages (`ki`, `einwilligung`, `loeschung`, `grenze`),
-`/nachweis/pflichten` and `/nachweis/bericht.json`. `make nachweis` collects all
-fourteen against the running stack and writes three separate signed documents:
-**Datenschutz**, **KI**, **Mitbestimmung**. `make nachweis-pruefen` is the gate
-and goes red on an unkept promise. Measured 20.09.2026: **83 findings across 14
+Every service answers about **itself** under `/noelia/…` — Noelia's dashboard
+since ADR-0045, which replaced the seven hand-built `/nachweis/…` addresses of
+20.09.2026 — and `/noelia/report.json` is what the scripts read. `make evidence`
+collects all fourteen against the running stack and writes three separate
+signed documents: **Datenschutz**, **KI**, **Mitbestimmung**.
+`make evidence-check` is the gate and goes red on an unkept promise. Measured 20.09.2026: **83 findings across 14
 services**, none unkept.
 
 **Why it exists at all: the principles were written down and not executable.**
-`Adr0022Tests` and `EntwurfsgrenzeTests` check the *tree* — but the AI access is
-`KiZugangV1`, which means provider, `base_url`, model and key come **per person
+`Adr0022Tests` and `DraftBoundaryTests` check the *tree* — but the AI access is
+`AiAccessV1`, which means provider, `base_url`, model and key come **per person
 at runtime** from the account settings. No test in the world sees where this
 tree actually speaks tonight. `docs/KI-EINSATZ-PRUEFUNG.md` is a snapshot from
 02.09.2026 and says so; it counts *two* AI consumers where there are now **four**
@@ -994,32 +999,35 @@ tree actually speaks tonight. `docs/KI-EINSATZ-PRUEFUNG.md` is a snapshot from
 "zertifiziert" or "erfüllt Art. X". Under Art. 42/43 DSGVO only a supervisory
 authority or a body accredited to EN ISO/IEC 17065 may certify; "certified"
 without accreditation is a misleading commercial practice in the EU
-(RL 2005/29/EG, RL 2006/114/EG). `DokumentwortTests` reads the scope sentences
-out of the generator and runs without a stack; `scripts/nachweis_worte.py`
-checks what actually came out. **The disclaimer is exempt from the word list on
+(RL 2005/29/EG, RL 2006/114/EG). `DocumentWordTests` reads the scope sentences
+out of the generator (`scripts/evidence_documents.py`) and runs without a stack;
+`scripts/evidence_words.py` checks what actually came out. Both carry the
+English twins (`compliant`, `conform`, `audited`, …) beside the German words. **The disclaimer is exempt from the word list on
 purpose** — it *denies* those words ("Es ist KEIN Zertifikat"), and a search that
 reads it flags the one sentence that makes the document honest. Measured on the
 first run; its wording is pinned from the other side instead.
 
-**Every citation carries `Leser` — what a human still decides — and it is never
-empty, as a test.** A citation that settled its own article would be exactly the
-presumption the vocabulary exists against. On the page `Leser` stands in the
+**Every citation carries `Reader` — what a human still decides — and it is never
+empty, as a test.** (`Leser` in our own citation type until ADR-0045; today it is
+a field of Noelia's `RegulatoryReference`.) A citation that settled its own
+article would be exactly the presumption the vocabulary exists against. On the
+page `Reader` stands in the
 **same row** as the citation, never as a footnote: a footnote survives neither a
 screenshot nor a paste into somebody else's table.
 
-**`Hinweis` is not a defect, and that distinction is the whole gate.** That
+**`Warning` is not a defect, and that distinction is the whole gate.** That
 model calls are not recorded is ADR-0024 and a decision; a gate that goes red on
-deliberate restraint gets switched off by the next person. Red is only `Fehlt`.
-And a check whose subject is absent reports `NichtAnwendbar`, never `Erfuellt` —
+deliberate restraint gets switched off by the next person. Red is only `Fail`.
+And a check whose subject is absent reports `NotApplicable`, never `Pass` —
 fourteen services without an AI seam would otherwise be fourteen green ticks
 over a seam that does not exist.
 
 **The AI directory counts people and names none.** It reports provider label and
-host and *counts* — "three people on `api.anthropic.com`". `EfAnbieterquelle`
+host and *counts* — "three people on `api.anthropic.com`". `EfProviderSource`
 groups in SQL and does not even fetch the encrypted key: what is not fetched
 cannot end up in a finding. ADR-0026 says the same for events.
 
-**The door is its own piece of paper.** `Nachweis__Geheimnis`, deliberately
+**The door is its own piece of paper.** `Evidence__Secret`, deliberately
 neither the notification secret nor the erasure one: "may trigger a mail", "may
 delete everything about a person" and "may see which providers this instance
 uses" are three different rights. **Empty means shut**, and shut answers
@@ -1048,18 +1056,19 @@ scout-service still forbids it locally, where a judgement beside a search hit
 
 **Thirteen exemptions exist in the whole tree**, in three services, for three
 homonyms: `Note` (English: remark), `Quote` (English: citation) and
-`WorkloadPercent`/`PensumProzent` (the workload a person states about the job
-they want). Each carries its reason, and **the reason appears in the finding** —
+`WorkloadPercent` (the workload a person states about the job they want;
+`PensumProzent` before the translation). Each carries its reason, and **the reason appears in the finding** —
 whoever adds an exemption writes it into a document a works council reads. A
 silent list in a test project grows; one that gets read does not. The count is
 pinned so a fourteenth stands out.
 
-**`Seitenanfrage.Anzahl` in profile-service is now `Seitenlaenge`**, exactly like
-scout-service and for the same reason. The vocabulary forced the naming, and
+**`Seitenanfrage.Anzahl` in profile-service became `Seitenlaenge`, and is
+`PageRequest.PageLength` today**, exactly like scout-service and for the same
+reason. The vocabulary forced the naming, and
 that is its job.
 
 **The gate needs the stack, and says so instead of hiding it.**
-`make nachweis-pruefen` runs inside `make validate` whenever the stack answers;
+`make evidence-check` runs inside `make validate` whenever the stack answers;
 when it does not, the report names it — the same treatment `validate.sh` gives
 the E2E journeys. A tick over a run that never happened is the kind of green
 that script was built against.
@@ -1067,15 +1076,16 @@ that script was built against.
 ## Conventions that bite
 
 - **Code is written in English. All of it, backend and frontend.** Type names, members, locals, parameters, test method names, comments and XML docs. This is not a style preference and it is not negotiable: it was asked for explicitly, and it drifted back to German twice because it was nowhere written down.
+  - **The backend is translated** — `src/`, `tests/`, `scripts/`, the Makefile, compose, the chart and the configuration keys, 21.–25.09.2026 (`10e0157` … `a4ec721`; each commit body lists its renames). **`web/` is not yet**: its identifiers, file names (`kontext.ts`, `fehler.ts`) and comments are still German. Where German deliberately stayed in the backend — the prompts sent to a model, the check ids (`wt.loeschung.nachweis`), the exemption reasons and finding texts that land in the German evidence documents, the keys of `docs/routenkarte.yml` — the line says why.
   - **The wire and the database were always English** and stay exactly as they are: 170 `[JsonPropertyName]` values, every `HasColumnName`, every `ToTable`. A rename touches identifiers only — no migration, no contract change. If a rename would move a JSON name or a column, the rename is wrong.
   - **German stays in exactly two places**: the text a person reads (`web/src/core/i18n/kataloge/de.ts` — that is the product's language, and `en`/`fr` are translations of it), and prose documents like this one, the ADRs and `docs/`.
   - Domain words with no faithful English equivalent (`Ablage`, `Personenzeile`) are renamed to what they *mean* (`DocumentStore`, `SubjectKeyedTable`), never transliterated. Where the German term is load-bearing in a document, the comment says so.
-  - **A settings property name IS the environment key, and it is the third contract beside the wire and the database.** `ConsentSettings.Adresse` binds `Consent__Adresse`; renaming the property alone leaves the value on its default, silently — measured 22.09.2026: `Storage__Wurzel` → `Root` made `POST /portfolios/me/attachments` answer 500 over a green build, and five of twenty portfolio journeys fell. Some of those keys sit in the shared compose anchor (`Erasure__Geheimnis`), so **one service cannot move alone**: the keys are renamed in a single pass over code, `docker-compose.yml`, the chart, `.env.example` and the scripts, or not at all. Until then the property keeps the key's spelling and a comment at the line says why.
+  - **A settings property name IS the environment key, and it is the third contract beside the wire and the database.** `ConsentSettings.BaseUrl` binds `Consent__BaseUrl`; renaming the property alone leaves the value on its default, silently — measured 22.09.2026: `Storage__Wurzel` → `Root` made `POST /portfolios/me/attachments` answer 500 over a green build, and five of twenty portfolio journeys fell (the key is `Storage__Root` today). Some of those keys sit in the shared compose anchor (`Erasure__Secret`), so **one service cannot move alone**: the keys are renamed in a single pass over code, `docker-compose.yml`, the chart, `.env.example` and the scripts, or not at all. That pass happened on 25.09.2026 (`229de78`), with no German alias left beside a key. `ComposeKeyTests` reads `docker-compose.yml` and requires every key a service's block sets to land on a settings property of that service — and the old German keys to land nowhere; it is the only suite that reads what compose sets, which is why both earlier breaks got past every other one.
   - **`docs/NAMING.md` holds the stem table and the six places where an identifier is also a contract.** Read it before a rename; the build finds none of those six.
 - **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`. There is no Python here any more; if a command in an old document says `uv`, `ruff`, `mypy`, `pytest` or `alembic`, that document is describing the predecessor.
 - **Warnings are errors** (`Directory.Build.props`). Central package management via `Directory.Packages.props` — versions go there, not into a `.csproj`.
 - **Sharing rule**: only domain-neutral, transport-independent, non-business code goes in `src/shared/`. Profile, company, job, transfer, contract, application and matching models stay inside the owning service. `Contracts.*` holds versioned boundary DTOs, never a shared domain model.
-- **A service-to-service body is a typed contract, never an anonymous object.** `new { userId = … }` compiles, serialises, and arrives as `Guid.Empty` at a receiver that declares `[JsonPropertyName("user_id")]`. Measured: all **four** notification hops did exactly this, and the whole notification path had never once delivered — 18 outbox rows given up after ten attempts, and the mailbox held nothing but confirmation mails. The erasure cascade was immune because sender and receiver share `LoeschungV1`. Where a shared type is genuinely not available, `BenachrichtigungsdrahtTests` is the pattern: capture what the sender writes, deserialise it with the *receiver's* type, and assert the value survives — never compare the two names, which is one string checked twice.
+- **A service-to-service body is a typed contract, never an anonymous object.** `new { userId = … }` compiles, serialises, and arrives as `Guid.Empty` at a receiver that declares `[JsonPropertyName("user_id")]`. Measured: all **four** notification hops did exactly this, and the whole notification path had never once delivered — 18 outbox rows given up after ten attempts, and the mailbox held nothing but confirmation mails. The erasure cascade was immune because sender and receiver share `ErasureV1` (then `LoeschungV1`). Where a shared type is genuinely not available, `NotificationWireTests` is the pattern: capture what the sender writes, deserialise it with the *receiver's* type, and assert the value survives — never compare the two names, which is one string checked twice.
 - **No secrets, tokens, CVs, contracts or raw source code in the repo or in logs.**
 - **No detour around a Noelia bug.** Write the code correctly, leave the test red, file a ticket in `bugs/` with a reproduction free of WorkerTransfer code, move on. Everything in `bugs/` must go green once the bug is fixed, without anyone reverting code.
 - **Run counter-probes, and make sure the break actually compiles** — a build error reads in the output like a passing test.

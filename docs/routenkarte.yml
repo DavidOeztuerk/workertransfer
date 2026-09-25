@@ -24,7 +24,7 @@
 # pruefbar. Bis dahin gab es im ganzen Baum ausserhalb von identity-service
 # KEINE einzige Rechtepruefung: die Navigation versteckte Firmeneintraege, und
 # der Server antwortete 403 nur dort, wo jemand daran gedacht hatte.
-# `Mitgliedschaftsrecht` las die Rolle je Anfrage aus der Tabelle — aber
+# `MembershipPermission` las die Rolle je Anfrage aus der Tabelle — aber
 # niemand fragte. Verstecken ist keine Zugriffskontrolle.
 #
 # `firma` heisst deshalb ab jetzt genauer: fuer eine Firma handelnd ALS ADMIN.
@@ -50,8 +50,8 @@
 # Karte). Auch das Chefkonto ist in dieser erfundenen Firma kein Administrator
 # und bekommt 403 — beide Spalten zeigen dieselbe Zahl aus zwei verschiedenen
 # Gruenden. Dass die Richtlinie dort wirklich zwischen den Rollen
-# unterscheidet, belegt `UnternehmensreiseTests` an einer Firma, die es gibt.
-# `RoutenkarteTests.Die_vierte_Spalte_unterscheidet_admin_von_member` nennt die
+# unterscheidet, belegt `CompanyJourneyTests` an einer Firma, die es gibt.
+# `RouteMapTests.The_fourth_column_distinguishes_admin_from_member` nennt die
 # fuenf beim Namen: eine davon zu oeffnen ist dann eine bewusste Aenderung und
 # keine stille.
 #
@@ -87,11 +87,16 @@
 # ---------------------------------------------------------------------------
 # WER SIE FAEHRT
 #
-#   scripts/route-map.sh              gegen den laufenden Stapel (make up)
-#   RoutenkarteTests (Gateway.Tests)  ohne Stapel: jede Route hat einen Eintrag
+#   scripts/route-map.sh              gegen den laufenden Stapel (make route-map)
+#   RouteMapTests (Gateway.Tests)     ohne Stapel: jede Route hat einen Eintrag
 #
 # Der zweite ist der, der eine NEUE Route rotlaufen laesst. Ohne ihn waere die
 # Karte genau so lange vollstaendig, bis jemand einen Endpunkt hinzufuegt.
+#
+# Die Schluessel dieser Datei (`pfad`, `ohne`, `person`, `mitglied`, `firma`,
+# `rumpf`, `warum`, `eintraege` …) bleiben deutsch, auch seit der Code Englisch
+# spricht. `RouteMapTests` bindet sie ueber `[YamlMember(Alias = …)]`: wer einen
+# umbenennt, laesst dessen Spalte still auf 0 fallen, ueber einem gruenen Bau.
 
 gruppen:
   - name: 'Anmeldung — offen, und mit Absicht auskunftslos'

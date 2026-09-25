@@ -98,10 +98,10 @@ make evidence          # three dated, signed documents against the running stack
 make evidence-check    # every check in every service; red as soon as a promise is unkept
 ```
 
-Every service answers seven addresses about itself — `/nachweis`, four section
-pages, `/nachweis/pflichten` and `/nachweis/bericht.json` — behind their own
-secret (`Evidence__Secret`; empty means the door is shut, and it answers
-**404**, not 403). `make evidence` collects all fourteen and writes three
+Every service answers about itself under `/noelia/…` — Noelia's dashboard, with
+`/noelia/report.json` as the machine-readable half — behind its own secret
+(`Evidence__Secret`; empty means the door is shut, and it answers **404**, not
+403). `make evidence` collects all fourteen and writes three
 separate documents for three readers: **Datenschutz**, **KI** and
 **Mitbestimmung**, each signed with ECDSA P-256 over its canonical form.
 

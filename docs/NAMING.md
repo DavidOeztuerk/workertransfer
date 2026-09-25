@@ -11,7 +11,16 @@ it is a contract change wearing a refactor's clothes.
 
 **What stays German.** The text a person reads (`web/src/core/i18n/kataloge/de.ts`
 — that is the product's language) and prose documents like CLAUDE.md, the ADRs
-and the rest of `docs/`.
+and the rest of `docs/`. A few strings in code stay German on purpose, and each
+says why at its line: the prompts sent to a model, the check ids
+(`wt.loeschung.nachweis`), the exemption reasons and finding texts that land in
+the German evidence documents, and the keys of `docs/routenkarte.yml`. Wire
+words such as `bis_10` or `zeugnis` are the wire, and do not move either.
+
+**Where it stands.** The backend follows this vocabulary since 25.09.2026 —
+`src/`, `tests/`, `scripts/`, the Makefile, compose, the chart and the
+configuration keys (`10e0157` … `a4ec721`; every commit body lists its renames).
+`web/` has not been renamed yet.
 
 ## The stems
 
@@ -41,11 +50,17 @@ keep the compound's shape.
 | Wanderung | SchemaMigration | not `Migration`: EF owns that name |
 | Bereitschaft | Readiness | |
 | Aufbewahrung | Retention | |
-| Bewerbung | Application | |
+| Bewerbung | Application | the aggregate is `JobApplication` — `…Applications.Application` is the layer |
 | Stelle | Job | the advert; `Position` is the role |
+| Profil | PersonProfile | the aggregate; `Profile` is the service |
+| Lebenslauf | CurriculumVitae | the aggregate; `Resume` is the service |
+| Unterlage | DocumentRecord | one stored document in resume-service |
 | Entwurf | Draft | |
 | Entwerfer | Drafter | the port (`IEntwerfer` → `IDrafter`) |
 | Anschreiber | CoverLetterWriter | |
+| Befehl | Command | `…Befehl` → `…Command`; the marker is `ICommandMessage`, not Noelia's `ICommand<T>` |
+| Abfrage | Query | the marker is `IQueryMessage` |
+| Versand | Dispatch | `VersandBehavior` → `DispatchBehavior` |
 | Gespraech | Conversation | |
 | Mandat | Mandate | |
 | Vorgang | Case | a running process; `Transfer` only where it is one. Locals are `caseItem` — `case` is a keyword |
@@ -70,6 +85,11 @@ keep the compound's shape.
 | Fund | Term | what a document yielded |
 | Berufsfeld | OccupationalField | |
 | Anschrift | PostalAddress | never `Address` alone — that is also a URL here |
+| Adresse (a URL) | BaseUrl | settings: `Consent__Adresse` → `Consent__BaseUrl`; `Adressen` → `BaseUrls` |
+| Zeitueberschreitung, Geduld | Timeout | |
+| Rueckadresse | RedirectUrl | the OAuth callback |
+| Takt | PollInterval | the outbox loop |
+| Auskunft | Lookup | `Auskunft__Resume` → `Lookup__Resume`; ports `ICompanyLookup`, `IPersonLookup` |
 | Anfrage | ResumeRequest / MarketRequest | never bare `Request`: MediatR already names its handler parameter that, and a local `request` beside it does not compile. Locals use `requestRecord`. |
 | Antwort | Response | |
 | Fassung | Version | |
@@ -85,6 +105,16 @@ keep the compound's shape.
 | Laenge | Length | `Seitenlaenge` → `PageLength` — never `Count` (ADR-0026) |
 | Umgebung | EnvironmentFile | not `Environment`: it would shadow `System.Environment` |
 | Reise | Journey | test suites: `ProfilreiseTests` → `ProfileJourneyTests` |
+| Auflagen | Conditions | `AuflagenTests` → `ConditionsTests`, one per service that has conditions |
+| Ganzes | CrossCutting | the suite `WorkerTransfer.CrossCutting.Tests` |
+| Probe | Probe | test doubles: `Probetor` → `ProbeGate` |
+| Tokenform | TokenShape | |
+| Stufe | Stage | advisor; on the wire still `1`/`2`/`3` |
+| Haken | Tick | scout: `HakenV1` → `TickV1` |
+| Treffer | Hit | scout: `HitV1` |
+| Wortausnahme | TermExemption | the reason stays German — it lands in the evidence document |
+| Remotegrad | RemoteMode | |
+| Umkreis | SearchRadius | |
 | Kanarienvogel | Canary | |
 | Gegenprobe | CounterProbe | |
 | Ortskunde | PlaceLookup | resolves free text to coordinates (ADR-0032) |
@@ -133,16 +163,24 @@ cases, as a schema change and as a 500.
   answer is not a hand-written `ALTER TYPE`: delete the migrations and let
   `dotnet ef migrations add` generate them, so a fresh schema creates the right
   label from the start.
-- **A settings property name IS the environment key.** `ConsentSettings.Adresse`
-  binds `Consent__Adresse`, and that key stands in `docker-compose.yml`, in the
+- **A settings property name IS the environment key.** `ConsentSettings.BaseUrl`
+  binds `Consent__BaseUrl`, and that key stands in `docker-compose.yml`, in the
   chart and in `.env.example`. Renaming the property alone leaves the value
-  unbound at its default — measured: `Storage__Wurzel` → `Root` made
-  `POST /portfolios/me/attachments` answer **500**, and five of twenty portfolio
-  journeys fell. Some of those keys sit in the shared compose anchor
-  (`Erasure__Geheimnis`), so **one service cannot move alone**. They are
-  therefore renamed in a single pass over the whole tree — code, compose, chart,
-  `.env.example`, scripts — or not at all. Until then the property keeps the
-  key's spelling and says so at the line.
+  unbound at its default — measured while the keys were still German:
+  `Storage__Wurzel` → `Root` made `POST /portfolios/me/attachments` answer
+  **500**, and five of twenty portfolio journeys fell. Some of those keys sit in
+  the shared compose anchor (`Erasure__Secret`), so **one service cannot move
+  alone**. They were therefore renamed in a single pass over the whole tree —
+  code, compose, chart, `.env.example`, scripts — on 25.09.2026 (`229de78`), with
+  no German alias left beside a key. Whoever runs an older `.env` renames its
+  variables by hand (`229de78` lists them): compose aborts on the one required
+  variable that moved, but the optional ones fall back silently — an old
+  `WORKERTRANSFER_BREMSE_FAKTOR=40` leaves the brake at factor 1. `ComposeKeyTests` now reads
+  `docker-compose.yml` and requires every key a service's block sets to land on a
+  settings property of that service, and the old German keys to land nowhere.
+  The same trap stands wherever a name is bound by convention: `RouteMapTests`
+  binds the German keys of `docs/routenkarte.yml` with `[YamlMember(Alias = …)]`,
+  and without the alias every column falls silently to 0.
 
 ## How a rename is verified
 
