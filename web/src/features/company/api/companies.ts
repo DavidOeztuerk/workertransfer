@@ -6,7 +6,7 @@
 
 import { request } from "../../../core/api/client";
 import { COMPANIES_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type Failure, interpretError } from "../../../shared/api/errors";
 import { i18n } from "../../../core/i18n/i18n";
 
 export interface CompanyProfile {
@@ -41,15 +41,15 @@ export interface CompanyProfileInput {
 
 export type SpeicherErgebnis =
   | { ok: true; profile: CompanyProfile }
-  | Fehlschlag<"no-company" | "invalid" | "offline">;
+  | Failure<"no-company" | "invalid" | "offline">;
 
 export type EigenesProfilErgebnis =
   | { ok: true; profile: CompanyProfile | null }
-  | Fehlschlag<"unavailable">;
+  | Failure<"unavailable">;
 
 export type SlugErgebnis =
   | { ok: true; profile: CompanyProfile }
-  | Fehlschlag<"not-found" | "unavailable">;
+  | Failure<"not-found" | "unavailable">;
 
 /**
  * Das Profil eines Unternehmens, oder `null`.
@@ -96,10 +96,10 @@ export async function getOwnCompanyProfile(
     "errors.profileUnavailable"
   );
   if (answer.ok) return { ok: true, profile: answer.value ?? null };
-  return deuten<"unavailable">(
+  return interpretError<"unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "errors.profileUnavailable" },
+      0: { reason: "unavailable", titleKey: "errors.profileUnavailable" },
     },
     "unavailable"
   );
@@ -117,11 +117,11 @@ export async function saveCompanyProfile(
     "errors.profileNotSaved"
   );
   if (answer.ok) return { ok: true, profile: answer.value };
-  return deuten<"no-company" | "invalid" | "offline">(
+  return interpretError<"no-company" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
-      403: { reason: "no-company", titel: "errors.chooseCompanyToActFor" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      403: { reason: "no-company", titleKey: "errors.chooseCompanyToActFor" },
     },
     "invalid"
   );
@@ -165,13 +165,13 @@ export async function getCompanyBySlug(
       },
     };
   }
-  return deuten<"not-found" | "unavailable">(
+  return interpretError<"not-found" | "unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "errors.noConnection" },
+      0: { reason: "unavailable", titleKey: "errors.noConnection" },
       404: {
         reason: "not-found",
-        titel: "errors.noCompanyAtAddress",
+        titleKey: "errors.noCompanyAtAddress",
       },
     },
     "unavailable"

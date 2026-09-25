@@ -6,77 +6,77 @@ import Select from "@mui/material/Select";
 import Typography from "@mui/material/Typography";
 import type { ReactNode } from "react";
 
-/** Eine Möglichkeit in einem <see cref="WahlFeld" />. */
-export interface Wahlmoeglichkeit<T extends string> {
-  wert: T;
+/** One option in a `ChoiceField`. */
+export interface ChoiceOption<T extends string> {
+  value: T;
   name: string;
-  /** Ein Satz darunter, wenn der Name allein nicht sagt, was passiert. */
-  hinweis?: string;
+  /** A sentence below it, when the name alone does not say what happens. */
+  hint?: string;
   symbol: ReactNode;
 }
 
-/** Eine benannte Wahl: Überschrift, erklärender Satz, Auswahlfeld. */
-export function WahlFeld<T extends string>({
-  ueberschrift,
-  beschreibung,
-  wert,
-  moeglichkeiten,
-  onWahl,
-  etikett,
+/** A named choice: heading, explanatory sentence, select field. */
+export function ChoiceField<T extends string>({
+  heading,
+  description,
+  value,
+  options,
+  onChoose,
+  ariaLabel,
 }: {
-  ueberschrift: string;
-  beschreibung: string;
-  wert: T;
-  moeglichkeiten: readonly Wahlmoeglichkeit<T>[];
-  onWahl: (gewaehlt: T) => void;
-  /** Für Vorleser: die Überschrift ist ein Text, kein Label. */
-  etikett: string;
+  heading: string;
+  description: string;
+  value: T;
+  options: readonly ChoiceOption<T>[];
+  onChoose: (chosen: T) => void;
+  /** For screen readers: the heading is a text, not a label. */
+  ariaLabel: string;
 }) {
-  const aktuell = moeglichkeiten.find((moeglich) => moeglich.wert === wert);
+  const current = options.find((option) => option.value === value);
 
   return (
     <Box sx={{ display: "grid", gap: 1 }}>
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 660 }}>
-          {ueberschrift}
+          {heading}
         </Typography>
         <Typography variant="caption" color="text.secondary" component="div">
-          {beschreibung}
+          {description}
         </Typography>
       </Box>
 
       <Select
-        value={wert}
+        value={value}
         size="small"
         fullWidth
-        inputProps={{ "aria-label": etikett }}
-        onChange={(event) => onWahl(event.target.value as T)}
-        // Zugeklappt mit Symbol, wie in der Liste — `renderValue`, weil MUI
-        // sonst nur den Text zeigt.
+        inputProps={{ "aria-label": ariaLabel }}
+        onChange={(event) => onChoose(event.target.value as T)}
+        // Closed with its symbol, as in the list — `renderValue`, because MUI
+        // otherwise shows only the text.
         renderValue={() => (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
             <Box sx={{ display: "flex", color: "text.secondary" }}>
-              {aktuell?.symbol}
+              {current?.symbol}
             </Box>
-            {aktuell?.name ?? ""}
+            {current?.name ?? ""}
           </Box>
         )}
         sx={{ borderRadius: 2, "& .MuiSelect-select": { py: 1.1 } }}
       >
-        {moeglichkeiten.map((moeglich) => (
-          <MenuItem key={moeglich.wert} value={moeglich.wert} sx={{ py: 1 }}>
+        {options.map((option) => (
+          <MenuItem key={option.value} value={option.value} sx={{ py: 1 }}>
             <ListItemIcon sx={{ minWidth: 36, color: "text.secondary" }}>
-              {moeglich.symbol}
+              {option.symbol}
             </ListItemIcon>
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography variant="body2">{moeglich.name}</Typography>
-              {moeglich.hinweis ? (
+              <Typography variant="body2">{option.name}</Typography>
+              {option.hint ? (
                 <Typography variant="caption" color="text.secondary" component="div">
-                  {moeglich.hinweis}
+                  {option.hint}
                 </Typography>
               ) : null}
             </Box>
-            {moeglich.wert === wert ? (
+            {option.value === value ? (
               <CheckIcon fontSize="small" sx={{ ml: 1.5, color: "primary.main" }} />
             ) : null}
           </MenuItem>

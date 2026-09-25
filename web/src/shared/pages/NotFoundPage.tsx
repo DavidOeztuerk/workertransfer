@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-/** Was bei einer unbekannten Adresse steht. */
+/** What stands at an unknown address. */
 export function NotFoundPage() {
   const { t } = useTranslation();
 

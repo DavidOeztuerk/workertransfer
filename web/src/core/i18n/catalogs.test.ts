@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SPRACHEN } from "../store/preferencesSlice";
+import { LANGUAGES } from "../store/preferencesSlice";
 import de from "./catalogs/de";
 import en from "./catalogs/en";
 import fr from "./catalogs/fr";
@@ -25,7 +25,7 @@ describe("the catalogues", () => {
   it("have the same keys in every language", () => {
     const source = paths(de).sort();
 
-    for (const language of SPRACHEN) {
+    for (const language of LANGUAGES) {
       expect(paths(catalogs[language]).sort(), `catalogue ${language}`).toEqual(source);
     }
   });
@@ -113,7 +113,7 @@ describe("the catalogues", () => {
   });
 
   it("leave no text empty", () => {
-    for (const language of SPRACHEN) {
+    for (const language of LANGUAGES) {
       for (const path of paths(catalogs[language])) {
         expect(read(catalogs[language], path).trim(), `${language}: ${path}`).not.toBe("");
       }

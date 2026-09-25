@@ -11,7 +11,7 @@
 
 import { request } from "../../../core/api/client";
 import { SCOUT_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type Failure, interpretError } from "../../../shared/api/errors";
 
 /** Ein Haken: ein gesuchtes Wort und ein Ja oder Nein. */
 export interface Haken {
@@ -92,7 +92,7 @@ export type ScoutFehler = "no-company" | "unauthenticated" | "consent-unavailabl
 
 export type Trefferseite =
   | { ok: true; items: Treffer[]; nextCursor: string | null }
-  | Fehlschlag<ScoutFehler>;
+  | Failure<ScoutFehler>;
 
 /**
  * Die Filter wandern in die URL, nicht in den Cursor.
@@ -156,26 +156,26 @@ export async function sucheKandidaten(
       nextCursor: answer.value?.next ?? null,
     };
   }
-  return deuten<ScoutFehler>(
+  return interpretError<ScoutFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "errors.sessionExpired",
-        text: "errors.signInAgain",
+        titleKey: "errors.sessionExpired",
+        detailKey: "errors.signInAgain",
       },
       403: {
         reason: "no-company",
-        titel: "errors.onlyCompaniesSeeProfiles",
-        text: "errors.chooseCompany",
+        titleKey: "errors.onlyCompaniesSeeProfiles",
+        detailKey: "errors.chooseCompany",
       },
       // NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
       // freigegeben — und genau das weiß in diesem Moment niemand.
       503: {
         reason: "consent-unavailable",
-        titel: "errors.ledgerSilent",
-        text: "errors.tryLater",
+        titleKey: "errors.ledgerSilent",
+        detailKey: "errors.tryLater",
       },
     },
     "offline"

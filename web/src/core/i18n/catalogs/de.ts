@@ -1162,12 +1162,12 @@ const de = {
   },
 
   /**
-   * Die Arbeitsprobe (ADR-0042).
+   * The work sample (ADR-0042).
    *
-   * Die drei Zusagen stehen hier als TEXT und nicht nur im Code: der Umfang in
-   * Stunden, dass die Bewertung zum Vorgang gehört, und dass Ablehnen nirgends
-   * vermerkt wird. Wo sie nur im Server stünden, wären sie bei der nächsten
-   * Überarbeitung der Oberfläche weg.
+   * The three promises stand here as TEXT and not only in the code: the effort
+   * in hours, that the evaluation belongs to the case, and that declining is
+   * recorded nowhere. Were they only in the server, they would be gone at the
+   * next rework of the UI.
    */
   assessments: {
     title: "Arbeitsproben",

@@ -8,10 +8,10 @@ import { request } from "../../../core/api/client";
 import { TRANSFER_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
 import {
-  type Deutung,
-  type Fehlschlag,
-  deuten,
-} from "../../../shared/api/fehler";
+  type ErrorReading,
+  type Failure,
+  interpretError,
+} from "../../../shared/api/errors";
 
 export type Availability = "open" | "listening" | "unavailable";
 
@@ -47,10 +47,10 @@ export interface MarketRequest {
   active: boolean | null;
 }
 
-export type StatusErgebnis = { ok: true; status: MarketStatus } | Fehlschlag<"unavailable">;
+export type StatusErgebnis = { ok: true; status: MarketStatus } | Failure<"unavailable">;
 export type SpeicherErgebnis =
   | { ok: true; status: MarketStatus }
-  | Fehlschlag<"unauthenticated" | "invalid" | "offline">;
+  | Failure<"unauthenticated" | "invalid" | "offline">;
 
 export type AnfrageFehler =
   | "already-asked"
@@ -58,8 +58,8 @@ export type AnfrageFehler =
   | "not-available"
   | "unavailable"
   | "offline";
-export type AnfrageErgebnis = { ok: true; request: MarketRequest } | Fehlschlag<AnfrageFehler>;
-export type AnfragenListe = { ok: true; requests: MarketRequest[] } | Fehlschlag<"unavailable">;
+export type AnfrageErgebnis = { ok: true; request: MarketRequest } | Failure<AnfrageFehler>;
+export type AnfragenListe = { ok: true; requests: MarketRequest[] } | Failure<"unavailable">;
 
 /**
  * Der eigene Marktstatus — und kein Ersatzwert, wenn er nicht abrufbar ist.
@@ -112,36 +112,36 @@ export async function saveMyMarketStatus(input: MarketStatusInput): Promise<Spei
     "errors.marketStatusNotSaved"
   );
   if (answer.ok) return { ok: true, status: answer.value };
-  return deuten<"unauthenticated" | "invalid" | "offline">(
+  return interpretError<"unauthenticated" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "errors.sessionExpired",
-        text: "errors.signInAgain",
+        titleKey: "errors.sessionExpired",
+        detailKey: "errors.signInAgain",
       },
     },
     "invalid"
   );
 }
 
-const ANFRAGEFEHLER: Partial<Record<number, Deutung<AnfrageFehler>>> =
+const ANFRAGEFEHLER: Partial<Record<number, ErrorReading<AnfrageFehler>>> =
   {
-    0: { reason: "offline", titel: "errors.noConnection" },
-    409: { reason: "already-asked", titel: "errors.alreadyAsked" },
+    0: { reason: "offline", titleKey: "errors.noConnection" },
+    409: { reason: "already-asked", titleKey: "errors.alreadyAsked" },
     403: {
       reason: "no-company",
-      titel: "errors.onlyCompaniesAsk",
-      text: "errors.chooseCompany",
+      titleKey: "errors.onlyCompaniesAsk",
+      detailKey: "errors.chooseCompany",
     },
     // `404` sagt bewusst nicht, ob es die Person gibt — die Oberfläche darf
     // daraus keine Auskunft basteln, die der Server gerade verweigert hat.
-    404: { reason: "not-available", titel: "errors.personNotRequestable" },
+    404: { reason: "not-available", titleKey: "errors.personNotRequestable" },
     503: {
       reason: "unavailable",
-      titel: "errors.ledgerSilent",
-      text: "errors.tryLater",
+      titleKey: "errors.ledgerSilent",
+      detailKey: "errors.tryLater",
     },
   };
 
@@ -153,7 +153,7 @@ export async function requestMarketStatus(subjectId: string): Promise<AnfrageErg
     "errors.requestNotSent"
   );
   if (answer.ok) return { ok: true, request: answer.value };
-  return deuten<AnfrageFehler>(answer.error, ANFRAGEFEHLER, "offline");
+  return interpretError<AnfrageFehler>(answer.error, ANFRAGEFEHLER, "offline");
 }
 
 async function post(path: string): Promise<AnfrageErgebnis> {
@@ -164,14 +164,14 @@ async function post(path: string): Promise<AnfrageErgebnis> {
     "errors.requestNotAnswered"
   );
   if (answer.ok) return { ok: true, request: answer.value };
-  return deuten<AnfrageFehler>(
+  return interpretError<AnfrageFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       503: {
         reason: "unavailable",
-        titel: "errors.ledgerSilent",
-        text: "errors.nothingChanged",
+        titleKey: "errors.ledgerSilent",
+        detailKey: "errors.nothingChanged",
       },
     },
     "offline"
@@ -198,11 +198,11 @@ async function listRequests(path: string, signal?: AbortSignal): Promise<Anfrage
   if (answer.ok) return { ok: true, requests: answer.value ?? [] };
   // `503` NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
   // gefragt oder freigegeben — und das weiß in diesem Moment niemand.
-  return deuten<"unavailable">(
+  return interpretError<"unavailable">(
     answer.error,
     {
-      0: { reason: "unavailable", titel: "errors.noConnection" },
-      503: { reason: "unavailable", titel: "errors.ledgerSilent" },
+      0: { reason: "unavailable", titleKey: "errors.noConnection" },
+      503: { reason: "unavailable", titleKey: "errors.ledgerSilent" },
     },
     "unavailable"
   );
@@ -226,7 +226,7 @@ export function listCompanyMarketRequests(signal?: AbortSignal): Promise<Anfrage
 export async function getMarketStatus(
   subjectId: string,
   signal?: AbortSignal
-): Promise<{ ok: true; status: MarketStatus | null } | Fehlschlag<"unavailable">> {
+): Promise<{ ok: true; status: MarketStatus | null } | Failure<"unavailable">> {
   const answer = await request<MarketStatus>(
     TRANSFER_BASE_URL,
     `/market/${subjectId}`,
@@ -235,9 +235,9 @@ export async function getMarketStatus(
   );
   if (answer.ok) return { ok: true, status: answer.value ?? null };
   if (answer.error.status === 404) return { ok: true, status: null };
-  return deuten<"unavailable">(
+  return interpretError<"unavailable">(
     answer.error,
-    { 503: { reason: "unavailable", titel: "errors.ledgerSilent" } },
+    { 503: { reason: "unavailable", titleKey: "errors.ledgerSilent" } },
     "unavailable"
   );
 }

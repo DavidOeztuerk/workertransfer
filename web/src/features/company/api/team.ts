@@ -7,7 +7,7 @@
 
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type Failure, interpretError } from "../../../shared/api/errors";
 
 export type Role = "admin" | "member";
 
@@ -28,16 +28,16 @@ export interface Invitation {
 
 export type MitgliederErgebnis =
   | { ok: true; members: CompanyMember[] }
-  | Fehlschlag<"fehlgeschlagen">;
+  | Failure<"fehlgeschlagen">;
 export type EinladungenErgebnis =
   | { ok: true; invitations: Invitation[] }
-  | Fehlschlag<"fehlgeschlagen">;
+  | Failure<"fehlgeschlagen">;
 export type EinladenErgebnis =
   | { ok: true; invitation: Invitation }
-  | Fehlschlag<"not-admin" | "not-yours" | "invalid" | "offline">;
+  | Failure<"not-admin" | "not-yours" | "invalid" | "offline">;
 export type EntfernenErgebnis =
   | { ok: true }
-  | Fehlschlag<"last-admin" | "not-admin" | "offline">;
+  | Failure<"last-admin" | "not-admin" | "offline">;
 
 /**
  * Die Mannschaft. Ein `404` heißt „nicht deins", nicht „kaputt".
@@ -58,9 +58,9 @@ export async function listMembers(
   );
   if (answer.ok) return { ok: true, members: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, members: [] };
-  return deuten<"fehlgeschlagen">(
+  return interpretError<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
+    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -77,9 +77,9 @@ export async function listInvitations(
   );
   if (answer.ok) return { ok: true, invitations: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, invitations: [] };
-  return deuten<"fehlgeschlagen">(
+  return interpretError<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
+    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -98,15 +98,15 @@ export async function inviteMember(
     "errors.invitationNotCreated"
   );
   if (answer.ok) return { ok: true, invitation: answer.value };
-  return deuten<"not-admin" | "not-yours" | "invalid" | "offline">(
+  return interpretError<"not-admin" | "not-yours" | "invalid" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       403: {
         reason: "not-admin",
-        titel: "errors.onlyAdminInvites",
+        titleKey: "errors.onlyAdminInvites",
       },
-      404: { reason: "not-yours", titel: "errors.cannotInviteForCompany" },
+      404: { reason: "not-yours", titleKey: "errors.cannotInviteForCompany" },
     },
     "invalid"
   );
@@ -115,7 +115,7 @@ export async function inviteMember(
 export async function withdrawInvitation(
   tenantId: string,
   invitationId: string
-): Promise<{ ok: true } | Fehlschlag<"fehlgeschlagen">> {
+): Promise<{ ok: true } | Failure<"fehlgeschlagen">> {
   // `204` ohne Rumpf — `request()` gibt dafür `undefined` zurück, statt den
   // Parser in einen Fehler laufen zu lassen, der wie ein Serverfehler aussähe.
   const answer = await request<void>(
@@ -125,9 +125,9 @@ export async function withdrawInvitation(
     "errors.invitationNotWithdrawn"
   );
   if (answer.ok) return { ok: true };
-  return deuten<"fehlgeschlagen">(
+  return interpretError<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
+    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
@@ -151,18 +151,18 @@ export async function removeMember(
     "errors.memberNotRemoved"
   );
   if (answer.ok) return { ok: true };
-  return deuten<"last-admin" | "not-admin" | "offline">(
+  return interpretError<"last-admin" | "not-admin" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       409: {
         reason: "last-admin",
-        titel: "errors.atLeastOneAdmin",
-        text: "errors.makeAdminFirst",
+        titleKey: "errors.atLeastOneAdmin",
+        detailKey: "errors.makeAdminFirst",
       },
       403: {
         reason: "not-admin",
-        titel: "errors.onlyAdminRemoves",
+        titleKey: "errors.onlyAdminRemoves",
       },
     },
     "offline"

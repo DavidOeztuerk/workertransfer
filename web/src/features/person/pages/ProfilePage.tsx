@@ -14,7 +14,7 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 
 import {
-  BerufsfeldSelect,
+  OccupationalFieldSelect,
   ConsentSwitch,
   ErrorBlock,
   LoadingBlock,
@@ -51,8 +51,8 @@ import { usePerson } from "../lib/session";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Nachweise } from "../components/Nachweise";
 import { AusUnterlagen } from "../components/AusUnterlagen";
-import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { offersGitHub } from "../../../shared/lib/occupationalFields";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { berufsfeldGesetzt } from "../../auth/store/authSlice";
 import { speichereBerufsfeld } from "../api/berufsfeld";
@@ -161,7 +161,7 @@ export function ProfilePage() {
   const berufsfeld = useAppSelector(
     (state) => state.auth.session?.berufsfeld ?? null,
   );
-  const github = zeigtGitHub(berufsfeld);
+  const github = offersGitHub(berufsfeld);
   const dispatch = useAppDispatch();
 
   /**
@@ -171,7 +171,7 @@ export function ProfilePage() {
    * Es gilt sofort, nicht erst mit „Speichern": Nachweiskasten und Navigation
    * folgen ihm unmittelbar.
    */
-  async function waehleBerufsfeld(feld: BerufsfeldWahl) {
+  async function waehleBerufsfeld(feld: OccupationalFieldChoice) {
     if (feld === berufsfeld) return;
 
     const result = await speichereBerufsfeld(feld);
@@ -453,8 +453,8 @@ export function ProfilePage() {
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
             />
-            <BerufsfeldSelect
-              wert={berufsfeld}
+            <OccupationalFieldSelect
+              value={berufsfeld}
               onChange={(feld) => void waehleBerufsfeld(feld)}
             />
 

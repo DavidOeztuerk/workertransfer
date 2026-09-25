@@ -4,24 +4,24 @@ import { ThemeProvider } from "@mui/material/styles";
 import { I18nextProvider } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 
-import { i18n, spracheAnwenden } from "./core/i18n/i18n";
+import { i18n, applyLanguage } from "./core/i18n/i18n";
 import { router } from "./core/router/Router";
 import { useAppDispatch, useAppSelector } from "./core/store/hooks";
 import {
-  SPRACHEN,
-  hatEigeneSprachwahl,
+  LANGUAGES,
+  hasOwnLanguageChoice,
   languageSet,
-  type Sprache,
+  type Language,
 } from "./core/store/preferencesSlice";
 import { useThemeMode } from "./shared/hooks/useThemeMode";
 
 /**
- * Die Anwendung unterhalb des Stores.
+ * The application below the store.
  *
- * Der `ThemeProvider` steht HIER und nicht in `main.tsx`, weil er das Theme aus
- * `useThemeMode` bekommt — und das liest die Vorliebe aus dem Store. Ein Hook
- * braucht eine Komponente unterhalb des `Provider`; in `main.tsx` gäbe es die
- * noch nicht.
+ * The `ThemeProvider` stands HERE and not in `main.tsx` because it gets the
+ * theme from `useThemeMode` — and that reads the preference from the store. A
+ * hook needs a component below the `Provider`; in `main.tsx` there is none
+ * yet.
  *
  * `CssBaseline` also sets `color-scheme`, so the browser's scrollbars and form
  * fields follow dark mode instead of staying light.
@@ -34,24 +34,24 @@ export function AppRoot() {
     (state) => state.auth.session?.language ?? null,
   );
 
-  // Die Sprache des KONTOS gilt auf einem Gerät, das noch nie eine gewählt hat.
+  // The ACCOUNT's language applies on a device that has never chosen one.
   //
-  // Nur dann: `hatEigeneSprachwahl()` unterscheidet „nichts gespeichert" von
-  // „‚Wie mein Gerät‘ gewählt", und die beiden dürfen nicht dasselbe bedeuten.
-  // Sonst zöge die Kontosprache jedem, der ausdrücklich dem Gerät folgen will,
-  // seine Wahl unter den Füssen weg — bei jedem Anmelden aufs Neue.
+  // Only then: `hasOwnLanguageChoice()` tells "nothing stored" from "chose
+  // 'like my device'", and the two must not mean the same. Otherwise the
+  // account language would pull the choice from under everybody who explicitly
+  // wants to follow their device — anew at every sign-in.
   useEffect(() => {
-    if (accountLanguage === null || hatEigeneSprachwahl()) return;
-    if (SPRACHEN.includes(accountLanguage as Sprache)) {
-      dispatch(languageSet(accountLanguage as Sprache));
+    if (accountLanguage === null || hasOwnLanguageChoice()) return;
+    if (LANGUAGES.includes(accountLanguage as Language)) {
+      dispatch(languageSet(accountLanguage as Language));
     }
   }, [dispatch, accountLanguage]);
 
-  // Beim Zeichnen und nicht in einem Effekt: ein Effekt liefe NACH dem ersten
-  // Bild, und dann steht die Seite einen Wimpernschlag lang auf Deutsch, bevor
-  // sie auf Französisch umspringt. Der Aufruf ist idempotent — er tut nichts,
-  // wenn die Sprache schon stimmt.
-  spracheAnwenden(languagePreference);
+  // While drawing and not in an effect: an effect would run AFTER the first
+  // frame, and then the page stands in German for the blink of an eye before
+  // it jumps to French. The call is idempotent — it does nothing when the
+  // language is already right.
+  applyLanguage(languagePreference);
 
   return (
     <I18nextProvider i18n={i18n}>

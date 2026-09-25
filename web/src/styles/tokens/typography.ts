@@ -1,10 +1,10 @@
 /**
- * Die Schriftskala.
+ * The type scale.
  *
- * Inter als variable Schrift, lokal eingebunden (`@fontsource-variable/inter`)
- * und NICHT von einem fremden Server: eine Oberfläche, die über Einwilligungen
- * entscheidet, soll beim Laden nicht die Adresse ihrer Besucher an Dritte
- * geben. Das ist kein Detail, das ist dieselbe Regel wie im Rest des Systems.
+ * Inter as a variable font, bundled locally (`@fontsource-variable/inter`) and
+ * NOT from a foreign server: a UI that decides about consents should not hand
+ * its visitors' addresses to third parties while loading. That is no detail,
+ * it is the same rule as in the rest of the system.
  */
 export const fontFamily = [
   "'Inter Variable'",
@@ -25,9 +25,9 @@ export const monoFamily = [
 ].join(", ");
 
 /**
- * Eine kleine Skala mit klaren Sprüngen. Überschriften stehen eng und dunkel,
- * Fliesstext atmet — auf dieser Plattform stehen lange, erklärende Sätze, und
- * die müssen lesbar bleiben.
+ * A small scale with clear steps. Headings stand tight and dark, body text
+ * breathes — this platform carries long, explanatory sentences, and they have
+ * to stay readable.
  */
 export const scale = {
   display: { fontSize: "2.5rem", lineHeight: 1.15, fontWeight: 700, letterSpacing: "-0.022em" },

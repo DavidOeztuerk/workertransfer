@@ -3,12 +3,12 @@ import { createAsyncThunk } from "@reduxjs/toolkit";
 import type { AppDispatch, RootState } from "./store";
 
 /**
- * Was schiefgehen kann, in EINER Gestalt — der auf dem Draht.
+ * What can go wrong, in ONE shape — the one on the wire.
  *
- * Die Dienste antworten durchgehend mit RFC-9457-Problemdokumenten, und jedes
- * trägt eine `correlationId`. Die wird hier bewusst mitgeführt: wer sich
- * beschwert, soll eine Kennung nennen können, mit der die Zeile über alle
- * Dienste auffindbar ist.
+ * The services answer with RFC 9457 problem documents throughout, and each one
+ * carries a `correlationId`. It is carried along here on purpose: whoever
+ * complains should be able to name an id that finds the line across every
+ * service.
  */
 export interface ApiError {
   status: number;
@@ -18,9 +18,9 @@ export interface ApiError {
 }
 
 /**
- * Der typisierte Thunk. Jeder Feature-Thunk geht hierüber, damit `rejectValue`
- * überall dieselbe Gestalt hat — sonst prüft jede Komponente einen anderen
- * Fehler, und einer davon wird vergessen.
+ * The typed thunk. Every feature thunk goes through it so that `rejectValue`
+ * has the same shape everywhere — otherwise each component checks a different
+ * error, and one of them gets forgotten.
  */
 export const createAppThunk = createAsyncThunk.withTypes<{
   state: RootState;

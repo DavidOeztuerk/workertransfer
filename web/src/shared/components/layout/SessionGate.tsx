@@ -7,13 +7,13 @@ import { sitzungBeendet } from "../../../features/auth/store/authSlice";
 import { loadSession } from "../../../features/auth/store/authThunks";
 
 /**
- * Access-JWT lebt fünfzehn Minuten (Girder `ExpireMinutes`). Zwei Minuten
- * Puffer, weil der Cookie httpOnly ist und die Oberfläche `exp` nicht lesen
- * kann. Visibility/Focus fängt den Deckel des Laptops.
+ * The access JWT lives fifteen minutes (Girder `ExpireMinutes`). Two minutes of
+ * buffer, because the cookie is httpOnly and the UI cannot read `exp`.
+ * Visibility/focus catches the laptop lid.
  */
-const ERNEUERUNG_NACH_MS = 13 * 60 * 1000;
+const RENEW_AFTER_MS = 13 * 60 * 1000;
 
-const OEFFENTLICHE_PFADE = [
+const PUBLIC_PATHS = [
   "/",
   "/login",
   "/register",
@@ -26,25 +26,24 @@ const OEFFENTLICHE_PFADE = [
   "/accessibility",
 ];
 
-function istGeschuetzterPfad(pathname: string): boolean {
+function isProtectedPath(pathname: string): boolean {
   if (pathname.startsWith("/careers/")) return false;
-  return !OEFFENTLICHE_PFADE.some((offen) => pathname === offen);
+  return !PUBLIC_PATHS.some((open) => pathname === open);
 }
 
 /**
- * Fragt, wer gerade handelt — und hält die Sitzung am Leben.
+ * Asks who is acting right now — and keeps the session alive.
  *
- * Wenn das Token abgelaufen ist (z. B. nach Docker-Neubau oder Ablauf ohne
- * Erneuerung), fällt die Sitzung sofort und der Benutzer wird sauber auf die
- * Startseite navigiert, statt auf einer geschützten Seite mit Fehlermeldungen
- * zu verharren.
+ * When the token has expired (e.g. after a Docker rebuild or an expiry without
+ * renewal), the session falls at once and the user is navigated cleanly to the
+ * start page instead of lingering on a protected page with error messages.
  *
- * <strong>Es blockiert die Seite nicht.</strong> Ein Ladebildschirm über der
- * ganzen Anwendung, nur um zu erfahren, ob jemand angemeldet ist, macht jeden
- * Kaltstart langsam — auch für die Marketingseite, die niemanden kennen muss.
+ * <strong>It does not block the page.</strong> A loading screen over the whole
+ * application, only to learn whether somebody is signed in, makes every cold
+ * start slow — the marketing page too, which needs to know nobody.
  *
- * Tokens bleiben im httpOnly-Cookie. Hier wird kein JWT dekodiert und nichts
- * in `localStorage` gelegt.
+ * Tokens stay in the httpOnly cookie. No JWT is decoded here and nothing is put
+ * into `localStorage`.
  */
 export function SessionGate({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
@@ -52,10 +51,10 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const status = useAppSelector((state) => state.auth.status);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const vorigerStatus = useRef(status);
+  const previousStatus = useRef(status);
 
-  // 1. Wenn ein Aufruf feststellt, dass Token/Refresh tot sind:
-  // Sitzung sofort beenden und auf Startseite navigieren.
+  // 1. When a call finds that token and refresh are dead: end the session at
+  // once and navigate to the start page.
   useEffect(() => {
     return onSessionExpired(() => {
       dispatch(sitzungBeendet());
@@ -63,29 +62,29 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
     });
   }, [dispatch, navigate]);
 
-  // 2. Wenn der Status auf 'anonymous' wechselt (oder nach Docker-Neubau als
-  // anonymous aufgelöst wird) und ein geschützter Pfad offen ist:
-  // automatisch auf die Startseite navigieren, statt UI mit Fehlern stehenzulassen.
+  // 2. When the status changes to 'anonymous' (or resolves as anonymous after a
+  // Docker rebuild) and a protected path is open: navigate to the start page
+  // automatically instead of leaving a UI full of errors standing.
   useEffect(() => {
-    const warAngemeldet = vorigerStatus.current === "authenticated";
-    vorigerStatus.current = status;
+    const wasSignedIn = previousStatus.current === "authenticated";
+    previousStatus.current = status;
 
     if (status !== "anonymous") return;
 
-    // WER SEINE SITZUNG ABSICHTLICH BEENDET, WILL NICHT WEGGERISSEN WERDEN.
+    // WHOEVER ENDS THEIR SESSION ON PURPOSE DOES NOT WANT TO BE TORN AWAY.
     //
-    // Die Löschseite leert die Sitzung selbst und zeigt danach „angenommen und
-    // läuft" — die einzige Auskunft, die es zu diesem Vorgang je gibt. Diese
-    // Regel navigierte sie weg, und die Person sah stattdessen die
-    // Marketingseite. Gemessen am 09.09.2026: `erasure-journey` fand die
-    // Bestätigung nicht mehr.
+    // The erasure page clears the session itself and then shows "accepted and
+    // running" — the only information about this case there will ever be.
+    // This rule navigated it away, and the person saw the marketing page
+    // instead. Measured on 09.09.2026: `erasure-journey` no longer found the
+    // confirmation.
     //
-    // CLAUDE.md warnt an derselben Stelle vor der verwandten Falle („der
-    // angenommene Zustand muss Vorrang vor der Anmeldeaufforderung haben") —
-    // das hier ist dieselbe Falle, eine Ebene höher.
+    // CLAUDE.md warns of the related trap at the same place ("the accepted
+    // state must take precedence over the login prompt") — this is the same
+    // trap, one level up.
     if (location.pathname === "/delete-account") return;
 
-    if (warAngemeldet || istGeschuetzterPfad(location.pathname)) {
+    if (wasSignedIn || isProtectedPath(location.pathname)) {
       navigate("/", { replace: true });
     }
   }, [status, location.pathname, navigate]);
@@ -95,17 +94,17 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   }, [dispatch, status]);
 
   useEffect(() => {
-    function pruefe() {
+    function check() {
       if (document.visibilityState === "hidden") return;
       if (status === "unknown") return;
       void dispatch(loadSession());
     }
 
-    document.addEventListener("visibilitychange", pruefe);
-    window.addEventListener("focus", pruefe);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
     return () => {
-      document.removeEventListener("visibilitychange", pruefe);
-      window.removeEventListener("focus", pruefe);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
     };
   }, [dispatch, status]);
 
@@ -116,7 +115,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
 
     timer.current = setTimeout(() => {
       void dispatch(loadSession());
-    }, ERNEUERUNG_NACH_MS);
+    }, RENEW_AFTER_MS);
 
     return () => {
       if (timer.current !== null) clearTimeout(timer.current);

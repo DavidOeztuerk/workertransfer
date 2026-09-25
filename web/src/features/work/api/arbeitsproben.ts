@@ -14,11 +14,11 @@
 import { request } from "../../../core/api/client";
 import { ASSESSMENT_BASE_URL } from "../../../env";
 import {
-  type Deutung,
+  type ErrorReading,
   type ErrorKey,
-  type Fehlschlag,
-  deuten,
-} from "../../../shared/api/fehler";
+  type Failure,
+  interpretError,
+} from "../../../shared/api/errors";
 
 /**
  * Wo ein Vorgang steht.
@@ -106,16 +106,16 @@ export const HOECHSTER_UMFANG = 8;
 /** Und die Frist liegt mindestens zwei Tage voraus. */
 export const MINDESTFRIST_TAGE = 2;
 
-export type Liste = { ok: true; items: Vorgang[] } | Fehlschlag<"no-company" | "unavailable">;
-export type Einzeln = { ok: true; vorgang: Vorgang } | Fehlschlag<"gone" | "unavailable">;
+export type Liste = { ok: true; items: Vorgang[] } | Failure<"no-company" | "unavailable">;
+export type Einzeln = { ok: true; vorgang: Vorgang } | Failure<"gone" | "unavailable">;
 export type Zugergebnis =
   | { ok: true; vorgang: Vorgang }
-  | Fehlschlag<"gone" | "conflict" | "invalid" | "unavailable" | "offline">;
+  | Failure<"gone" | "conflict" | "invalid" | "unavailable" | "offline">;
 
-const SCHWEIGT: Deutung<"unavailable"> = {
+const SCHWEIGT: ErrorReading<"unavailable"> = {
   reason: "unavailable",
-  titel: "errors.ledgerSilent",
-  text: "errors.tryLater",
+  titleKey: "errors.ledgerSilent",
+  detailKey: "errors.tryLater",
 };
 
 /**
@@ -136,7 +136,7 @@ export async function ladeMeineVorgaenge(signal?: AbortSignal): Promise<Liste> {
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
 
-  return deuten<"no-company" | "unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
+  return interpretError<"no-company" | "unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
 }
 
 /** Die Vorgänge des Unternehmens. */
@@ -152,13 +152,13 @@ export async function ladeFirmenvorgaenge(signal?: AbortSignal): Promise<Liste> 
 
   // `503` NICHT als leere Liste zeigen: das waere die Behauptung, niemand habe
   // eine Aufgabe bekommen — und das weiss in diesem Moment niemand.
-  return deuten<"no-company" | "unavailable">(
+  return interpretError<"no-company" | "unavailable">(
     answer.error,
     {
       403: {
         reason: "no-company",
-        titel: "errors.onlyCompaniesAsk",
-        text: "errors.chooseCompany",
+        titleKey: "errors.onlyCompaniesAsk",
+        detailKey: "errors.chooseCompany",
       },
       503: SCHWEIGT,
     },
@@ -185,10 +185,10 @@ export async function ladeVorgang(id: string, signal?: AbortSignal): Promise<Ein
 
   if (answer.ok && answer.value != null) return { ok: true, vorgang: answer.value };
 
-  return deuten<"gone" | "unavailable">(
+  return interpretError<"gone" | "unavailable">(
     answer.ok ? LEERE_ANTWORT : answer.error,
     // `404` sagt bewusst nicht, WARUM. Vier Lagen, eine Antwort.
-    { 404: { reason: "gone", titel: "errors.assessmentGone" }, 503: SCHWEIGT },
+    { 404: { reason: "gone", titleKey: "errors.assessmentGone" }, 503: SCHWEIGT },
     "unavailable"
   );
 }
@@ -207,15 +207,15 @@ async function schicke(
 
   if (answer.ok && answer.value != null) return { ok: true, vorgang: answer.value };
 
-  return deuten<"gone" | "conflict" | "invalid" | "unavailable" | "offline">(
+  return interpretError<"gone" | "conflict" | "invalid" | "unavailable" | "offline">(
     answer.ok ? LEERE_ANTWORT : answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       // `404` heisst: diese Person hat diesem Unternehmen nichts freigegeben —
       // oder es gibt den Vorgang nicht, oder er gehoert jemand anderem. Die
       // Oberflaeche bastelt daraus keine Auskunft.
-      404: { reason: "gone", titel: "errors.assessmentGone" },
-      409: { reason: "conflict", titel: "errors.stepNotPossible" },
+      404: { reason: "gone", titleKey: "errors.assessmentGone" },
+      409: { reason: "conflict", titleKey: "errors.stepNotPossible" },
       503: SCHWEIGT,
     },
     // `422` steht ABSICHTLICH nicht in der Tabelle, und das ist hier mehr als

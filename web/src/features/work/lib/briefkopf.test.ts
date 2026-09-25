@@ -26,7 +26,7 @@ describe("briefkopf", () => {
     );
 
     expect(kopf.name).toBe("Anna Beispiel");
-    expect(kopf.zeilen).toEqual(["Weg 2", "", "80331 München", "DE", "+4989123"]);
+    expect(kopf.lines).toEqual(["Weg 2", "", "80331 München", "DE", "+4989123"]);
   });
 
   it("nimmt Firmenanschrift, sobald das Unternehmen sie eingetragen hat", () => {
@@ -63,7 +63,7 @@ describe("briefkopf", () => {
     );
 
     expect(an.name).toBe("Muster GmbH");
-    expect(an.zeilen).toEqual(["Musterstraße 1", "10115 Berlin", "DE"]);
+    expect(an.lines).toEqual(["Musterstraße 1", "10115 Berlin", "DE"]);
   });
 
   it("fällt auf den Stellenort zurück, solange kein Firmenprofil da ist", () => {
@@ -83,6 +83,6 @@ describe("briefkopf", () => {
     });
 
     expect(an.name).toBe("");
-    expect(an.zeilen).toEqual(["", "20095 Hamburg", ""]);
+    expect(an.lines).toEqual(["", "20095 Hamburg", ""]);
   });
 });

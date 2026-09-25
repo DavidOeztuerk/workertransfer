@@ -21,7 +21,7 @@ import Typography from "@mui/material/Typography";
 import { Delete as DeleteIcon, Visibility as ViewIcon } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { Briefbogen } from "../../../shared/components/Briefbogen";
+import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../../company/api/companies";
 import { ladeAnschrift } from "../../person/api/zivilidentitaet";
 import { empfaengerAusFirma, kopfAusSitzung } from "../lib/briefkopf";
@@ -406,12 +406,12 @@ export function DraftPage() {
                 }
               />
             ) : (
-              <Briefbogen
-                betreff={e.subject}
+              <LetterSheet
+                subject={e.subject}
                 text={e.body}
-                leerHinweis={schreibt ? t("drafts.writingNow") : t("drafts.emptyLetter")}
-                kopf={kopfAusSitzung(session, anschrift.data)}
-                empfaenger={empfaengerAusFirma(firma.data, stelle.data)}
+                emptyHint={schreibt ? t("drafts.writingNow") : t("drafts.emptyLetter")}
+                sender={kopfAusSitzung(session, anschrift.data)}
+                recipient={empfaengerAusFirma(firma.data, stelle.data)}
               />
             )}
 

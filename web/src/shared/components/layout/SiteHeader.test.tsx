@@ -4,16 +4,16 @@ import { describe, expect, it } from "vitest";
 
 import { renderMitStore } from "../../../features/auth/test/render";
 import type { Session } from "../../../features/auth/types/session";
-import type { BerufsfeldWahl } from "../../lib/berufsfelder";
+import type { OccupationalFieldChoice } from "../../lib/occupationalFields";
 import { SiteHeader } from "./SiteHeader";
 
 /**
- * Die Navigation folgt dem Berufsfeld (ADR-0039). Drei Fälle — der mittlere
- * zeigt, dass GitHub nicht abgewertet wird. Es verbirgt nur; die Route bleibt
- * erreichbar.
+ * The navigation follows the occupational field (ADR-0039). Three cases — the
+ * middle one shows that GitHub is not devalued. It only hides; the route stays
+ * reachable.
  */
-describe("SiteHeader und das Berufsfeld", () => {
-  function konto(berufsfeld: BerufsfeldWahl): Session {
+describe("SiteHeader and the occupational field", () => {
+  function account(occupationalField: OccupationalFieldChoice): Session {
     return {
       userId: "11111111-1111-1111-1111-111111111111",
       email: "anna@example.com",
@@ -22,48 +22,48 @@ describe("SiteHeader und das Berufsfeld", () => {
       displayName: "Anna Beispiel",
       givenName: "",
       familyName: "",
-      berufsfeld,
+      berufsfeld: occupationalField,
     };
   }
 
-  async function kontomenue(berufsfeld: BerufsfeldWahl) {
+  async function openAccountMenu(occupationalField: OccupationalFieldChoice) {
     const user = userEvent.setup();
     renderMitStore(<SiteHeader />, {
-      auth: { status: "authenticated", session: konto(berufsfeld) },
+      auth: { status: "authenticated", session: account(occupationalField) },
     });
     await user.click(screen.getByRole("button", { name: "Mein Konto" }));
   }
 
-  it("zeigt GitHub, solange niemand ein Berufsfeld genannt hat", async () => {
-    await kontomenue(null);
+  it("shows GitHub as long as nobody has named an occupational field", async () => {
+    await openAccountMenu(null);
 
     expect(
       screen.getByRole("menuitem", { name: "GitHub" }),
     ).toBeInTheDocument();
   });
 
-  it("zeigt GitHub weiterhin bei it_software", async () => {
-    await kontomenue("it_software");
+  it("still shows GitHub for it_software", async () => {
+    await openAccountMenu("it_software");
 
     expect(
       screen.getByRole("menuitem", { name: "GitHub" }),
     ).toBeInTheDocument();
   });
 
-  it("trägt Darstellung und Sprache als EINE Zeile, die zeigt was gilt", async () => {
-    // Eine Zeile wie jede andere, die den geltenden Wert nennt.
-    await kontomenue(null);
+  it("carries appearance and language as ONE row that shows what applies", async () => {
+    // A row like any other, naming the value that applies.
+    await openAccountMenu(null);
 
-    const zeile = screen.getByRole("menuitem", { name: /Darstellung/ });
-    expect(zeile).toHaveTextContent("System");
+    const row = screen.getByRole("menuitem", { name: /Darstellung/ });
+    expect(row).toHaveTextContent("System");
     expect(screen.getByRole("menuitem", { name: /Sprache/ })).toBeInTheDocument();
   });
 
-  it("führt eine Ebene tiefer statt ein zweites Overlay zu öffnen", async () => {
-    // Dieselbe Fläche tauscht ihren Inhalt statt ein zweites Overlay zu öffnen.
+  it("goes one level deeper instead of opening a second overlay", async () => {
+    // The same surface swaps its content instead of opening a second overlay.
     const user = userEvent.setup();
     renderMitStore(<SiteHeader />, {
-      auth: { status: "authenticated", session: konto(null) },
+      auth: { status: "authenticated", session: account(null) },
     });
     await user.click(screen.getByRole("button", { name: "Mein Konto" }));
     await user.click(screen.getByRole("menuitem", { name: /Darstellung/ }));
@@ -73,8 +73,8 @@ describe("SiteHeader und das Berufsfeld", () => {
       screen.getByRole("menuitemradio", { name: /System/ }),
     ).toBeChecked();
 
-    // Die Wahl schliesst das Menü: die Wirkung ist sofort zu sehen, statt
-    // hinter einem Modal zu liegen.
+    // The choice closes the menu: the effect is visible at once instead of
+    // lying behind a modal.
     await user.click(screen.getByRole("menuitemradio", { name: "Dunkel" }));
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -85,25 +85,24 @@ describe("SiteHeader und das Berufsfeld", () => {
     );
   });
 
-  it("stellt „Abmelden“ ans Ende, unter die Vorlieben", async () => {
-    await kontomenue(null);
+  it("puts \"Abmelden\" (sign out) at the end, below the preferences", async () => {
+    await openAccountMenu(null);
 
-    const eintraege = screen.getAllByRole("menuitem").map((e) => e.textContent ?? "");
-    expect(eintraege[eintraege.length - 1]).toContain("Abmelden");
+    const entries = screen.getAllByRole("menuitem").map((e) => e.textContent ?? "");
+    expect(entries[entries.length - 1]).toContain("Abmelden");
   });
 
-  it("nennt im Kontomenü, WER angemeldet ist", async () => {
-    // Auf einer Plattform, die über Freigaben entscheidet, ist „unter welchem
-    // Konto tue ich das?" keine Kleinigkeit — am Avatar stehen nur zwei
-    // Buchstaben.
-    await kontomenue(null);
+  it("names in the account menu WHO is signed in", async () => {
+    // On a platform that decides about releases, "under which account am I
+    // doing this?" is no trifle — the avatar shows only two letters.
+    await openAccountMenu(null);
 
     expect(screen.getByText("anna@example.com")).toBeInTheDocument();
   });
 
-  it("nennt den abgemeldeten Knopf NICHT „Mein Konto“", async () => {
-    // Der Name ist zugleich das Signal, an dem die E2E-Anmeldung ihren Erfolg
-    // erkennt — er darf abgemeldet nicht dastehen.
+  it("does NOT call the signed-out button \"Mein Konto\"", async () => {
+    // The name is also the signal by which the E2E sign-in recognises its
+    // success — it must not stand there while signed out.
     renderMitStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
 
     expect(screen.queryByRole("button", { name: "Mein Konto" })).not.toBeInTheDocument();
@@ -112,9 +111,9 @@ describe("SiteHeader und das Berufsfeld", () => {
     ).toBeInTheDocument();
   });
 
-  it("gibt es NIRGENDS mehr ein Zahnrad", async () => {
+  it("has no gear ANYWHERE any more", async () => {
     for (const auth of [
-      { status: "authenticated" as const, session: konto(null) },
+      { status: "authenticated" as const, session: account(null) },
       { status: "anonymous" as const, session: null },
     ]) {
       const { unmount } = renderMitStore(<SiteHeader />, { auth });
@@ -127,9 +126,9 @@ describe("SiteHeader und das Berufsfeld", () => {
     }
   });
 
-  it("gibt auch abgemeldeten Besuchern Darstellung und Sprache — an derselben Stelle", async () => {
-    // Wer die Sprache wechselt, weil er die Oberfläche nicht lesen kann, muss
-    // das vor der Anmeldung tun können.
+  it("gives signed-out visitors appearance and language too — at the same place", async () => {
+    // Whoever switches the language because they cannot read the UI must be
+    // able to do so before signing in.
     const user = userEvent.setup();
     renderMitStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
 
@@ -139,14 +138,14 @@ describe("SiteHeader und das Berufsfeld", () => {
     expect(screen.getByRole("menuitem", { name: /Sprache/ })).toBeInTheDocument();
   });
 
-  it("bietet einem Konto im Handwerk kein GitHub an", async () => {
-    await kontomenue("handwerk");
+  it("offers no GitHub to an account in the crafts", async () => {
+    await openAccountMenu("handwerk");
 
     expect(
       screen.queryByRole("menuitem", { name: "GitHub" }),
     ).not.toBeInTheDocument();
 
-    // Der Rest des Menüs steht.
+    // The rest of the menu stands.
     expect(
       screen.getByRole("menuitem", { name: "Lebenslauf" }),
     ).toBeInTheDocument();

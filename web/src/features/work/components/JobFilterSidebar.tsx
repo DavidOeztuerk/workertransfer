@@ -14,7 +14,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
-import type { Ortung } from "../../../shared/hooks/useGeolocation";
+import type { GeolocationState } from "../../../shared/hooks/useGeolocation";
 import { radius } from "../../../styles/tokens/spacing";
 
 import {
@@ -93,11 +93,11 @@ export function JobFilterSidebar({
   onChange: (filter: Stellenfilter) => void;
   onSubmit: () => void;
   onReset: () => void;
-  ortung: Ortung;
+  ortung: GeolocationState;
 }) {
   const { t } = useTranslation();
   const anzahl = aktiveFilter(entwurf);
-  const hatStandort = ortung.standort !== null;
+  const hatStandort = ortung.position !== null;
 
   /*
    * EINE MITTE GENÜGT, und der getippte Ort ist auch eine.
@@ -127,10 +127,10 @@ export function JobFilterSidebar({
   // Only when there is something to say: what the button does and that the
   // position is rounded lives in its tooltip, on demand instead of permanently.
   const hinweis =
-    ortung.fehler ??
+    ortung.error ??
     (hatStandort
       ? t("jobs.locationRounded")
-      : ortung.moeglich
+      : ortung.supported
         ? null
         : t("geolocation.unsupported"));
 
@@ -309,22 +309,22 @@ export function JobFilterSidebar({
                           : t("jobs.useLocation")
                       }
                       color={hatStandort ? "primary" : "default"}
-                      disabled={!ortung.moeglich || ortung.laedt}
+                      disabled={!ortung.supported || ortung.loading}
                       onClick={() => {
                         if (!hatStandort) {
-                          ortung.frage();
+                          ortung.request();
                           return;
                         }
 
                         // Der Standort geht, und die Entfernung geht mit. Ein
                         // stehengebliebenes „25 km" ohne Punkt sähe wie ein aktiver
                         // Filter aus und wäre keiner.
-                        ortung.vergiss();
+                        ortung.forget();
                         onChange({ ...entwurf, radius: "" });
                       }}
                       sx={{ mb: 0.25 }}
                     >
-                      {ortung.laedt ? (
+                      {ortung.loading ? (
                         <CircularProgress size={20} />
                       ) : (
                         <MyLocationIcon />
@@ -335,7 +335,7 @@ export function JobFilterSidebar({
               </Box>
 
               {hinweis === null ? null : (
-                <FormHelperText error={ortung.fehler !== null} sx={{ mx: 0 }}>
+                <FormHelperText error={ortung.error !== null} sx={{ mx: 0 }}>
                   {hinweis}
                 </FormHelperText>
               )}

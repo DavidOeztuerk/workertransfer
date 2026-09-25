@@ -1,4 +1,4 @@
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
  * Wer gerade handelt.
@@ -35,7 +35,7 @@ export interface Session {
    * In welcher Arbeitswelt die Person steht, oder `null` für „nicht angegeben".
    * Daraus folgt nur, was die Oberfläche anbietet (ADR-0039).
    */
-  berufsfeld: BerufsfeldWahl;
+  berufsfeld: OccupationalFieldChoice;
 }
 
 /**

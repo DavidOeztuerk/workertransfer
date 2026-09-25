@@ -2,7 +2,7 @@ import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { RESUME_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
-import { deuten } from "../../../shared/api/fehler";
+import { interpretError } from "../../../shared/api/errors";
 
 /**
  * Der Lebenslauf — strenger als das Profil, und das ist der ganze Entwurf.
@@ -225,13 +225,13 @@ export async function uploadDocument(
   );
 
   if (answer.ok) return { ok: true, value: answer.value };
-  const gedeutet = deuten<"invalid" | "too-large" | "too-many" | "offline">(
+  const gedeutet = interpretError<"invalid" | "too-large" | "too-many" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
-      413: { reason: "too-large", titel: "errors.fileTooLarge" },
-      415: { reason: "invalid", titel: "errors.fileNotAccepted" },
-      422: { reason: "too-many", titel: "errors.fileNotAccepted" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      413: { reason: "too-large", titleKey: "errors.fileTooLarge" },
+      415: { reason: "invalid", titleKey: "errors.fileNotAccepted" },
+      422: { reason: "too-many", titleKey: "errors.fileNotAccepted" },
     },
     "invalid"
   );

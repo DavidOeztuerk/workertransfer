@@ -12,7 +12,7 @@
 
 import { request } from "../../../core/api/client";
 import { RESUME_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type Failure, interpretError } from "../../../shared/api/errors";
 
 export interface ResumeRequest {
   id: string;
@@ -30,7 +30,7 @@ export type AnfrageFehler =
   | "unavailable"
   | "offline";
 
-export type AnfrageErgebnis = { ok: true; request: ResumeRequest } | Fehlschlag<AnfrageFehler>;
+export type AnfrageErgebnis = { ok: true; request: ResumeRequest } | Failure<AnfrageFehler>;
 
 export async function requestResume(subjectId: string): Promise<AnfrageErgebnis> {
   const answer = await request<ResumeRequest>(
@@ -40,24 +40,24 @@ export async function requestResume(subjectId: string): Promise<AnfrageErgebnis>
     "errors.requestNotSent"
   );
   if (answer.ok) return { ok: true, request: answer.value };
-  return deuten<AnfrageFehler>(
+  return interpretError<AnfrageFehler>(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
-      409: { reason: "already-asked", titel: "errors.alreadyAsked" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      409: { reason: "already-asked", titleKey: "errors.alreadyAsked" },
       403: {
         reason: "no-company",
-        titel: "errors.onlyCompaniesRequestResume",
-        text: "errors.chooseCompany",
+        titleKey: "errors.onlyCompaniesRequestResume",
+        detailKey: "errors.chooseCompany",
       },
       // Fragen setzt die PROFIL-Freigabe voraus, nie die Existenz eines
       // Lebenslaufs: „hat schon einen geschrieben" ist eine Tatsache über die
       // Person, nach der niemand tasten können soll.
-      404: { reason: "not-available", titel: "errors.personNotRequestable" },
+      404: { reason: "not-available", titleKey: "errors.personNotRequestable" },
       503: {
         reason: "unavailable",
-        titel: "errors.ledgerSilent",
-        text: "errors.tryLater",
+        titleKey: "errors.ledgerSilent",
+        detailKey: "errors.tryLater",
       },
     },
     "offline"

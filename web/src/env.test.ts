@@ -3,21 +3,21 @@ import { describe, expect, it } from "vitest";
 import * as env from "./env";
 
 /**
- * Jede Basisadresse zeigt auf den Port ihres Dienstes.
+ * Every base URL points at its service's port.
  *
- * Der Anlass: `GITHUB_BASE_URL` fiel auf **8010** zurück — den Port von
- * notification-service. Wer `/github` öffnete, schickte seinen Kontonamen an
- * den falschen Dienst und bekam eine Fehlermeldung, die nach einem abgelehnten
- * Konto aussah.
+ * The occasion: `GITHUB_BASE_URL` fell back to **8010** — the port of
+ * notification-service. Whoever opened `/github` sent their account name to
+ * the wrong service and got an error message that looked like a refused
+ * account.
  *
- * Unbemerkt blieb es, weil der Nachbar niemandem fehlt: die Oberfläche redet
- * mit notification-service überhaupt nicht (die Benachrichtigungs-Einstellungen
- * liegen bei identity). Ein Versatz um eins traf deshalb nur einen einzigen
- * Aufrufer, und den erst auf einer Seite, die kein Unit-Test öffnet.
+ * It went unnoticed because nobody misses the neighbour: the UI does not talk
+ * to notification-service at all (the notification settings live at
+ * identity). An offset by one therefore hit a single caller only, and that one
+ * only on a page no unit test opens.
  *
- * Die Tabelle steht hier ausgeschrieben und wird nicht aus dem Code abgeleitet
- * — sonst prüfte sie sich selbst. Sie ist dieselbe wie in CLAUDE.md und in
- * `docker-compose.yml`; ein neuer Dienst gehört an alle drei Stellen.
+ * The table is written out here and not derived from the code — otherwise it
+ * would check itself. It is the same as in CLAUDE.md and in
+ * `docker-compose.yml`; a new service belongs in all three places.
  */
 const PORTS: [string, number][] = [
   ["API_BASE_URL", 8001],
@@ -32,19 +32,18 @@ const PORTS: [string, number][] = [
   ["GITHUB_BASE_URL", 8011],
 ];
 
-describe("die Basisadressen", () => {
-  it.each(PORTS)("%s zeigt auf %i", (name, port) => {
+describe("the base URLs", () => {
+  it.each(PORTS)("%s points at %i", (name, port) => {
     expect(env[name as keyof typeof env]).toBe(`http://localhost:${port}`);
   });
 
   /**
-   * Zwei Dienste dürfen sich keinen Port teilen — ein Tippfehler wäre sonst
-   * nicht „falscher Port", sondern „zwei Aufrufer, ein Ziel", und das fällt
-   * noch später auf.
+   * Two services must not share a port — a typo would otherwise be not "wrong
+   * port" but "two callers, one target", and that shows up even later.
    */
-  it("vergibt keinen Port zweimal", () => {
-    const adressen = PORTS.map(([name]) => env[name as keyof typeof env]);
+  it("assigns no port twice", () => {
+    const urls = PORTS.map(([name]) => env[name as keyof typeof env]);
 
-    expect(new Set(adressen).size).toBe(adressen.length);
+    expect(new Set(urls).size).toBe(urls.length);
   });
 });

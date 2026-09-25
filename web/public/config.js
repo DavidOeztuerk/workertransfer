@@ -1,16 +1,16 @@
-// Laufzeitkonfiguration der Oberfläche.
+// Runtime configuration of the UI.
 //
-// Diese Fassung ist ABSICHTLICH leer und ändert nichts: `src/env.ts` fällt dann
-// auf die VITE_-Variablen und zuletzt auf den Port-Rückfall zurück — also genau
-// auf das Verhalten, das `pnpm dev` und docker compose schon immer hatten.
+// This version is DELIBERATELY empty and changes nothing: `src/env.ts` then
+// falls back to the VITE_ variables and finally to the port fallback — exactly
+// the behaviour `pnpm dev` and docker compose always had.
 //
-// Im Kubernetes-Cluster legt das Helm-Chart eine echte Fassung über diese Datei
-// (deploy/helm/workertransfer/templates/web.yaml). Der Grund steht dort und in
-// ADR-0028, kurz: `vite build` backt die VITE_-Variablen in das Bündel ein, ein
-// gebautes Image trüge seine URLs also fest in sich und könnte in Staging und
-// Produktion nicht dasselbe sein.
+// In the Kubernetes cluster the Helm chart lays a real version over this file
+// (written by deploy/helm/workertransfer/templates/configmap-web.yaml, mounted
+// by web.yaml). The reason stands there and in ADR-0028, in short: `vite build`
+// bakes the VITE_ variables into the bundle, so a built image would carry its
+// URLs baked in and could not be the same in staging and production.
 //
-// Sie liegt in public/ und nicht in src/, weil sie NICHT gebündelt werden darf:
-// sie muss als eigene Datei im Auslieferungsverzeichnis landen, damit man sie
-// dort ersetzen kann.
+// It lives in public/ and not in src/ because it must NOT be bundled: it has
+// to land as a file of its own in the served directory so that it can be
+// replaced there. `__WT_CONFIG__` and the keys inside it are that contract.
 window.__WT_CONFIG__ = {};

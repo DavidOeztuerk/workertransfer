@@ -1,7 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { GITHUB_BASE_URL } from "../../../env";
-import type { ErrorKey } from "../../../shared/api/fehler";
+import type { ErrorKey } from "../../../shared/api/errors";
 
 /**
  * Die eigene, nachgewiesene GitHub-Verbindung.

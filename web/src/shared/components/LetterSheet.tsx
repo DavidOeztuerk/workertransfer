@@ -2,57 +2,57 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 /**
- * Ein Anschreiben, gesetzt wie ein Brief — ohne eine Datei zu sein.
+ * A cover letter, set like a letter — without being a file.
  *
- * Dieselbe Komponente für die Prüfansicht und die Unternehmensmappe. Zwei
- * Darstellungen wären zwei Wahrheiten.
+ * The same component for the review view and the company's folder. Two
+ * renderings would be two truths.
  */
-export interface Briefkopf {
+export interface LetterHead {
   name?: string;
-  zeilen?: string[];
+  lines?: string[];
 }
 
-function zeilenVon(kopf?: Briefkopf): string[] {
-  return [kopf?.name, ...(kopf?.zeilen ?? [])].filter(
-    (zeile): zeile is string => typeof zeile === "string" && zeile.trim().length > 0,
+function linesOf(head?: LetterHead): string[] {
+  return [head?.name, ...(head?.lines ?? [])].filter(
+    (line): line is string => typeof line === "string" && line.trim().length > 0,
   );
 }
 
-function Block({ zeilen, sx }: { zeilen: string[]; sx?: object }) {
-  if (zeilen.length === 0) return null;
+function Block({ lines, sx }: { lines: string[]; sx?: object }) {
+  if (lines.length === 0) return null;
   return (
     <Box sx={{ mb: 3, textAlign: "left", ...sx }}>
-      {zeilen.map((zeile, i) => (
+      {lines.map((line, i) => (
         <Typography
-          key={`${i}-${zeile}`}
+          key={`${i}-${line}`}
           sx={{ fontFamily: "inherit", fontSize: "11pt", lineHeight: 1.5 }}
         >
-          {zeile}
+          {line}
         </Typography>
       ))}
     </Box>
   );
 }
 
-export function Briefbogen({
-  betreff,
+export function LetterSheet({
+  subject,
   text,
-  leerHinweis,
-  kopf,
-  empfaenger,
+  emptyHint,
+  sender,
+  recipient,
 }: {
-  betreff?: string;
+  subject?: string;
   text: string;
-  /** Steht im Brief, wenn noch kein Text da ist — nie ein Platzhalter-Unternehmen. */
-  leerHinweis?: string;
-  /** Absender. Konto oder Snapshot, nie das Modell. */
-  kopf?: Briefkopf;
-  /** Empfänger. Firmenprofil und Stelle, nie das Modell. */
-  empfaenger?: Briefkopf;
+  /** Stands in the letter while there is no text yet — never a placeholder company. */
+  emptyHint?: string;
+  /** The sender. Account or snapshot, never the model. */
+  sender?: LetterHead;
+  /** The recipient. Company profile and job, never the model. */
+  recipient?: LetterHead;
 }) {
-  const absätze = text.length === 0 ? [] : text.split(/\n{2,}/);
-  const absender = zeilenVon(kopf);
-  const an = zeilenVon(empfaenger);
+  const paragraphs = text.length === 0 ? [] : text.split(/\n{2,}/);
+  const from = linesOf(sender);
+  const to = linesOf(recipient);
 
   return (
     <Box
@@ -77,9 +77,9 @@ export function Briefbogen({
         },
       }}
     >
-      <Block zeilen={absender} />
-      <Block zeilen={an} sx={{ mb: 4 }} />
-      {betreff ? (
+      <Block lines={from} />
+      <Block lines={to} sx={{ mb: 4 }} />
+      {subject ? (
         <Typography
           component="h2"
           sx={{
@@ -89,15 +89,15 @@ export function Briefbogen({
             mb: 3,
           }}
         >
-          {betreff}
+          {subject}
         </Typography>
       ) : null}
-      {absätze.length === 0 ? (
+      {paragraphs.length === 0 ? (
         <Typography sx={{ fontFamily: "inherit", fontStyle: "italic", color: "text.secondary" }}>
-          {leerHinweis ?? "\u00a0"}
+          {emptyHint ?? " "}
         </Typography>
       ) : (
-        absätze.map((absatz, i) => (
+        paragraphs.map((paragraph, i) => (
           <Typography
             key={i}
             component="p"
@@ -108,7 +108,7 @@ export function Briefbogen({
               whiteSpace: "pre-wrap",
             }}
           >
-            {absatz}
+            {paragraph}
           </Typography>
         ))
       )}

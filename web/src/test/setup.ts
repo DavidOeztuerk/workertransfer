@@ -2,90 +2,89 @@ import "@testing-library/jest-dom/vitest";
 import { configure } from "@testing-library/react";
 
 /**
- * Die Wartegrenze von `findBy*` und `waitFor` — 1000 ms wären zu knapp.
+ * The wait limit of `findBy*` and `waitFor` — 1000 ms would be too tight.
  *
- * Sie ist NICHT dasselbe wie Vitests `testTimeout` (in vite.config.ts auf 20 s,
- * mit derselben Begründung): `testTimeout` beendet den ganzen Test,
- * `asyncUtilTimeout` beendet eine einzelne Wartezeit. Ein Test kann also 3,8
- * Sekunden laufen und trotzdem an einer 1-Sekunden-Wartezeit scheitern — genau
- * das war der Befund: ein Volllauf mit 2 roten Tests, der nächste mit 7, jedes
- * Mal andere Dateien, und alle grün, sobald sie einzeln laufen.
+ * It is NOT the same as Vitest's `testTimeout` (20 s in vite.config.ts, for
+ * the same reason): `testTimeout` ends the whole test, `asyncUtilTimeout` ends
+ * a single wait. A test can therefore run for 3.8 seconds and still fail on a
+ * one-second wait — exactly that was the finding: a full run with 2 red tests,
+ * the next with 7, different files each time, and all green as soon as they ran
+ * alone.
  *
- * Eine Testsuite, deren Ergebnis von der Maschinenlast abhängt, ist keine. Die
- * höhere Grenze verlangsamt keinen grünen Lauf: sie greift nur dort, wo vorher
- * abgebrochen wurde.
+ * A test suite whose result depends on machine load is none. The higher limit
+ * slows no green run down: it only takes effect where the run used to abort.
  *
- * WIEDER 5 SEKUNDEN. Am 09.09.2026 standen hier 10, mit der Begründung,
- * `DraftPage` scheitere auf dem Läufer an einer zu langen Abrufkette. Das war
- * falsch: die Erhöhung änderte nichts, der Test fiel im nächsten Lauf genauso.
- * Die Ursache lag in `features/work/lib/kontext.ts` — eine Antwort, die nach
- * dem Verwerfen ankam, füllte den Zwischenspeicher wieder. Es war nie zu
- * langsam, es war der falsche Wert.
+ * BACK TO 5 SECONDS. On 09.09.2026 it stood at 10, on the grounds that
+ * `DraftPage` failed on the runner because of a fetch chain that was too long.
+ * That was wrong: the increase changed nothing, and the test fell the same way
+ * in the next run. The cause lay in `features/work/lib/kontext.ts` — an answer
+ * that arrived after the discard filled the cache again. It was never too
+ * slow, it was the wrong value.
  *
- * Die Lehre ist die Zahl selbst: eine Wartegrenze hochzusetzen sieht immer
- * nach einer Lösung aus und verbirgt genauso oft eine.
+ * The lesson is the number itself: raising a wait limit always looks like a
+ * fix and just as often hides one.
  */
 configure({ asyncUtilTimeout: 5_000 });
 
 /**
- * Ein eigener, berechenbarer `localStorage` für die Testreihe.
+ * A `localStorage` of our own, predictable, for the test run.
  *
- * Nicht aus Bequemlichkeit, sondern weil er sonst von der Node-Version abhängt:
- * **Node 25 bringt ein globales `localStorage` mit, das ohne
- * `--localstorage-file` keine Methoden hat.** jsdom übernimmt es, und
- * `window.localStorage.getItem` ist dann `undefined`. Lokal auf Node 24 fiel
- * das nicht auf — in der CI (Node 25) fielen 18 Tests in fünf Dateien um, mit
+ * Not for convenience, but because it otherwise depends on the Node version:
+ * **Node 25 ships a global `localStorage` that has no methods without
+ * `--localstorage-file`.** jsdom takes it over, and
+ * `window.localStorage.getItem` is then `undefined`. Locally on Node 24 that
+ * went unnoticed — in CI (Node 25) 18 tests in five files fell over with
  * `TypeError: s.getItem is not a function`.
  *
- * Die Alternative wäre gewesen, den Ersatz nur einzusetzen, wenn der
- * vorhandene kaputt ist. Dann prüfte die CI aber etwas anderes als die
- * Entwicklungsmaschine — und im schlechteren Fall gar nichts mehr, weil der
- * Produktivcode einen unbrauchbaren Speicher still überspringt und jeder Test
- * trivial grün würde. Ein Ersatz für alle ist ehrlicher.
+ * The alternative would have been to insert the replacement only when the
+ * existing one is broken. Then CI would check something other than the
+ * development machine — and in the worse case nothing at all, because the
+ * production code silently skips an unusable storage and every test would be
+ * trivially green. One replacement for all is more honest.
  *
- * Der Produktivcode schützt sich unabhängig davon selbst
- * (`core/store/preferencesSlice.ts`): er fängt jeden Zugriff ab und verzichtet
- * sonst. Hier stand `intent.ts` — die gemerkte Stelle —, und die ist mit PBI-8
- * gefallen, weil sie geschrieben und nie gelesen wurde.
+ * The production code protects itself independently of this
+ * (`core/store/preferencesSlice.ts`): it catches every access and otherwise
+ * does without. `intent.ts` — the remembered location — stood here, and it
+ * fell with PBI-8 because it was written and never read.
  */
 function inMemoryStorage(): Storage {
-  const daten = new Map<string, string>();
+  const data = new Map<string, string>();
   return {
     get length() {
-      return daten.size;
+      return data.size;
     },
-    clear: () => daten.clear(),
-    getItem: (key: string) => daten.get(key) ?? null,
-    key: (index: number) => [...daten.keys()][index] ?? null,
-    removeItem: (key: string) => void daten.delete(key),
-    setItem: (key: string, value: string) => void daten.set(key, String(value)),
+    clear: () => data.clear(),
+    getItem: (key: string) => data.get(key) ?? null,
+    key: (index: number) => [...data.keys()][index] ?? null,
+    removeItem: (key: string) => void data.delete(key),
+    setItem: (key: string, value: string) => void data.set(key, String(value)),
   };
 }
 
-for (const ziel of [globalThis, globalThis.window].filter(Boolean)) {
+for (const target of [globalThis, globalThis.window].filter(Boolean)) {
   try {
-    Object.defineProperty(ziel, "localStorage", {
+    Object.defineProperty(target, "localStorage", {
       value: inMemoryStorage(),
       configurable: true,
       writable: true,
     });
   } catch {
-    // Lässt sich der Eintrag nicht überschreiben, bleibt es beim vorhandenen.
-    // Ob der taugt, entscheidet die Prüfung darunter.
+    // If the entry cannot be overwritten, the existing one stays. Whether it
+    // is any good is decided by the check below.
   }
 }
 
-// Selbstprüfung, mit einem Satz statt achtzehn Rätseln.
+// A self-check, with one sentence instead of eighteen riddles.
 //
-// Ohne sie äußert sich ein nicht überschreibbarer Speicher als `TypeError:
-// s.getItem is not a function` in fünf verschiedenen Dateien — genau das Bild,
-// das diese Datei aufräumt, und man sucht es im Produktivcode. Ein klarer
-// Abbruch hier nennt stattdessen die Ursache.
+// Without it a storage that cannot be overwritten shows up as `TypeError:
+// s.getItem is not a function` in five different files — exactly the picture
+// this file clears up, and one searches for it in the production code. A clear
+// abort here names the cause instead.
 if (typeof globalThis.localStorage?.getItem !== "function") {
   throw new Error(
-    "localStorage ist in dieser Testumgebung unbrauchbar und liess sich nicht " +
-      "ersetzen. Bekannte Ursache: Node >= 25 stellt ein globales localStorage " +
-      "ohne Methoden bereit (nur mit --localstorage-file nutzbar). " +
-      "Siehe apps/web/src/test/setup.ts."
+    "localStorage is unusable in this test environment and could not be " +
+      "replaced. Known cause: Node >= 25 provides a global localStorage " +
+      "without methods (usable only with --localstorage-file). " +
+      "See web/src/test/setup.ts."
   );
 }

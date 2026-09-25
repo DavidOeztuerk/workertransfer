@@ -130,8 +130,8 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
   );
   if (!answer.ok) {
     // ÜBERSETZT, nicht durchgereicht. `message` ist hier ein fertiger Satz für
-    // die Oberfläche und kein Schlüssel — anders als in den `deuten`-Tabellen,
-    // die `deuten()` selbst auflöst. Der Unterschied ist einmal übersehen
+    // die Oberfläche und kein Schlüssel — anders als in den `interpretError`-Tabellen,
+    // die `interpretError()` selbst auflöst. Der Unterschied ist einmal übersehen
     // worden, und dann stand `errors.draftHelpUnavailableLong` wörtlich im
     // Warnkasten: i18next gibt einen Schlüssel unverändert zurück, wenn ihn
     // niemand nachschlägt.

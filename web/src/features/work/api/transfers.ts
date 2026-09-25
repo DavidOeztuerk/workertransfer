@@ -7,11 +7,11 @@ import { request } from "../../../core/api/client";
 import { TRANSFER_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
 import {
-  type Deutung,
+  type ErrorReading,
   type ErrorKey,
-  type Fehlschlag,
-  deuten,
-} from "../../../shared/api/fehler";
+  type Failure,
+  interpretError,
+} from "../../../shared/api/errors";
 
 export type TransferStatus =
   | "interested"
@@ -51,8 +51,8 @@ export type PersonAction = "accept-talk" | "accept-offer" | "confirm-release" | 
 export type CompanyAction = "complete" | "withdraw";
 
 export type TransferFehler = "not-available" | "no-company" | "conflict" | "unavailable" | "offline";
-export type TransferErgebnis = { ok: true; transfer: Transfer } | Fehlschlag<TransferFehler>;
-export type TransferListe = { ok: true; transfers: Transfer[] } | Fehlschlag<"fehlgeschlagen">;
+export type TransferErgebnis = { ok: true; transfer: Transfer } | Failure<TransferFehler>;
+export type TransferListe = { ok: true; transfers: Transfer[] } | Failure<"fehlgeschlagen">;
 
 /** Läuft der Vorgang noch? Nur dann gibt es einen Ausstieg. */
 export const RUNNING: TransferStatus[] = ["interested", "talking", "offered", "accepted"];
@@ -77,21 +77,21 @@ export function euro(cents: number | null): string {
 }
 
 const UEBERGANGSFEHLER: Partial<
-  Record<number, Deutung<TransferFehler>>
+  Record<number, ErrorReading<TransferFehler>>
 > = {
-  0: { reason: "offline", titel: "errors.noConnection" },
+  0: { reason: "offline", titleKey: "errors.noConnection" },
   // Kein Status, keine Freigabe, „gerade nicht", fremder Vorgang — vom Server
   // bewusst nicht unterschieden. Die Oberfläche unterscheidet sie auch nicht.
-  404: { reason: "not-available", titel: "errors.notPossibleNow" },
+  404: { reason: "not-available", titleKey: "errors.notPossibleNow" },
   403: {
     reason: "no-company",
-    titel: "errors.activeCompanyRequired",
-    text: "errors.chooseCompanyShort",
+    titleKey: "errors.activeCompanyRequired",
+    detailKey: "errors.chooseCompanyShort",
   },
   503: {
     reason: "unavailable",
-    titel: "errors.ledgerSilent",
-    text: "errors.tryLater",
+    titleKey: "errors.ledgerSilent",
+    detailKey: "errors.tryLater",
   },
 };
 
@@ -105,7 +105,7 @@ async function move(
   if (answer.error.status === 409) {
     return { ok: false, reason: "conflict", error: answer.error };
   }
-  return deuten<TransferFehler>(answer.error, UEBERGANGSFEHLER, "offline");
+  return interpretError<TransferFehler>(answer.error, UEBERGANGSFEHLER, "offline");
 }
 
 export function expressInterest(subjectId: string, message: string): Promise<TransferErgebnis> {
@@ -144,9 +144,9 @@ async function listTransfers(path: string, signal?: AbortSignal): Promise<Transf
   if (answer.ok) return { ok: true, transfers: answer.value ?? [] };
   // Nicht als leere Liste zeigen: „keine Vorgänge" ist eine Aussage, und sie
   // wäre falsch.
-  return deuten<"fehlgeschlagen">(
+  return interpretError<"fehlgeschlagen">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titel: "errors.noConnection" } },
+    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }

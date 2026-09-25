@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { i18n } from "../../../core/i18n/i18n";
-import type { Berufsfeld } from "../../../shared/lib/berufsfelder";
+import type { OccupationalField } from "../../../shared/lib/occupationalFields";
 
 /**
  * Registrieren, bestätigen, erneut senden — die drei Wege in ein Konto.
@@ -28,7 +28,7 @@ export interface RegistrierEingabe {
    */
   unternehmensname?: string;
   /** Freiwillig (ADR-0039). Nicht gesetzt heisst „nicht angegeben". */
-  berufsfeld?: Berufsfeld;
+  berufsfeld?: OccupationalField;
 }
 
 export type RegistrierErgebnis = { ok: true } | { ok: false; meldung: string };

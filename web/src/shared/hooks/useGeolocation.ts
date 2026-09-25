@@ -1,109 +1,108 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-/** Wie genau eine Position das Haus verlässt. */
-const STELLEN = 2;
+/** How precisely a position leaves the house. */
+const DECIMALS = 2;
 
 /**
- * Ein Ort, so ungenau wie er sein darf.
+ * A place, as imprecise as it may be.
  *
- * Zwei Nachkommastellen sind gut ein Kilometer. Feiner wäre nicht besser,
- * sondern nur mehr: die Stellen tragen einen ORTSNAMEN, und ihre Koordinaten
- * sind die des Stadtmittelpunkts — eine genauere Position könnte an keiner
- * Antwort etwas ändern. Sie stünde nur in der Adresszeile und damit in den
- * Zugriffsprotokollen.
+ * Two decimals are a good kilometre. Finer would not be better, only more: the
+ * jobs carry a PLACE NAME, and their coordinates are those of the town centre
+ * — a more precise position could change no answer. It would only stand in the
+ * address line and thereby in the access logs.
  */
-export interface Standort {
+export interface RoundedPosition {
   lat: number;
   lon: number;
 }
 
-export interface Ortung {
-  /** Der gerundete Standort, oder `null`, solange keiner erfragt wurde. */
-  standort: Standort | null;
-  /** Läuft gerade eine Abfrage? */
-  laedt: boolean;
-  /** Was schiefging, in einem Satz für Menschen. `null`, wenn nichts. */
-  fehler: string | null;
-  /** Kann dieser Browser das überhaupt? */
-  moeglich: boolean;
-  /** Fragt den Browser — der fragt die Person. */
-  frage: () => void;
-  /** Vergisst die Position wieder. */
-  vergiss: () => void;
+export interface GeolocationState {
+  /** The rounded position, or `null` as long as none was asked for. */
+  position: RoundedPosition | null;
+  /** Is a request running right now? */
+  loading: boolean;
+  /** What went wrong, in one sentence for humans. `null` if nothing. */
+  error: string | null;
+  /** Can this browser do it at all? */
+  supported: boolean;
+  /** Asks the browser — which asks the person. */
+  request: () => void;
+  /** Forgets the position again. */
+  forget: () => void;
 }
 
 /**
- * Der eigene Standort — auf Knopfdruck, nie von selbst.
+ * One's own position — at the press of a button, never by itself.
  *
- * <strong>Es gibt keinen Aufruf beim Laden der Seite.</strong> Der Browser
- * fragt die Person um Erlaubnis, sobald `getCurrentPosition` läuft; ein Abruf
- * im Effekt hiesse also, ungefragt einen Systemdialog aufzuklappen, bevor
- * jemand gesagt hat, dass er nach Entfernung filtern will. Der Knopf IST die
- * Einwilligung — dieselbe Regel wie beim Entwurfsknopf (ADR-0024).
+ * <strong>There is no call when the page loads.</strong> The browser asks the
+ * person for permission as soon as `getCurrentPosition` runs; a fetch in an
+ * effect would therefore mean opening a system dialog unasked, before anybody
+ * has said they want to filter by distance. The button IS the consent — the
+ * same rule as for the draft button (ADR-0024).
  *
- * <strong>Nichts wird gespeichert.</strong> Die Position lebt in diesem Zustand
- * und endet mit der Seite: kein `localStorage`, kein Profilfeld, keine Zeile in
- * einer Tabelle. Ein gemerkter Wohnort wäre ein personenbezogenes Datum, das
- * niemand angelegt hat — und über das die Auskunft dann schweigen würde.
+ * <strong>Nothing is stored.</strong> The position lives in this state and
+ * ends with the page: no `localStorage`, no profile field, no row in a table. A
+ * remembered home town would be personal data nobody created — and about which
+ * the data access page would then stay silent.
  *
- * <strong>Gerundet, bevor sie irgendwohin geht.</strong> Siehe `Standort`.
+ * <strong>Rounded before it goes anywhere.</strong> See `RoundedPosition`.
  */
-export function useGeolocation(): Ortung {
+export function useGeolocation(): GeolocationState {
   const { t } = useTranslation();
-  const [standort, setStandort] = useState<Standort | null>(null);
-  const [laedt, setLaedt] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [position, setPosition] = useState<RoundedPosition | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const moeglich = typeof navigator !== "undefined" && "geolocation" in navigator;
+  const supported = typeof navigator !== "undefined" && "geolocation" in navigator;
 
-  const frage = useCallback(() => {
-    if (!moeglich) {
-      setFehler(t("geolocation.unsupported"));
+  const request = useCallback(() => {
+    if (!supported) {
+      setError(t("geolocation.unsupported"));
       return;
     }
 
-    setLaedt(true);
-    setFehler(null);
+    setLoading(true);
+    setError(null);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const runde = (wert: number) => Number(wert.toFixed(STELLEN));
+      (found) => {
+        const round = (value: number) => Number(value.toFixed(DECIMALS));
 
-        setStandort({
-          lat: runde(position.coords.latitude),
-          lon: runde(position.coords.longitude),
+        setPosition({
+          lat: round(found.coords.latitude),
+          lon: round(found.coords.longitude),
         });
-        setLaedt(false);
+        setLoading(false);
       },
-      (ausfall) => {
-        // Drei Fälle, drei Sätze. Ein gemeinsames „Standort nicht verfügbar"
-        // liesse offen, ob die Person selbst abgelehnt hat — dann wäre der
-        // Ratschlag „nochmal versuchen" schlicht falsch.
-        setFehler(
-          ausfall.code === ausfall.PERMISSION_DENIED
+      (failure) => {
+        // Three cases, three sentences. A shared "position not available"
+        // would leave open whether the person refused themselves — then the
+        // advice "try again" would simply be wrong.
+        setError(
+          failure.code === failure.PERMISSION_DENIED
             ? t("geolocation.denied")
-            : ausfall.code === ausfall.TIMEOUT
+            : failure.code === failure.TIMEOUT
               ? t("geolocation.timeout")
               : t("geolocation.unknown")
         );
-        setLaedt(false);
+        setLoading(false);
       },
       {
-        // Kein GPS-Fix: die Antwort wird ohnehin auf einen Kilometer gerundet,
-        // und `enableHighAccuracy` kostet auf einem Telefon spürbar Strom für
-        // eine Genauigkeit, die hier weggeworfen wird.
+        // No GPS fix: the answer is rounded to a kilometre anyway, and
+        // `enableHighAccuracy` costs noticeable power on a phone for a
+        // precision that is thrown away here.
         enableHighAccuracy: false,
         timeout: 10000,
         maximumAge: 300000,
       }
     );
-  }, [moeglich, t]);
+  }, [supported, t]);
 
-  const vergiss = useCallback(() => {
-    setStandort(null);
-    setFehler(null);
+  const forget = useCallback(() => {
+    setPosition(null);
+    setError(null);
   }, []);
 
-  return { standort, laedt, fehler, moeglich, frage, vergiss };
+  return { position, loading, error, supported, request, forget };
 }

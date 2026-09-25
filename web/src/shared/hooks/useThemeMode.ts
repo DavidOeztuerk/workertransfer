@@ -8,29 +8,29 @@ import { getThemeOptions } from "../../styles/theme";
 
 interface ThemeModeReturn {
   theme: Theme;
-  /** Was tatsächlich gezeichnet wird. */
+  /** What is actually drawn. */
   mode: PaletteMode;
-  /** Was die Person GEWÄHLT hat — inklusive "system". */
+  /** What the person CHOSE — "system" included. */
   preference: ColorPreference;
   toggle: () => void;
   setPreference: (next: ColorPreference) => void;
 }
 
 /**
- * Das Theme und seine Umschaltung.
+ * The theme and its switch.
  *
- * <strong>Heisst `useThemeMode` und nicht `useTheme`</strong>, weil MUI selbst
- * ein `useTheme()` mitbringt, das das Theme-OBJEKT liefert. Zwei Hooks gleichen
- * Namens in einer Datei sind der Import, den man beim Überfliegen verwechselt.
+ * <strong>Called `useThemeMode` and not `useTheme`</strong>, because MUI itself
+ * brings a `useTheme()` that yields the theme OBJECT. Two hooks of the same name
+ * in one file are the import one mixes up while skimming.
  *
- * Die Vorliebe kommt aus dem Store, nicht aus lokalem Zustand: sie wird an
- * mehreren Stellen gelesen (Kopfzeile, Einstellungen), und zwei Quellen für
- * dieselbe Wahl gehen beim ersten Umschalten auseinander.
+ * The preference comes from the store, not from local state: it is read in
+ * several places (header, settings), and two sources for the same choice drift
+ * apart at the first switch.
  *
- * `system` bleibt ein eigener Wert. Wer es beim Start zu "hell" zusammenfaltet,
- * kann nie wieder unterscheiden, ob jemand hell GEWÄHLT hat oder ob wir dem
- * Gerät folgen — und dann folgt die Oberfläche einem Wechsel der Systemvorliebe
- * nicht mehr.
+ * `system` stays a value of its own. Whoever folds it into "light" at start can
+ * never again tell whether somebody CHOSE light or whether we follow the
+ * device — and then the UI no longer follows a change of the system
+ * preference.
  */
 export function useThemeMode(): ThemeModeReturn {
   const dispatch = useAppDispatch();

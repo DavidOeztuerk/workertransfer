@@ -1,22 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { onSessionExpired, request } from "./client";
-import { zuruecksetzenFuerTests } from "./refreshGate";
+import { resetForTests } from "./refreshGate";
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  zuruecksetzenFuerTests();
+  resetForTests();
 });
 
-function antworten(folge: { status: number; body?: unknown; path?: string }[]) {
-  const gefragt: string[] = [];
+function respondWith(sequence: { status: number; body?: unknown; path?: string }[]) {
+  const asked: string[] = [];
   let i = 0;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === "string" ? input : input.toString();
-      gefragt.push(new URL(url).pathname);
-      const answer = folge[i] ?? folge[folge.length - 1];
+      asked.push(new URL(url).pathname);
+      const answer = sequence[i] ?? sequence[sequence.length - 1];
       i += 1;
       return new Response(JSON.stringify(answer?.body ?? {}), {
         status: answer?.status ?? 200,
@@ -24,12 +24,12 @@ function antworten(folge: { status: number; body?: unknown; path?: string }[]) {
       });
     }),
   );
-  return gefragt;
+  return asked;
 }
 
-describe("request — Sitzungserneuerung", () => {
-  it("erneuert einmal bei 401 und wiederholt den Originalaufruf", async () => {
-    const pfade = antworten([
+describe("request — session renewal", () => {
+  it("refreshes once on 401 and repeats the original call", async () => {
+    const paths = respondWith([
       { status: 401 },
       { status: 200, body: { status: "ok" } },
       { status: 200, body: { items: [] } },
@@ -41,10 +41,10 @@ describe("request — Sitzungserneuerung", () => {
     );
 
     expect(answer.ok).toBe(true);
-    expect(pfade).toEqual(["/jobs", "/auth/refresh", "/jobs"]);
+    expect(paths).toEqual(["/jobs", "/auth/refresh", "/jobs"]);
   });
 
-  it("zwei parallele 401 teilen sich einen Refresh", async () => {
+  it("two parallel 401s share one refresh", async () => {
     let refresh = 0;
     vi.stubGlobal(
       "fetch",
@@ -72,8 +72,8 @@ describe("request — Sitzungserneuerung", () => {
     expect(refresh).toBe(1);
   });
 
-  it("401 auf /auth/login löst keinen Refresh aus", async () => {
-    const pfade = antworten([{ status: 401, body: { title: "no" } }]);
+  it("a 401 on /auth/login triggers no refresh", async () => {
+    const paths = respondWith([{ status: 401, body: { title: "no" } }]);
 
     const answer = await request(
       "http://example.test",
@@ -82,29 +82,29 @@ describe("request — Sitzungserneuerung", () => {
     );
 
     expect(answer.ok).toBe(false);
-    expect(pfade).toEqual(["/auth/login"]);
+    expect(paths).toEqual(["/auth/login"]);
   });
 
-  it("benachrichtigt über Sitzungsablauf, wenn 401 nicht erneuert werden kann", async () => {
-    const ablaufSpion = vi.fn();
-    const abmelden = onSessionExpired(ablaufSpion);
+  it("notifies about session expiry when a 401 cannot be renewed", async () => {
+    const expirySpy = vi.fn();
+    const unsubscribe = onSessionExpired(expirySpy);
 
     try {
-      antworten([
-        { status: 401 }, // Erstaufruf scheitert mit 401
-        { status: 401 }, // POST /auth/refresh scheitert ebenfalls (Token tot)
+      respondWith([
+        { status: 401 }, // the first call fails with 401
+        { status: 401 }, // POST /auth/refresh fails too (token dead)
       ]);
 
       const answer = await request("http://example.test", "/profiles/me");
       expect(answer.ok).toBe(false);
-      expect(ablaufSpion).toHaveBeenCalledTimes(1);
+      expect(expirySpy).toHaveBeenCalledTimes(1);
     } finally {
-      abmelden();
+      unsubscribe();
     }
   });
 
-  it("legt kein Token in den Speicher", async () => {
-    antworten([{ status: 200, body: {} }]);
+  it("puts no token into storage", async () => {
+    respondWith([{ status: 200, body: {} }]);
     await request("http://example.test", "/auth/session");
     expect(window.localStorage.length).toBe(0);
     expect(window.sessionStorage.length).toBe(0);

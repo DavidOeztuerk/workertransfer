@@ -10,10 +10,10 @@ import { request } from "../../../core/api/client";
 import { JOBS_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
 import {
-  type Deutung,
-  type Fehlschlag,
-  deuten,
-} from "../../../shared/api/fehler";
+  type ErrorReading,
+  type Failure,
+  interpretError,
+} from "../../../shared/api/errors";
 
 export type RemoteMode = "none" | "hybrid" | "full";
 export type EmploymentType = "full_time" | "part_time" | "contract" | "internship";
@@ -141,7 +141,7 @@ export interface SearchFilters {
 export type SucheFehler = "offline" | "fehlgeschlagen";
 export type JobFehler = "not-found" | "no-company" | "conflict" | "invalid" | "offline";
 
-export type SucheFehlschlag = Fehlschlag<SucheFehler>;
+export type SucheFehlschlag = Failure<SucheFehler>;
 
 export type SucheErgebnis =
   | {
@@ -162,9 +162,9 @@ export type SucheErgebnis =
     }
   | SucheFehlschlag;
 
-export type JobErgebnis = { ok: true; job: Job } | Fehlschlag<JobFehler>;
+export type JobErgebnis = { ok: true; job: Job } | Failure<JobFehler>;
 
-export type EigeneJobsErgebnis = { ok: true; jobs: Job[] } | Fehlschlag<SucheFehler>;
+export type EigeneJobsErgebnis = { ok: true; jobs: Job[] } | Failure<SucheFehler>;
 
 /**
  * Werte aus dem Vertrag sind keine Sätze für Menschen.
@@ -271,9 +271,9 @@ export async function searchJobs(
     "errors.searchFailed"
   );
   if (!answer.ok) {
-    return deuten<SucheFehler>(
+    return interpretError<SucheFehler>(
       answer.error,
-      { 0: { reason: "offline", titel: "errors.noConnection" } },
+      { 0: { reason: "offline", titleKey: "errors.noConnection" } },
       "fehlgeschlagen"
     );
   }
@@ -317,22 +317,22 @@ export async function listOwnJobs(signal?: AbortSignal): Promise<EigeneJobsErgeb
   // fragt ohne Unternehmen ohnehin nicht, aber die Antwort bleibt dieselbe wie
   // zuvor: eine leere Liste, keine Meldung.
   if (answer.error.status === 403) return { ok: true, jobs: [] };
-  return deuten<SucheFehler>(
+  return interpretError<SucheFehler>(
     answer.error,
-    { 0: { reason: "offline", titel: "errors.noConnection" } },
+    { 0: { reason: "offline", titleKey: "errors.noConnection" } },
     "fehlgeschlagen"
   );
 }
 
-const SCHREIBFEHLER: Partial<Record<number, Deutung<JobFehler>>> =
+const SCHREIBFEHLER: Partial<Record<number, ErrorReading<JobFehler>>> =
   {
-    0: { reason: "offline", titel: "errors.noConnection" },
+    0: { reason: "offline", titleKey: "errors.noConnection" },
     403: {
       reason: "no-company",
-      titel: "errors.onlyCompanyPublishes",
-      text: "errors.chooseCompany",
+      titleKey: "errors.onlyCompanyPublishes",
+      detailKey: "errors.chooseCompany",
     },
-    404: { reason: "not-found", titel: "errors.jobMissing" },
+    404: { reason: "not-found", titleKey: "errors.jobMissing" },
   };
 
 async function schreiben(
@@ -353,7 +353,7 @@ async function schreiben(
   if (answer.error.status === 409) {
     return { ok: false, reason: "conflict", error: answer.error };
   }
-  return deuten<JobFehler>(answer.error, SCHREIBFEHLER, "invalid");
+  return interpretError<JobFehler>(answer.error, SCHREIBFEHLER, "invalid");
 }
 
 // Kein `tenant_id` im Rumpf: das Unternehmen steht im Token und wird gegen die
@@ -382,7 +382,7 @@ export function closeJob(jobId: string): Promise<JobErgebnis> {
  * einem Text, den das Unternehmen selbst verfasst hat. Nichts wird gespeichert:
  * weder die Bitte noch die Antwort.
  */
-export type EntwurfErgebnis = { ok: true; draft: string } | Fehlschlag<"no-company" | "unavailable">;
+export type EntwurfErgebnis = { ok: true; draft: string } | Failure<"no-company" | "unavailable">;
 
 export async function draftJobText(input: {
   title: string;
@@ -398,10 +398,10 @@ export async function draftJobText(input: {
     "errors.draftHelpUnavailableLong"
   );
   if (answer.ok) return { ok: true, draft: answer.value?.draft ?? "" };
-  return deuten<"no-company" | "unavailable">(
+  return interpretError<"no-company" | "unavailable">(
     answer.error,
     {
-      403: { reason: "no-company", titel: "errors.actForCompanyRequired" },
+      403: { reason: "no-company", titleKey: "errors.actForCompanyRequired" },
     },
     "unavailable"
   );

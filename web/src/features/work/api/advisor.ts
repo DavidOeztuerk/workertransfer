@@ -12,7 +12,7 @@
 
 import { request } from "../../../core/api/client";
 import { ADVISOR_BASE_URL } from "../../../env";
-import { type Deutung, type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type ErrorReading, type Failure, interpretError } from "../../../shared/api/errors";
 
 /**
  * Das Mandat: vier Werte, alle freiwillig.
@@ -95,25 +95,25 @@ export interface Gespraech {
   email?: string;
 }
 
-export type MandatErgebnis = { ok: true; mandat: Mandat } | Fehlschlag<"unavailable">;
+export type MandatErgebnis = { ok: true; mandat: Mandat } | Failure<"unavailable">;
 export type SchreibErgebnis =
   | { ok: true; mandat: Mandat }
-  | Fehlschlag<"unauthenticated" | "invalid" | "unavailable" | "offline">;
-export type MeineListe = { ok: true; items: MeinGespraech[] } | Fehlschlag<"unavailable">;
+  | Failure<"unauthenticated" | "invalid" | "unavailable" | "offline">;
+export type MeineListe = { ok: true; items: MeinGespraech[] } | Failure<"unavailable">;
 export type Firmenliste =
   | { ok: true; items: Gespraech[] }
-  | Fehlschlag<"no-company" | "unavailable">;
+  | Failure<"no-company" | "unavailable">;
 export type Stufenergebnis =
   | { ok: true; stage: number }
-  | Fehlschlag<"gone" | "unavailable" | "offline">;
+  | Failure<"gone" | "unavailable" | "offline">;
 export type Zugergebnis =
   | { ok: true }
-  | Fehlschlag<"gone" | "conflict" | "unavailable" | "offline">;
+  | Failure<"gone" | "conflict" | "unavailable" | "offline">;
 
-const SCHWEIGT: Deutung<"unavailable"> = {
+const SCHWEIGT: ErrorReading<"unavailable"> = {
   reason: "unavailable",
-  titel: "errors.ledgerSilent",
-  text: "errors.tryLater",
+  titleKey: "errors.ledgerSilent",
+  detailKey: "errors.tryLater",
 };
 
 /**
@@ -134,7 +134,7 @@ export async function ladeMandat(signal?: AbortSignal): Promise<MandatErgebnis> 
 
   if (answer.ok) return { ok: true, mandat: answer.value };
 
-  return deuten<"unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
+  return interpretError<"unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
 }
 
 export async function schreibeMandat(eingabe: MandatEingabe): Promise<SchreibErgebnis> {
@@ -147,14 +147,14 @@ export async function schreibeMandat(eingabe: MandatEingabe): Promise<SchreibErg
 
   if (answer.ok) return { ok: true, mandat: answer.value };
 
-  return deuten<"unauthenticated" | "invalid" | "unavailable" | "offline">(
+  return interpretError<"unauthenticated" | "invalid" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "errors.sessionExpired",
-        text: "errors.signInAgain",
+        titleKey: "errors.sessionExpired",
+        detailKey: "errors.signInAgain",
       },
       503: SCHWEIGT,
     },
@@ -174,7 +174,7 @@ export async function ladeMeineGespraeche(signal?: AbortSignal): Promise<MeineLi
 
   // `503` NICHT als leere Liste zeigen: das waere die Behauptung, niemand habe
   // ein Gespraech eroeffnet — und das weiss in diesem Moment niemand.
-  return deuten<"unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
+  return interpretError<"unavailable">(answer.error, { 503: SCHWEIGT }, "unavailable");
 }
 
 export async function ladeFirmengespraeche(signal?: AbortSignal): Promise<Firmenliste> {
@@ -187,13 +187,13 @@ export async function ladeFirmengespraeche(signal?: AbortSignal): Promise<Firmen
 
   if (answer.ok) return { ok: true, items: answer.value?.items ?? [] };
 
-  return deuten<"no-company" | "unavailable">(
+  return interpretError<"no-company" | "unavailable">(
     answer.error,
     {
       403: {
         reason: "no-company",
-        titel: "errors.onlyCompaniesAsk",
-        text: "errors.chooseCompany",
+        titleKey: "errors.onlyCompaniesAsk",
+        detailKey: "errors.chooseCompany",
       },
       503: SCHWEIGT,
     },
@@ -217,12 +217,12 @@ async function stufenzug(id: string, pfad: string, stage: number): Promise<Stufe
 
   if (answer.ok) return { ok: true, stage: answer.value?.stage ?? 0 };
 
-  return deuten<"gone" | "unavailable" | "offline">(
+  return interpretError<"gone" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       // `404` sagt bewusst nicht, ob es das Gespraech gibt.
-      404: { reason: "gone", titel: "errors.conversationGone" },
+      404: { reason: "gone", titleKey: "errors.conversationGone" },
       503: SCHWEIGT,
     },
     "offline"
@@ -242,14 +242,14 @@ async function zug(pfad: string): Promise<Zugergebnis> {
 
   if (answer.ok) return { ok: true };
 
-  return deuten<"gone" | "conflict" | "unavailable" | "offline">(
+  return interpretError<"gone" | "conflict" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
-      404: { reason: "gone", titel: "errors.conversationGone" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      404: { reason: "gone", titleKey: "errors.conversationGone" },
       // `409` kommt mit dem Satz des Servers: sein Problemdokument weiss ueber
       // diesen Uebergang mehr als eine Tabelle hier.
-      409: { reason: "conflict", titel: "errors.stepNotPossible" },
+      409: { reason: "conflict", titleKey: "errors.stepNotPossible" },
       503: SCHWEIGT,
     },
     "offline"
@@ -272,15 +272,15 @@ export async function eroeffne(subjectId: string, note: string): Promise<Zugerge
 
   if (answer.ok) return { ok: true };
 
-  return deuten<"gone" | "conflict" | "unavailable" | "offline">(
+  return interpretError<"gone" | "conflict" | "unavailable" | "offline">(
     answer.error,
     {
-      0: { reason: "offline", titel: "errors.noConnection" },
-      403: { reason: "conflict", titel: "errors.onlyCompaniesAsk", text: "errors.chooseCompany" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      403: { reason: "conflict", titleKey: "errors.onlyCompaniesAsk", detailKey: "errors.chooseCompany" },
       // `404` heisst: diese Person hat diesem Unternehmen nichts freigegeben —
       // oder sie hat es ausgeschlossen, oder es gibt sie nicht. Die drei sind
       // ununterscheidbar, und die Oberflaeche bastelt daraus keine Auskunft.
-      404: { reason: "gone", titel: "errors.personNotRequestable" },
+      404: { reason: "gone", titleKey: "errors.personNotRequestable" },
       503: SCHWEIGT,
     },
     "offline"

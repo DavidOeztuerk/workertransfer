@@ -16,7 +16,7 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
-import { DarstellungsAbschnitte } from "../../../shared/components/layout/darstellung";
+import { AppearanceSections } from "../../../shared/components/layout/appearance";
 import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
 import { Zivilidentitaet } from "../components/Zivilidentitaet";
 import { useAsync } from "../lib/useAsync";
@@ -177,7 +177,7 @@ export function SettingsPage() {
 
 /**
  * Darstellung und Sprache, ausführlich. Das Kontomenü trägt die knappe Fassung;
- * beide lesen `useVorlieben`.
+ * beide lesen `usePreferences`.
  */
 function Darstellungsblock() {
   const { t } = useTranslation();
@@ -188,7 +188,7 @@ function Darstellungsblock() {
         <Typography variant="h2" sx={{ mb: 2.5 }}>
           {t("settings.appearanceTitle")}
         </Typography>
-        <DarstellungsAbschnitte />
+        <AppearanceSections />
       </CardContent>
     </Card>
   );

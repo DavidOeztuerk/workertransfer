@@ -37,9 +37,9 @@ import { useHandelnder } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { useFirmenprofile } from "../lib/useFirmenprofile";
 import {
-  type Seitenergebnis,
-  useBlaettern,
-} from "../../../shared/hooks/useBlaettern";
+  type PageResult,
+  usePagination,
+} from "../../../shared/hooks/usePagination";
 import { size } from "../../../styles/tokens/spacing";
 import {
   JobFilterSidebar,
@@ -174,7 +174,7 @@ export function JobsPage() {
   const geholtFuer = useRef<string | null>(null);
 
   useEffect(() => {
-    const standort = ortung.standort;
+    const standort = ortung.position;
 
     if (standort === null) {
       geholtFuer.current = null;
@@ -197,20 +197,20 @@ export function JobsPage() {
     });
 
     return () => abbruch.abort();
-  }, [ortung.standort]);
+  }, [ortung.position]);
 
   const load = useCallback(
     (page: number, pageSize: number, signal: AbortSignal) =>
       searchJobs(zuFiltern(applied), page, pageSize, signal).then(
-        (result): Seitenergebnis<Job, SucheFehlschlag> =>
+        (result): PageResult<Job, SucheFehlschlag> =>
           result.ok
-            ? { ok: true, seite: result }
-            : { ok: false, fehler: result },
+            ? { ok: true, page: result }
+            : { ok: false, error: result },
       ),
     [applied],
   );
 
-  const list = useBlaettern<Job, SucheFehlschlag>(load, JSON.stringify(applied));
+  const list = usePagination<Job, SucheFehlschlag>(load, JSON.stringify(applied));
 
   // Einmal für die ganze Seite, nicht je Stelle. Solange die Sitzung unbekannt
   // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
@@ -319,14 +319,14 @@ export function JobsPage() {
           onSubmit={() =>
             setApplied({
               ...form,
-              lat: ortung.standort?.lat ?? null,
-              lon: ortung.standort?.lon ?? null,
+              lat: ortung.position?.lat ?? null,
+              lon: ortung.position?.lon ?? null,
             })
           }
           onReset={() => {
             setForm(LEERER_FILTER);
             setApplied(NICHTS_GESUCHT);
-            ortung.vergiss();
+            ortung.forget();
           }}
         />
 
@@ -335,9 +335,9 @@ export function JobsPage() {
         <LoadingBlock label={t("jobs.searching")} />
       ) : null}
 
-      {list.fehler !== null ? <ErrorBlock error={list.fehler.error} /> : null}
+      {list.error !== null ? <ErrorBlock error={list.error.error} /> : null}
 
-      {!list.pending && list.fehler === null && list.items.length === 0 ? (
+      {!list.pending && list.error === null && list.items.length === 0 ? (
         <EmptyBlock
           title={t("jobs.emptyTitle")}
           hint={t("jobs.emptyHint")}
@@ -526,8 +526,8 @@ export function JobsPage() {
             pageSize={list.pageSize}
             totalItems={list.totalItems}
             totalPages={list.totalPages}
-            onPage={list.gehe}
-            onPageSize={list.setzeGroesse}
+            onPage={list.goTo}
+            onPageSize={list.setPageSize}
           />
         </Box>
       </Box>

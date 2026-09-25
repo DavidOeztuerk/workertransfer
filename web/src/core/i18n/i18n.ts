@@ -1,24 +1,24 @@
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 
-import { aufgeloest, type Sprachvorliebe } from "../store/preferencesSlice";
+import { resolveLanguage, type LanguagePreference } from "../store/preferencesSlice";
 import de from "./catalogs/de";
 import en from "./catalogs/en";
 import fr from "./catalogs/fr";
 
 /**
- * Die Kataloge, und wer entscheidet, welcher gilt.
+ * The catalogues, and who decides which one applies.
  *
- * <strong>Deutsch ist die Quelle</strong>, nicht nur eine von dreien: die
- * deutschen Texte waren zuerst da, sind geschrieben und geprüft, und alles
- * andere ist daraus übersetzt. Deshalb ist Deutsch auch der Rückfall — ein Text
- * in der Quellsprache ist besser als ein fehlender.
+ * <strong>German is the source</strong>, not merely one of three: the German
+ * texts came first, are written and reviewed, and everything else is
+ * translated from them. That is why German is also the fallback — a text in
+ * the source language is better than a missing one.
  *
- * <strong>Der Rückfall ist ausdrücklich eingeschaltet.</strong> Ohne ihn zeigt
- * i18next den Schlüssel selbst an, und `settings.language.label` mitten auf
- * einer Seite sieht aus wie ein kaputtes Programm statt wie eine fehlende
- * Übersetzung. Sichtbar fehlen soll sie trotzdem — dafür sorgt der Test, der
- * die Kataloge gegeneinander hält, nicht die Oberfläche.
+ * <strong>The fallback is switched on explicitly.</strong> Without it i18next
+ * shows the key itself, and `settings.language.label` in the middle of a page
+ * looks like a broken program rather than a missing translation. It should
+ * still be visibly missing — the test that holds the catalogues against each
+ * other takes care of that, not the UI.
  */
 export const i18n = i18next.createInstance();
 
@@ -31,24 +31,24 @@ void i18n.use(initReactI18next).init({
   lng: "de",
   fallbackLng: "de",
   interpolation: {
-    // React entkommt selbst, und zwar gründlicher. Doppelt entkommen macht aus
-    // einem Apostroph ein `&#39;` mitten im Satz.
+    // React escapes by itself, and more thoroughly. Escaping twice turns an
+    // apostrophe into an `&#39;` in the middle of a sentence.
     escapeValue: false,
   },
 });
 
-/** Setzt die Sprache aus der Vorliebe. `system` folgt dem Gerät (ADR-0031). */
-export function spracheAnwenden(vorliebe: Sprachvorliebe): void {
-  const language = aufgeloest(vorliebe);
+/** Sets the language from the preference. `system` follows the device (ADR-0031). */
+export function applyLanguage(preference: LanguagePreference): void {
+  const language = resolveLanguage(preference);
 
   if (i18n.language !== language) {
     void i18n.changeLanguage(language);
   }
 
   if (typeof document !== "undefined") {
-    // Ohne das bleibt `<html lang>` auf Deutsch stehen: Vorleseprogramme
-    // sprechen den Text dann mit der falschen Aussprache, und die Silbentrennung
-    // des Browsers trennt nach den falschen Regeln.
+    // Without this `<html lang>` stays German: screen readers then speak the
+    // text with the wrong pronunciation, and the browser's hyphenation splits
+    // words by the wrong rules.
     document.documentElement.lang = language;
   }
 }

@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { createAppThunk } from "../../../core/store/thunkHelpers";
-import { leseBerufsfeld } from "../../../shared/lib/berufsfelder";
+import { readOccupationalField } from "../../../shared/lib/occupationalFields";
 import type { Membership, Session, SessionWireState } from "../types/session";
 
 interface SessionBody {
@@ -34,7 +34,7 @@ const toSession = (body: SessionBody): Session => ({
   displayName: body.display_name ?? "",
   givenName: body.given_name ?? "",
   familyName: body.family_name ?? "",
-  berufsfeld: leseBerufsfeld(body.occupational_field),
+  berufsfeld: readOccupationalField(body.occupational_field),
 });
 
 /**
@@ -50,7 +50,7 @@ export const loadSession = createAppThunk<Session | null>(
     const answer = await request<SessionAntwort>(
       API_BASE_URL,
       "/auth/session",
-      { ohneErneuerung: true },
+      { skipRefresh: true },
       "errors.sessionNotChecked"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
@@ -66,7 +66,7 @@ export const loadSession = createAppThunk<Session | null>(
       const erneut = await request<SessionAntwort>(
         API_BASE_URL,
         "/auth/session",
-        { ohneErneuerung: true },
+        { skipRefresh: true },
         "errors.sessionNotChecked"
       );
       if (!erneut.ok) return rejectWithValue(erneut.error);
@@ -80,7 +80,7 @@ export const loadSession = createAppThunk<Session | null>(
 /**
  * Rotiert die httpOnly-Cookies. Kein Rumpf, kein Token im JSON.
  *
- * `ohneErneuerung`: ein 401 hier IST die Absage, kein Anlass für einen zweiten
+ * `skipRefresh`: ein 401 hier IST die Absage, kein Anlass für einen zweiten
  * Versuch — der Server löscht den toten Refresh-Cookie sonst in einer Schleife.
  */
 export const erneuern = createAppThunk<boolean>(
@@ -89,7 +89,7 @@ export const erneuern = createAppThunk<boolean>(
     const answer = await request<unknown>(
       API_BASE_URL,
       "/auth/refresh",
-      { method: "POST", ohneErneuerung: true },
+      { method: "POST", skipRefresh: true },
       "errors.sessionNotChecked"
     );
     if (!answer.ok) return rejectWithValue(answer.error);

@@ -4,16 +4,16 @@ import Box from "@mui/material/Box";
 import Switch from "@mui/material/Switch";
 
 /**
- * Der Schalter für eine Freigabe.
+ * The switch for a release — the ONE place that renders a consent toggle.
  *
- * <strong>Ein Schalter und keine Ankreuzbox</strong> — und das ist keine
- * Geschmacksfrage: eine Ankreuzbox verspricht, dass die Änderung erst beim
- * Absenden gilt. Bei einer Einwilligung wirkt sie SOFORT (ADR-0013), und wer
- * hier eine Box zeichnet, macht ein Versprechen, das die Anwendung bricht.
+ * <strong>A switch and not a checkbox</strong> — and that is no matter of
+ * taste: a checkbox promises that the change applies only on submit. For a
+ * consent it takes effect AT ONCE (ADR-0013), and whoever draws a box here
+ * makes a promise the application breaks.
  *
- * MUIs `Switch` ist ein `input[type=checkbox]` mit `role="switch"` — die Rolle
- * ist das, was zählt: Screenreader sagen "Schalter, ein/aus" statt
- * "Kontrollkästchen, aktiviert".
+ * MUI's `Switch` is an `input[type=checkbox]` with `role="switch"` — the role
+ * is what counts: screen readers say "switch, on/off" instead of "checkbox,
+ * checked".
  */
 export function ConsentSwitch({
   label,

@@ -18,8 +18,8 @@ import Link from "@mui/material/Link";
 import { Trans, useTranslation } from "react-i18next";
 
 import { useAppSelector } from "../../../core/store/hooks";
-import { BerufsfeldSelect } from "../../../shared/components/ui";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { OccupationalFieldSelect } from "../../../shared/components/ui";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
 import {
@@ -66,7 +66,7 @@ export function RegisterPage() {
   const [nachname, setNachname] = useState("");
 
   // Kein Pflichtfeld, Vorauswahl leer (ADR-0039).
-  const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
+  const [berufsfeld, setBerufsfeld] = useState<OccupationalFieldChoice>(null);
 
   // Geurteilt wird erst, wenn ein Feld verlassen wurde: während des Tippens
   // ist jede Adresse unfertig.
@@ -261,7 +261,7 @@ export function RegisterPage() {
           {t("civilIdentity.legalNameHint")}
         </Typography>
 
-        <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
+        <OccupationalFieldSelect value={berufsfeld} onChange={setBerufsfeld} />
 
         {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
 

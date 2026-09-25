@@ -9,7 +9,7 @@ import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
 import { useParams } from "react-router-dom";
 
-import { Briefbogen } from "../../../shared/components/Briefbogen";
+import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../api/companies";
 import { empfaengerAusFirma, kopfAusKontakt } from "../../work/lib/briefkopf";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
@@ -144,11 +144,11 @@ export function CompanyApplicationPage() {
           </Tabs>
 
           {aktuell.key === "letter" ? (
-            <Briefbogen
-              betreff={undefined}
+            <LetterSheet
+              subject={undefined}
               text={e.message}
-              kopf={kopfAusKontakt(e.applicant_contact)}
-              empfaenger={empfaengerAusFirma(firma.data, stelle.data)}
+              sender={kopfAusKontakt(e.applicant_contact)}
+              recipient={empfaengerAusFirma(firma.data, stelle.data)}
             />
           ) : null}
 

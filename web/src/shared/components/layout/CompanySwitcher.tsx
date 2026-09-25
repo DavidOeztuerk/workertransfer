@@ -7,16 +7,15 @@ import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { actForCompany, loadMemberships } from "../../../features/auth/store/authThunks";
 
 /**
- * „Handeln als" — Person oder eines der Unternehmen.
+ * "Acting as" — the person or one of the companies.
  *
- * <strong>Der Client NENNT die Firma, der Server ENTSCHEIDET.</strong> Die
- * Auswahl schickt `POST /auth/company/{id}`; erst dort wird die Mitgliedschaft
- * geprüft und der Mandant ins Token geschrieben (ADR-0018). Was hier steht, ist
- * also nie eine Behauptung über Rechte, sondern eine Bitte.
+ * <strong>The client NAMES the company, the server DECIDES.</strong> The choice
+ * sends `POST /auth/company/{id}`; only there is the membership checked and the
+ * tenant written into the token (ADR-0018). What stands here is therefore never
+ * a claim about rights, but a request.
  *
- * Zurück auf „ich selbst" geht nur über Abmelden, und das ist ehrlich: ein
- * Personentoken lässt sich nicht aus einem Firmentoken herausrechnen, es muss
- * neu ausgestellt werden.
+ * Back to "myself" goes only through signing out, and that is honest: a person
+ * token cannot be computed out of a company token, it has to be issued anew.
  */
 export function CompanySwitcher() {
   const { t } = useTranslation();
@@ -33,13 +32,10 @@ export function CompanySwitcher() {
   return (
     <TextField
       select
-      // NATIV, und das ist keine Nebensache: MUIs Vorgabe rendert ein `div`
-      // mit `role="button"`, das ein verstecktes Feld fuellt. Ein natives
-      // `<select>` ist das, was ein Screenreader als Auswahlliste ansagt, was
-      // die Tastatur ohne Zusatzcode bedient, und was `selectOption` in den
-      // E2E-Reisen findet. Die MUI-Fassung sieht nur so aus.
-      // `inputLabel.shrink`: ein natives Feld zeigt seinen Wert sofort, die
-      // schwebende Beschriftung laege sonst darueber.
+      // MUI's select, not a native one — why stands at `MuiSelect` in
+      // `styles/theme.ts`: it draws `role="combobox"`, which screen readers
+      // announce as a select. Playwright's `selectOption` does not reach it;
+      // the E2E journeys use the helper in `e2e/stack.ts` instead.
       size="small"
       label={t("header.actingAs")}
       value={tenantId ?? ""}
@@ -52,9 +48,9 @@ export function CompanySwitcher() {
       <MenuItem value="" disabled>
         {t("header.myself")}
       </MenuItem>
-      {memberships.map((firma) => (
-        <MenuItem key={firma.id} value={firma.id}>
-          {firma.name}
+      {memberships.map((company) => (
+        <MenuItem key={company.id} value={company.id}>
+          {company.name}
         </MenuItem>
       ))}
     </TextField>

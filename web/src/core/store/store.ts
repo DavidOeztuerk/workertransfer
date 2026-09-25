@@ -4,8 +4,8 @@ import auth from "../../features/auth/store/authSlice";
 import preferences from "./preferencesSlice";
 
 /**
- * Der Store. Je Feature ein Slice, angemeldet HIER — das ist die einzige Datei,
- * an der man sieht, woraus der Zustand der Anwendung besteht.
+ * The store. One slice per feature, registered HERE — this is the only file
+ * that shows what the application's state consists of.
  */
 export const store = configureStore({
   reducer: {

@@ -1,7 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import type { Membership, Session, SessionStatus } from "../types/session";
@@ -44,7 +44,7 @@ const authSlice = createSlice({
      * Konto-Menü zeigte.
      */
     /** Das Berufsfeld hat sich geändert — die Navigation zieht sofort nach. */
-    berufsfeldGesetzt(state, action: PayloadAction<BerufsfeldWahl>) {
+    berufsfeldGesetzt(state, action: PayloadAction<OccupationalFieldChoice>) {
       if (state.session !== null) {
         state.session = { ...state.session, berufsfeld: action.payload };
       }

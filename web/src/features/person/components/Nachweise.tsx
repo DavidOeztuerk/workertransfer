@@ -9,10 +9,10 @@ import { Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
-  belegartenFuer,
-  hochladbareBelege,
-} from "../../../shared/lib/berufsfelder";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+  evidenceKindsFor,
+  uploadableEvidenceKinds,
+} from "../../../shared/lib/occupationalFields";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
  * Welche Nachweise zu dieser Arbeit gehören (ADR-0039).
@@ -22,14 +22,14 @@ import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
  * (ADR-0022 §3). Die Chips sind nicht anklickbar: ein Beleg wird dadurch keine
  * Nennung (ADR-0033).
  */
-export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
+export function Nachweise({ feld }: { feld: OccupationalFieldChoice }) {
   const { t } = useTranslation();
 
   if (feld === null) return null;
 
-  const alle = belegartenFuer(feld);
-  const hochladbar = new Set(hochladbareBelege(feld).map((art) => art.schluessel));
-  const nurGenannt = alle.filter((art) => !hochladbar.has(art.schluessel));
+  const alle = evidenceKindsFor(feld);
+  const hochladbar = new Set(uploadableEvidenceKinds(feld).map((art) => art.labelKey));
+  const nurGenannt = alle.filter((art) => !hochladbar.has(art.labelKey));
 
   return (
     <Card sx={{ mt: 3 }}>
@@ -44,8 +44,8 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 2.5 }}>
           {alle.map((art) => (
             <Chip
-              key={art.schluessel}
-              label={t(art.schluessel)}
+              key={art.labelKey}
+              label={t(art.labelKey)}
               size="small"
               variant="outlined"
             />
@@ -55,7 +55,7 @@ export function Nachweise({ feld }: { feld: BerufsfeldWahl }) {
         {nurGenannt.length > 0 ? (
           <Alert severity="info" sx={{ mb: 2.5 }}>
             {t("credentials.nameOnly", {
-              belege: nurGenannt.map((art) => t(art.schluessel)).join(", "),
+              belege: nurGenannt.map((art) => t(art.labelKey)).join(", "),
             })}
           </Alert>
         ) : null}

@@ -1,14 +1,14 @@
 /**
- * Ein Flug für `POST /auth/refresh`.
+ * One flight for `POST /auth/refresh`.
  *
- * Access-JWT stirbt nach fünfzehn Minuten; der Refresh-Cookie (Pfad `/auth`,
- * httpOnly) trägt weiter. Ohne diese Klammer würden zwanzig parallele 401
- * zwanzig Rotationen anstoßen — Girder hat Reuse-Grace, aber ein Flug reicht.
+ * The access JWT dies after fifteen minutes; the refresh cookie (path `/auth`,
+ * httpOnly) carries on. Without this gate twenty parallel 401s would start
+ * twenty rotations — Girder has reuse grace, but one flight is enough.
  *
- * Tokens liegen im Cookie. Hier steht kein Bearer und kein Speicher.
+ * Tokens live in the cookie. No bearer and no storage stand here.
  */
 
-const AUTH_OHNE_ERNEUERUNG = [
+const AUTH_PATHS_WITHOUT_REFRESH = [
   "/auth/login",
   "/auth/register",
   "/auth/refresh",
@@ -17,30 +17,30 @@ const AUTH_OHNE_ERNEUERUNG = [
   "/auth/logout",
 ];
 
-/** Auth-Pfade, deren 401 die Absage IST und kein abgelaufenes Access-JWT. */
-export function brauchtKeineErneuerung(path: string): boolean {
-  const pfad = path.split("?")[0] ?? path;
-  return AUTH_OHNE_ERNEUERUNG.some((bekannt) => pfad === bekannt);
+/** Auth paths whose 401 IS the refusal and not an expired access JWT. */
+export function skipsRefresh(path: string): boolean {
+  const bare = path.split("?")[0] ?? path;
+  return AUTH_PATHS_WITHOUT_REFRESH.some((known) => bare === known);
 }
 
 let inflight: Promise<boolean> | null = null;
 
 /**
- * Rotiert die Cookies einmal. Mehrere Aufrufer teilen dasselbe Versprechen.
+ * Rotates the cookies once. Several callers share the same promise.
  *
- * `true` heisst: der Server hat neue Cookies gesetzt. `false`: tot oder Netz —
- * der Server löscht dann den Refresh-Cookie, damit `/auth/session` nicht
- * ewig `renewable` sagt.
+ * `true` means: the server set new cookies. `false`: dead or network — the
+ * server then deletes the refresh cookie so that `/auth/session` does not say
+ * `renewable` for ever.
  */
-export function erneuereEinmal(baseUrl: string): Promise<boolean> {
+export function refreshOnce(baseUrl: string): Promise<boolean> {
   if (inflight === null) {
     inflight = (async () => {
       try {
-        const antwort = await fetch(`${baseUrl}/auth/refresh`, {
+        const response = await fetch(`${baseUrl}/auth/refresh`, {
           method: "POST",
           credentials: "include",
         });
-        return antwort.ok;
+        return response.ok;
       } catch {
         return false;
       } finally {
@@ -51,7 +51,7 @@ export function erneuereEinmal(baseUrl: string): Promise<boolean> {
   return inflight;
 }
 
-/** Nur für Tests: sonst hängt ein Flug aus dem vorigen Fall. */
-export function zuruecksetzenFuerTests(): void {
+/** For tests only: otherwise a flight from the previous case hangs on. */
+export function resetForTests(): void {
   inflight = null;
 }

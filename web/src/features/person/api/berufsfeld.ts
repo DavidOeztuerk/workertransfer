@@ -1,13 +1,13 @@
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
  * Das Berufsfeld des eigenen Kontos setzen. `null` heisst entfernen. Keine
  * Kennung im Rumpf — der Server schreibt nur in das angemeldete Konto.
  */
 export async function speichereBerufsfeld(
-  feld: BerufsfeldWahl,
+  feld: OccupationalFieldChoice,
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
   const answer = await request<unknown>(
     API_BASE_URL,

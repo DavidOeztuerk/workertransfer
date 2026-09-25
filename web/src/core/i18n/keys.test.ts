@@ -8,8 +8,8 @@ import {
   employmentLabel,
   remoteLabel,
 } from "../../features/work/api/jobs";
-import { BERUFSFELDER } from "../../shared/lib/berufsfelder";
-import { SPRACHEN } from "../store/preferencesSlice";
+import { OCCUPATIONAL_FIELDS } from "../../shared/lib/occupationalFields";
+import { LANGUAGES } from "../store/preferencesSlice";
 import de from "./catalogs/de";
 import { i18n } from "./i18n";
 
@@ -25,9 +25,9 @@ import { i18n } from "./i18n";
  *
  * Hence this guard. It separates the two kinds of sites:
  *
- * - A key in a <c>deuten</c> table (<c>titel:</c>, <c>text:</c>) or as the
- *   fallback of <c>request(...)</c> is RIGHT — both are looked up, and at the
- *   answer rather than when the module loads.
+ * - A key in an <c>interpretError</c> table (<c>titleKey:</c>,
+ *   <c>detailKey:</c>) or as the fallback of <c>request(...)</c> is RIGHT —
+ *   both are looked up, and at the answer rather than when the module loads.
  * - A key in a field the UI draws directly (<c>meldung:</c>, <c>message:</c>,
  *   <c>detail:</c>, <c>title:</c>) is a defect as long as no <c>i18n.t</c>
  *   stands beside it.
@@ -193,8 +193,8 @@ const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
     nested("treffer", "reach", unionMembers("features/company/api/scout.ts", "Erreichbarkeit")),
   "applications.status${zeile.status.charAt(0).toUpperCase()}${zeile.status.slice(1)}": () =>
     nested("zeile", "status", unionMembers(`${WORK}/api/applications.ts`, "ApplicationStatus")),
-  "occupation.field.${feld}": () => each("feld", [...BERUFSFELDER]),
-  "language.${wert}": () => each("wert", [...SPRACHEN]),
+  "occupation.field.${field}": () => each("field", [...OCCUPATIONAL_FIELDS]),
+  "language.${language}": () => each("language", [...LANGUAGES]),
   // A type derived from the catalogue itself: tsc checks every use of it.
   'errors.${keyof Catalog["errors"] & string}': () =>
     Object.keys(de.errors).map((key) => `errors.${key}`),
@@ -258,10 +258,10 @@ describe("catalogue keys", () => {
 
   /**
    * A key does not have to stand inside `t(…)` to be one: status tables,
-   * navigation entries and `deuten` tables hold keys that a `t(variable)` reads
-   * later. Every string literal that starts with a catalogue section and looks
-   * like a path must therefore name a text — or stand in `NOT_KEYS` with its
-   * reason.
+   * navigation entries and `interpretError` tables hold keys that a
+   * `t(variable)` reads later. Every string literal that starts with a
+   * catalogue section and looks like a path must therefore name a text — or
+   * stand in `NOT_KEYS` with its reason.
    */
   it("name a text wherever a literal looks like a key", () => {
     const pattern = /(["'`])([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+)\1/g;

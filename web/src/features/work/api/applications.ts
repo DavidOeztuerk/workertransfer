@@ -8,10 +8,10 @@
  import { request } from "../../../core/api/client";
  import { APPLICATIONS_BASE_URL } from "../../../env";
  import {
-   type Deutung,
-   type Fehlschlag,
-   deuten,
- } from "../../../shared/api/fehler";
+   type ErrorReading,
+   type Failure,
+   interpretError,
+ } from "../../../shared/api/errors";
  
  export type ApplicationStatus = "submitted" | "reviewing" | "rejected" | "withdrawn" | "hired";
  
@@ -59,9 +59,9 @@ export interface ApplicantContact {
  
  export type BewerbungErgebnis =
    | { ok: true; application: Application }
-   | Fehlschlag<BewerbungFehler>;
+   | Failure<BewerbungFehler>;
  
- export type ListenErgebnis = { ok: true; applications: Application[] } | Fehlschlag<"fehlgeschlagen" | "offline">;
+ export type ListenErgebnis = { ok: true; applications: Application[] } | Failure<"fehlgeschlagen" | "offline">;
  
  export type DraftStatus = "generating" | "review" | "needs_changes" | "approved" | "sent" | "failed";
  
@@ -109,43 +109,43 @@ export interface ApplicantContact {
    | "invalid"
    | "offline";
  
- export type DraftErgebnis = { ok: true; draft: Draft } | Fehlschlag<DraftFehler>;
- export type DraftListenErgebnis = { ok: true; drafts: Draft[] } | Fehlschlag<"fehlgeschlagen" | "offline">;
+ export type DraftErgebnis = { ok: true; draft: Draft } | Failure<DraftFehler>;
+ export type DraftListenErgebnis = { ok: true; drafts: Draft[] } | Failure<"fehlgeschlagen" | "offline">;
  
  const SCHREIBFEHLER: Partial<
-   Record<number, Deutung<BewerbungFehler>>
+   Record<number, ErrorReading<BewerbungFehler>>
  > = {
-   0: { reason: "offline", titel: "errors.noConnection" },
+   0: { reason: "offline", titleKey: "errors.noConnection" },
    401: {
      reason: "unauthenticated",
-     titel: "errors.accountToApply",
-     text: "errors.signIn",
+     titleKey: "errors.accountToApply",
+     detailKey: "errors.signIn",
    },
-   404: { reason: "gone", titel: "errors.jobClosed" },
+   404: { reason: "gone", titleKey: "errors.jobClosed" },
    // Weder abgelehnt noch angenommen: wir wissen es gerade nicht, und eine
    // Absage, die niemand ausgesprochen hat, wäre die schlimmere Antwort.
    503: {
      reason: "unavailable",
-     titel: "errors.serviceSilent",
-     text: "errors.tryLater",
+     titleKey: "errors.serviceSilent",
+     detailKey: "errors.tryLater",
    },
  };
  
  const ENTWURF_FEHLER: Partial<
-   Record<number, Deutung<DraftFehler>>
+   Record<number, ErrorReading<DraftFehler>>
  > = {
-   0: { reason: "offline", titel: "errors.noConnection" },
+   0: { reason: "offline", titleKey: "errors.noConnection" },
    401: {
      reason: "unauthenticated",
-     titel: "errors.accountToApply",
-     text: "errors.signIn",
+     titleKey: "errors.accountToApply",
+     detailKey: "errors.signIn",
    },
-   404: { reason: "not_found", titel: "errors.draftNotFound" },
-   409: { reason: "conflict", titel: "errors.stepNotAllowed" },
+   404: { reason: "not_found", titleKey: "errors.draftNotFound" },
+   409: { reason: "conflict", titleKey: "errors.stepNotAllowed" },
    503: {
      reason: "unavailable",
-     titel: "errors.noProvider",
-     text: "errors.draftProviderMissing",
+     titleKey: "errors.noProvider",
+     detailKey: "errors.draftProviderMissing",
    },
  };
  
@@ -162,7 +162,7 @@ export interface ApplicantContact {
    if (answer.error.status === 409) {
      return { ok: false, reason: "already", error: answer.error };
    }
-   return deuten<BewerbungFehler>(answer.error, SCHREIBFEHLER, "invalid");
+   return interpretError<BewerbungFehler>(answer.error, SCHREIBFEHLER, "invalid");
  }
  
  async function entwerfen(path: string, method: "POST" | "PATCH" | "PUT", body?: unknown): Promise<DraftErgebnis> {
@@ -182,7 +182,7 @@ export interface ApplicantContact {
    if (answer.error.status === 503) {
      return { ok: false, reason: "unavailable", error: answer.error };
    }
-   return deuten<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid");
+   return interpretError<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid");
  }
  
  async function entwurfSchritt(path: string): Promise<DraftErgebnis> {
@@ -199,7 +199,7 @@ export interface ApplicantContact {
    if (answer.error.status === 503) {
      return { ok: false, reason: "unavailable", error: answer.error };
    }
-   return deuten<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid");
+   return interpretError<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid");
  }
  
  export function apply(input: ApplicationInput): Promise<BewerbungErgebnis> {
@@ -230,9 +230,9 @@ export interface ApplicantContact {
    if (answer.error.status === 401 || answer.error.status === 403) {
      return { ok: true, applications: [] };
    }
-   return deuten<"fehlgeschlagen" | "offline">(
+   return interpretError<"fehlgeschlagen" | "offline">(
      answer.error,
-     { 0: { reason: "offline", titel: "errors.noConnection" } },
+     { 0: { reason: "offline", titleKey: "errors.noConnection" } },
      "fehlgeschlagen"
    );
  }
@@ -259,25 +259,25 @@ export interface ApplicantContact {
      "errors.companyApplicationNotLoaded"
    );
    if (answer.ok) return { ok: true, application: answer.value };
-   return deuten<BewerbungFehler>(
+   return interpretError<BewerbungFehler>(
      answer.error,
      {
-       0: { reason: "offline", titel: "errors.noConnection" },
+       0: { reason: "offline", titleKey: "errors.noConnection" },
        401: {
          reason: "unauthenticated",
-         titel: "errors.accountToApply",
-         text: "errors.signIn",
+         titleKey: "errors.accountToApply",
+         detailKey: "errors.signIn",
        },
        403: {
          reason: "gone",
-         titel: "errors.actForCompanyRequired",
-         text: "errors.chooseCompany",
+         titleKey: "errors.actForCompanyRequired",
+         detailKey: "errors.chooseCompany",
        },
-       404: { reason: "gone", titel: "errors.jobMissing" },
+       404: { reason: "gone", titleKey: "errors.jobMissing" },
        503: {
          reason: "unavailable",
-         titel: "errors.serviceSilent",
-         text: "errors.tryLater",
+         titleKey: "errors.serviceSilent",
+         detailKey: "errors.tryLater",
        },
      },
      "invalid"
@@ -294,9 +294,9 @@ export interface ApplicantContact {
    ).then((answer) =>
      answer.ok
        ? { ok: true, drafts: (answer.value ?? []).map(alsEntwurf) }
-       : deuten<"fehlgeschlagen" | "offline">(
+       : interpretError<"fehlgeschlagen" | "offline">(
            answer.error,
-           { 0: { reason: "offline", titel: "errors.noConnection" } },
+           { 0: { reason: "offline", titleKey: "errors.noConnection" } },
            "fehlgeschlagen"
          )
    );
@@ -315,9 +315,9 @@ export interface ApplicantContact {
    ).then((answer) =>
      answer.ok
        ? { ok: true, drafts: (answer.value ?? []).map(alsEntwurf) }
-       : deuten<"fehlgeschlagen" | "offline">(
+       : interpretError<"fehlgeschlagen" | "offline">(
            answer.error,
-           { 0: { reason: "offline", titel: "errors.noConnection" } },
+           { 0: { reason: "offline", titleKey: "errors.noConnection" } },
            "fehlgeschlagen"
          )
    );
@@ -332,7 +332,7 @@ export interface ApplicantContact {
    ).then((answer) =>
      answer.ok
        ? { ok: true, draft: alsEntwurf(answer.value) }
-       : deuten<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid")
+       : interpretError<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid")
    );
  }
  
@@ -367,7 +367,7 @@ export interface ApplicantContact {
    return entwurfSchritt(`/applications/drafts/${draftId}/send`);
  }
  
- export function deleteDraft(draftId: string): Promise<{ ok: true } | Fehlschlag<DraftFehler>> {
+ export function deleteDraft(draftId: string): Promise<{ ok: true } | Failure<DraftFehler>> {
    return request<void>(
      APPLICATIONS_BASE_URL,
      `/applications/drafts/${draftId}`,
@@ -376,6 +376,6 @@ export interface ApplicantContact {
    ).then((answer) =>
      answer.ok
        ? { ok: true }
-       : deuten<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid")
+       : interpretError<DraftFehler>(answer.error, ENTWURF_FEHLER, "invalid")
    );
  }
