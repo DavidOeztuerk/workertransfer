@@ -3,16 +3,16 @@ import { API_BASE_URL } from "../../../env";
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
- * Das Berufsfeld des eigenen Kontos setzen. `null` heisst entfernen. Keine
- * Kennung im Rumpf — der Server schreibt nur in das angemeldete Konto.
+ * Sets the occupational field of one's own account. `null` means remove. No id
+ * in the body — the server writes only into the signed-in account.
  */
-export async function speichereBerufsfeld(
-  feld: OccupationalFieldChoice,
+export async function saveOccupationalField(
+  field: OccupationalFieldChoice,
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
   const answer = await request<unknown>(
     API_BASE_URL,
     "/account/occupational-field",
-    { method: "PUT", body: { occupational_field: feld } },
+    { method: "PUT", body: { occupational_field: field } },
     "errors.occupationNotSaved",
   );
 

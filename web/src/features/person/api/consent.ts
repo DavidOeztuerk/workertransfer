@@ -3,37 +3,35 @@ import type { ApiError } from "../../../core/store/thunkHelpers";
 import { CONSENT_BASE_URL } from "../../../env";
 
 /**
- * Der Consent-Ledger, wie die Oberfläche ihn benutzt.
+ * The consent ledger as the UI uses it.
  *
- * Eine Stelle für alle Capabilities: Profil und Portfolio beantworten
- * verschiedene Fragen, aber sie stellen sie über dieselben drei Endpunkte. Zwei
- * Kopien dieser Aufrufe würden sich irgendwann über das Format uneinig.
+ * One place for all capabilities: profile and portfolio answer different
+ * questions, but they ask them over the same three endpoints. Two copies of
+ * these calls would at some point disagree about the format.
  *
- * <strong>Nie zwischengespeichert.</strong> Ein Widerruf muss beim nächsten
- * Lesen wirken (ADR-0013) — ein Cache wäre hier kein Geschwindigkeitsdetail,
- * sondern ein Regelbruch.
+ * <strong>Never cached.</strong> A withdrawal must take effect on the next read
+ * (ADR-0013) — a cache here would be no speed detail but a rule violation.
  */
 export const PROFILE_VISIBILITY = "profile.visibility:public";
 export const PORTFOLIO_VISIBILITY = "portfolio.visibility:public";
-// Der Dienst prüft sie seit jeher (`IEinwilligungstor.Sichtbarkeit`), die
-// Oberfläche kannte sie nur zum ANZEIGEN — erteilen konnte man sie nirgends.
+// The service has always checked it (`IConsentGate.MayBeShownAsync`); the UI knew
+// it only to DISPLAY it — nobody could grant it anywhere.
 export const GITHUB_VISIBILITY = "github.visibility:public";
 
 export type ConsentResult = { ok: true; granted: boolean } | { ok: false; error: ApiError };
 
 /**
- * Gilt diese Einwilligung gerade? `null` heisst: der Ledger hat nicht geantwortet.
+ * Does this consent hold right now? `null` means: the ledger did not answer.
  *
- * Hier stand einmal `false` für diesen Fall, mit einer Begründung, die weiter
- * gilt: ein Schalter, der versehentlich „freigegeben" behauptet, ist die
- * gefährlichere Lüge. Sie schloss aber nur die eine Hälfte. `false` heisst für
- * den Aufrufer „nicht freigegeben", und ein Schalter in dieser Stellung ist
- * <strong>bedienbar</strong>: der nächste Klick schickt ein `grant` für eine
- * Einwilligung, deren Zustand niemand kennt — und wer längst freigegeben hatte,
- * liest „nicht freigegeben" und hält den Widerruf für erledigt.
+ * This used to return `false` for that case, with a reason that still holds: a
+ * switch that accidentally claims "released" is the more dangerous lie. But it
+ * closed only one half. `false` means "not released" to the caller, and a
+ * switch in that position is <strong>operable</strong>: the next click sends a
+ * `grant` for a consent whose state nobody knows — and whoever had long since
+ * released reads "not released" and takes the withdrawal for done.
  *
- * `null` trennt beides: die Anzeige bleibt aus, der Schalter wird gesperrt, und
- * die Seite sagt, was los ist.
+ * `null` separates the two: the display stays off, the switch is locked, and
+ * the page says what is going on.
  */
 export async function isGranted(
   subjectId: string,
@@ -50,11 +48,11 @@ export async function isGranted(
 }
 
 /**
- * Erteilen oder zurückziehen.
+ * Grant or withdraw.
  *
- * Der Widerruf trägt immer eine Begründung, weil der Vertrag sie verlangt: eine
- * Entziehung muss erklärbar sein, eine Erteilung nicht. Die Voreinstellung sagt
- * ehrlich, wo der Widerruf ausgelöst wurde, statt etwas zu erfinden.
+ * A revocation always carries a reason because the contract demands one: a
+ * withdrawal must be explainable, a grant need not be. The default says
+ * honestly where the revocation was triggered instead of inventing something.
  */
 export async function setGranted(
   subjectId: string,
@@ -87,15 +85,15 @@ export type MyConsentsResult =
   | { ok: false; error: ApiError };
 
 /**
- * Was gerade gilt — nur die eigenen Freigaben.
+ * What holds right now — only one's own releases.
  *
- * `GET /consent/me` nimmt <strong>keine</strong> Subjektkennung, weder im Pfad
- * noch in der Abfrage: eine fremde Liste würde sagen, welche anderen Unternehmen
- * Zugriff halten.
+ * `GET /consent/me` takes <strong>no</strong> subject id, neither in the path
+ * nor in the query: a foreign list would say which other companies hold
+ * access.
  *
- * Ein Fehler wird NICHT als leere Liste gezeigt. „Du hast nichts freigegeben"
- * ist eine Aussage, und auf genau dieser Seite wäre sie die beruhigendste
- * falsche Antwort, die das System geben kann.
+ * An error is NOT shown as an empty list. "You have released nothing" is a
+ * statement, and on exactly this page it would be the most reassuring wrong
+ * answer the system can give.
  */
 export async function listMyConsents(signal?: AbortSignal): Promise<MyConsentsResult> {
   const answer = await request<GrantedConsent[]>(
@@ -109,15 +107,15 @@ export async function listMyConsents(signal?: AbortSignal): Promise<MyConsentsRe
 }
 
 export interface ParsedCapability {
-  /** Der Bereich in Worten, oder `null`, wenn die Form unbekannt ist. */
+  /** The area in words, or `null` if the shape is unknown. */
   area: string | null;
-  /** Die Tenant-UUID, wenn die Freigabe einem Unternehmen gilt. */
+  /** The tenant UUID, if the release applies to one company. */
   tenantId: string | null;
-  /** Gilt sie allen Unternehmen? */
+  /** Does it apply to all companies? */
   public: boolean;
 }
 
-/** Die bekannten Bereiche. Der Wert ist ein Katalogschlüssel, kein Satz. */
+/** The known areas. The value is a catalogue key, not a sentence. */
 const AREAS: Record<string, string> = {
   profile: "consents.areaProfile",
   resume: "consents.areaResume",
@@ -127,11 +125,11 @@ const AREAS: Record<string, string> = {
 };
 
 /**
- * `resume.visibility:tenant:<uuid>` → lesbare Teile.
+ * `resume.visibility:tenant:<uuid>` → readable parts.
  *
- * Unbekannte Formen ergeben `area: null` — die Oberfläche zeigt sie dann roh
- * an, statt sie zu verschlucken. Eine Freigabe zu verbergen, weil ihr Format
- * nicht erkannt wurde, wäre auf dieser Seite der schlimmste denkbare Fehler.
+ * Unknown shapes give `area: null` — the UI then shows them raw instead of
+ * swallowing them. Hiding a release because its format was not recognised
+ * would be the worst conceivable defect on this page.
  */
 export function parseCapability(capability: string): ParsedCapability {
   const match = /^([a-z]+)\.visibility:(public|tenant:([0-9a-fA-F-]{36}))$/.exec(capability);
@@ -144,7 +142,7 @@ export interface ConsentHistoryEntry {
   capability: string;
   action: "GRANT" | "REVOKE" | "DELETE";
   recorded_at: string;
-  /** Nur der betroffenen Person gegenüber gefüllt. */
+  /** Filled only towards the person concerned. */
   reason: string | null;
 }
 
@@ -152,7 +150,7 @@ export type ConsentHistoryResult =
   | { ok: true; events: ConsentHistoryEntry[] }
   | { ok: false; error: ApiError };
 
-/** Die eigene Geschichte — für die Auskunft, nicht für die Übersicht. */
+/** One's own history — for the data export, not for the overview. */
 export async function listMyConsentHistory(
   signal?: AbortSignal
 ): Promise<ConsentHistoryResult> {

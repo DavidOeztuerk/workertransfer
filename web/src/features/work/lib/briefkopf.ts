@@ -1,11 +1,11 @@
 import type { Session } from "../../auth/types/session";
-import type { Anschrift } from "../../person/api/zivilidentitaet";
+import type { PostalAddress } from "../../person/api/civilIdentity";
 import type { LetterHead } from "../../../shared/components/LetterSheet";
 import type { CompanyProfile } from "../../company/api/companies";
 import type { ApplicantContact } from "../api/applications";
 import type { Job } from "../api/jobs";
 
-export function kopfAusSitzung(session: Session | null, anschrift?: Anschrift | null): LetterHead {
+export function kopfAusSitzung(session: Session | null, anschrift?: PostalAddress | null): LetterHead {
   const name =
     `${session?.givenName ?? ""} ${session?.familyName ?? ""}`.trim() ||
     session?.displayName ||

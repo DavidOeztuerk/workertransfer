@@ -1,8 +1,8 @@
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
 
-/** Bewerbungsanschrift — Vorlage für den Briefkopf, nie für die Suche, nie für KI. */
-export interface Anschrift {
+/** Postal address for applications — a template for the letterhead, never for search, never for AI. */
+export interface PostalAddress {
   line1: string;
   line2: string;
   postalCode: string;
@@ -11,7 +11,7 @@ export interface Anschrift {
   phone: string;
 }
 
-interface Draht {
+interface PostalAddressWire {
   line1: string;
   line2: string;
   postal_code: string;
@@ -20,16 +20,16 @@ interface Draht {
   phone: string;
 }
 
-const zuAnsicht = (draht: Draht): Anschrift => ({
-  line1: draht.line1 ?? "",
-  line2: draht.line2 ?? "",
-  postalCode: draht.postal_code ?? "",
-  city: draht.city ?? "",
-  country: draht.country ?? "DE",
-  phone: draht.phone ?? "",
+const toView = (wire: PostalAddressWire): PostalAddress => ({
+  line1: wire.line1 ?? "",
+  line2: wire.line2 ?? "",
+  postalCode: wire.postal_code ?? "",
+  city: wire.city ?? "",
+  country: wire.country ?? "DE",
+  phone: wire.phone ?? "",
 });
 
-export const LEERE_ANSCHRIFT: Anschrift = {
+export const EMPTY_POSTAL_ADDRESS: PostalAddress = {
   line1: "",
   line2: "",
   postalCode: "",
@@ -38,31 +38,31 @@ export const LEERE_ANSCHRIFT: Anschrift = {
   phone: "",
 };
 
-export async function ladeAnschrift(signal?: AbortSignal): Promise<Anschrift | null> {
-  const answer = await request<Draht>(
+export async function getPostalAddress(signal?: AbortSignal): Promise<PostalAddress | null> {
+  const answer = await request<PostalAddressWire>(
     API_BASE_URL,
     "/account/address",
     { signal },
     "errors.settingsUnavailable",
   );
-  return answer.ok && answer.value !== undefined ? zuAnsicht(answer.value) : null;
+  return answer.ok && answer.value !== undefined ? toView(answer.value) : null;
 }
 
-export async function speichereAnschrift(
-  anschrift: Anschrift,
-): Promise<{ ok: true; anschrift: Anschrift } | { ok: false; detail: string }> {
-  const answer = await request<Draht>(
+export async function savePostalAddress(
+  address: PostalAddress,
+): Promise<{ ok: true; address: PostalAddress } | { ok: false; detail: string }> {
+  const answer = await request<PostalAddressWire>(
     API_BASE_URL,
     "/account/address",
     {
       method: "PUT",
       body: {
-        line1: anschrift.line1,
-        line2: anschrift.line2,
-        postal_code: anschrift.postalCode,
-        city: anschrift.city,
-        country: anschrift.country,
-        phone: anschrift.phone,
+        line1: address.line1,
+        line2: address.line2,
+        postal_code: address.postalCode,
+        city: address.city,
+        country: address.country,
+        phone: address.phone,
       },
     },
     "errors.settingsNotSaved",
@@ -70,10 +70,10 @@ export async function speichereAnschrift(
   if (!answer.ok || answer.value === undefined) {
     return { ok: false, detail: answer.ok ? "" : answer.error.detail };
   }
-  return { ok: true, anschrift: zuAnsicht(answer.value) };
+  return { ok: true, address: toView(answer.value) };
 }
 
-export async function speichereKlarname(
+export async function saveLegalName(
   givenName: string,
   familyName: string,
 ): Promise<{ ok: true } | { ok: false; detail: string }> {

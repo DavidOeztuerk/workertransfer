@@ -16,30 +16,30 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
 import { PORTFOLIO_VISIBILITY, isGranted, setGranted } from "../api/consent";
-import { type Arbeit, anhangUrl, ladeMeines } from "../api/portfolio";
+import { type PortfolioItem, attachmentUrl, getMyPortfolio } from "../api/portfolio";
 
-/** Rolle und Jahr, soweit angegeben — und ob eine Datei hängt. */
-function summaryLine(arbeit: Arbeit, mitDatei: string): string {
+/** Role and year, as far as stated — and whether a file is attached. */
+function summaryLine(item: PortfolioItem, withFile: string): string {
   const parts: string[] = [];
-  if (arbeit.role !== "") parts.push(arbeit.role);
-  if (arbeit.year !== null) parts.push(String(arbeit.year));
-  if (arbeit.attachment !== null) parts.push(mitDatei);
+  if (item.role !== "") parts.push(item.role);
+  if (item.year !== null) parts.push(String(item.year));
+  if (item.attachment !== null) parts.push(withFile);
   return parts.join(" · ");
 }
 
 /**
- * <c>/portfolio</c> — das Schaufenster und seine eigene Freigabe.
+ * <c>/portfolio</c> — the showcase and its own release.
  *
- * <strong>Die Freigabe ist getrennt vom Profil</strong>, und das ist keine
- * Verdopplung: jemand kann ansprechbar sein, ohne seine Arbeiten zu zeigen.
+ * <strong>The release is separate from the profile</strong>, and that is no
+ * duplication: somebody can be approachable without showing their work.
  *
- * <strong>Drei Zustände am Schalter, nicht zwei.</strong> Schweigt der Ledger,
- * ist der Schalter <em>gesperrt</em> und sagt es — sonst gäbe der nächste Klick
- * eine Freigabe für etwas, dessen Stand niemand kennt. Und ohne eine einzige
- * Arbeit lässt sich nichts freigeben: was es nicht gibt, kann man nicht zeigen.
+ * <strong>Three states at the switch, not two.</strong> If the ledger is
+ * silent, the switch is <em>locked</em> and says so — otherwise the next click
+ * would grant a release for something whose state nobody knows. And without a
+ * single item nothing can be released: what does not exist cannot be shown.
  */
 export function PortfolioPage() {
   const { t } = useTranslation();
@@ -47,16 +47,16 @@ export function PortfolioPage() {
   const session = useAppSelector((state) => state.auth.session);
   const subjectId = session?.userId ?? null;
 
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [toggling, setSchaltet] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState(false);
 
   const showcase = useAsync(
-    (signal) => ladeMeines(signal),
+    (signal) => getMyPortfolio(signal),
     [subjectId],
     subjectId !== null,
   );
 
-  const freigabe = useAsync(
+  const release = useAsync(
     () => isGranted(subjectId as string, PORTFOLIO_VISIBILITY),
     [subjectId],
     subjectId !== null,
@@ -64,47 +64,47 @@ export function PortfolioPage() {
 
   if (status === "anonymous" || subjectId === null) {
     return (
-      <AnmeldungNoetig
-        titel={t("portfolio.title")}
-        satz="portfolio.signInRequired"
+      <SignInRequired
+        title={t("portfolio.title")}
+        sentenceKey="portfolio.signInRequired"
       />
     );
   }
 
-  const arbeiten = showcase.value?.ok
+  const items = showcase.value?.ok
     ? (showcase.value.value?.items ?? [])
     : [];
-  const hatArbeiten = arbeiten.length > 0;
+  const hasItems = items.length > 0;
 
-  // `undefined` heisst „wird noch geladen", `null` heisst „der Ledger schweigt".
-  const ledgerSchweigt = freigabe.value === null;
-  const ledgerUnbekannt = freigabe.laedt || ledgerSchweigt;
+  // `undefined` means "still loading", `null` means "the ledger is silent".
+  const ledgerSilent = release.value === null;
+  const ledgerUnknown = release.loading || ledgerSilent;
 
-  async function umschalten(neu: boolean) {
-    setSchaltet(true);
+  async function toggle(next: boolean) {
+    setToggling(true);
     const result = await setGranted(
       subjectId as string,
       PORTFOLIO_VISIBILITY,
-      neu,
+      next,
       t("portfolio.revokeReason"),
     );
-    setSchaltet(false);
+    setToggling(false);
 
     if (result.ok) {
-      setFehler(null);
-      freigabe.setze(result.granted);
+      setError(null);
+      release.set(result.granted);
     } else {
-      setFehler(result.error.detail);
-      freigabe.again();
+      setError(result.error.detail);
+      release.again();
     }
   }
 
-  const hint = ledgerSchweigt
+  const hint = ledgerSilent
     ? t("portfolio.releaseSilent")
-    : freigabe.laedt
+    : release.loading
       ? t("portfolio.releaseChecking")
       : t(
-          hatArbeiten
+          hasItems
             ? "portfolio.releaseEffective"
             : "portfolio.releaseWithoutItem",
         );
@@ -115,12 +115,12 @@ export function PortfolioPage() {
       narrow
       lead={t("portfolio.lead")}
     >
-      {fehler !== null ? (
+      {error !== null ? (
         <ErrorBlock
           error={{
             status: 0,
             title: t("portfolio.releaseFailed"),
-            detail: fehler,
+            detail: error,
           }}
           title={t("portfolio.releaseFailed")}
         />
@@ -131,16 +131,16 @@ export function PortfolioPage() {
           <ConsentSwitch
             label={t("portfolio.releaseLabel")}
             hint={hint}
-            checked={freigabe.value === true}
-            disabled={!hatArbeiten || toggling || ledgerUnbekannt}
-            onChange={(neu) => void umschalten(neu)}
+            checked={release.value === true}
+            disabled={!hasItems || toggling || ledgerUnknown}
+            onChange={(next) => void toggle(next)}
           />
         </CardContent>
       </Card>
 
       <Card>
         <CardContent>
-          {showcase.laedt ? (
+          {showcase.loading ? (
             <LoadingBlock label={t("portfolio.loading")} />
           ) : null}
 
@@ -148,7 +148,7 @@ export function PortfolioPage() {
             <ErrorBlock error={showcase.value.error} />
           ) : null}
 
-          {!showcase.laedt && showcase.value?.ok && !hatArbeiten ? (
+          {!showcase.loading && showcase.value?.ok && !hasItems ? (
             <EmptyBlock
               title={t("portfolio.emptyTitle")}
               hint={t("portfolio.emptyHint")}
@@ -164,7 +164,7 @@ export function PortfolioPage() {
             />
           ) : null}
 
-          {hatArbeiten ? (
+          {hasItems ? (
             <>
               <Box
                 sx={{
@@ -174,7 +174,7 @@ export function PortfolioPage() {
                   mb: 3,
                 }}
               >
-                {arbeiten.map((arbeit, index) => (
+                {items.map((item, index) => (
                   <Card
                     // The order is the stored field's, and a work sample's
                     // address is its position in it: a work sample has no id of
@@ -192,9 +192,9 @@ export function PortfolioPage() {
                       }}
                     >
                       <Box>
-                        <Typography variant="h4">{arbeit.title}</Typography>
+                        <Typography variant="h4">{item.title}</Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {summaryLine(arbeit, t("portfolio.withFile"))}
+                          {summaryLine(item, t("portfolio.withFile"))}
                         </Typography>
                       </Box>
                       <Box
@@ -213,9 +213,9 @@ export function PortfolioPage() {
                         >
                           {t("portfolio.edit")}
                         </Button>
-                        {arbeit.attachment !== null ? (
+                        {item.attachment !== null ? (
                           <Link
-                            href={anhangUrl(subjectId, arbeit.attachment)}
+                            href={attachmentUrl(subjectId, item.attachment)}
                             target="_blank"
                             rel="noreferrer noopener"
                             variant="body2"

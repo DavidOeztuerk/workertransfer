@@ -20,36 +20,37 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
 import {
-  type Verbindung,
-  anmeldungAbschliessen,
-  anmeldungBeginnen,
-  anmeldungMoeglich,
-  holeNeu,
-  ladeMeine,
-  nenneKonto,
-  pruefeNachweis,
-  trenne,
+  type Connection,
+  disconnect,
+  finishOAuth,
+  getMyConnection,
+  isOAuthAvailable,
+  nameAccount,
+  refreshRepositories,
+  startOAuth,
+  verifyConnection,
 } from "../api/github";
 import { getMyProfile, saveMyProfile } from "../api/profile";
-import { ausRepositories, vorschlaegeAus } from "../lib/vorschlaege";
+import { fromRepositories, suggestionsFrom } from "../lib/suggestions";
 
 /**
- * <c>/github</c> — die eigene, nachgewiesene Verbindung.
+ * <c>/github</c> — one's own, verified connection.
  *
- * <strong>Belege, keine Noten.</strong> Was hier steht, sind öffentliche
- * Repositories mit Link. Diese Plattform rechnet daraus keine Punktzahl und
- * keine Rangfolge — wer wissen will, ob der Code gut ist, sieht ihn sich an.
- * Das ist nicht Zurückhaltung, sondern die Linie: Anforderung rein, Belege
- * raus; nie Mensch rein, Zahl raus.
+ * <strong>Evidence, not marks.</strong> What stands here are public
+ * repositories with a link. This platform computes no score and no ranking
+ * from them — whoever wants to know whether the code is good looks at it. That
+ * is not restraint but the line: requirement in, evidence out; never person
+ * in, number out.
  *
- * <strong>Und keine stille Unvollständigkeit.</strong> Keine Repositories sind
- * kein Mangel, sondern eine Auskunft — wer nichts auf GitHub hat, ist nicht
- * schlechter, sondern woanders. Die Seite sagt das ausdrücklich.
+ * <strong>And no silent incompleteness.</strong> No repositories are no defect
+ * but a piece of information — whoever has nothing on GitHub is not worse, but
+ * elsewhere. The page says so explicitly.
  *
- * <strong>Geholt wird nur auf Auslösung.</strong> Kein Abgleich im Hintergrund.
+ * <strong>Fetched only when triggered.</strong> No reconciliation in the
+ * background.
  *
  * <strong>The fast path comes first and asks for no name.</strong> Typing the
  * account was the GIST's requirement — a gist search must know whose gists to
@@ -63,125 +64,125 @@ export function GitHubPage() {
   const session = useAppSelector((state) => state.auth.session);
 
   const [login, setLogin] = useState("");
-  /** Ist der Weg von Hand aufgeklappt? Zu, solange die Anmeldung genügt. */
-  const [vonHand, setVonHand] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
-  const [uebernehmen, setUebernehmen] = useState(false);
+  /** Is the manual path expanded? Closed as long as signing in suffices. */
+  const [manual, setManual] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [adopt, setAdopt] = useState(false);
 
   const connection = useAsync(
-    (signal) => ladeMeine(signal),
+    (signal) => getMyConnection(signal),
     [session?.userId],
     session !== null,
   );
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig titel={t("github.title")} satz="github.signInRequired" />
+      <SignInRequired title={t("github.title")} sentenceKey="github.signInRequired" />
     );
   }
 
   async function run(
-    was: () => Promise<{ ok: boolean; error?: { detail: string } }>,
+    action: () => Promise<{ ok: boolean; error?: { detail: string } }>,
   ) {
-    setLaeuft(true);
-    const result = await was();
-    setLaeuft(false);
+    setRunning(true);
+    const result = await action();
+    setRunning(false);
 
-    if (!result.ok && result.error) setFehler(result.error.detail);
-    else setFehler(null);
+    if (!result.ok && result.error) setError(result.error.detail);
+    else setError(null);
 
     connection.again();
   }
 
-  const loaded = !connection.laedt && connection.value?.ok === true;
-  const current: Verbindung | null = connection.value?.ok
+  const loaded = !connection.loading && connection.value?.ok === true;
+  const current: Connection | null = connection.value?.ok
     ? connection.value.value
     : null;
 
   /*
-   * OB es die Anmeldung gibt, wird beim Betrachten geholt — WOHIN sie führt,
-   * erst auf Klick.
+   * WHETHER signing in exists is fetched while viewing — WHERE it leads only
+   * on click.
    *
-   * Der Unterschied ist nicht kosmetisch: `anmeldungBeginnen` legt eine
-   * Verbindung an, wenn es noch keine gibt. Vorgeholt entstünde eine Zeile für
-   * jeden, der die Seite einmal geöffnet und dann weitergeklickt hat.
+   * The difference is not cosmetic: `startOAuth` creates a connection if there
+   * is none yet. Prefetched, it would leave a row for everyone who opened the
+   * page once and then clicked on.
    */
-  const moeglich = useAsync(
-    (signal) => anmeldungMoeglich(signal),
+  const oauth = useAsync(
+    (signal) => isOAuthAvailable(signal),
     [session?.userId],
     session !== null,
   );
-  const mitAnmeldung = moeglich.value === true;
+  const withOAuth = oauth.value === true;
 
   // Without configured OAuth the manual path is not a side path but THE path —
   // then there is nothing to expand.
-  const vonHandZeigen = !mitAnmeldung || vonHand;
+  const showManual = !withOAuth || manual;
 
   /*
-   * EIN GENANNTES KONTO IST KEIN GRUND, DEN GIST AUFZUZWINGEN.
+   * A NAMED ACCOUNT IS NO REASON TO FORCE THE GIST.
    *
-   * Hier stand die umgekehrte Regel — „wer ein Konto genannt hat, steckt im
-   * Weg von Hand" —, damit ein Neuladen die Zeichenfolge nicht versteckt. Am
-   * echten Stand gemessen war die Reparatur schlimmer als der Schaden: einen
-   * Namen nennt auch, wer sich danach doch anmelden will, und der bekam den
-   * Gist dann dauerhaft ins Bild. Die Zeichenfolge ist nach einem Neuladen
-   * einen Klick entfernt und ändert sich dabei nicht.
+   * The reverse rule stood here — "whoever has named an account is on the
+   * manual path" — so that a reload would not hide the string. Measured on the
+   * real system the repair was worse than the damage: a name is also given by
+   * somebody who then wants to sign in after all, and they got the gist
+   * permanently in view. After a reload the string is one click away and does
+   * not change.
    *
-   * Was NICHT zuklappen darf, ist der Ausweg: wer einen falschen Namen stehen
-   * hat, scheitert an der Anmeldung (der Vergleich lehnt ab) und braucht
-   * „Anderes Konto" — der Knopf steht deshalb oben und nicht im Abschnitt.
+   * What must NOT collapse is the way out: whoever has a wrong name standing
+   * fails at signing in (the comparison refuses) and needs "Other account" —
+   * the button therefore stands at the top and not in the section.
    */
-  const genanntesKonto = current?.login != null && !current.verified
+  const namedAccount = current?.login != null && !current.verified
     ? current.login
     : null;
 
-  /** Anmeldung beginnen und hingehen. */
-  async function meldeAn() {
-    setLaeuft(true);
-    const ziel = await anmeldungBeginnen();
-    setLaeuft(false);
+  /** Start signing in and go there. */
+  async function signIn() {
+    setRunning(true);
+    const target = await startOAuth();
+    setRunning(false);
 
-    if (ziel === null) {
-      setFehler(t("github.signInFailed"));
+    if (target === null) {
+      setError(t("github.signInFailed"));
       return;
     }
 
-    window.location.assign(ziel);
+    window.location.assign(target);
   }
 
   /*
-   * DIE RÜCKKEHR VON GITHUB.
+   * THE RETURN FROM GITHUB.
    *
-   * Der Einmalcode steht in der Adresszeile. Er wird eingelöst und die Adresse
-   * danach BEREINIGT — ein Code, der im Verlauf des Browsers stehen bleibt,
-   * ist ein Geheimnis an einem Ort, an dem niemand eines vermutet. Verbraucht
-   * ist er ohnehin, aber das weiss nur der Server.
+   * The one-time code stands in the address bar. It is redeemed and the
+   * address CLEANED afterwards — a code left standing in the browser's history
+   * is a secret in a place where nobody suspects one. It is used up anyway, but
+   * only the server knows that.
    */
-  const [eingeloest, setzeEingeloest] = useState(false);
+  const [redeemed, setRedeemed] = useState(false);
 
   useEffect(() => {
-    if (eingeloest) return;
+    if (redeemed) return;
 
-    const adresse = new URLSearchParams(window.location.search);
-    const code = adresse.get("code");
-    const zustand = adresse.get("state");
+    const query = new URLSearchParams(window.location.search);
+    const code = query.get("code");
+    const state = query.get("state");
 
-    if (code === null || zustand === null) return;
+    if (code === null || state === null) return;
 
-    setzeEingeloest(true);
+    setRedeemed(true);
     window.history.replaceState({}, "", window.location.pathname);
 
-    void anmeldungAbschliessen(code, zustand).then((ergebnis) => {
-      if (!ergebnis.ok) {
-        setFehler(t("github.signInFailed"));
+    void finishOAuth(code, state).then((result) => {
+      if (!result.ok) {
+        setError(t("github.signInFailed"));
         return;
       }
 
-      setFehler(null);
+      setError(null);
       connection.again();
     });
-  }, [eingeloest, connection, t]);
+  }, [redeemed, connection, t]);
 
   return (
     <PageShell
@@ -193,13 +194,13 @@ export function GitHubPage() {
         {t("github.onlyOnRequest")}
       </Typography>
 
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
-      {connection.laedt ? (
+      {connection.loading ? (
         <Card>
           <CardContent>
             <LoadingBlock label={t("github.loading")} />
@@ -218,11 +219,11 @@ export function GitHubPage() {
               {t("github.proof")}
             </Typography>
 
-            {mitAnmeldung ? (
-              <Box sx={{ mb: vonHand ? 3 : 0 }}>
+            {withOAuth ? (
+              <Box sx={{ mb: manual ? 3 : 0 }}>
                 <Button
                   variant="contained"
-                  onClick={() => void meldeAn()}
+                  onClick={() => void signIn()}
                   disabled={running}
                 >
                   {t("github.withGithub")}
@@ -230,7 +231,7 @@ export function GitHubPage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                   {t("github.withGithubHint")}
                 </Typography>
-                {genanntesKonto !== null ? (
+                {namedAccount !== null ? (
                   <Box
                     sx={{
                       mt: 2,
@@ -243,14 +244,14 @@ export function GitHubPage() {
                     <Typography variant="body2">
                       <Trans
                         i18nKey="github.namedAccount"
-                        values={{ login: genanntesKonto }}
+                        values={{ login: namedAccount }}
                         components={{ 1: <strong /> }}
                       />
                     </Typography>
                     <Button
                       variant="text"
                       size="small"
-                      onClick={() => void run(async () => ({ ok: await trenne() }))}
+                      onClick={() => void run(async () => ({ ok: await disconnect() }))}
                       disabled={running}
                       sx={{ px: 0 }}
                     >
@@ -262,24 +263,24 @@ export function GitHubPage() {
                 <Button
                   variant="text"
                   size="small"
-                  onClick={() => setVonHand((offen) => !offen)}
+                  onClick={() => setManual((open) => !open)}
                   sx={{ mt: 1.5, px: 0, display: "block" }}
                 >
-                  {vonHand ? t("github.manualHide") : t("github.manual")}
+                  {manual ? t("github.manualHide") : t("github.manual")}
                 </Button>
               </Box>
             ) : null}
 
-            {vonHandZeigen ? (
+            {showManual ? (
               <Box>
-                {mitAnmeldung ? <Divider sx={{ mb: 2.5 }} /> : null}
+                {withOAuth ? <Divider sx={{ mb: 2.5 }} /> : null}
 
                 {current?.login == null ? (
                   <Box
                     component="form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void run(() => nenneKonto(login));
+                      void run(() => nameAccount(login));
                     }}
                     sx={{
                       display: "flex",
@@ -336,16 +337,16 @@ export function GitHubPage() {
                     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                       <Button
                         variant="contained"
-                        onClick={() => void run(() => pruefeNachweis())}
+                        onClick={() => void run(() => verifyConnection())}
                         disabled={running}
                       >
                         {running ? t("github.proofChecking") : t("github.proofCheck")}
                       </Button>
-                      {mitAnmeldung ? null : (
+                      {withOAuth ? null : (
                         <Button
                           variant="text"
                           onClick={() =>
-                            void run(async () => ({ ok: await trenne() }))
+                            void run(async () => ({ ok: await disconnect() }))
                           }
                           disabled={running}
                         >
@@ -407,7 +408,7 @@ export function GitHubPage() {
                   // (ADR-0022 §2). Both are statements about a REPOSITORY, never
                   // about a person; one click carries a word into the profile,
                   // and only then has a human said it.
-                  const woerter = [
+                  const words = [
                     ...new Set([...repo.topics, ...repo.languages]),
                   ];
                   return (
@@ -425,7 +426,7 @@ export function GitHubPage() {
                         {repo.description !== "" ? ` · ${repo.description}` : ""}
                       </Typography>
 
-                      {woerter.length > 0 ? (
+                      {words.length > 0 ? (
                         <Box
                           sx={{
                             display: "flex",
@@ -434,8 +435,8 @@ export function GitHubPage() {
                             mt: 0.5,
                           }}
                         >
-                          {woerter.map((wort) => (
-                            <Chip key={wort} label={wort} size="small" />
+                          {words.map((word) => (
+                            <Chip key={word} label={word} size="small" />
                           ))}
                         </Box>
                       ) : null}
@@ -449,8 +450,8 @@ export function GitHubPage() {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={uebernehmen}
-                    onChange={(_, an) => setUebernehmen(an)}
+                    checked={adopt}
+                    onChange={(_, on) => setAdopt(on)}
                   />
                 }
                 label={t("github.adoptSkills")}
@@ -459,30 +460,30 @@ export function GitHubPage() {
                 variant="outlined"
                 onClick={() =>
                   void run(async () => {
-                    const result = await holeNeu();
-                    if (!result.ok || !uebernehmen || !result.value) return result;
-                    const profil = await getMyProfile();
-                    if (!profil.ok || profil.profile === null) return result;
-                    const extra = vorschlaegeAus(
-                      ausRepositories(result.value.repositories),
-                      profil.profile.skills,
+                    const result = await refreshRepositories();
+                    if (!result.ok || !adopt || !result.value) return result;
+                    const ownProfile = await getMyProfile();
+                    if (!ownProfile.ok || ownProfile.profile === null) return result;
+                    const extra = suggestionsFrom(
+                      fromRepositories(result.value.repositories),
+                      ownProfile.profile.skills,
                     );
                     if (extra.length === 0) return result;
                     await saveMyProfile({
-                      headline: profil.profile.headline,
-                      bio: profil.profile.bio,
-                      location: profil.profile.location,
-                      remote_ok: profil.profile.remote_ok,
-                      skills: [...profil.profile.skills, ...extra].slice(0, 30),
-                      // MITSCHREIBEN, nicht weglassen. Dieser Aufruf schreibt
-                      // das GANZE Profil zurueck, und `null` nimmt eine Angabe
-                      // zurueck (ADR-0041): ohne diese zwei Zeilen loeschte ein
-                      // Klick auf „Vorschlaege uebernehmen" die
-                      // Pendelbereitschaft, ohne dass jemand danach gefragt
-                      // haette. Der Compiler hat es bemerkt — deshalb sind die
-                      // Felder Pflicht und nicht optional.
-                      commute_km: profil.profile.commute_km,
-                      relocation: profil.profile.relocation,
+                      headline: ownProfile.profile.headline,
+                      bio: ownProfile.profile.bio,
+                      location: ownProfile.profile.location,
+                      remote_ok: ownProfile.profile.remote_ok,
+                      skills: [...ownProfile.profile.skills, ...extra].slice(0, 30),
+                      // WRITE ALONG, do not leave out. This call writes the
+                      // WHOLE profile back, and `null` takes a statement back
+                      // (ADR-0041): without these two lines a click on "adopt
+                      // suggestions" would delete the commuting readiness
+                      // without anybody asking for it. The compiler noticed —
+                      // which is why the fields are required and not
+                      // optional.
+                      commute_km: ownProfile.profile.commute_km,
+                      relocation: ownProfile.profile.relocation,
                     });
                     return result;
                   })
@@ -496,7 +497,7 @@ export function GitHubPage() {
               <Button
                 variant="text"
                 onClick={() =>
-                  void run(async () => ({ ok: await trenne() }))
+                  void run(async () => ({ ok: await disconnect() }))
                 }
                 disabled={running}
               >

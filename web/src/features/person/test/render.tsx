@@ -13,19 +13,18 @@ import auth from "../../auth/store/authSlice";
 import type { Membership, Session, SessionStatus } from "../../auth/types/session";
 
 /**
- * Die Hülle, die eine Seite dieses Bereichs zum Leben braucht: Store, Theme,
- * Router.
+ * The shell a page of this area needs to come alive: store, theme, router.
  *
- * Sie steht hier und nicht in `src/shared/test/`, wo sie hingehörte — dieser
- * Durchgang darf `shared/` nicht anfassen. Sie ist damit die dritte Kopie
- * (`features/public/test/`, `features/auth/test/`); wer die Bereiche später
- * zusammenzieht, legt eine nach `shared/` und wirft die anderen weg.
+ * It stands here and not in `src/shared/test/`, where it would belong — this
+ * pass was not allowed to touch `shared/`. It is thus the third copy
+ * (`features/public/test/`, `features/auth/test/`); whoever later merges the
+ * areas puts one into `shared/` and throws the others away.
  *
- * <strong>Ein eigener Store je Aufruf.</strong> Der echte Store ist ein
- * Einzelstück; über Testgrenzen hinweg trüge er den Zustand des vorigen Tests
- * weiter, und dann hängt ein Ergebnis an der Reihenfolge der Tests.
+ * <strong>A store of its own per call.</strong> The real store is a singleton;
+ * across test boundaries it would carry the previous test's state along, and a
+ * result would then depend on the order of the tests.
  */
-export interface AuthVorgabe {
+export interface AuthPreset {
   status?: SessionStatus;
   session?: Session | null;
   memberships?: Membership[];
@@ -34,20 +33,20 @@ export interface AuthVorgabe {
 export const PERSON: Session = {
   userId: "11111111-1111-1111-1111-111111111111",
   email: "anna@example.com",
-  tenantId: null, language: "de", displayName: "Anna Beispiel", givenName: "", familyName: "", berufsfeld: null,
+  tenantId: null, language: "de", displayName: "Anna Example", givenName: "", familyName: "", berufsfeld: null,
 };
 
-export function testStore(fallback: AuthVorgabe = {}) {
+export function testStore(preset: AuthPreset = {}) {
   return configureStore({
     reducer: { auth, preferences },
     preloadedState: {
       auth: {
-        // Voreinstellung „anonymous" und nicht „unknown": `unknown` heisst „noch
-        // nicht gefragt", und die Seiten dieses Bereichs zeichnen dann einen
-        // Ladezustand statt eines Inhalts.
-        status: fallback.status ?? "anonymous",
-        session: fallback.session ?? null,
-        memberships: fallback.memberships ?? [],
+        // Default "anonymous" and not "unknown": `unknown` means "not asked
+        // yet", and the pages of this area then draw a loading state instead
+        // of content.
+        status: preset.status ?? "anonymous",
+        session: preset.session ?? null,
+        memberships: preset.memberships ?? [],
         error: null,
         pending: false,
       },
@@ -55,8 +54,8 @@ export function testStore(fallback: AuthVorgabe = {}) {
   });
 }
 
-/** Kurzform für „angemeldet als Person, ohne Unternehmen" — der Normalfall. */
-export const ANGEMELDET: AuthVorgabe = { status: "authenticated", session: PERSON };
+/** Short for "signed in as a person, without a company" — the normal case. */
+export const SIGNED_IN: AuthPreset = { status: "authenticated", session: PERSON };
 
 /**
  * The catalogues belong in the test host: without `I18nextProvider`
@@ -64,15 +63,15 @@ export const ANGEMELDET: AuthVorgabe = { status: "authenticated", session: PERSO
  * `language.label` then says nothing about the UI. German is pinned, like in the
  * Playwright configuration and for the same reason (ADR-0031).
  */
-export function renderMitStore(
+export function renderWithStore(
   ui: ReactElement,
   {
-    auth: fallback,
+    auth: preset,
     route = "/",
     ...options
-  }: RenderOptions & { auth?: AuthVorgabe; route?: string } = {}
+  }: RenderOptions & { auth?: AuthPreset; route?: string } = {}
 ) {
-  const store = testStore(fallback);
+  const store = testStore(preset);
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (

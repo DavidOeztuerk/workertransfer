@@ -10,7 +10,7 @@ import Typography from "@mui/material/Typography";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { AnmeldungNoetig } from "../../person/components/AnmeldungNoetig";
+import { SignInRequired } from "../../person/components/SignInRequired";
 import { Schreibfortschritt } from "../components/Schreibfortschritt";
 import { getJob } from "../api/jobs";
 import { merke } from "../lib/kontext";
@@ -95,7 +95,7 @@ export function DraftsPage() {
   }
 
   if (!signedIn) {
-    return <AnmeldungNoetig titel={t("drafts.title")} satz="drafts.signInRequired" />;
+    return <SignInRequired title={t("drafts.title")} sentenceKey="drafts.signInRequired" />;
   }
 
   async function nochmal(entwurf: Draft) {

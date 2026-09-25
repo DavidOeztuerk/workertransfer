@@ -26,37 +26,46 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { useLocation } from "react-router-dom";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { SignInRequired } from "../components/SignInRequired";
 import { parseSkills } from "../lib/skills";
 import { useAsync } from "../lib/useAsync";
-import { Lebenslaufblatt } from "../components/lebenslauf/Lebenslaufblatt";
+import { CurriculumVitaeSheet } from "../components/resume/CurriculumVitaeSheet";
 import { getMyProfile } from "../api/profile";
 import {
-  type Lebenslaufanfrage,
-  type Ausbildung,
-  type Station,
-  beantworten,
+  type CurriculumVitaeTemplate,
+  type DocumentKind,
+  type DocumentRecordV1,
+  type Education,
+  type Position,
+  type ResumeRequest,
+  answerResumeRequest,
   deleteDocument,
+  getMyCurriculumVitae,
   getMyDocuments,
-  holeEigenenInhalt,
-  ladeMeinen,
-  ladeMeineAnfragen,
+  getMyResumeRequests,
+  getOwnDocumentContent,
+  markAsCurriculumVitae,
+  revokeResumeRequest,
+  saveMyCurriculumVitae,
   setTemplate,
-  speichereMeinen,
   uploadDocument,
-  zuruecknehmen,
-  alsLebenslauf,
-  type Unterlagenart,
-  type UnterlageV1,
 } from "../api/resume";
 
-type Lebenslaufweg = "wahl" | "manuell" | "datei";
+/**
+ * How the CV is kept: not chosen yet, typed in by hand, or as an uploaded
+ * file. The draft page links here with `{ mode: "file" }` or
+ * `{ mode: "manual" }` in the router state.
+ */
+type ResumeMode = "choice" | "manual" | "file";
 
-function wegAusSuche(wert: string | null): Lebenslaufweg {
-  return wert === "manuell" || wert === "datei" ? wert : "wahl";
+function modeFromState(value: string | null): ResumeMode {
+  return value === "manual" || value === "file" ? value : "choice";
 }
 
-const LEERE_STATION: Station = {
+/** The kinds an enclosure may have — the CV file is chosen on its own path. */
+type EnclosureKind = Exclude<DocumentKind, "lebenslauf">;
+
+const EMPTY_POSITION: Position = {
   employer: "",
   title: "",
   started_on: "",
@@ -65,7 +74,7 @@ const LEERE_STATION: Station = {
   technologies: [],
 };
 
-const LEERE_BILDUNG: Ausbildung = {
+const EMPTY_EDUCATION: Education = {
   institution: "",
   qualification: "",
   started_on: "",
@@ -74,227 +83,227 @@ const LEERE_BILDUNG: Ausbildung = {
 
 const TEMPLATES = ["schlicht", "klassisch", "modern"] as const;
 
-/** Leer heisst „läuft noch", nicht „unbekannt" — deshalb `null` und nicht `""`. */
+/** Empty means "still running", not "unknown" — hence `null` and not `""`. */
 function normaliseEnd(value: string): string | null {
-  const getrimmt = value.trim();
-  return getrimmt === "" ? null : getrimmt;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 export function ResumePage() {
   const { t } = useTranslation();
-  const ort = useLocation();
+  const location = useLocation();
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
-  const lebenslauf = useAsync(
-    (signal) => ladeMeinen(signal),
+  const curriculumVitae = useAsync(
+    (signal) => getMyCurriculumVitae(signal),
     [session?.userId],
     session !== null,
   );
-  const anfragen = useAsync(
-    (signal) => ladeMeineAnfragen(signal),
+  const requests = useAsync(
+    (signal) => getMyResumeRequests(signal),
     [session?.userId],
     session !== null,
   );
   /*
-   * DAS PROFIL, NUR FÜR DIE VORSCHAU.
+   * THE PROFILE, ONLY FOR THE PREVIEW.
    *
-   * Überschrift, Text, Ort und Fähigkeiten stehen im Profil, nicht im
-   * Lebenslauf — das Blatt braucht sie aber, weil das Unternehmen sie dort
-   * sieht. Ohne diesen Aufruf zeigte die Vorschau ein anderes Blatt als der
-   * Empfänger, und genau das soll sie nicht.
+   * Headline, text, location and skills stand in the profile, not in the CV —
+   * but the sheet needs them, because the company sees them there. Without this
+   * call the preview would show a different sheet from the recipient's, and
+   * that is exactly what it must not do.
    */
-  const meinProfil = useAsync(
+  const ownProfile = useAsync(
     (signal) => getMyProfile(signal),
     [session?.userId],
     session !== null,
   );
 
-  const meineUnterlagen = useAsync(
+  const ownDocuments = useAsync(
     (signal) => getMyDocuments(signal),
     [session?.userId],
     session !== null,
   );
 
-  const [rows, setZeilen] = useState<Station[]>([]);
-  const [lehren, setLehren] = useState<Ausbildung[]>([]);
-  const [schulen, setSchulen] = useState<Ausbildung[]>([]);
-  const [saved, setGespeichert] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
-  const [template, setTemplateState] = useState<"schlicht" | "klassisch" | "modern">("schlicht");
+  const [rows, setRows] = useState<Position[]>([]);
+  const [apprenticeships, setApprenticeships] = useState<Education[]>([]);
+  const [schools, setSchools] = useState<Education[]>([]);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [template, setTemplateState] = useState<CurriculumVitaeTemplate>("schlicht");
   const [uploading, setUploading] = useState<string | null>(null);
-  const [dateiname, setDateiname] = useState("");
-  const [dateiart, setDateiart] = useState<"zeugnis" | "zertifikat" | "sonstiges">("zeugnis");
-  const [datei, setDatei] = useState<File | null>(null);
-  const [zuLoeschen, setZuLoeschen] = useState<string | null>(null);
-  const [weg, setWeg] = useState<Lebenslaufweg>(() =>
-    wegAusSuche((ort.state as { weg?: string } | null)?.weg ?? null),
+  const [documentName, setDocumentName] = useState("");
+  const [documentKind, setDocumentKind] = useState<EnclosureKind>("zeugnis");
+  const [chosenFile, setChosenFile] = useState<File | null>(null);
+  const [toDelete, setToDelete] = useState<string | null>(null);
+  const [mode, setMode] = useState<ResumeMode>(() =>
+    modeFromState((location.state as { mode?: string } | null)?.mode ?? null),
   );
-  const [cvDatei, setCvDatei] = useState<File | null>(null);
+  const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvName, setCvName] = useState("");
 
-  // Das Formular folgt dem geladenen Stand — aber nur, wenn wirklich einer da
-  // ist. Bei einem Ladefehler bleibt es leer UND die Seite sagt warum; ein
-  // stilles leeres Formular waere die Einladung, den Lebenslauf zu ueberschreiben.
+  // The form follows the loaded state — but only when there really is one. On
+  // a loading error it stays empty AND the page says why; a silent empty form
+  // would be the invitation to overwrite the CV.
   useEffect(() => {
-    if (lebenslauf.value?.ok && lebenslauf.value.value !== null) {
-      setZeilen(
-        lebenslauf.value.value.positions.map((station) => ({ ...station })),
+    if (curriculumVitae.value?.ok && curriculumVitae.value.value !== null) {
+      setRows(
+        curriculumVitae.value.value.positions.map((position) => ({ ...position })),
       );
-      const bildung = lebenslauf.value.value.education ?? [];
-      setLehren(bildung.filter((eintrag) => eintrag.kind !== "schule").map((e) => ({ ...e })));
-      setSchulen(bildung.filter((eintrag) => eintrag.kind === "schule").map((e) => ({ ...e })));
-      if (lebenslauf.value.value.template) {
-        setTemplateState(lebenslauf.value.value.template);
+      const education = curriculumVitae.value.value.education ?? [];
+      setApprenticeships(education.filter((entry) => entry.kind !== "schule").map((e) => ({ ...e })));
+      setSchools(education.filter((entry) => entry.kind === "schule").map((e) => ({ ...e })));
+      if (curriculumVitae.value.value.template) {
+        setTemplateState(curriculumVitae.value.value.template);
       }
     }
-  }, [lebenslauf.value]);
+  }, [curriculumVitae.value]);
 
-  const unterlagenListe: UnterlageV1[] =
-    meineUnterlagen.value?.ok ? meineUnterlagen.value.value : [];
-  const cvUnterlagen = unterlagenListe.filter((doc) => doc.kind === "lebenslauf");
-  const beilagen = unterlagenListe.filter((doc) => doc.kind !== "lebenslauf");
+  const documentList: DocumentRecordV1[] =
+    ownDocuments.value?.ok ? ownDocuments.value.value : [];
+  const cvDocuments = documentList.filter((doc) => doc.kind === "lebenslauf");
+  const enclosures = documentList.filter((doc) => doc.kind !== "lebenslauf");
 
   useEffect(() => {
-    if (weg !== "wahl") return;
-    if (cvUnterlagen.length > 0) {
-      setWeg("datei");
+    if (mode !== "choice") return;
+    if (cvDocuments.length > 0) {
+      setMode("file");
       return;
     }
-    if (lebenslauf.value?.ok && lebenslauf.value.value !== null) {
-      setWeg("manuell");
+    if (curriculumVitae.value?.ok && curriculumVitae.value.value !== null) {
+      setMode("manual");
     }
-  }, [weg, cvUnterlagen.length, lebenslauf.value]);
+  }, [mode, cvDocuments.length, curriculumVitae.value]);
 
   useEffect(() => {
-    if (weg !== "manuell") return;
-    setZeilen((bisher) => (bisher.length === 0 ? [{ ...LEERE_STATION }] : bisher));
-  }, [weg]);
+    if (mode !== "manual") return;
+    setRows((previous) => (previous.length === 0 ? [{ ...EMPTY_POSITION }] : previous));
+  }, [mode]);
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig
-        titel={t("resume.title")}
-        satz="resume.signInRequired"
+      <SignInRequired
+        title={t("resume.title")}
+        sentenceKey="resume.signInRequired"
       />
     );
   }
 
-  function change(index: number, teil: Partial<Station>) {
-    setZeilen((before) =>
-      before.map((row, i) => (i === index ? { ...row, ...teil } : row)),
+  function change(index: number, part: Partial<Position>) {
+    setRows((before) =>
+      before.map((row, i) => (i === index ? { ...row, ...part } : row)),
     );
-    setGespeichert(false);
+    setSaved(false);
   }
 
-  function aendereBildung(
-    setter: typeof setLehren,
+  function changeEducation(
+    setter: typeof setApprenticeships,
     index: number,
-    teil: Partial<Ausbildung>,
+    part: Partial<Education>,
   ) {
-    setter((before) => before.map((row, i) => (i === index ? { ...row, ...teil } : row)));
-    setGespeichert(false);
+    setter((before) => before.map((row, i) => (i === index ? { ...row, ...part } : row)));
+    setSaved(false);
   }
 
-  async function speichern() {
-    setLaeuft(true);
-    const result = await speichereMeinen({
+  async function save() {
+    setRunning(true);
+    const result = await saveMyCurriculumVitae({
       positions: rows.filter(
         (row) =>
           row.employer.trim() !== "" && row.title.trim() !== "" && row.started_on.trim() !== "",
       ),
       education: [
-        ...lehren
+        ...apprenticeships
           .filter((row) => row.institution.trim() !== "" && row.started_on.trim() !== "")
           .map((row) => ({ ...row, kind: "ausbildung" as const })),
-        ...schulen
+        ...schools
           .filter((row) => row.institution.trim() !== "" && row.started_on.trim() !== "")
           .map((row) => ({ ...row, kind: "schule" as const })),
       ],
     });
-    setLaeuft(false);
+    setRunning(false);
 
     if (result.ok) {
-      setFehler(null);
-      setGespeichert(true);
-      lebenslauf.setze({ ok: true, value: result.value });
+      setError(null);
+      setSaved(true);
+      curriculumVitae.set({ ok: true, value: result.value });
     } else {
-      setFehler(result.error.detail);
-      setGespeichert(false);
+      setError(result.error.detail);
+      setSaved(false);
     }
   }
 
-  async function beantworteAnfrage(id: string, grant: boolean) {
-    setLaeuft(true);
-    const result = await beantworten(id, grant);
-    setLaeuft(false);
-    if (!result.ok) setFehler(result.error.detail);
-    anfragen.again();
+  async function answerRequest(id: string, grant: boolean) {
+    setRunning(true);
+    const result = await answerResumeRequest(id, grant);
+    setRunning(false);
+    if (!result.ok) setError(result.error.detail);
+    requests.again();
   }
 
-  async function nimmZurueck(id: string) {
-    setLaeuft(true);
-    const result = await zuruecknehmen(id);
-    setLaeuft(false);
-    if (!result.ok) setFehler(result.error.detail);
-    anfragen.again();
+  async function revokeRequest(id: string) {
+    setRunning(true);
+    const result = await revokeResumeRequest(id);
+    setRunning(false);
+    if (!result.ok) setError(result.error.detail);
+    requests.again();
   }
 
-  async function handleTemplateChange(newTemplate: "schlicht" | "klassisch" | "modern") {
-    setLaeuft(true);
+  async function handleTemplateChange(newTemplate: CurriculumVitaeTemplate) {
+    setRunning(true);
     const result = await setTemplate(newTemplate);
-    setLaeuft(false);
-    if (!result.ok) setFehler(result.error.detail);
+    setRunning(false);
+    if (!result.ok) setError(result.error.detail);
     else setTemplateState(newTemplate);
   }
 
-  async function handleUpload(kind: Unterlagenart, file: File, name: string) {
-    const genannt = name.trim() || file.name.replace(/\.[^/.]+$/, "");
-    setUploading(genannt);
-    const result = await uploadDocument(file, genannt, kind);
+  async function handleUpload(kind: DocumentKind, file: File, name: string) {
+    const named = name.trim() || file.name.replace(/\.[^/.]+$/, "");
+    setUploading(named);
+    const result = await uploadDocument(file, named, kind);
     setUploading(null);
 
-    if (!result.ok) setFehler(result.error.detail);
+    if (!result.ok) setError(result.error.detail);
     else {
-      setFehler(null);
-      setDatei(null);
-      setDateiname("");
-      setCvDatei(null);
+      setError(null);
+      setChosenFile(null);
+      setDocumentName("");
+      setCvFile(null);
       setCvName("");
-      meineUnterlagen.again();
+      ownDocuments.again();
     }
   }
 
   async function handlePreview(docId: string) {
-    const result = await holeEigenenInhalt(docId);
+    const result = await getOwnDocumentContent(docId);
     if (!result.ok) {
-      setFehler(result.error.detail);
+      setError(result.error.detail);
       return;
     }
     const win = window.open(result.value.url, "_blank");
     if (!win) URL.revokeObjectURL(result.value.url);
   }
 
-  async function handleAlsLebenslauf(id: string) {
-    const result = await alsLebenslauf(id);
-    if (!result.ok) setFehler(result.error.detail);
+  async function handleMarkAsCurriculumVitae(id: string) {
+    const result = await markAsCurriculumVitae(id);
+    if (!result.ok) setError(result.error.detail);
     else {
-      setFehler(null);
-      setWeg("datei");
-      meineUnterlagen.again();
+      setError(null);
+      setMode("file");
+      ownDocuments.again();
     }
   }
 
   async function handleDeleteDocument() {
-    if (zuLoeschen === null) return;
-    const id = zuLoeschen;
-    setZuLoeschen(null);
+    if (toDelete === null) return;
+    const id = toDelete;
+    setToDelete(null);
     const result = await deleteDocument(id);
-    if (!result.ok) setFehler(result.error.detail);
+    if (!result.ok) setError(result.error.detail);
     else {
-      setFehler(null);
-      meineUnterlagen.again();
+      setError(null);
+      ownDocuments.again();
     }
   }
 
@@ -304,9 +313,9 @@ export function ResumePage() {
       narrow
       lead={t("resume.lead")}
     >
-      {fehler !== null ? (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFehler(null)}>
-          {fehler}
+      {error !== null ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
         </Alert>
       ) : null}
 
@@ -316,19 +325,19 @@ export function ResumePage() {
             {t("resume.requests")}
           </Typography>
 
-          {anfragen.laedt ? (
+          {requests.loading ? (
             <LoadingBlock label={t("resume.requestsLoading")} />
           ) : null}
 
-          {anfragen.value && !anfragen.value.ok ? (
-            <ErrorBlock error={anfragen.value.error} />
+          {requests.value && !requests.value.ok ? (
+            <ErrorBlock error={requests.value.error} />
           ) : null}
 
-          {anfragen.value?.ok && anfragen.value.value.length === 0 ? (
+          {requests.value?.ok && requests.value.value.length === 0 ? (
             <EmptyBlock title={t("resume.requestsEmpty")} />
           ) : null}
 
-          {anfragen.value?.ok && anfragen.value.value.length > 0 ? (
+          {requests.value?.ok && requests.value.value.length > 0 ? (
             <Box
               component="ul"
               sx={{
@@ -340,15 +349,15 @@ export function ResumePage() {
                 m: 0,
               }}
             >
-              {anfragen.value.value.map((anfrage) => (
-                <Anfragezeile
-                  key={anfrage.id}
-                  anfrage={anfrage}
+              {requests.value.value.map((resumeRequest) => (
+                <RequestRow
+                  key={resumeRequest.id}
+                  resumeRequest={resumeRequest}
                   locked={running}
-                  onAntwort={(grant) =>
-                    void beantworteAnfrage(anfrage.id, grant)
+                  onAnswer={(grant) =>
+                    void answerRequest(resumeRequest.id, grant)
                   }
-                  onZurueck={() => void nimmZurueck(anfrage.id)}
+                  onRevoke={() => void revokeRequest(resumeRequest.id)}
                 />
               ))}
             </Box>
@@ -356,7 +365,7 @@ export function ResumePage() {
         </CardContent>
       </Card>
 
-      {weg === "wahl" ? (
+      {mode === "choice" ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.pathChoiceTitle")}</Typography>
@@ -371,8 +380,8 @@ export function ResumePage() {
                   // visible and unreachable. CardActionArea renders a real
                   // <button> and takes focus, Enter and Space with it.
                   onClick={() => {
-                    setWeg("manuell");
-                    setZeilen((bisher) => (bisher.length === 0 ? [{ ...LEERE_STATION }] : bisher));
+                    setMode("manual");
+                    setRows((previous) => (previous.length === 0 ? [{ ...EMPTY_POSITION }] : previous));
                   }}
                 >
                 <CardContent>
@@ -384,7 +393,7 @@ export function ResumePage() {
                 </CardActionArea>
               </Card>
               <Card variant="outlined">
-                <CardActionArea onClick={() => setWeg("datei")}>
+                <CardActionArea onClick={() => setMode("file")}>
                   <CardContent>
                     <Typography variant="h4">{t("resume.pathFile")}</Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -401,21 +410,21 @@ export function ResumePage() {
           <Button
             variant="text"
             onClick={() => {
-              const next = weg === "datei" ? "manuell" : "datei";
-              setWeg(next);
-              if (next === "manuell") {
-                setZeilen((bisher) => (bisher.length === 0 ? [{ ...LEERE_STATION }] : bisher));
+              const next = mode === "file" ? "manual" : "file";
+              setMode(next);
+              if (next === "manual") {
+                setRows((previous) => (previous.length === 0 ? [{ ...EMPTY_POSITION }] : previous));
               }
             }}
           >
-            {weg === "datei"
+            {mode === "file"
               ? t("resume.switchToManual")
               : t("resume.switchToFile")}
           </Button>
         </Box>
       )}
 
-      {weg === "datei" ? (
+      {mode === "file" ? (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.cvFile")}</Typography>
@@ -432,18 +441,18 @@ export function ResumePage() {
                   onChange={(event) => {
                     const file = event.target.files?.[0] ?? null;
                     event.target.value = "";
-                    setCvDatei(file);
+                    setCvFile(file);
                     if (file) {
                       setCvName(file.name.replace(/\.[^/.]+$/, ""));
-                      setFehler(null);
+                      setError(null);
                     }
                   }}
                 />
               </Button>
-              {cvDatei ? (
+              {cvFile ? (
                 <>
                   <Typography variant="body2" color="text.secondary">
-                    {cvDatei.name}
+                    {cvFile.name}
                   </Typography>
                   <TextField
                     label={t("resume.documentName")}
@@ -453,7 +462,7 @@ export function ResumePage() {
                   <Button
                     variant="contained"
                     onClick={() => {
-                      if (cvDatei) void handleUpload("lebenslauf", cvDatei, cvName);
+                      if (cvFile) void handleUpload("lebenslauf", cvFile, cvName);
                     }}
                     disabled={uploading !== null}
                   >
@@ -467,13 +476,13 @@ export function ResumePage() {
                 </Alert>
               ) : null}
             </Box>
-            {cvUnterlagen.length === 0 ? (
+            {cvDocuments.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 {t("resume.noDocuments")}
               </Typography>
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {cvUnterlagen.map((doc) => (
+                {cvDocuments.map((doc) => (
                   <Card key={doc.id} variant="outlined">
                     <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -496,7 +505,7 @@ export function ResumePage() {
                         <IconButton
                           size="small"
                           color="error"
-                          onClick={() => setZuLoeschen(doc.id)}
+                          onClick={() => setToDelete(doc.id)}
                           disabled={running}
                           aria-label={t("resume.documentDelete")}
                         >
@@ -512,7 +521,7 @@ export function ResumePage() {
         </Card>
       ) : null}
 
-      {weg === "datei" ? (
+      {mode === "file" ? (
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1 }}>{t("resume.documents")}</Typography>
@@ -528,34 +537,34 @@ export function ResumePage() {
                 hidden
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
-                  // Sonst feuert onChange nicht, wenn dieselbe Datei nochmal
-                  // gewählt wird — nach Löschen und erneut Hochladen wirkt
-                  // der Knopf dann tot, ohne Fehler.
+                  // Otherwise onChange does not fire when the same file is
+                  // chosen again — after deleting and uploading again the
+                  // button then seems dead, without an error.
                   event.target.value = "";
-                  setDatei(file);
+                  setChosenFile(file);
                   if (file) {
-                    setDateiname(file.name.replace(/\.[^/.]+$/, ""));
-                    setFehler(null);
+                    setDocumentName(file.name.replace(/\.[^/.]+$/, ""));
+                    setError(null);
                   }
                 }}
               />
             </Button>
-            {datei ? (
+            {chosenFile ? (
               <>
                 <Typography variant="body2" color="text.secondary">
-                  {datei.name}
+                  {chosenFile.name}
                 </Typography>
                 <TextField
                   label={t("resume.documentName")}
-                  value={dateiname}
-                  onChange={(event) => setDateiname(event.target.value)}
+                  value={documentName}
+                  onChange={(event) => setDocumentName(event.target.value)}
                 />
                 <TextField
                   select
                   label={t("resume.documentKind")}
-                  value={dateiart}
+                  value={documentKind}
                   onChange={(event) =>
-                    setDateiart(event.target.value as "zeugnis" | "zertifikat" | "sonstiges")
+                    setDocumentKind(event.target.value as EnclosureKind)
                   }
                 >
                   <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
@@ -565,7 +574,7 @@ export function ResumePage() {
                 <Button
                   variant="contained"
                   onClick={() => {
-                    if (datei) void handleUpload(dateiart, datei, dateiname);
+                    if (chosenFile) void handleUpload(documentKind, chosenFile, documentName);
                   }}
                   disabled={uploading !== null}
                 >
@@ -580,21 +589,21 @@ export function ResumePage() {
             ) : null}
           </Box>
 
-          {meineUnterlagen.laedt ? (
+          {ownDocuments.loading ? (
             <LoadingBlock label={t("resume.documentsLoading")} />
           ) : null}
 
-          {meineUnterlagen.value && !meineUnterlagen.value.ok ? (
-            <ErrorBlock error={meineUnterlagen.value.error} />
+          {ownDocuments.value && !ownDocuments.value.ok ? (
+            <ErrorBlock error={ownDocuments.value.error} />
           ) : null}
 
-          {meineUnterlagen.value?.ok && beilagen.length === 0 ? (
+          {ownDocuments.value?.ok && enclosures.length === 0 ? (
             <Typography variant="body2" color="text.secondary">{t("resume.noDocuments")}</Typography>
           ) : null}
 
-          {beilagen.length > 0 && (
+          {enclosures.length > 0 && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
-              {beilagen.map((doc) => (
+              {enclosures.map((doc) => (
                 <Card key={doc.id} variant="outlined">
                   <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -615,7 +624,7 @@ export function ResumePage() {
                     </Box>
                     <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
                       {doc.kind !== "lebenslauf" ? (
-                        <Button size="small" onClick={() => void handleAlsLebenslauf(doc.id)}>
+                        <Button size="small" onClick={() => void handleMarkAsCurriculumVitae(doc.id)}>
                           {t("drafts.useAsResume")}
                         </Button>
                       ) : null}
@@ -629,7 +638,7 @@ export function ResumePage() {
                       <IconButton
                         size="small"
                         color="error"
-                        onClick={() => setZuLoeschen(doc.id)}
+                        onClick={() => setToDelete(doc.id)}
                         disabled={running}
                         aria-label={t("resume.documentDelete")}
                       >
@@ -645,21 +654,21 @@ export function ResumePage() {
       </Card>
       ) : null}
 
-      {weg === "manuell" ? (
+      {mode === "manual" ? (
       <>
       <Box
         component="form"
         onSubmit={(event) => {
           event.preventDefault();
-          void speichern();
+          void save();
         }}
       >
-      {lebenslauf.laedt ? (
+      {curriculumVitae.loading ? (
         <LoadingBlock label={t("resume.loading")} />
       ) : null}
 
-      {lebenslauf.value && !lebenslauf.value.ok ? (
-        <ErrorBlock error={lebenslauf.value.error} />
+      {curriculumVitae.value && !curriculumVitae.value.ok ? (
+        <ErrorBlock error={curriculumVitae.value.error} />
       ) : null}
 
       {saved ? (
@@ -683,8 +692,8 @@ export function ResumePage() {
                 <IconButton
                   size="small"
                   onClick={() => {
-                    setZeilen((before) => before.filter((_, i) => i !== index));
-                    setGespeichert(false);
+                    setRows((before) => before.filter((_, i) => i !== index));
+                    setSaved(false);
                   }}
                   aria-label={t("resume.removeEntry")}
                 >
@@ -737,7 +746,7 @@ export function ResumePage() {
           ))}
           <Button
             variant="outlined"
-            onClick={() => setZeilen((before) => [...before, { ...LEERE_STATION }])}
+            onClick={() => setRows((before) => [...before, { ...EMPTY_POSITION }])}
           >
             {t("resume.addPosition")}
           </Button>
@@ -750,7 +759,7 @@ export function ResumePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t("resume.trainingLead")}
           </Typography>
-          {lehren.map((row, index) => (
+          {apprenticeships.map((row, index) => (
             <Box key={index} sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
                 <Typography variant="h3">
@@ -759,8 +768,8 @@ export function ResumePage() {
                 <IconButton
                   size="small"
                   onClick={() => {
-                    setLehren((before) => before.filter((_, i) => i !== index));
-                    setGespeichert(false);
+                    setApprenticeships((before) => before.filter((_, i) => i !== index));
+                    setSaved(false);
                   }}
                   aria-label={t("resume.removeEntry")}
                 >
@@ -771,18 +780,18 @@ export function ResumePage() {
                 <TextField
                   label={t("resume.institution")}
                   value={row.institution}
-                  onChange={(e) => aendereBildung(setLehren, index, { institution: e.target.value })}
+                  onChange={(e) => changeEducation(setApprenticeships, index, { institution: e.target.value })}
                 />
                 <TextField
                   label={t("resume.qualification")}
                   value={row.qualification}
-                  onChange={(e) => aendereBildung(setLehren, index, { qualification: e.target.value })}
+                  onChange={(e) => changeEducation(setApprenticeships, index, { qualification: e.target.value })}
                 />
                 <TextField
                   label={t("resume.from")}
                   type="month"
                   value={row.started_on}
-                  onChange={(e) => aendereBildung(setLehren, index, { started_on: e.target.value })}
+                  onChange={(e) => changeEducation(setApprenticeships, index, { started_on: e.target.value })}
                   helperText={t("resume.fromHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
@@ -790,7 +799,7 @@ export function ResumePage() {
                   label={t("resume.to")}
                   type="month"
                   value={row.ended_on ?? ""}
-                  onChange={(e) => aendereBildung(setLehren, index, { ended_on: normaliseEnd(e.target.value) })}
+                  onChange={(e) => changeEducation(setApprenticeships, index, { ended_on: normaliseEnd(e.target.value) })}
                   helperText={t("resume.toHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
@@ -800,7 +809,7 @@ export function ResumePage() {
           ))}
           <Button
             variant="outlined"
-            onClick={() => setLehren((before) => [...before, { ...LEERE_BILDUNG }])}
+            onClick={() => setApprenticeships((before) => [...before, { ...EMPTY_EDUCATION }])}
           >
             {t("resume.addTraining")}
           </Button>
@@ -813,7 +822,7 @@ export function ResumePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t("resume.schoolLead")}
           </Typography>
-          {schulen.map((row, index) => (
+          {schools.map((row, index) => (
             <Box key={index} sx={{ mb: 3 }}>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
                 <Typography variant="h3">
@@ -822,8 +831,8 @@ export function ResumePage() {
                 <IconButton
                   size="small"
                   onClick={() => {
-                    setSchulen((before) => before.filter((_, i) => i !== index));
-                    setGespeichert(false);
+                    setSchools((before) => before.filter((_, i) => i !== index));
+                    setSaved(false);
                   }}
                   aria-label={t("resume.removeEntry")}
                 >
@@ -834,18 +843,18 @@ export function ResumePage() {
                 <TextField
                   label={t("resume.schoolName")}
                   value={row.institution}
-                  onChange={(e) => aendereBildung(setSchulen, index, { institution: e.target.value })}
+                  onChange={(e) => changeEducation(setSchools, index, { institution: e.target.value })}
                 />
                 <TextField
                   label={t("resume.schoolQualification")}
                   value={row.qualification}
-                  onChange={(e) => aendereBildung(setSchulen, index, { qualification: e.target.value })}
+                  onChange={(e) => changeEducation(setSchools, index, { qualification: e.target.value })}
                 />
                 <TextField
                   label={t("resume.from")}
                   type="month"
                   value={row.started_on}
-                  onChange={(e) => aendereBildung(setSchulen, index, { started_on: e.target.value })}
+                  onChange={(e) => changeEducation(setSchools, index, { started_on: e.target.value })}
                   helperText={t("resume.fromHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
@@ -853,7 +862,7 @@ export function ResumePage() {
                   label={t("resume.to")}
                   type="month"
                   value={row.ended_on ?? ""}
-                  onChange={(e) => aendereBildung(setSchulen, index, { ended_on: normaliseEnd(e.target.value) })}
+                  onChange={(e) => changeEducation(setSchools, index, { ended_on: normaliseEnd(e.target.value) })}
                   helperText={t("resume.toHint")}
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
@@ -863,7 +872,7 @@ export function ResumePage() {
           ))}
           <Button
             variant="outlined"
-            onClick={() => setSchulen((before) => [...before, { ...LEERE_BILDUNG }])}
+            onClick={() => setSchools((before) => [...before, { ...EMPTY_EDUCATION }])}
           >
             {t("resume.addSchool")}
           </Button>
@@ -909,22 +918,22 @@ export function ResumePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {t("resume.previewLead")}
           </Typography>
-          <Lebenslaufblatt
+          <CurriculumVitaeSheet
             // The preview IS the promise (ADR-0035: the same rendering the
             // person sees, nothing rendered differently for the recipient), so
             // it is the SAME component as in the application folder — two
             // renderings would be two truths. Fed from the RUNNING form and not
             // from the saved state, so a typed position shows before saving.
             template={template}
-            daten={{
-              headline: meinProfil.value?.ok
-                ? (meinProfil.value.profile?.headline ?? "")
+            data={{
+              headline: ownProfile.value?.ok
+                ? (ownProfile.value.profile?.headline ?? "")
                 : "",
-              bio: meinProfil.value?.ok ? (meinProfil.value.profile?.bio ?? "") : "",
-              location: meinProfil.value?.ok
-                ? (meinProfil.value.profile?.location ?? "")
+              bio: ownProfile.value?.ok ? (ownProfile.value.profile?.bio ?? "") : "",
+              location: ownProfile.value?.ok
+                ? (ownProfile.value.profile?.location ?? "")
                 : "",
-              skills: meinProfil.value?.ok ? (meinProfil.value.profile?.skills ?? []) : [],
+              skills: ownProfile.value?.ok ? (ownProfile.value.profile?.skills ?? []) : [],
               positions: rows.filter(
                 (row) =>
                   row.employer.trim() !== ""
@@ -932,12 +941,12 @@ export function ResumePage() {
                   && row.started_on.trim() !== "",
               ),
               education: [
-                ...lehren
+                ...apprenticeships
                   .filter(
                     (row) => row.institution.trim() !== "" && row.started_on.trim() !== "",
                   )
                   .map((row) => ({ ...row, kind: "ausbildung" as const })),
-                ...schulen
+                ...schools
                   .filter(
                     (row) => row.institution.trim() !== "" && row.started_on.trim() !== "",
                   )
@@ -971,28 +980,28 @@ export function ResumePage() {
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
                   event.target.value = "";
-                  setDatei(file);
+                  setChosenFile(file);
                   if (file) {
-                    setDateiname(file.name.replace(/\.[^/.]+$/, ""));
-                    setFehler(null);
+                    setDocumentName(file.name.replace(/\.[^/.]+$/, ""));
+                    setError(null);
                   }
                 }}
               />
             </Button>
-            {datei ? (
+            {chosenFile ? (
               <>
-                <Typography variant="body2" color="text.secondary">{datei.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{chosenFile.name}</Typography>
                 <TextField
                   label={t("resume.documentName")}
-                  value={dateiname}
-                  onChange={(event) => setDateiname(event.target.value)}
+                  value={documentName}
+                  onChange={(event) => setDocumentName(event.target.value)}
                 />
                 <TextField
                   select
                   label={t("resume.documentKind")}
-                  value={dateiart}
+                  value={documentKind}
                   onChange={(event) =>
-                    setDateiart(event.target.value as "zeugnis" | "zertifikat" | "sonstiges")
+                    setDocumentKind(event.target.value as EnclosureKind)
                   }
                 >
                   <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
@@ -1002,7 +1011,7 @@ export function ResumePage() {
                 <Button
                   variant="contained"
                   onClick={() => {
-                    if (datei) void handleUpload(dateiart, datei, dateiname);
+                    if (chosenFile) void handleUpload(documentKind, chosenFile, documentName);
                   }}
                   disabled={uploading !== null}
                 >
@@ -1011,11 +1020,11 @@ export function ResumePage() {
               </>
             ) : null}
           </Box>
-          {beilagen.length === 0 ? (
+          {enclosures.length === 0 ? (
             <Typography variant="body2" color="text.secondary">{t("resume.noDocuments")}</Typography>
           ) : (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {beilagen.map((doc) => (
+              {enclosures.map((doc) => (
                 <Card key={doc.id} variant="outlined">
                   <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Typography variant="body1">{doc.name}</Typography>
@@ -1023,7 +1032,7 @@ export function ResumePage() {
                       <IconButton size="small" onClick={() => void handlePreview(doc.id)} aria-label={t("resume.viewFile")}>
                         <ViewIcon />
                       </IconButton>
-                      <IconButton size="small" color="error" onClick={() => setZuLoeschen(doc.id)} aria-label={t("resume.documentDelete")}>
+                      <IconButton size="small" color="error" onClick={() => setToDelete(doc.id)} aria-label={t("resume.documentDelete")}>
                         <DeleteIcon />
                       </IconButton>
                     </Box>
@@ -1038,21 +1047,21 @@ export function ResumePage() {
       ) : null}
 
       <Dialog
-        open={zuLoeschen !== null}
-        onClose={() => setZuLoeschen(null)}
-        aria-labelledby="unterlage-loeschen-titel"
-        aria-describedby="unterlage-loeschen-text"
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
+        aria-labelledby="document-delete-title"
+        aria-describedby="document-delete-text"
       >
-        <DialogTitle id="unterlage-loeschen-titel">
+        <DialogTitle id="document-delete-title">
           {t("resume.documentDeleteTitle")}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="unterlage-loeschen-text">
+          <DialogContentText id="document-delete-text">
             {t("resume.documentDeleteConfirm")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setZuLoeschen(null)}>
+          <Button onClick={() => setToDelete(null)}>
             {t("common.cancel")}
           </Button>
           <Button
@@ -1069,34 +1078,34 @@ export function ResumePage() {
 }
 
 /**
- * Eine Anfrage mit ihrem Stand.
+ * A request with its state.
  *
- * <strong>„Freigegeben" und „hält gerade Zugriff" sind zwei Dinge.</strong>
- * `GRANTED` heisst „wurde einmal erteilt"; ob die Freigabe JETZT gilt, sagt
- * `active`. Nur wer sie hält, bekommt „Zurückziehen" angeboten — sonst böte die
- * Seite eine Handlung an, die nichts mehr ändert.
+ * <strong>"Released" and "currently holds access" are two things.</strong>
+ * `GRANTED` means "was granted once"; whether the release holds NOW is said by
+ * `active`. Only whoever holds it is offered "Withdraw" — otherwise the page
+ * would offer an action that no longer changes anything.
  */
-function Anfragezeile({
-  anfrage,
+function RequestRow({
+  resumeRequest,
   locked,
-  onAntwort,
-  onZurueck,
+  onAnswer,
+  onRevoke,
 }: {
-  anfrage: Lebenslaufanfrage;
+  resumeRequest: ResumeRequest;
   locked: boolean;
-  onAntwort: (grant: boolean) => void;
-  onZurueck: () => void;
+  onAnswer: (grant: boolean) => void;
+  onRevoke: () => void;
 }) {
   const { t } = useTranslation();
-  const open = anfrage.status === "PENDING";
-  const haeltZugriff = anfrage.status === "GRANTED" && anfrage.active === true;
+  const open = resumeRequest.status === "PENDING";
+  const holdsAccess = resumeRequest.status === "GRANTED" && resumeRequest.active === true;
 
   const current = open
     ? t("resume.statusOpen")
-    : anfrage.status === "DECLINED"
+    : resumeRequest.status === "DECLINED"
       ? t("resume.statusDeclined")
       : t(
-          haeltZugriff
+          holdsAccess
             ? "resume.statusReleased"
             : "resume.statusWithdrawn",
         );
@@ -1127,7 +1136,7 @@ function Anfragezeile({
               <Button
                 variant="contained"
                 size="small"
-                onClick={() => onAntwort(true)}
+                onClick={() => onAnswer(true)}
                 disabled={locked}
               >
                 {t("common.release")}
@@ -1135,18 +1144,18 @@ function Anfragezeile({
               <Button
                 variant="text"
                 size="small"
-                onClick={() => onAntwort(false)}
+                onClick={() => onAnswer(false)}
                 disabled={locked}
               >
                 {t("common.decline")}
               </Button>
             </>
           ) : null}
-          {haeltZugriff ? (
+          {holdsAccess ? (
             <Button
               variant="text"
               size="small"
-              onClick={onZurueck}
+              onClick={onRevoke}
               disabled={locked}
             >
               {t("common.withdraw")}

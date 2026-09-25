@@ -1,51 +1,50 @@
-import { request } from "../../../core/api/client";
-import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type ApiResult, request } from "../../../core/api/client";
 import { PORTFOLIO_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
 
 /**
- * Die Arbeitsproben — ein Schaufenster mit eigener Freigabe.
+ * The work samples — a showcase with its own release.
  *
- * <strong>Getrennt vom Profil, und das ist Absicht:</strong> jemand kann
- * ansprechbar sein, ohne seine Arbeiten zu zeigen. Zwei Freigaben, zwei
- * Entscheidungen.
+ * <strong>Separate from the profile, and that is deliberate:</strong> somebody
+ * can be approachable without showing their work. Two releases, two
+ * decisions.
  */
-export interface Arbeit {
+export interface PortfolioItem {
   title: string;
   summary: string;
-  /** `null` heisst „kein Link", nicht „leerer Link". */
+  /** `null` means "no link", not "empty link". */
   url: string | null;
   role: string;
   year: number | null;
-  /** Name einer hochgeladenen Datei — vom Server vergeben, nie selbst gewählt. */
+  /** Name of an uploaded file — assigned by the server, never chosen by oneself. */
   attachment: string | null;
   /**
-   * Womit gearbeitet wurde — von der Person selbst genannt.
+   * What was used — named by the person themselves.
    *
-   * Macht die Arbeit nicht durchsuchbar: suchbar wird eine Fähigkeit erst im
-   * Profil, und dorthin kommt sie mit einem Klick.
+   * Does not make the work searchable: a skill becomes searchable only in the
+   * profile, and it gets there with one click.
    */
   technologies: string[];
 }
 
-export interface Schaufenster {
+export interface Portfolio {
   subject_id: string;
-  items: Arbeit[];
+  items: PortfolioItem[];
   updated_at: string;
 }
 
-export type Antwort<T> = { ok: true; value: T } | { ok: false; error: ApiError };
-
 /**
- * Das eigene Schaufenster.
+ * One's own showcase.
  *
- * Wie beim Lebenslauf drei Ausgänge: `wert: null` heisst „noch nichts
- * eingetragen" (ein `404`, der Normalfall), ein Transportfehler ist etwas
- * anderes. Zusammengelegt zeigte die Seite eine leere Liste, obwohl die Arbeiten
- * nur gerade nicht abrufbar sind — und das nächste Speichern löschte sie.
+ * Three outcomes, as with the CV: `value: null` means "nothing entered yet" (a
+ * `404`, the normal case), a transport error is something else. Merged, the
+ * page showed an empty list although the work was only unreachable at the
+ * moment — and the next save deleted it.
  */
-export async function ladeMeines(signal?: AbortSignal): Promise<Antwort<Schaufenster | null>> {
-  const answer = await request<Schaufenster>(
+export async function getMyPortfolio(
+  signal?: AbortSignal
+): Promise<ApiResult<Portfolio | null>> {
+  const answer = await request<Portfolio>(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
     { signal },
@@ -58,45 +57,48 @@ export async function ladeMeines(signal?: AbortSignal): Promise<Antwort<Schaufen
 }
 
 /**
- * Speichert das GANZE Feld.
+ * Saves the WHOLE field.
  *
- * Der Dienst kennt keine Teiländerung: eine Arbeit hat keine eigene Kennung,
- * ihre Adresse ist ihre Stelle in der Liste. Wer eine ändert, schickt alle.
+ * The service knows no partial update: an item has no id of its own, its
+ * address is its position in the list. Whoever changes one sends all of them.
  */
-export async function speichereMeines(
-  arbeiten: Arbeit[],
+export async function saveMyPortfolio(
+  items: PortfolioItem[],
   signal?: AbortSignal
-): Promise<Antwort<Schaufenster>> {
-  const answer = await request<Schaufenster>(
+): Promise<ApiResult<Portfolio>> {
+  const answer = await request<Portfolio>(
     PORTFOLIO_BASE_URL,
     "/portfolios/me",
-    { method: "PUT", body: { items: arbeiten }, signal },
+    { method: "PUT", body: { items }, signal },
     "errors.portfolioNotSaved"
   );
 
   return answer.ok
-    ? { ok: true, value: answer.value as Schaufenster }
+    ? { ok: true, value: answer.value as Portfolio }
     : { ok: false, error: answer.error };
 }
 
-export interface Anhang {
+export interface Attachment {
   name: string;
   content_type: string;
   size: number;
 }
 
 /**
- * Eine Datei anhängen.
+ * Attach a file.
  *
- * <strong>Der lokale Dateiname wandert nicht mit.</strong> Der Server vergibt
- * den Namen; die Oberfläche zeigt deshalb nur, <em>dass</em> eine Datei hängt
- * und wohin sie zeigt. Ein angezeigter lokaler Name wäre eine Behauptung über
- * etwas, das der Server gar nicht kennt.
+ * <strong>The local file name does not travel along.</strong> The server
+ * assigns the name; the UI therefore shows only <em>that</em> a file is
+ * attached and where it points. A displayed local name would be a claim about
+ * something the server does not even know.
  *
- * Eigener Aufruf statt <c>request</c>: hier geht ein <c>FormData</c> über die
- * Leitung, kein JSON, und der Browser muss die Grenzmarkierung selbst setzen.
+ * Its own call instead of <c>request</c>: a <c>FormData</c> goes over the wire
+ * here, not JSON, and the browser must set the boundary itself.
  */
-export async function haengeAn(file: File, signal?: AbortSignal): Promise<Antwort<Anhang>> {
+export async function uploadAttachment(
+  file: File,
+  signal?: AbortSignal
+): Promise<ApiResult<Attachment>> {
   const body = new FormData();
   body.append("file", file);
 
@@ -130,9 +132,9 @@ export async function haengeAn(file: File, signal?: AbortSignal): Promise<Antwor
     };
   }
 
-  return { ok: true, value: (await answer.json()) as Anhang };
+  return { ok: true, value: (await answer.json()) as Attachment };
 }
 
-/** Wo eine Datei liegt. Zusammengesetzt wie serverseitig: Person und Name. */
-export const anhangUrl = (subjectId: string, name: string): string =>
+/** Where a file lives. Composed as on the server: person and name. */
+export const attachmentUrl = (subjectId: string, name: string): string =>
   `${PORTFOLIO_BASE_URL}/portfolios/${subjectId}/attachments/${name}`;

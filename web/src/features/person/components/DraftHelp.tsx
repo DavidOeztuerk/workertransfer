@@ -8,24 +8,23 @@ import TextField from "@mui/material/TextField";
 import { draftProfileText } from "../api/profile";
 
 /**
- * Formulierungshilfe — auf Anforderung, und sie sagt, was hinausgeht.
+ * Writing help — on request, and it says what goes out.
  *
- * Die drei Entscheidungen, die hier sichtbar sind:
+ * The three decisions visible here:
  *
- * 1. <strong>Nur auf Knopfdruck.</strong> Kein Vorschlag von selbst, kein
- *    Hintergrundlauf, kein Gedächtnis. Dieselbe Regel wie bei GitHub: einmal
- *    auf Bitte hinsehen ist etwas anderes als dauerhaft hinterhersehen.
- * 2. <strong>Der Hinweis steht am Knopf</strong>, nicht in einer
- *    Datenschutzerklärung. Wer drückt, hat gelesen, dass sein Text an einen
- *    fremden Anbieter geht.
- * 3. <strong>Der Entwurf ersetzt nur das Formularfeld.</strong> Gespeichert
- *    wird er erst, wenn die Person auf „Speichern" drückt — dann ist es ihr
- *    Text. Es gibt keinen Eintrag im Ledger: der Knopf IST die Einwilligung,
- *    informiert und je Benutzung.
+ * 1. <strong>Only at the press of a button.</strong> No suggestion by itself,
+ *    no background run, no memory. The same rule as for GitHub: looking once
+ *    when asked is something different from watching permanently.
+ * 2. <strong>The notice stands at the button</strong>, not in a privacy
+ *    policy. Whoever presses it has read that their text goes to a third-party
+ *    provider.
+ * 3. <strong>The draft replaces only the form field.</strong> It is saved only
+ *    when the person presses "Save" — then it is their text. There is no ledger
+ *    entry: the button IS the consent, informed and per use.
  *
- * Und ein bewusstes Detail: hat sie schon etwas geschrieben, heisst der Knopf
- * „umformulieren" statt „schreiben". Ein Knopf, der ungefragt vorhandene Arbeit
- * überschreibt, wird einmal gedrückt und danach nie wieder.
+ * And one deliberate detail: if they have already written something, the
+ * button says "rephrase" instead of "write". A button that overwrites existing
+ * work unasked gets pressed once and never again.
  */
 export function DraftHelp({
   onDraft,
@@ -35,19 +34,19 @@ export function DraftHelp({
   hasText: boolean;
 }) {
   const { t } = useTranslation();
-  const [wish, setzeWunsch] = useState("");
-  const [problem, setzeProblem] = useState<string | null>(null);
-  const [running, setzeLaeuft] = useState(false);
+  const [wish, setWish] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  async function frage() {
-    setzeLaeuft(true);
+  async function ask() {
+    setRunning(true);
     const result = await draftProfileText(wish);
-    setzeLaeuft(false);
+    setRunning(false);
     if (result.ok) {
-      setzeProblem(null);
+      setProblem(null);
       onDraft(result.draft);
     } else {
-      setzeProblem(result.message);
+      setProblem(result.message);
     }
   }
 
@@ -57,7 +56,7 @@ export function DraftHelp({
         label={t(hasText ? "draftHelp.labelRephrase" : "draftHelp.labelNew")}
         helperText={t("draftHelp.hint")}
         value={wish}
-        onChange={(event) => setzeWunsch(event.target.value)}
+        onChange={(event) => setWish(event.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
         fullWidth
       />
@@ -68,7 +67,7 @@ export function DraftHelp({
           // without it the click would submit the profile instead of helping.
           type="button"
           variant="text"
-          onClick={() => void frage()}
+          onClick={() => void ask()}
           disabled={running}
         >
           {running

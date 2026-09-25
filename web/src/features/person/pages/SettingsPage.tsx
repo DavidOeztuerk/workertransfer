@@ -17,33 +17,33 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { AppearanceSections } from "../../../shared/components/layout/appearance";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
-import { Zivilidentitaet } from "../components/Zivilidentitaet";
+import { SignInRequired } from "../components/SignInRequired";
+import { CivilIdentity } from "../components/CivilIdentity";
 import { useAsync } from "../lib/useAsync";
 import {
-  type KiAnbieter,
-  type Kontoeinstellungen,
-  ladeEinstellungen,
-  speichereEinstellungen,
-  speichereSchluessel,
-} from "../api/kontoeinstellungen";
+  type AccountSettings,
+  type AiProvider,
+  getAccountSettings,
+  saveAccountSettings,
+  saveAiKey,
+} from "../api/accountSettings";
 import {
-  ALLES_AN,
-  type Benachrichtigungswahl,
-  ladeWahl,
-  speichereWahl,
-} from "../api/settings";
+  ALL_ON,
+  type NotificationPreferences,
+  getNotificationPreferences,
+  saveNotificationPreferences,
+} from "../api/notificationPreferences";
 
 /**
- * Die sechs Schalter. Der fünfte ist der Eingang einer Bewerbung beim
- * Unternehmen, der sechste die Entdeckung des eigenen Profils in einer Suche.
+ * The switches. The fifth is an application arriving at the company, the sixth
+ * the discovery of one's own profile in a search.
  *
- * Der Hinweis unter jedem sagt, was das Abschalten <em>kostet</em>, nicht was
- * der Schalter tut. Wer „Marktstatus-Anfragen" abschaltet, soll wissen, dass er
- * von der Anfrage dann nur erfährt, wenn er zufällig vorbeischaut.
+ * The hint under each says what switching it off <em>costs</em>, not what the
+ * switch does. Whoever switches off "market status requests" should know that
+ * they then learn of the request only if they happen to drop by.
  */
-const SCHALTER: {
-  key: keyof Benachrichtigungswahl;
+const SWITCHES: {
+  key: keyof NotificationPreferences;
   label: string;
   hint: string;
 }[] = [
@@ -58,63 +58,62 @@ const SCHALTER: {
 ];
 
 /**
- * <c>/settings</c> — was in einer Mail stehen darf.
+ * <c>/settings</c> — what a mail may say.
  *
- * <strong>Der Text oben ist die eigentliche Aussage der Seite</strong> und
- * wurde wörtlich übernommen: eine Mail sagt nur, <em>dass</em> es etwas Neues
- * gibt. Kein Firmenname, kein Vorgang, keine Anzahl. Eine Mail kann in einem
- * Postfach landen, das nicht nur der Person gehört — und dann wäre der Satz,
- * der sie nützlicher machte, genau der, der jemanden den Arbeitsplatz kostet.
+ * <strong>The text at the top is the page's actual statement</strong> and was
+ * taken over verbatim: a mail says only <em>that</em> there is something new.
+ * No company name, no case, no count. A mail may land in an inbox that does not
+ * belong to the person alone — and then the sentence that would make it more
+ * useful is exactly the one that costs somebody their job.
  *
- * <strong>Unbekannt ist nicht aus.</strong> Antwortet der Dienst nicht, stehen
- * die Schalter zwar auf ihrer Voreinstellung, sind aber <em>gesperrt</em>. Wer
- * sie in diesem Zustand bedienen könnte, speicherte eine Einstellung, die er
- * nie getroffen hat — und überschriebe womöglich eine, die er einmal getroffen
- * hat.
+ * <strong>Unknown is not off.</strong> If the service does not answer, the
+ * switches stand at their default but are <em>locked</em>. Whoever could
+ * operate them in that state would save a setting they never made — and might
+ * overwrite one they once made.
  */
 export function SettingsPage() {
   const { t } = useTranslation();
   const session = useAppSelector((state) => state.auth.session);
   const status = useAppSelector((state) => state.auth.status);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [saving, setSpeichert] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const choice = useAsync(
-    (signal) => ladeWahl(signal),
+    (signal) => getNotificationPreferences(signal),
     [session?.userId],
     session !== null,
   );
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig
-        titel={t("settings.title")}
-        satz="settings.signInRequired"
+      <SignInRequired
+        title={t("settings.title")}
+        sentenceKey="settings.signInRequired"
       />
     );
   }
 
-  const unbekannt = choice.laedt || choice.value === null;
-  const werte = choice.value ?? ALLES_AN;
+  const stateUnknown = choice.loading || choice.value === null;
+  const values = choice.value ?? ALL_ON;
 
-  async function umschalten(
-    key: keyof Benachrichtigungswahl,
-    neu: boolean,
+  async function toggle(
+    key: keyof NotificationPreferences,
+    next: boolean,
   ) {
-    const nextValue = { ...werte, [key]: neu };
-    setSpeichert(true);
-    choice.setze(nextValue);
+    const nextValue = { ...values, [key]: next };
+    setSaving(true);
+    choice.set(nextValue);
 
-    const result = await speichereWahl(nextValue);
-    setSpeichert(false);
+    const result = await saveNotificationPreferences(nextValue);
+    setSaving(false);
 
     if (result.ok) {
-      setFehler(null);
-      choice.setze(result.choice);
+      setError(null);
+      choice.set(result.choice);
     } else {
-      setFehler(result.error.detail);
-      // Zurueck auf das, was der Dienst wirklich hat — die Anzeige darf keine
-      // Einstellung behaupten, die nicht gespeichert wurde.
+      setError(result.error.detail);
+      // Back to what the service really has — the display must not claim a
+      // setting that was not saved.
       choice.again();
     }
   }
@@ -131,31 +130,31 @@ export function SettingsPage() {
             {t("settings.notifications")}
           </Typography>
 
-          {fehler !== null ? (
+          {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {fehler}
+              {error}
             </Alert>
           ) : null}
 
-          {choice.laedt ? (
+          {choice.loading ? (
             <LoadingBlock label={t("settings.loading")} />
           ) : null}
 
-          {choice.value === null && !choice.laedt ? (
+          {choice.value === null && !choice.loading ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {t("settings.unavailable")}
             </Alert>
           ) : null}
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {SCHALTER.map((entry) => (
+            {SWITCHES.map((entry) => (
               <ConsentSwitch
                 key={entry.key}
                 label={t(entry.label)}
                 hint={t(entry.hint)}
-                checked={werte[entry.key]}
-                disabled={saving || unbekannt}
-                onChange={(neu) => void umschalten(entry.key, neu)}
+                checked={values[entry.key]}
+                disabled={saving || stateUnknown}
+                onChange={(next) => void toggle(entry.key, next)}
               />
             ))}
           </Box>
@@ -166,20 +165,20 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Darstellungsblock />
-      <Zivilidentitaet />
-      <Datenschutzblock />
-      <KiBlock />
-      <Nachweisblock />
+      <AppearanceBlock />
+      <CivilIdentity />
+      <PrivacyBlock />
+      <AiBlock />
+      <RecordsBlock />
     </PageShell>
   );
 }
 
 /**
- * Darstellung und Sprache, ausführlich. Das Kontomenü trägt die knappe Fassung;
- * beide lesen `usePreferences`.
+ * Appearance and language, in full. The account menu carries the short
+ * version; both read `usePreferences`.
  */
-function Darstellungsblock() {
+function AppearanceBlock() {
   const { t } = useTranslation();
 
   return (
@@ -194,19 +193,19 @@ function Darstellungsblock() {
   );
 }
 
-/** Wie lange das Konto ohne Anmeldung bestehen bleibt. */
-function Datenschutzblock() {
+/** How long the account persists without a sign-in. */
+function PrivacyBlock() {
   const { t } = useTranslation();
-  const stand = useAsync((signal) => ladeEinstellungen(signal), []);
+  const current = useAsync((signal) => getAccountSettings(signal), []);
   const [saved, setSaved] = useState(false);
 
-  const einstellungen = stand.value ?? null;
+  const settings = current.value ?? null;
 
-  async function setze(monate: number | null) {
-    if (einstellungen === null) return;
-    const result = await speichereEinstellungen({ ...einstellungen, deleteAfterMonths: monate });
+  async function apply(months: number | null) {
+    if (settings === null) return;
+    const result = await saveAccountSettings({ ...settings, deleteAfterMonths: months });
     if (result.ok) {
-      stand.setze(result.einstellungen);
+      current.set(result.settings);
       setSaved(true);
     }
   }
@@ -218,24 +217,24 @@ function Datenschutzblock() {
           {t("settings.privacy")}
         </Typography>
 
-        {stand.laedt ? <LoadingBlock label={t("settings.loading")} /> : null}
+        {current.loading ? <LoadingBlock label={t("settings.loading")} /> : null}
 
-        {einstellungen !== null ? (
+        {settings !== null ? (
           <>
             <TextField
               select
               label={t("settings.expiry")}
-              value={String(einstellungen.deleteAfterMonths ?? "")}
+              value={String(settings.deleteAfterMonths ?? "")}
               helperText={t("settings.expiryHint")}
               onChange={(event) =>
-                void setze(event.target.value === "" ? null : Number(event.target.value))
+                void apply(event.target.value === "" ? null : Number(event.target.value))
               }
               sx={{ maxWidth: 360 }}
             >
               <MenuItem value="">{t("settings.expiryNever")}</MenuItem>
-              {[6, 12, 24, 36].map((monate) => (
-                <MenuItem key={monate} value={monate}>
-                  {t("settings.expiryMonths", { count: monate })}
+              {[6, 12, 24, 36].map((months) => (
+                <MenuItem key={months} value={months}>
+                  {t("settings.expiryMonths", { count: months })}
                 </MenuItem>
               ))}
             </TextField>
@@ -253,44 +252,43 @@ function Datenschutzblock() {
 }
 
 /**
- * Wer gefragt werden darf — und der Schlüssel, der nur hineingeht.
+ * Who may be asked — and the key, which only goes in.
  *
- * <strong>Der Schlüssel hat ein eigenes Feld und einen eigenen Knopf.</strong>
- * Er kommt nie zurück, kann also gar nicht im Formular stehen; ihn zusammen mit
- * dem Rest zu speichern hiesse, ihn bei jedem Speichern erneut über die Leitung
- * zu schicken.
+ * <strong>The key has a field and a button of its own.</strong> It never comes
+ * back, so it cannot stand in the form at all; saving it together with the
+ * rest would mean sending it over the wire again at every save.
  *
- * <strong>Ein eigener Server braucht keinen</strong>, und dann verschwindet das
- * Feld — statt leer dazustehen und eine Pflicht anzudeuten, die es nicht gibt.
- * Das ist zugleich die einzige Wahl, bei der der Text die Maschine nicht
- * verlässt.
+ * <strong>An own server needs none</strong>, and then the field disappears —
+ * instead of standing there empty and suggesting a duty that does not exist.
+ * That is at the same time the only choice in which the text does not leave
+ * the machine.
  */
-function KiBlock() {
+function AiBlock() {
   const { t } = useTranslation();
-  const stand = useAsync((signal) => ladeEinstellungen(signal), []);
-  const [schluessel, setSchluessel] = useState("");
+  const current = useAsync((signal) => getAccountSettings(signal), []);
+  const [aiKey, setAiKey] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const einstellungen = stand.value ?? null;
+  const settings = current.value ?? null;
 
-  async function setze(teil: Partial<Kontoeinstellungen>) {
-    if (einstellungen === null) return;
-    const result = await speichereEinstellungen({ ...einstellungen, ...teil });
+  async function apply(part: Partial<AccountSettings>) {
+    if (settings === null) return;
+    const result = await saveAccountSettings({ ...settings, ...part });
     if (result.ok) {
-      stand.setze(result.einstellungen);
+      current.set(result.settings);
       setSaved(true);
     }
   }
 
-  async function speichereDenSchluessel() {
-    if (await speichereSchluessel(schluessel)) {
-      setSchluessel("");
-      stand.again();
+  async function storeAiKey() {
+    if (await saveAiKey(aiKey)) {
+      setAiKey("");
+      current.again();
       setSaved(true);
     }
   }
 
-  const eigenerServer = einstellungen?.provider === "openai_compatible";
+  const ownServer = settings?.provider === "openai_compatible";
 
   return (
     <Card sx={{ mt: 3 }}>
@@ -302,16 +300,16 @@ function KiBlock() {
           {t("settings.aiLead")}
         </Typography>
 
-        {stand.laedt ? <LoadingBlock label={t("settings.loading")} /> : null}
+        {current.loading ? <LoadingBlock label={t("settings.loading")} /> : null}
 
-        {einstellungen !== null ? (
+        {settings !== null ? (
           <Box sx={{ display: "grid", gap: 2.5 }}>
             <TextField
               select
               label={t("settings.provider")}
-              value={einstellungen.provider ?? "none"}
+              value={settings.provider ?? "none"}
               helperText={t("settings.providerHint")}
-              onChange={(event) => void setze({ provider: event.target.value as KiAnbieter })}
+              onChange={(event) => void apply({ provider: event.target.value as AiProvider })}
             >
               <MenuItem value="none">{t("settings.providerNone")}</MenuItem>
               <MenuItem value="openai_compatible">
@@ -320,44 +318,44 @@ function KiBlock() {
               <MenuItem value="anthropic">{t("settings.providerAnthropic")}</MenuItem>
             </TextField>
 
-            {einstellungen.provider !== "none" ? (
+            {settings.provider !== "none" ? (
               <>
                 <TextField
                   label={t("settings.address")}
                   helperText={t("settings.addressHint")}
-                  value={einstellungen.baseUrl ?? ""}
+                  value={settings.baseUrl ?? ""}
                   onChange={(event) =>
-                    stand.setze({ ...einstellungen, baseUrl: event.target.value })
+                    current.set({ ...settings, baseUrl: event.target.value })
                   }
-                  onBlur={() => void setze({ baseUrl: einstellungen.baseUrl ?? "" })}
+                  onBlur={() => void apply({ baseUrl: settings.baseUrl ?? "" })}
                 />
                 <TextField
                   label={t("settings.model")}
                   helperText={t("settings.modelHint")}
-                  value={einstellungen.model ?? ""}
+                  value={settings.model ?? ""}
                   onChange={(event) =>
-                    stand.setze({ ...einstellungen, model: event.target.value })
+                    current.set({ ...settings, model: event.target.value })
                   }
-                  onBlur={() => void setze({ model: einstellungen.model ?? "" })}
+                  onBlur={() => void apply({ model: settings.model ?? "" })}
                 />
 
-                {!eigenerServer ? (
+                {!ownServer ? (
                   <Box>
                     <TextField
                       label={t("settings.key")}
                       type="password"
                       autoComplete="off"
-                      value={schluessel}
-                      onChange={(event) => setSchluessel(event.target.value)}
+                      value={aiKey}
+                      onChange={(event) => setAiKey(event.target.value)}
                       helperText={t("settings.keyHint")}
                     />
                     <Box sx={{ display: "flex", gap: 1.5, mt: 1.5, alignItems: "center" }}>
-                      <Button variant="outlined" onClick={() => void speichereDenSchluessel()}>
+                      <Button variant="outlined" onClick={() => void storeAiKey()}>
                         {t("settings.keySave")}
                       </Button>
                       <Typography variant="body2" color="text.secondary">
-                        {einstellungen.keyPresent
-                          ? t("settings.keyStored", { endung: einstellungen.keyTail })
+                        {settings.keyPresent
+                          ? t("settings.keyStored", { endung: settings.keyTail })
                           : t("settings.keyNone")}
                       </Typography>
                     </Box>
@@ -367,8 +365,8 @@ function KiBlock() {
                 <ConsentSwitch
                   label={t("settings.aiLog")}
                   hint={t("settings.aiLogHint")}
-                  checked={einstellungen.auditLog === true}
-                  onChange={(next) => void setze({ auditLog: next })}
+                  checked={settings.auditLog === true}
+                  onChange={(next) => void apply({ auditLog: next })}
                 />
               </>
             ) : null}
@@ -386,12 +384,12 @@ function KiBlock() {
 }
 
 /**
- * Die Wege zu dem, was über einen festgehalten ist.
+ * The ways to what is recorded about oneself.
  *
  * The closing paragraph names what is NOT possible here: a settings page
  * that keeps a gap quiet looks complete and is not.
  */
-function Nachweisblock() {
+function RecordsBlock() {
   const { t } = useTranslation();
 
   return (

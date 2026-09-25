@@ -2,8 +2,8 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ANGEMELDET, PERSON, renderMitStore } from "../test/render";
-import { type Netz, netz } from "../test/netz";
+import { SIGNED_IN, PERSON, renderWithStore } from "../test/render";
+import { type Network, stubNetwork } from "../test/network";
 import { ConsentsPage } from "./ConsentsPage";
 
 const TENANT = "22222222-2222-2222-2222-222222222222";
@@ -12,15 +12,15 @@ function granted(capability: string) {
   return { capability, granted_at: "2026-08-02T10:00:00Z" };
 }
 
-let draht: Netz;
+let wire: Network;
 
 beforeEach(() => {
-  draht = netz({
+  wire = stubNetwork({
     "GET /consent/me": { body: [] },
     "POST /consent/revoke": { body: { granted: false } },
     "POST /consent/grant": { body: { granted: true } },
-    // Die Seite fragt jetzt auch, ob ein GitHub-Konto verbunden ist — ohne
-    // eines gibt es dort nichts freizugeben.
+    // The page now also asks whether a GitHub account is connected — without
+    // one there is nothing to release there.
     "GET /github/me": { status: 404 },
     [`GET /companies/${TENANT}/profile`]: { status: 404 },
   });
@@ -31,105 +31,104 @@ afterEach(() => {
 });
 
 describe("ConsentsPage", () => {
-  it("fragt nach der Anmeldung, statt Freigaben zu zeigen, die niemandem gehören", async () => {
-    renderMitStore(<ConsentsPage />);
+  it("asks for sign-in instead of showing releases that belong to nobody", async () => {
+    renderWithStore(<ConsentsPage />);
 
     expect(await screen.findByRole("link", { name: "anmelden" })).toBeTruthy();
-    expect(draht.aufrufe).toHaveLength(0);
+    expect(wire.calls).toHaveLength(0);
   });
 
-  it("zeichnet einen Ladezustand, solange die Sitzung unbekannt ist", async () => {
-    // `unknown` heisst „noch nicht gefragt". Als „abgemeldet" gezeichnet, sähe
-    // eine angemeldete Person beim Kaltstart „Bitte anmelden".
-    renderMitStore(<ConsentsPage />, { auth: { status: "unknown" } });
+  it("draws a loading state while the session is unknown", async () => {
+    // `unknown` means "not asked yet". Drawn as "signed out", a signed-in
+    // person would see "Please sign in" on a cold start.
+    renderWithStore(<ConsentsPage />, { auth: { status: "unknown" } });
 
     expect(await screen.findByRole("status")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "anmelden" })).toBeNull();
   });
 
-  it("sagt deutlich, dass nichts freigegeben ist, wenn nichts freigegeben ist", async () => {
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+  it("says clearly that nothing is released when nothing is released", async () => {
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByText(/Niemand sieht etwas von dir/)).toBeTruthy();
   });
 
-  it("liest die eigene Liste ohne Subjektkennung — weder im Pfad noch in der Abfrage", async () => {
-    // Eine fremde Liste würde sagen, welche ANDEREN Unternehmen Zugriff halten.
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+  it("reads its own list without a subject id — neither in the path nor in the query", async () => {
+    // A foreign list would say which OTHER companies hold access.
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     await screen.findByText(/Niemand sieht etwas von dir/);
-    const gelesen = draht.letzter("GET /consent/me");
-    expect(gelesen?.url).toBe("/consent/me");
-    expect(gelesen?.url).not.toContain(PERSON.userId);
+    const read = wire.last("GET /consent/me");
+    expect(read?.url).toBe("/consent/me");
+    expect(read?.url).not.toContain(PERSON.userId);
   });
 
-  it("zeigt einen Fehler nie als leere Liste", async () => {
-    // „Du hast nichts freigegeben" wäre hier die beruhigendste falsche Antwort,
-    // die dieses System geben kann.
-    draht.setze("GET /consent/me", {
+  it("never shows an error as an empty list", async () => {
+    // "You have released nothing" would be the most reassuring wrong answer
+    // this system can give here.
+    wire.set("GET /consent/me", {
       status: 503,
-      body: { title: "Ledger schweigt" },
+      body: { title: "Ledger silent" },
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.queryByText(/Niemand sieht etwas von dir/)).toBeNull();
   });
 
-  it("benennt den Bereich und sagt, dass eine öffentliche Freigabe allen gilt", async () => {
-    // `market` statt `profile`: die drei globalen Sichtbarkeiten sind oben
-    // Schalter geworden und stehen deshalb nicht mehr als Zeile in der Liste.
-    // Der Prüfgegenstand ist unverändert — wie eine öffentliche Freigabe
-    // BENANNT wird.
-    draht.setze("GET /consent/me", {
+  it("names the area and says that a public release applies to everyone", async () => {
+    // `market` instead of `profile`: the three global visibilities have become
+    // switches at the top and therefore no longer stand as a row in the list.
+    // What is checked is unchanged — how a public release is NAMED.
+    wire.set("GET /consent/me", {
       body: [granted("market.visibility:public")],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByText(/Marktstatus · Alle Unternehmen/)).toBeTruthy();
   });
 
-  it("löst den Firmennamen auf, statt eine UUID zu zeigen", async () => {
-    draht.setze("GET /consent/me", {
+  it("resolves the company name instead of showing a UUID", async () => {
+    wire.set("GET /consent/me", {
       body: [granted(`resume.visibility:tenant:${TENANT}`)],
     });
-    draht.setze(`GET /companies/${TENANT}/profile`, {
+    wire.set(`GET /companies/${TENANT}/profile`, {
       body: { tenant_id: TENANT, display_name: "Acme GmbH" },
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByText(/Lebenslauf · Acme GmbH/)).toBeTruthy();
     expect(screen.queryByText(new RegExp(TENANT))).toBeNull();
   });
 
-  it("erfindet keinen Namen für ein Unternehmen ohne Profil", async () => {
-    draht.setze("GET /consent/me", {
+  it("invents no name for a company without a profile", async () => {
+    wire.set("GET /consent/me", {
       body: [granted(`market.visibility:tenant:${TENANT}`)],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText(/Marktstatus · Ein Unternehmen/),
     ).toBeTruthy();
   });
 
-  it("zeigt eine unbekannte Capability, statt sie zu verschlucken", async () => {
-    // Eine Freigabe zu verbergen, weil die Oberfläche ihr Format nicht kennt,
-    // wäre auf genau dieser Seite der schlimmste denkbare Fehler.
-    draht.setze("GET /consent/me", {
+  it("shows an unknown capability instead of swallowing it", async () => {
+    // Hiding a release because the UI does not know its format would be the
+    // worst conceivable defect on exactly this page.
+    wire.set("GET /consent/me", {
       body: [granted("something.entirely:new")],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByText(/something.entirely:new/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Zurückziehen" })).toBeTruthy();
   });
 
-  it("zieht mit einer Begründung zurück, weil ein Widerruf erklärbar sein muss", async () => {
-    draht.setze("GET /consent/me", {
+  it("withdraws with a reason, because a revocation must be explainable", async () => {
+    wire.set("GET /consent/me", {
       body: [granted("market.visibility:public")],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(
@@ -137,9 +136,9 @@ describe("ConsentsPage", () => {
     );
 
     await waitFor(() =>
-      expect(draht.letzter("POST /consent/revoke")).toBeDefined(),
+      expect(wire.last("POST /consent/revoke")).toBeDefined(),
     );
-    expect(draht.letzter("POST /consent/revoke")?.body).toEqual({
+    expect(wire.last("POST /consent/revoke")?.body).toEqual({
       subject_id: PERSON.userId,
       capability: "market.visibility:public",
       reason: expect.stringContaining("Freigaben"),
@@ -147,70 +146,69 @@ describe("ConsentsPage", () => {
   });
 
   /**
-   * <strong>Die Seite kann jetzt ERTEILEN.</strong>
+   * <strong>The page can GRANT now.</strong>
    *
-   * Vorher war sie eine Einbahnstrasse: sie zeigte, was gilt, und bot
-   * „Zurückziehen". Wer sichtbar werden wollte, musste raten, auf welcher von
-   * fünf Seiten der Schalter liegt — eine Seite namens „Meine Freigaben", die
-   * keine Freigabe erteilen kann, beantwortet die Frage nicht, für die man sie
-   * öffnet.
+   * Before, it was a one-way street: it showed what holds and offered
+   * "Withdraw". Whoever wanted to become visible had to guess which of five
+   * pages held the switch — a page called "My releases" that cannot grant a
+   * release does not answer the question it is opened for.
    */
-  it("erteilt eine Freigabe, statt nur zurückziehen zu können", async () => {
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+  it("grants a release instead of only being able to withdraw", async () => {
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
-    const schalter = await screen.findByRole("switch", {
+    const toggle = await screen.findByRole("switch", {
       name: /Profil freigeben/,
     });
-    expect(schalter).not.toBeChecked();
+    expect(toggle).not.toBeChecked();
 
-    await user.click(schalter);
+    await user.click(toggle);
 
     await waitFor(() =>
-      expect(draht.letzter("POST /consent/grant")).toBeDefined(),
+      expect(wire.last("POST /consent/grant")).toBeDefined(),
     );
-    // Beim Erteilen fragt niemand nach einem Grund — nur eine Entziehung muss
-    // erklärbar sein (ADR-0027).
-    expect(draht.letzter("POST /consent/grant")?.body).toEqual({
+    // Nobody asks for a reason when granting — only a withdrawal must be
+    // explainable (ADR-0027).
+    expect(wire.last("POST /consent/grant")?.body).toEqual({
       subject_id: PERSON.userId,
       capability: "profile.visibility:public",
     });
   });
 
-  it("zeigt den Schalter als an, wenn die Freigabe gilt — und zieht sie mit Grund zurück", async () => {
-    draht.setze("GET /consent/me", {
+  it("shows the switch as on when the release holds — and withdraws it with a reason", async () => {
+    wire.set("GET /consent/me", {
       body: [granted("portfolio.visibility:public")],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
-    const schalter = await screen.findByRole("switch", {
+    const toggle = await screen.findByRole("switch", {
       name: /Meine Arbeiten freigeben/,
     });
-    expect(schalter).toBeChecked();
+    expect(toggle).toBeChecked();
 
-    await user.click(schalter);
+    await user.click(toggle);
 
     await waitFor(() =>
-      expect(draht.letzter("POST /consent/revoke")).toBeDefined(),
+      expect(wire.last("POST /consent/revoke")).toBeDefined(),
     );
-    expect(draht.letzter("POST /consent/revoke")?.body).toMatchObject({
+    expect(wire.last("POST /consent/revoke")?.body).toMatchObject({
       capability: "portfolio.visibility:public",
       reason: expect.stringContaining("Freigaben"),
     });
   });
 
   /**
-   * Dieselbe Freigabe darf nicht zweimal auf der Seite stehen.
+   * The same release must not stand twice on the page.
    *
-   * Einmal als Schalter und einmal als Zeile mit „Zurückziehen" — und niemand
-   * wüsste, welche der beiden gilt.
+   * Once as a switch and once as a row with "Withdraw" — and nobody would know
+   * which of the two holds.
    */
-  it("führt eine geschaltete Freigabe nicht zusätzlich als Zeile", async () => {
-    draht.setze("GET /consent/me", {
+  it("does not additionally list a switched release as a row", async () => {
+    wire.set("GET /consent/me", {
       body: [granted("profile.visibility:public")],
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     await screen.findByRole("switch", { name: /Profil freigeben/ });
 
@@ -219,34 +217,34 @@ describe("ConsentsPage", () => {
   });
 
   /**
-   * Ohne verbundenes Konto gibt es bei GitHub nichts freizugeben — der
-   * Schalter bleibt trotzdem sichtbar und sagt, was fehlt.
+   * Without a connected account there is nothing to release at GitHub — the
+   * switch stays visible anyway and says what is missing.
    *
-   * Ihn zu verstecken hiesse, die Möglichkeit zu verschweigen. Vor dieser Seite
-   * gab es den Schalter überhaupt nicht: der Dienst prüft
-   * `github.visibility:public` seit jeher, erteilen konnte man sie nirgends.
+   * Hiding it would mean keeping the possibility quiet. Before this page the
+   * switch did not exist at all: the service has always checked
+   * `github.visibility:public`, but nobody could grant it anywhere.
    */
-  it("sagt bei GitHub, dass zuerst ein Konto verbunden werden muss", async () => {
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+  it("says at GitHub that an account must be connected first", async () => {
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
-    const schalter = await screen.findByRole("switch", {
+    const toggle = await screen.findByRole("switch", {
       name: /GitHub-Belege freigeben/,
     });
 
-    expect(schalter).toBeDisabled();
+    expect(toggle).toBeDisabled();
     expect(screen.getByText(/zuerst ein GitHub-Konto verbinden/)).toBeTruthy();
   });
 
   /**
-   * Ein GENANNTES Konto ist noch kein Beleg.
+   * A NAMED account is not evidence yet.
    *
-   * Gemessen an der laufenden Anlage: die Verbindung stand als
-   * <c>verified: false</c> da, und der Schalter war bedienbar. Freigegeben
-   * wären damit die Repositories eines Kontos, das der Person niemand
-   * zugeordnet hat.
+   * Measured on the running system: the connection stood there as
+   * <c>verified: false</c>, and the switch was operable. That would have
+   * released the repositories of an account nobody had attributed to the
+   * person.
    */
-  it("lässt eine unbestätigte GitHub-Verbindung nicht freigeben", async () => {
-    draht.setze("GET /github/me", {
+  it("does not let an unverified GitHub connection be released", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "octocat",
@@ -256,18 +254,18 @@ describe("ConsentsPage", () => {
         repositories: [],
       },
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
-    const schalter = await screen.findByRole("switch", {
+    const toggle = await screen.findByRole("switch", {
       name: /GitHub-Belege freigeben/,
     });
 
-    expect(schalter).toBeDisabled();
+    expect(toggle).toBeDisabled();
     expect(screen.getByText(/noch nicht nachgewiesen/)).toBeTruthy();
   });
 
-  it("lässt GitHub freigeben, sobald ein Konto verbunden ist", async () => {
-    draht.setze("GET /github/me", {
+  it("lets GitHub be released as soon as an account is connected", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "anna",
@@ -277,39 +275,38 @@ describe("ConsentsPage", () => {
         repositories: [],
       },
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
-    const schalter = await screen.findByRole("switch", {
+    const toggle = await screen.findByRole("switch", {
       name: /GitHub-Belege freigeben/,
     });
-    await waitFor(() => expect(schalter).not.toBeDisabled());
+    await waitFor(() => expect(toggle).not.toBeDisabled());
 
-    await user.click(schalter);
+    await user.click(toggle);
 
     await waitFor(() =>
-      expect(draht.letzter("POST /consent/grant")?.body).toMatchObject({
+      expect(wire.last("POST /consent/grant")?.body).toMatchObject({
         capability: "github.visibility:public",
       }),
     );
   });
 
   /**
-   * Was KEINEN Schalter hat, steht trotzdem auf der Seite — und zwar BEIDE
-   * Wege dorthin.
+   * What has NO switch stands on the page anyway — and BOTH ways there do.
    *
-   * Ohne den ersten Absatz sähe die Seite vollständig aus und wäre es nicht:
-   * der Lebenslauf fehlt, und wer ihn sucht, hält das für ein Versehen. Er ist
-   * keins (ADR-0020).
+   * Without the first paragraph the page would look complete and would not be:
+   * the CV is missing, and whoever looks for it takes that for an oversight. It
+   * is none (ADR-0020).
    *
-   * Ohne den ZWEITEN stand dort nur die Hälfte, und die las sich falsch: wer
-   * sich gerade selbst bewerben wollte, fand einen Satz über seinen jetzigen
-   * Arbeitgeber und schloss daraus, sein Lebenslauf dürfe nirgends hin. Wer
-   * sich bewirbt, schickt ihn mit — das ist der Sinn. Beide Absätze müssen
-   * dastehen, sonst erklärt die Seite die Hälfte und verwirrt über den Rest.
+   * Without the SECOND only half stood there, and it read wrongly: whoever was
+   * just about to apply found a sentence about their current employer and
+   * concluded their CV may go nowhere. Whoever applies sends it along — that is
+   * the point. Both paragraphs must stand there, or the page explains one half
+   * and confuses about the rest.
    */
-  it("erklärt beide Wege zum Lebenslauf — den gefragten und den gesendeten", async () => {
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+  it("explains both ways to the CV — the requested and the sent one", async () => {
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText(/Wenn ein Unternehmen fragt/),
@@ -325,15 +322,15 @@ describe("ConsentsPage", () => {
     ).toBeTruthy();
   });
 
-  it("meldet einen gescheiterten Widerruf, statt Erfolg vorzutäuschen", async () => {
-    draht.setze("GET /consent/me", {
+  it("reports a failed withdrawal instead of faking success", async () => {
+    wire.set("GET /consent/me", {
       body: [granted("market.visibility:public")],
     });
-    draht.setze("POST /consent/revoke", {
+    wire.set("POST /consent/revoke", {
       status: 503,
-      body: { title: "Keine Verbindung zum Consent-Ledger." },
+      body: { title: "No connection to the consent ledger." },
     });
-    renderMitStore(<ConsentsPage />, { auth: ANGEMELDET });
+    renderWithStore(<ConsentsPage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(

@@ -4,7 +4,7 @@ import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 
-export interface LebenslaufPosition {
+export interface CurriculumVitaePosition {
   employer: string;
   title: string;
   started_on: string;
@@ -13,7 +13,7 @@ export interface LebenslaufPosition {
   technologies: string[];
 }
 
-export interface LebenslaufAusbildung {
+export interface CurriculumVitaeEducation {
   institution: string;
   qualification: string;
   started_on: string;
@@ -21,47 +21,48 @@ export interface LebenslaufAusbildung {
   kind?: "schule" | "ausbildung";
 }
 
-export type Lebenslaufvorlage = "schlicht" | "klassisch" | "modern";
+/** The wire words of the three templates. */
+export type CurriculumVitaeTemplateName = "schlicht" | "klassisch" | "modern";
 
-export interface Lebenslaufdaten {
+export interface CurriculumVitaeData {
   headline: string;
   bio: string;
   location: string;
   skills: string[];
-  positions: LebenslaufPosition[];
-  education: LebenslaufAusbildung[];
+  positions: CurriculumVitaePosition[];
+  education: CurriculumVitaeEducation[];
 }
 
 /**
- * Eine Komponente, drei Vorlagen — für die Person und das Unternehmen dieselbe.
+ * One component, three templates — the same for the person and the company.
  *
- * Nur Tokens, keine Farbliterale. Druckbar, damit ein PDF über den Browser
- * entsteht; der Server erzeugt keins (ADR-0035).
+ * Tokens only, no colour literals. Printable, so that a PDF comes out of the
+ * browser; the server renders none (ADR-0035).
  */
-export function Lebenslaufblatt({
-  daten,
+export function CurriculumVitaeSheet({
+  data,
   template,
 }: {
-  daten: Lebenslaufdaten;
-  template: Lebenslaufvorlage;
+  data: CurriculumVitaeData;
+  template: CurriculumVitaeTemplateName;
 }) {
   const { t, i18n } = useTranslation();
 
-  function monat(wert: string | null): string {
-    if (wert === null || wert === "") return t("resume.today");
-    const datum = new Date(`${wert}-01`);
-    if (Number.isNaN(datum.getTime())) return wert;
-    return datum.toLocaleDateString(i18n.language, { month: "short", year: "numeric" });
+  function month(value: string | null): string {
+    if (value === null || value === "") return t("resume.today");
+    const date = new Date(`${value}-01`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString(i18n.language, { month: "short", year: "numeric" });
   }
 
-  const kopf = (
+  const header = (
     <Box sx={{ mb: 3, pb: 2, borderBottom: 2, borderColor: "divider" }}>
       <Typography variant="h3" sx={{ mb: 0.5, fontWeight: 700 }}>
-        {daten.headline || t("resume.noHeadline")}
+        {data.headline || t("resume.noHeadline")}
       </Typography>
-      {daten.location ? (
+      {data.location ? (
         <Typography variant="body2" color="text.secondary">
-          {daten.location}
+          {data.location}
         </Typography>
       ) : (
         <Typography variant="body2" color="text.secondary">
@@ -71,39 +72,39 @@ export function Lebenslaufblatt({
     </Box>
   );
 
-  const bio = daten.bio ? (
-    <Abschnitt titel={t("resume.aboutMe")} template={template}>
-      <Typography sx={{ whiteSpace: "pre-wrap" }}>{daten.bio}</Typography>
-    </Abschnitt>
+  const bio = data.bio ? (
+    <Section title={t("resume.aboutMe")} template={template}>
+      <Typography sx={{ whiteSpace: "pre-wrap" }}>{data.bio}</Typography>
+    </Section>
   ) : null;
 
-  const faehigkeiten =
-    daten.skills.length > 0 ? (
-      <Abschnitt titel={t("resume.skills")} template={template}>
+  const skills =
+    data.skills.length > 0 ? (
+      <Section title={t("resume.skills")} template={template}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-          {daten.skills.map((skill) => (
+          {data.skills.map((skill) => (
             <Chip key={skill} label={skill} size="small" variant="outlined" />
           ))}
         </Box>
-      </Abschnitt>
+      </Section>
     ) : (
-      <Abschnitt titel={t("resume.skills")} template={template}>
+      <Section title={t("resume.skills")} template={template}>
         <Typography variant="body2" color="text.secondary">
           {t("resume.skillsMissing")}
         </Typography>
-      </Abschnitt>
+      </Section>
     );
 
-  const stationen =
-    daten.positions.length > 0 ? (
-      <Abschnitt titel={t("resume.experience")} template={template}>
-        {daten.positions.map((pos, i) => (
+  const positions =
+    data.positions.length > 0 ? (
+      <Section title={t("resume.experience")} template={template}>
+        {data.positions.map((pos, i) => (
           <Box key={i} sx={{ mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {pos.title}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {pos.employer} · {monat(pos.started_on)} – {monat(pos.ended_on)}
+              {pos.employer} · {month(pos.started_on)} – {month(pos.ended_on)}
             </Typography>
             {pos.description ? (
               <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{pos.description}</Typography>
@@ -117,60 +118,60 @@ export function Lebenslaufblatt({
             ) : null}
           </Box>
         ))}
-      </Abschnitt>
+      </Section>
     ) : (
-      <Abschnitt titel={t("resume.experience")} template={template}>
+      <Section title={t("resume.experience")} template={template}>
         <Typography variant="body2" color="text.secondary">
           {t("resume.experienceMissing")}
         </Typography>
-      </Abschnitt>
+      </Section>
     );
 
-  const lehren = daten.education.filter((edu) => edu.kind !== "schule");
-  const schulen = daten.education.filter((edu) => edu.kind === "schule");
+  const apprenticeships = data.education.filter((edu) => edu.kind !== "schule");
+  const schools = data.education.filter((edu) => edu.kind === "schule");
 
-  const ausbildung =
-    lehren.length > 0 ? (
-      <Abschnitt titel={t("resume.training")} template={template}>
-        {lehren.map((edu, i) => (
+  const training =
+    apprenticeships.length > 0 ? (
+      <Section title={t("resume.training")} template={template}>
+        {apprenticeships.map((edu, i) => (
           <Box key={i} sx={{ mb: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {edu.qualification || edu.institution}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {edu.institution} · {monat(edu.started_on)} – {monat(edu.ended_on)}
+              {edu.institution} · {month(edu.started_on)} – {month(edu.ended_on)}
             </Typography>
           </Box>
         ))}
-      </Abschnitt>
+      </Section>
     ) : (
-      <Abschnitt titel={t("resume.training")} template={template}>
+      <Section title={t("resume.training")} template={template}>
         <Typography variant="body2" color="text.secondary">
           {t("resume.trainingMissing")}
         </Typography>
-      </Abschnitt>
+      </Section>
     );
 
-  const schule =
-    schulen.length > 0 ? (
-      <Abschnitt titel={t("resume.school")} template={template}>
-        {schulen.map((edu, i) => (
+  const school =
+    schools.length > 0 ? (
+      <Section title={t("resume.school")} template={template}>
+        {schools.map((edu, i) => (
           <Box key={i} sx={{ mb: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {edu.qualification || edu.institution}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {edu.institution} · {monat(edu.started_on)} – {monat(edu.ended_on)}
+              {edu.institution} · {month(edu.started_on)} – {month(edu.ended_on)}
             </Typography>
           </Box>
         ))}
-      </Abschnitt>
+      </Section>
     ) : null;
 
-  const inhalt =
+  const content =
     template === "klassisch" ? (
       <>
-        {kopf}
+        {header}
         {bio}
         <Box
           sx={{
@@ -180,21 +181,21 @@ export function Lebenslaufblatt({
           }}
         >
           <Box>
-            {stationen}
-            {ausbildung}
-            {schule}
+            {positions}
+            {training}
+            {school}
           </Box>
-          <Box>{faehigkeiten}</Box>
+          <Box>{skills}</Box>
         </Box>
       </>
     ) : (
       <>
-        {kopf}
+        {header}
         {bio}
-        {stationen}
-        {ausbildung}
-        {schule}
-        {faehigkeiten}
+        {positions}
+        {training}
+        {school}
+        {skills}
       </>
     );
 
@@ -216,18 +217,18 @@ export function Lebenslaufblatt({
         },
       }}
     >
-      {inhalt}
+      {content}
     </Box>
   );
 }
 
-function Abschnitt({
-  titel,
+function Section({
+  title,
   template,
   children,
 }: {
-  titel: string;
-  template: Lebenslaufvorlage;
+  title: string;
+  template: CurriculumVitaeTemplateName;
   children: ReactNode;
 }) {
   return (
@@ -242,7 +243,7 @@ function Abschnitt({
           pb: 0.5,
         }}
       >
-        {titel}
+        {title}
       </Typography>
       {children}
     </Box>

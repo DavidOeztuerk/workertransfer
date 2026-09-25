@@ -1,79 +1,79 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Laden ohne TanStack Query.
+ * Loading without TanStack Query.
  *
- * <strong>Gemessen, nicht gewählt.</strong> `AppRoot.tsx` hängt keinen
- * `QueryClientProvider` ein — `useQuery` aus dem alten Code würde in der echten
- * Anwendung werfen („No QueryClient set"). Der ALTE Testhelfer stellte einen
- * bereit, ein Test wäre also grün gewesen, während die Seite weiss bleibt.
+ * <strong>Measured, not chosen.</strong> `AppRoot.tsx` mounts no
+ * `QueryClientProvider` — `useQuery` from the old code would throw in the real
+ * application ("No QueryClient set"). The OLD test helper provided one, so a
+ * test would have been green while the page stays white.
  *
- * Ein `personSlice` scheidet ebenso aus: `core/store/store.ts` meldet `auth` und
- * `preferences` an und liegt ausserhalb dieses Territoriums.
+ * A `personSlice` is ruled out as well: `core/store/store.ts` registers `auth`
+ * and `preferences` and lies outside this territory.
  *
- * Der Haken kennt drei Zustände, und das ist der Punkt: `laedt` ist nicht
- * „leer", und `wert === undefined` ist nicht „nichts vorhanden".
+ * The hook knows three states, and that is the point: `loading` is not
+ * "empty", and `value === undefined` is not "nothing there".
  */
-export interface AsyncZustand<T> {
+export interface AsyncState<T> {
   value: T | undefined;
-  laedt: boolean;
-  /** Neu laden — nach einer Änderung, die die Antwort verändert hat. */
+  loading: boolean;
+  /** Load again — after a change that altered the answer. */
   again: () => void;
-  /** Den Wert von Hand setzen, wenn die Antwort ihn schon mitbrachte. */
-  setze: (value: T) => void;
+  /** Set the value by hand when the answer already brought it along. */
+  set: (value: T) => void;
 }
 
 /**
- * @param laden ruft den Dienst. Bekommt ein `AbortSignal`.
- * @param aktiv `false` heisst „gar nicht erst fragen" (etwa: niemand angemeldet).
- *   Der Zustand bleibt dann für immer im Laden — die Seite fragt vorher ab.
+ * @param load calls the service. Receives an `AbortSignal`.
+ * @param active `false` means "do not even ask" (for example: nobody signed
+ *   in). The state then stays loading for ever — the page checks beforehand.
  */
 export function useAsync<T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: unknown[],
-  aktiv = true
-): AsyncZustand<T> {
-  const [value, setzeWert] = useState<T | undefined>(undefined);
-  const [laedt, setzeLaedt] = useState(aktiv);
-  const [runde, setzeRunde] = useState(0);
+  active = true
+): AsyncState<T> {
+  const [value, setValue] = useState<T | undefined>(undefined);
+  const [loading, setLoading] = useState(active);
+  const [round, setRound] = useState(0);
 
-  // Die Abhängigkeiten kommen vom Aufrufer; `laden` selbst ist bei jedem
-  // Rendern eine neue Funktion und darf deshalb NICHT in die Liste.
-  const ruf = useCallback(load, deps);
+  // The dependencies come from the caller; `load` itself is a new function on
+  // every render and must therefore NOT go into the list.
+  const call = useCallback(load, deps);
 
   useEffect(() => {
-    if (!aktiv) {
-      setzeLaedt(false);
+    if (!active) {
+      setLoading(false);
       return;
     }
     const abort = new AbortController();
     let alive = true;
-    setzeLaedt(true);
-    void ruf(abort.signal).then(
+    setLoading(true);
+    void call(abort.signal).then(
       (answer) => {
         if (!alive) return;
-        setzeWert(answer);
-        setzeLaedt(false);
+        setValue(answer);
+        setLoading(false);
       },
       () => {
-        // Ein abgebrochener Aufruf ist kein Ergebnis. Die API-Module werfen
-        // ohnehin nicht — ein Statuscode ist dort eine Antwort.
-        if (alive) setzeLaedt(false);
+        // An aborted call is no result. The API modules do not throw anyway —
+        // a status code is an answer there.
+        if (alive) setLoading(false);
       }
     );
     return () => {
       alive = false;
       abort.abort();
     };
-  }, [ruf, aktiv, runde]);
+  }, [call, active, round]);
 
   return {
     value,
-    laedt,
-    again: useCallback(() => setzeRunde((n) => n + 1), []),
-    setze: useCallback((neu: T) => {
-      setzeWert(neu);
-      setzeLaedt(false);
+    loading,
+    again: useCallback(() => setRound((n) => n + 1), []),
+    set: useCallback((next: T) => {
+      setValue(next);
+      setLoading(false);
     }, []),
   };
 }

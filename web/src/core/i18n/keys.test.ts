@@ -105,7 +105,7 @@ function unionMembers(path: string, name: string): string[] {
 
 /**
  * Evaluates a key template exactly as it stands in the source, once per scope.
- * `\`profile.commute_\${stufe}\`` with `{ stufe: "egal" }` gives
+ * `\`profile.commute_\${readiness}\`` with `{ readiness: "egal" }` gives
  * `profile.commute_egal`.
  */
 function evaluate(template: string, scopes: Record<string, unknown>[]): string[] {
@@ -145,13 +145,13 @@ const WORK = "features/work";
  */
 const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
   "deleteAccount.deleted${number}": () =>
-    each("number", constantArray(`${PAGES}/DeleteAccountPage.tsx`, "WAS_VERSCHWINDET")),
-  "profile.commute_${stufe}": () =>
-    each("stufe", constantArray(`${PAGES}/ProfilePage.tsx`, "PENDELSTUFEN")),
-  "profile.relocate_${wert}": () =>
-    each("wert", constantArray(`${PAGES}/ProfilePage.tsx`, "UMZUGSWERTE")),
+    each("number", constantArray(`${PAGES}/DeleteAccountPage.tsx`, "WHAT_DISAPPEARS")),
+  "profile.commute_${readiness}": () =>
+    each("readiness", constantArray(`${PAGES}/ProfilePage.tsx`, "COMMUTE_READINESS")),
+  "profile.relocate_${value}": () =>
+    each("value", constantArray(`${PAGES}/ProfilePage.tsx`, "RELOCATION_READINESS")),
   "profile.commute_${treffer.reach_commute}": () =>
-    nested("treffer", "reach_commute", unionMembers("features/person/api/profile.ts", "Pendelstufe")),
+    nested("treffer", "reach_commute", unionMembers("features/person/api/profile.ts", "CommuteReadiness")),
   "resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}": () =>
     each("templ", constantArray(`${PAGES}/ResumePage.tsx`, "TEMPLATES")),
   "resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}Hint": () =>
@@ -284,7 +284,7 @@ describe("catalogue keys", () => {
    * <strong>Every key the code BUILDS is known here.</strong>
    *
    * The first test sees only keys that stand whole in the source. A template
-   * such as `profile.commute_${stufe}` is invisible to it — and the English
+   * such as `profile.commute_${readiness}` is invisible to it — and the English
    * rename of the catalogue renamed exactly these prefixes in one pass. So every
    * template in the code must stand in `DYNAMIC`, with the values its variable
    * part can take; a new template that nobody lists makes this red instead of

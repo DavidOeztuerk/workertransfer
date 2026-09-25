@@ -15,21 +15,21 @@ import {
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
- * Welche Nachweise zu dieser Arbeit gehören (ADR-0039).
+ * Which kinds of evidence belong to this work (ADR-0039).
  *
- * Vorschläge, keine Vorschrift — hochladen lässt sich alles. Erscheint nur mit
- * genanntem Berufsfeld; ein leerer Kasten wäre die Behauptung, dort fehle etwas
- * (ADR-0022 §3). Die Chips sind nicht anklickbar: ein Beleg wird dadurch keine
- * Nennung (ADR-0033).
+ * Suggestions, not a prescription — anything can be uploaded. Appears only
+ * with a named occupational field; an empty box would be the claim that
+ * something is missing there (ADR-0022 §3). The chips are not clickable: a
+ * piece of evidence does not become a naming that way (ADR-0033).
  */
-export function Nachweise({ feld }: { feld: OccupationalFieldChoice }) {
+export function EvidenceKinds({ field }: { field: OccupationalFieldChoice }) {
   const { t } = useTranslation();
 
-  if (feld === null) return null;
+  if (field === null) return null;
 
-  const alle = evidenceKindsFor(feld);
-  const hochladbar = new Set(uploadableEvidenceKinds(feld).map((art) => art.labelKey));
-  const nurGenannt = alle.filter((art) => !hochladbar.has(art.labelKey));
+  const all = evidenceKindsFor(field);
+  const uploadable = new Set(uploadableEvidenceKinds(field).map((kind) => kind.labelKey));
+  const nameOnly = all.filter((kind) => !uploadable.has(kind.labelKey));
 
   return (
     <Card sx={{ mt: 3 }}>
@@ -42,20 +42,20 @@ export function Nachweise({ feld }: { feld: OccupationalFieldChoice }) {
         </Typography>
 
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 2.5 }}>
-          {alle.map((art) => (
+          {all.map((kind) => (
             <Chip
-              key={art.labelKey}
-              label={t(art.labelKey)}
+              key={kind.labelKey}
+              label={t(kind.labelKey)}
               size="small"
               variant="outlined"
             />
           ))}
         </Box>
 
-        {nurGenannt.length > 0 ? (
+        {nameOnly.length > 0 ? (
           <Alert severity="info" sx={{ mb: 2.5 }}>
             {t("credentials.nameOnly", {
-              belege: nurGenannt.map((art) => t(art.labelKey)).join(", "),
+              belege: nameOnly.map((kind) => t(kind.labelKey)).join(", "),
             })}
           </Alert>
         ) : null}

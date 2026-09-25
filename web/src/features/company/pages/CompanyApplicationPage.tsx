@@ -13,8 +13,8 @@ import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../api/companies";
 import { empfaengerAusFirma, kopfAusKontakt } from "../../work/lib/briefkopf";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { Lebenslaufblatt } from "../../person/components/lebenslauf/Lebenslaufblatt";
-import { holeFremdenInhalt, ladeSichtbaren } from "../../person/api/resume";
+import { CurriculumVitaeSheet } from "../../person/components/resume/CurriculumVitaeSheet";
+import { getVisibleCurriculumVitae, getVisibleDocumentContent } from "../../person/api/resume";
 import { getCandidateProfile } from "../api/fremdprofil";
 import { getCompanyApplication } from "../api/applications";
 import { useHandelnder } from "../lib/session";
@@ -58,7 +58,7 @@ export function CompanyApplicationPage() {
   const lebenslauf = useAsync(
     (signal) =>
       e?.shares_resume
-        ? ladeSichtbaren(e.subject_id, signal)
+        ? getVisibleCurriculumVitae(e.subject_id, signal)
         : Promise.resolve({ ok: true as const, value: null }),
     [e?.subject_id, e?.shares_resume],
     e !== null,
@@ -153,9 +153,9 @@ export function CompanyApplicationPage() {
           ) : null}
 
           {aktuell.key === "resume" && cv ? (
-            <Lebenslaufblatt
+            <CurriculumVitaeSheet
               template={cv.template}
-              daten={{
+              data={{
                 headline: profil.data?.headline ?? "",
                 bio: profil.data?.bio ?? "",
                 location: profil.data?.location ?? "",
@@ -192,7 +192,7 @@ function Unterlagenansicht({
   useEffect(() => {
     let frei: string | null = null;
     let weg = false;
-    void holeFremdenInhalt(subjectId, documentId).then((result) => {
+    void getVisibleDocumentContent(subjectId, documentId).then((result) => {
       if (weg || !result.ok) return;
       frei = result.value.url;
       setUrl(result.value.url);

@@ -16,16 +16,17 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
 import {
-  type Arbeit,
-  haengeAn,
-  ladeMeines,
-  speichereMeines,
+  type PortfolioItem,
+  getMyPortfolio,
+  saveMyPortfolio,
+  uploadAttachment,
 } from "../api/portfolio";
 
-interface Entwurf {
+/** The form's state: every field as typed, the year still a string. */
+interface ItemDraft {
   title: string;
   summary: string;
   url: string;
@@ -35,7 +36,7 @@ interface Entwurf {
   technologies: string[];
 }
 
-const LEER: Entwurf = {
+const EMPTY: ItemDraft = {
   title: "",
   summary: "",
   url: "",
@@ -45,92 +46,91 @@ const LEER: Entwurf = {
   technologies: [],
 };
 
-const zuEntwurf = (arbeit: Arbeit): Entwurf => ({
-  title: arbeit.title,
-  summary: arbeit.summary,
-  url: arbeit.url ?? "",
-  role: arbeit.role,
-  year: arbeit.year === null ? "" : String(arbeit.year),
-  attachment: arbeit.attachment,
-  technologies: arbeit.technologies,
+const toDraft = (item: PortfolioItem): ItemDraft => ({
+  title: item.title,
+  summary: item.summary,
+  url: item.url ?? "",
+  role: item.role,
+  year: item.year === null ? "" : String(item.year),
+  attachment: item.attachment,
+  technologies: item.technologies,
 });
 
-/** Leere Felder werden `null`, nicht `""` — „nicht angegeben" ist kein leerer Wert. */
-function zuArbeit(draft: Entwurf): Arbeit {
-  const jahr = draft.year.trim();
+/** Empty fields become `null`, not `""` — "not stated" is no empty value. */
+function toItem(draft: ItemDraft): PortfolioItem {
+  const year = draft.year.trim();
 
   return {
     title: draft.title.trim(),
     summary: draft.summary.trim(),
     url: draft.url.trim() === "" ? null : draft.url.trim(),
     role: draft.role.trim(),
-    year: jahr === "" ? null : Number(jahr),
+    year: year === "" ? null : Number(year),
     attachment: draft.attachment,
     technologies: draft.technologies,
   };
 }
 
 /**
- * <c>/portfolio/new</c> und <c>/portfolio/:stelle</c> — eine Arbeit anlegen
- * oder ändern.
+ * <c>/portfolio/new</c> and <c>/portfolio/:index</c> — create or change an
+ * item.
  *
- * <strong>Eine Arbeit hat keine eigene Kennung.</strong> Ihre Adresse ist ihre
- * Stelle in der gespeicherten Liste, und Speichern heisst deshalb: das ganze
- * Feld schicken, mit genau einem geänderten Eintrag. Wer das übersieht, löscht
- * beim Speichern die übrigen.
+ * <strong>An item has no id of its own.</strong> Its address is its position
+ * in the stored list, and saving therefore means: send the whole field, with
+ * exactly one changed entry. Whoever overlooks that deletes the others on save.
  *
- * <strong>Das Entfernen steht HIER und nicht in der Liste.</strong> Hier hat die
- * Person die Arbeit vor Augen, um die es geht — in einer Liste träfe der Klick
- * eine Zeile unter vielen.
+ * <strong>Removing stands HERE and not in the list.</strong> Here the person
+ * has the item in front of them that it is about — in a list the click would
+ * hit one row among many.
  *
  * <strong>The file field states its rules up front</strong> — which formats and
  * how large. A field whose rules you learn by failing is a riddle, not a field.
  */
 export function PortfolioItemPage() {
   const { t } = useTranslation();
-  const { stelle } = useParams();
+  const { index } = useParams();
   const navigate = useNavigate();
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
-  const neu = stelle === undefined;
+  const isNew = index === undefined;
   const showcase = useAsync(
-    (signal) => ladeMeines(signal),
+    (signal) => getMyPortfolio(signal),
     [session?.userId],
     session !== null,
   );
 
-  const [draft, setEntwurf] = useState<Entwurf>(LEER);
-  const [loaded, setGeladen] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const [draft, setDraft] = useState<ItemDraft>(EMPTY);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  const arbeiten = showcase.value?.ok
+  const items = showcase.value?.ok
     ? (showcase.value.value?.items ?? [])
     : [];
-  const position = neu ? arbeiten.length : Number(stelle);
-  const vorhanden =
-    !neu &&
+  const position = isNew ? items.length : Number(index);
+  const exists =
+    !isNew &&
     Number.isInteger(position) &&
     position >= 0 &&
-    position < arbeiten.length;
+    position < items.length;
 
   useEffect(() => {
     if (loaded || !showcase.value?.ok) return;
-    if (vorhanden) setEntwurf(zuEntwurf(arbeiten[position] as Arbeit));
-    setGeladen(true);
-  }, [loaded, showcase.value, vorhanden, arbeiten, position]);
+    if (exists) setDraft(toDraft(items[position] as PortfolioItem));
+    setLoaded(true);
+  }, [loaded, showcase.value, exists, items, position]);
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig
-        titel={t("portfolio.itemTitle")}
-        satz="portfolio.signInRequired"
+      <SignInRequired
+        title={t("portfolio.itemTitle")}
+        sentenceKey="portfolio.signInRequired"
       />
     );
   }
 
-  if (showcase.laedt) {
+  if (showcase.loading) {
     return (
       <PageShell title={t("portfolio.itemTitle")} narrow>
         <LoadingBlock label={t("portfolio.itemLoading")} />
@@ -138,9 +138,9 @@ export function PortfolioItemPage() {
     );
   }
 
-  // Eine Adresse, hinter der nichts steht — etwa nach dem Entfernen in einem
-  // zweiten Tab, oder wenn jemand die Zahl von Hand ändert.
-  if (!neu && !vorhanden) {
+  // An address with nothing behind it — say after removing in a second tab,
+  // or when somebody changes the number by hand.
+  if (!isNew && !exists) {
     return (
       <PageShell title={t("portfolio.itemMissingTitle")} narrow>
         <EmptyBlock
@@ -156,53 +156,53 @@ export function PortfolioItemPage() {
     );
   }
 
-  function change(teil: Partial<Entwurf>) {
-    setEntwurf((before) => ({ ...before, ...teil }));
-    setFehler(null);
+  function change(part: Partial<ItemDraft>) {
+    setDraft((before) => ({ ...before, ...part }));
+    setError(null);
   }
 
-  async function speichern() {
-    const nextValue = [...arbeiten];
-    if (neu) nextValue.push(zuArbeit(draft));
-    else nextValue[position] = zuArbeit(draft);
+  async function save() {
+    const nextValue = [...items];
+    if (isNew) nextValue.push(toItem(draft));
+    else nextValue[position] = toItem(draft);
 
-    setLaeuft(true);
-    const result = await speichereMeines(nextValue);
-    setLaeuft(false);
+    setRunning(true);
+    const result = await saveMyPortfolio(nextValue);
+    setRunning(false);
 
     if (result.ok) void navigate("/portfolio");
-    else setFehler(result.error.detail);
+    else setError(result.error.detail);
   }
 
-  async function entfernen() {
-    setLaeuft(true);
-    const result = await speichereMeines(
-      arbeiten.filter((_, i) => i !== position),
+  async function remove() {
+    setRunning(true);
+    const result = await saveMyPortfolio(
+      items.filter((_, i) => i !== position),
     );
-    setLaeuft(false);
+    setRunning(false);
 
     if (result.ok) void navigate("/portfolio");
-    else setFehler(result.error.detail);
+    else setError(result.error.detail);
   }
 
-  async function dateiWaehlen(file: File) {
-    setLaeuft(true);
-    const result = await haengeAn(file);
-    setLaeuft(false);
+  async function chooseFile(file: File) {
+    setRunning(true);
+    const result = await uploadAttachment(file);
+    setRunning(false);
 
     if (result.ok) change({ attachment: result.value.name });
-    else setFehler(result.error.detail);
+    else setError(result.error.detail);
   }
 
   // The local file name is NOT shown: it never travels to the server, and the
   // UI may only say what is true — that a file is attached.
-  const dateiSatz =
+  const fileSentence =
     draft.attachment !== null ? "portfolio.fileAttached" : "portfolio.noFile";
 
   return (
     <PageShell
       title={
-        neu
+        isNew
           ? t("portfolio.itemNew")
           : draft.title !== ""
             ? draft.title
@@ -218,9 +218,9 @@ export function PortfolioItemPage() {
 
       <Card>
         <CardContent>
-          {fehler !== null ? (
+          {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {fehler}
+              {error}
             </Alert>
           ) : null}
 
@@ -228,7 +228,7 @@ export function PortfolioItemPage() {
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              void speichern();
+              void save();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
@@ -268,7 +268,7 @@ export function PortfolioItemPage() {
                 {t("portfolio.file")}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {t(dateiSatz)}
+                {t(fileSentence)}
               </Typography>
               <Button
                 component="label"
@@ -283,10 +283,10 @@ export function PortfolioItemPage() {
                   accept="image/png,image/jpeg,application/pdf"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    // Das Feld zurücksetzen, damit dieselbe Datei erneut
-                    // gewählt werden kann.
+                    // Reset the field so that the same file can be chosen
+                    // again.
                     event.target.value = "";
-                    if (file !== undefined) void dateiWaehlen(file);
+                    if (file !== undefined) void chooseFile(file);
                   }}
                 />
               </Button>
@@ -306,11 +306,11 @@ export function PortfolioItemPage() {
                   ? t("common.saving")
                   : t("common.save")}
               </Button>
-              {!neu ? (
+              {!isNew ? (
                 <Button
                   variant="text"
                   color="error"
-                  onClick={() => void entfernen()}
+                  onClick={() => void remove()}
                   disabled={running}
                 >
                   {running

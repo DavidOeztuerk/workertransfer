@@ -2,15 +2,15 @@ import { request } from "../../../core/api/client";
 import { COMPANIES_BASE_URL } from "../../../env";
 
 /**
- * Nur der Anzeigename eines Unternehmens — mehr braucht dieser Bereich nicht.
+ * Only a company's display name — this area needs no more.
  *
- * `/consents` löst damit die Tenant-UUID einer Freigabe zu einem Namen auf. Den
- * Namen im Ledger zu führen hiesse, eine Kopie zu halten, die veraltet, sobald
- * ein Unternehmen sich umbenennt — und der Ledger verwaltet Fähigkeiten, keine
- * Unternehmen.
+ * `/consents` uses it to resolve the tenant UUID of a release to a name.
+ * Keeping the name in the ledger would mean holding a copy that goes stale the
+ * moment a company renames itself — and the ledger manages capabilities, not
+ * companies.
  *
- * `null` heisst „kein Profil abrufbar". Die Seite schreibt dann „Ein
- * Unternehmen" und erfindet keinen Namen.
+ * `null` means "no profile retrievable". The page then writes "A company" and
+ * invents no name.
  */
 export interface CompanyName {
   tenant_id: string;

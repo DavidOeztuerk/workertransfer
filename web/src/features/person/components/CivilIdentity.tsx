@@ -13,55 +13,56 @@ import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { loadSession } from "../../auth/store/authThunks";
 import { useAsync } from "../lib/useAsync";
 import {
-  LEERE_ANSCHRIFT,
-  ladeAnschrift,
-  speichereAnschrift,
-  speichereKlarname,
-} from "../api/zivilidentitaet";
+  EMPTY_POSTAL_ADDRESS,
+  getPostalAddress,
+  saveLegalName,
+  savePostalAddress,
+} from "../api/civilIdentity";
 
 /**
- * Klarname und Bewerbungsanschrift — eine Quelle für Profil und Einstellungen.
+ * Legal name and postal address for applications — one source for profile and
+ * settings.
  *
- * Der Matching-Ort auf dem Profil ist etwas anderes: er ist frei, sichtbar
- * nach Freigabe, und nie eine Straße (ADR-0038).
+ * The matching location on the profile is something else: it is free text,
+ * visible after release, and never a street (ADR-0038).
  */
-export function Zivilidentitaet() {
+export function CivilIdentity() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const session = useAppSelector((state) => state.auth.session);
-  const anschrift = useAsync((signal) => ladeAnschrift(signal), [session?.userId]);
+  const address = useAsync((signal) => getPostalAddress(signal), [session?.userId]);
 
-  const [vorname, setVorname] = useState(session?.givenName ?? "");
-  const [nachname, setNachname] = useState(session?.familyName ?? "");
-  const [form, setForm] = useState(LEERE_ANSCHRIFT);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [givenName, setGivenName] = useState(session?.givenName ?? "");
+  const [familyName, setFamilyName] = useState(session?.familyName ?? "");
+  const [form, setForm] = useState(EMPTY_POSTAL_ADDRESS);
+  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setVorname(session?.givenName ?? "");
-    setNachname(session?.familyName ?? "");
+    setGivenName(session?.givenName ?? "");
+    setFamilyName(session?.familyName ?? "");
   }, [session?.givenName, session?.familyName]);
 
   useEffect(() => {
-    if (anschrift.value) setForm(anschrift.value);
-  }, [anschrift.value]);
+    if (address.value) setForm(address.value);
+  }, [address.value]);
 
-  async function speichern() {
+  async function save() {
     setSaving(true);
-    setFehler(null);
-    const name = await speichereKlarname(vorname, nachname);
-    const adresse = await speichereAnschrift(form);
+    setError(null);
+    const name = await saveLegalName(givenName, familyName);
+    const postal = await savePostalAddress(form);
     setSaving(false);
     if (!name.ok) {
-      setFehler(name.detail);
+      setError(name.detail);
       return;
     }
-    if (!adresse.ok) {
-      setFehler(adresse.detail);
+    if (!postal.ok) {
+      setError(postal.detail);
       return;
     }
-    setForm(adresse.anschrift);
+    setForm(postal.address);
     setSaved(true);
     void dispatch(loadSession());
   }
@@ -76,13 +77,13 @@ export function Zivilidentitaet() {
           {t("civilIdentity.purpose")}
         </Typography>
 
-        {anschrift.laedt ? <LoadingBlock label={t("common.loading")} /> : null}
+        {address.loading ? <LoadingBlock label={t("common.loading")} /> : null}
 
         <Box
           component="form"
           onSubmit={(event) => {
             event.preventDefault();
-            void speichern();
+            void save();
           }}
           sx={{ display: "grid", gap: 2 }}
         >
@@ -90,15 +91,15 @@ export function Zivilidentitaet() {
             <TextField
               label={t("civilIdentity.firstName")}
               autoComplete="given-name"
-              value={vorname}
-              onChange={(event) => setVorname(event.target.value)}
+              value={givenName}
+              onChange={(event) => setGivenName(event.target.value)}
               fullWidth
             />
             <TextField
               label={t("civilIdentity.lastName")}
               autoComplete="family-name"
-              value={nachname}
-              onChange={(event) => setNachname(event.target.value)}
+              value={familyName}
+              onChange={(event) => setFamilyName(event.target.value)}
               fullWidth
             />
           </Box>
@@ -150,7 +151,7 @@ export function Zivilidentitaet() {
             fullWidth
           />
 
-          {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
+          {error !== null ? <Alert severity="error">{error}</Alert> : null}
           {saved ? (
             <Alert severity="success" role="status">
               {t("civilIdentity.saved")}

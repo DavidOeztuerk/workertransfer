@@ -23,7 +23,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../../company/api/companies";
-import { ladeAnschrift } from "../../person/api/zivilidentitaet";
+import { getPostalAddress } from "../../person/api/civilIdentity";
 import { empfaengerAusFirma, kopfAusSitzung } from "../lib/briefkopf";
 import { merke } from "../lib/kontext";
 import { schreibbeginn, schreibende } from "../lib/schreibuhr";
@@ -32,14 +32,14 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { AnmeldungNoetig } from "../../person/components/AnmeldungNoetig";
+import { SignInRequired } from "../../person/components/SignInRequired";
 import {
   deleteDocument,
+  getMyCurriculumVitae,
   getMyDocuments,
-  holeEigenenInhalt,
-  ladeMeinen,
+  getOwnDocumentContent,
   uploadDocument,
-  type UnterlageV1,
+  type DocumentRecordV1,
 } from "../../person/api/resume";
 import { Schreibfortschritt } from "../components/Schreibfortschritt";
 import { getJob } from "../api/jobs";
@@ -118,12 +118,12 @@ export function DraftPage() {
     signedIn && e !== null && !schreibt,
   );
   const lebenslauf = useAsync(
-    () => merke(`resume:${session?.userId ?? ""}`, () => ladeMeinen()),
+    () => merke(`resume:${session?.userId ?? ""}`, () => getMyCurriculumVitae()),
     [session?.userId],
     signedIn && e !== null && !schreibt,
   );
   const anschrift = useAsync(
-    () => merke(`anschrift:${session?.userId ?? ""}`, () => ladeAnschrift()),
+    () => merke(`anschrift:${session?.userId ?? ""}`, () => getPostalAddress()),
     [session?.userId],
     signedIn && !!session?.userId,
   );
@@ -177,7 +177,7 @@ export function DraftPage() {
   }
 
   if (!signedIn || !id) {
-    return <AnmeldungNoetig titel={t("drafts.title")} satz="drafts.signInRequired" />;
+    return <SignInRequired title={t("drafts.title")} sentenceKey="drafts.signInRequired" />;
   }
 
   if (entwurf.pending && !e) {
@@ -269,7 +269,7 @@ export function DraftPage() {
   }
 
   async function handlePreview(docId: string) {
-    const result = await holeEigenenInhalt(docId);
+    const result = await getOwnDocumentContent(docId);
     if (!result.ok) {
       setFehler(result.error.detail);
       return;
@@ -542,14 +542,14 @@ export function DraftPage() {
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => navigate("/resume", { state: { weg: "datei" } })}
+                      onClick={() => navigate("/resume", { state: { mode: "file" } })}
                     >
                       {t("drafts.resumeEdit")}
                     </Button>
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => navigate("/resume", { state: { weg: "datei" } })}
+                      onClick={() => navigate("/resume", { state: { mode: "file" } })}
                     >
                       {t("drafts.resumeReplace")}
                     </Button>
@@ -564,14 +564,14 @@ export function DraftPage() {
                     <Button
                       size="small"
                       variant={hatFormular ? "outlined" : "contained"}
-                      onClick={() => navigate("/resume", { state: { weg: "manuell" } })}
+                      onClick={() => navigate("/resume", { state: { mode: "manual" } })}
                     >
                       {hatFormular ? t("drafts.resumeEdit") : t("drafts.resumeCreate")}
                     </Button>
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => navigate("/resume", { state: { weg: "datei" } })}
+                      onClick={() => navigate("/resume", { state: { mode: "file" } })}
                     >
                       {t("drafts.resumeUpload")}
                     </Button>
@@ -579,7 +579,7 @@ export function DraftPage() {
                 </Box>
               )}
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 2 }}>
-                {beilagen.map((doc: UnterlageV1) => (
+                {beilagen.map((doc: DocumentRecordV1) => (
                   <Box
                     key={doc.id}
                     sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}
