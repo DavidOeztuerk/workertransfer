@@ -9,6 +9,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { ADMIN_CASES, type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { getOwnCompanyProfile, saveCompanyProfile } from "../api/companies";
@@ -45,6 +46,20 @@ const list = (raw: string): string[] =>
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
+
+
+/**
+ * Saving the shop window demands an `admin` (PBI-2), and the profile names
+ * what was wrong with it. A catalogue text, never companies-service's sentence
+ * — each pattern matches `EmployerProfile.cs`, which points back here.
+ */
+const SAVE_CASES: readonly ServerCase[] = [
+  ...ADMIN_CASES,
+  { status: 422, pattern: /display name must not be empty/i, key: "companyProfile.displayNameRequired" },
+  { status: 422, pattern: /link|http and https/i, key: "companyProfile.websiteInvalid" },
+  { status: 422, pattern: /at most \d+ (locations|benefits)/i, key: "companyProfile.tooManyEntries" },
+  { status: 422, pattern: /exceeds \d+ characters/i, key: "companyProfile.fieldTooLong" },
+];
 
 /**
  * <c>/company/profile</c> — how a company presents itself.
@@ -126,7 +141,7 @@ export function CompanyProfilePage() {
       setError(null);
       setSaved(true);
     } else {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.profileNotSaved", SAVE_CASES)));
       setSaved(false);
     }
   }

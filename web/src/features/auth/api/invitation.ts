@@ -2,6 +2,7 @@ import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
 import type { Membership } from "../types/session";
 import { i18n } from "../../../core/i18n/i18n";
+import { failureKey } from "../../../shared/api/errors";
 
 export type InvitationResult =
   | { ok: true; membership: Membership }
@@ -45,8 +46,21 @@ export async function acceptInvitation(
     };
   }
 
+  // 400 carries two cases the person answers differently: an expired
+  // invitation (ask for a new one) and one issued for another address (sign in
+  // with that one). The sentences are identity-service's (`Invitation.cs`), and
+  // they point back here; neither is shown.
   if (answer.error.status === 400) {
-    return { ok: false, needsAccount: false, message: answer.error.detail };
+    return {
+      ok: false,
+      needsAccount: false,
+      message: i18n.t(
+        failureKey(answer.error, "errors.invitationInvalid", [
+          { status: 400, pattern: /has expired/i, key: "invitation.expired" },
+          { status: 400, pattern: /different email address/i, key: "errors.invitedAddress" },
+        ]),
+      ),
+    };
   }
 
   return {

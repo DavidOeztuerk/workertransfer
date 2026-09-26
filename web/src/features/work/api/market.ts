@@ -100,6 +100,8 @@ export async function getMyMarketStatus(signal?: AbortSignal): Promise<MarketSta
       ...answer.error,
       title: i18n.t("errors.marketStatusUnavailable"),
       detail: i18n.t("errors.marketStatusUnchangeable"),
+      titleKey: "errors.marketStatusUnavailable",
+      detailKey: "errors.marketStatusUnchangeable",
     },
   };
 }

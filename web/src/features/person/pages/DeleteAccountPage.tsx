@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { sessionEnded } from "../../auth/store/authSlice";
 import { SignInRequired } from "../components/SignInRequired";
 import { requestErasure } from "../api/erasure";
+import { failureKey } from "../../../shared/api/errors";
 
 /** Only the numbers — the wording lives in the catalogues. */
 const WHAT_DISAPPEARS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -125,7 +126,7 @@ export function DeleteAccountPage() {
       // with 401 — the store would stay as it is.
       dispatch(sessionEnded());
     } else {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.deletionNotAccepted")));
     }
   }
 

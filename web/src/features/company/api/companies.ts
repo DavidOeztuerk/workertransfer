@@ -159,6 +159,8 @@ export async function getCompanyBySlug(
         status: 0,
         title: i18n.t("errors.pageUnavailable"),
         detail: i18n.t("errors.pageUnavailable"),
+        titleKey: "errors.pageUnavailable",
+        detailKey: "errors.pageUnavailable",
       },
     };
   }

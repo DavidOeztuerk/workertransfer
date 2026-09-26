@@ -1,3 +1,4 @@
+import type { ApiError } from "../../../core/store/thunkHelpers";
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
@@ -8,7 +9,7 @@ import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFi
  */
 export async function saveOccupationalField(
   field: OccupationalFieldChoice,
-): Promise<{ ok: true } | { ok: false; detail: string }> {
+): Promise<{ ok: true } | { ok: false; error: ApiError }> {
   const answer = await request<unknown>(
     API_BASE_URL,
     "/account/occupational-field",
@@ -16,5 +17,5 @@ export async function saveOccupationalField(
     "errors.occupationNotSaved",
   );
 
-  return answer.ok ? { ok: true } : { ok: false, detail: answer.error.detail };
+  return answer.ok ? { ok: true } : { ok: false, error: answer.error };
 }

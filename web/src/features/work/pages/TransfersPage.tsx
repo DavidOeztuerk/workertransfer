@@ -14,6 +14,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -81,8 +82,17 @@ export function TransfersPage() {
     setRunning(true);
     const result = await personMove(id, action);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
-    else setError(null);
+    // A 409 means the case moved on meanwhile (the company withdrew, or a
+    // step was already taken) — a catalogue text, never the server's sentence.
+    if (!result.ok) {
+      setError(
+        t(
+          failureKey(result.error, "errors.stepFailed", [
+            { status: 409, key: "transfers.stepNotNow" },
+          ]),
+        ),
+      );
+    } else setError(null);
     transfers.reload();
   }
 
@@ -112,7 +122,9 @@ export function TransfersPage() {
       ) : null}
 
       {transfers.data !== null && !transfers.data.ok ? (
-        <Alert severity="error">{transfers.data.error.detail}</Alert>
+        <Alert severity="error">
+          {t(failureKey(transfers.data.error, "errors.listNotLoaded"))}
+        </Alert>
       ) : null}
 
       {transfers.data?.ok && list.length === 0 ? (

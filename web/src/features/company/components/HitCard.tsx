@@ -16,7 +16,8 @@ import {
   getMarketStatus,
   requestMarketStatus,
 } from "../../work/api/market";
-import { expressInterest } from "../../work/api/transfers";
+import { COMPANY_TRANSFER_CASES, expressInterest } from "../../work/api/transfers";
+import { failureKey } from "../../../shared/api/errors";
 import { openConversation } from "../../work/api/advisor";
 
 /** As catalogue keys — the wording lies in the catalogues. */
@@ -302,7 +303,7 @@ function ConversationOpener({ subjectId }: { subjectId: string }) {
               setMessage(null);
               setDone(true);
             } else {
-              setMessage(result.error.detail ?? result.error.title);
+              setMessage(t(failureKey(result.error, "errors.conversationNotOpened")));
             }
           });
         }}
@@ -353,7 +354,7 @@ function ResumeRequestButton({ subjectId }: { subjectId: string }) {
               setMessage(null);
               setAsked(true);
             } else {
-              setMessage(result.error.detail);
+              setMessage(t(failureKey(result.error, "errors.requestNotSent")));
             }
           });
         }}
@@ -411,7 +412,7 @@ function MarketAccess({
             setRunning(true);
             void requestMarketStatus(subjectId).then((result) => {
               setRunning(false);
-              setMessage(result.ok ? null : result.error.detail);
+              setMessage(result.ok ? null : t(failureKey(result.error, "errors.requestNotSent")));
               onChanged();
             });
           }}
@@ -464,7 +465,13 @@ function MarketAccess({
                     setMessage(
                       result.ok
                         ? t("scout.interestRecorded")
-                        : result.error.detail,
+                        : t(
+                            failureKey(
+                              result.error,
+                              "errors.interestNotRecorded",
+                              COMPANY_TRANSFER_CASES,
+                            ),
+                          ),
                     );
                   },
                 );

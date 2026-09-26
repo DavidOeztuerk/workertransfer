@@ -10,6 +10,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../../work/lib/session";
 import { useAsync } from "../../work/lib/useAsync";
 import {
@@ -71,7 +72,7 @@ export function CompanyAdvisorPage() {
     const result = action === "hand-over" ? await handOver(id) : await endAsCompany(id);
     setRunning(false);
 
-    setError(result.ok ? null : (result.error.detail ?? result.error.title));
+    setError(result.ok ? null : t(failureKey(result.error, "errors.conversationStepFailed")));
     setHandedOver(result.ok && action === "hand-over");
     conversations.reload();
   }

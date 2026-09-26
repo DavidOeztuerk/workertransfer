@@ -132,6 +132,9 @@ const de = {
     tabsLabel: "Anmelden oder neues Konto anlegen",
     tabSignIn: "Anmelden",
     tabRegister: "Konto anlegen",
+    invalidCredentials: "E-Mail oder Passwort stimmen nicht.",
+    notConfirmed:
+      "Deine E-Mail-Adresse ist noch nicht bestätigt. Öffne zuerst den Link aus der Bestätigungs-E-Mail.",
   },
 
   logout: {
@@ -197,6 +200,9 @@ const de = {
     choiceListeningHint: "Ich suche nicht, bin aber für ein gutes Angebot ansprechbar.",
     choiceUnavailable: "Gerade nicht",
     choiceUnavailableHint: "Auch mit Freigabe darf mich niemand ansprechen.",
+    remarkTooLong: "Die Notiz ist zu lang. Kürze sie bitte.",
+    requestAlreadyAnswered:
+      "Diese Anfrage ist schon beantwortet. Lade die Seite neu, um ihren Stand zu sehen.",
   },
 
   transfer: {
@@ -462,6 +468,9 @@ const de = {
     refreshing: "Wird geholt…",
     adoptSkills: "Als Fähigkeiten ins Profil übernehmen",
     disconnect: "Verbindung trennen",
+    notProven:
+      "Der Nachweis steht noch aus: ein öffentlicher Gist mit genau dieser Beschreibung ist nicht zu finden. Leg ihn an und prüf dann erneut.",
+    unavailable: "GitHub antwortet gerade nicht. Versuch es später noch einmal.",
   },
 
   resume: {
@@ -552,6 +561,8 @@ const de = {
     uploadedOn: "Hochgeladen am {{datum}}",
     viewFile: "Datei ansehen",
     uploading: "Wird hochgeladen…",
+    tooManyDocuments:
+      "Hier liegen schon so viele Unterlagen, wie Platz haben. Lösche zuerst eine, dann geht die neue.",
   },
 
   errors: {
@@ -676,6 +687,9 @@ const de = {
     draftsNotLoaded: "Die Entwürfe konnten nicht geladen werden.",
     draftNotDeleted: "Der Entwurf konnte nicht gelöscht werden.",
     companyApplicationNotLoaded: "Die Unternehmensbewerbung konnte nicht geladen werden.",
+    adminOnly: "Das darf nur, wer Administrator dieses Unternehmens ist.",
+    tooManyAttempts:
+      "Zu viele Versuche in kurzer Zeit. Warte eine Minute und versuch es dann noch einmal.",
   },
 
   drafts: {
@@ -796,6 +810,9 @@ const de = {
       failed:
         "Das Schreiben ist fehlgeschlagen. Du kannst es erneut versuchen oder den Text selbst schreiben.",
     },
+    nothingToRevise:
+      "Es gibt keine offene Anmerkung — also nichts zu überarbeiten. Schreib zuerst, was sich ändern soll.",
+    quoted: "„{{quote}}“",
   },
 
   job: {
@@ -884,6 +901,9 @@ const de = {
     partProfile: "Profil",
     partResume: "Lebenslauf",
     partPortfolio: "Arbeiten",
+    withdrawFailed: "Die Bewerbung ließ sich nicht zurückziehen.",
+    withdrawNotPossible:
+      "Diese Bewerbung lässt sich nicht mehr zurückziehen. Lade die Seite neu, um ihren Stand zu sehen.",
   },
 
   transfers: {
@@ -906,6 +926,8 @@ const de = {
     acceptConversation: "Gespräch annehmen",
     acceptOffer: "Angebot annehmen",
     confirmRelease: "Freigabe bestätigen und abschließen",
+    stepNotNow:
+      "Dieser Schritt geht gerade nicht mehr — das Gespräch hat sich inzwischen bewegt. Lade die Seite neu.",
   },
 
   companyTransfers: {
@@ -929,6 +951,12 @@ const de = {
     feeHint: "Wird festgehalten, nicht überwiesen.",
     makeOffer: "Angebot machen",
     complete: "Abschließen",
+    alreadyRunning:
+      "Mit dieser Person läuft schon ein Transfer — ihr findet ihn unter „Transfers“.",
+    stepNotNow:
+      "Dieser Schritt geht gerade nicht mehr — der Transfer hat sich inzwischen bewegt. Lade die Seite neu.",
+    textTooLong: "Der Text ist zu lang. Kürze ihn bitte.",
+    feeNegative: "Eine Ablöse ist nicht negativ.",
   },
 
   companyJobs: {
@@ -963,6 +991,15 @@ const de = {
     helpInProgress: "Wird geschrieben…",
     helpButton: "Vorschlag holen",
     helpButtonReplaces: "Vorschlag holen (ersetzt die Beschreibung)",
+    stateMovedOn:
+      "Diese Ausschreibung steht schon anders, als der Schritt voraussetzt. Lade die Seite neu.",
+    fieldsRequired: "Titel und Beschreibung brauchen beide einen Text.",
+    fieldTooLong: "Eines der Felder ist zu lang. Kürze es bitte.",
+    skillTooLong:
+      "Eine der Fähigkeiten ist zu lang — länger, als ein Profil sie fassen könnte. Kürze sie bitte.",
+    tooManySkills: "Das sind mehr Fähigkeiten, als eine Ausschreibung fassen kann.",
+    helpNoProvider:
+      "Es ist kein Entwurfsanbieter eingerichtet — einen Vorschlag gibt es deshalb nicht. Deine Beschreibung bleibt, wie sie ist.",
   },
 
   team: {
@@ -987,6 +1024,7 @@ const de = {
     role: "Rolle",
     sent: "Einladung verschickt.",
     sending: "Wird verschickt…",
+    inviteEmailInvalid: "Das sieht nicht nach einer E-Mail-Adresse aus. Prüf die Schreibweise.",
   },
 
   companyProfile: {
@@ -1011,6 +1049,10 @@ const de = {
     phone: "Telefon",
     benefits: "Leistungen",
     benefitsHint: "Mit Komma getrennt, zum Beispiel: Homeoffice, Weiterbildung",
+    displayNameRequired: "Der Anzeigename braucht einen Text.",
+    websiteInvalid: "Die Website muss eine vollständige Adresse mit http:// oder https:// sein.",
+    tooManyEntries: "Das sind mehr Standorte oder Leistungen, als das Profil fassen kann.",
+    fieldTooLong: "Eines der Felder ist zu lang. Kürze es bitte.",
   },
 
   companyApplications: {
@@ -1168,6 +1210,14 @@ const de = {
     salaryFromOnly: "ab {{von}} €",
     salaryToOnly: "bis {{bis}} €",
     salaryRange: "{{von}}–{{bis}} € / Monat",
+    excludedPlaceholder: "arbeitgeber.de",
+    entryMonthInvalid: "Der Eintritt ist ein Monat, geschrieben JJJJ-MM — zum Beispiel 2026-11.",
+    workloadOutOfRange: "Das Pensum liegt zwischen 10 und 100 Prozent.",
+    salaryNegative: "Ein Gehalt ist nicht negativ.",
+    salaryRangeReversed: "Die untere Grenze des Gehalts liegt über der oberen. Tausch sie bitte.",
+    tooManyExclusions: "Du hast mehr Unternehmen ausgeschlossen, als ein Mandat fassen kann.",
+    exclusionByDomain:
+      "Ein ausgeschlossenes Unternehmen nennst du über seine Domain — ohne @ und ohne Leerzeichen, zum Beispiel arbeitgeber.de.",
   },
 
   /**
@@ -1220,6 +1270,23 @@ const de = {
     feedbackField: "Deine Rückmeldung",
     feedbackHint: "Die Person liest genau diesen Text — auch bei einer Absage. Es gibt kein zweites Feld daneben und keine Note.",
     sendFeedback: "Rückmeldung senden",
+    taskIncomplete: "Überschrift und Aufgabe brauchen beide einen Text.",
+    taskTooLong: "Überschrift oder Aufgabe ist zu lang. Kürze sie bitte.",
+    effortOutOfRange:
+      "Der Umfang liegt außerhalb des Erlaubten — der Hinweis unter dem Feld nennt die Grenze.",
+    deadlineTooSoon:
+      "Die Frist ist zu knapp — der Hinweis unter dem Feld nennt, wie viel Vorlauf sie braucht.",
+    solutionEmpty: "Gib etwas ab: einen Text, einen Link oder beides.",
+    solutionTooLong: "Deine Lösung ist zu lang. Kürze sie bitte.",
+    linkInvalid:
+      "Der Link muss eine vollständige Adresse sein, die mit http:// oder https:// beginnt — und nicht übermäßig lang.",
+    feedbackRequired: "Eine Rückmeldung braucht einen Text — auch eine Absage.",
+    feedbackTooLong: "Die Rückmeldung ist zu lang. Kürze sie bitte.",
+    alreadySubmitted: "Diese Arbeitsprobe ist schon abgegeben.",
+    deadlinePassed: "Die Frist für diese Arbeitsprobe ist vorbei.",
+    nothingSubmitted: "Es wurde noch nichts abgegeben, auf das sich antworten ließe.",
+    alreadyEvaluated:
+      "Diese Arbeitsprobe ist schon beantwortet — eine zweite Rückmeldung gibt es nicht.",
   },
   careers: {
     title: "Karriere",
@@ -1314,6 +1381,8 @@ const de = {
     resendFailed: "Die E-Mail konnte gerade nicht angefordert werden. Versuch es später noch einmal.",
     resent: "Falls nötig, ist die E-Mail erneut unterwegs.",
     alreadyVerified: "Adresse schon bestätigt? <1>Zur Anmeldung</1>",
+    passwordRejected:
+      "Das Passwort ist zu kurz. Mindestens 12 Zeichen — lieber eine Wortfolge, die du dir merkst, als etwas Kurzes mit Sonderzeichen.",
   },
 
   verify: {
@@ -1348,6 +1417,7 @@ const de = {
     declinedTitle: "Einladung nicht angenommen",
     needsAccount: "<1>Anmelden</1> — oder zuerst <3>Registrieren</3> und den Link danach erneut öffnen.",
     toHome: "Zur Startseite",
+    expired: "Diese Einladung ist abgelaufen. Bitte lass dir eine neue schicken.",
   },
 
   footer: {

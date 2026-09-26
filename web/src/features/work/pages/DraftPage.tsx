@@ -39,6 +39,7 @@ import {
   getMyCurriculumVitae,
   getMyDocuments,
   getOwnDocumentContent,
+  UPLOAD_CASES,
   uploadDocument,
   type DocumentKind,
   type DocumentRecordV1,
@@ -51,6 +52,7 @@ import {
   emptyLetterHintKey,
   writingKey,
 } from "../lib/draftErrors";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -207,7 +209,9 @@ export function DraftPage() {
         {draftFetch.data.reason === "unavailable" ? (
           <Alert severity="info">{t(writingKey(draftFetch.data.error.detail))}</Alert>
         ) : (
-          <Alert severity="error">{draftFetch.data.error.detail}</Alert>
+          <Alert severity="error">
+            {t(failureKey(draftFetch.data.error, "errors.draftNotLoaded"))}
+          </Alert>
         )}
       </PageShell>
     );
@@ -279,7 +283,9 @@ export function DraftPage() {
     const result = await uploadDocument(file, name, fileKind);
     setUploading(null);
     if (!result.ok) {
-      setError(result.error.detail);
+      // 0/413/415/422 carry their keys from `uploadDocument`; every other
+      // status reads as the step's own sentence, never resume-service's.
+      setError(t(failureKey(result.error, "errors.documentNotUploaded", UPLOAD_CASES)));
       return;
     }
     setFile(null);
@@ -296,7 +302,7 @@ export function DraftPage() {
   async function handlePreview(docId: string) {
     const result = await getOwnDocumentContent(docId);
     if (!result.ok) {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.documentsNotLoaded")));
       return;
     }
     const win = window.open(result.value.url, "_blank");
@@ -742,7 +748,7 @@ export function DraftPage() {
                   />
                   {quote ? (
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      {t("drafts.markedQuote")} „{quote}“
+                      {t("drafts.markedQuote")} {t("drafts.quoted", { quote })}
                     </Alert>
                   ) : null}
                   <Button
@@ -773,7 +779,7 @@ export function DraftPage() {
                 <Box key={c.id} sx={{ mt: 2, p: 1.5, border: 1, borderColor: "divider" }}>
                   {c.quote ? (
                     <Typography variant="body2" sx={{ fontStyle: "italic", mb: 0.5 }}>
-                      „{c.quote}“
+                      {t("drafts.quoted", { quote: c.quote })}
                     </Typography>
                   ) : null}
                   <Typography>{c.text}</Typography>

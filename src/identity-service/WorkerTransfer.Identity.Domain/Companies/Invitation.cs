@@ -77,10 +77,13 @@ public sealed class InvitationInvalidException() : Exception("This invitation is
 /// recipient is holding anyway, and it is fixable — ask to be invited again. A
 /// blanket "invalid" would only leave them at a loss.
 /// </remarks>
-public sealed class InvitationExpiredException() : Exception("This invitation has expired");
+public sealed class InvitationExpiredException()
+    // web/src/features/auth/api/invitation.ts matches this sentence.
+    : Exception("This invitation has expired");
 
 /// <summary>The invitation was issued for a different address.</summary>
 public sealed class NotYourInvitationException()
+    // web/src/features/auth/api/invitation.ts matches this sentence.
     : Exception("This invitation was issued for a different email address");
 
 /// <summary>An invitation into a company.</summary>

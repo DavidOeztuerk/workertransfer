@@ -61,6 +61,7 @@ public sealed class RejectionShape : IAuthorizationMiddlewareResultHandler
 
         if (authorizeResult.Forbidden)
         {
+            // web/src/shared/api/errors.ts (ADMIN_CASES) matches both sentences below.
             if (context.Items.ContainsKey(Silent))
             {
                 await ProblemDetailsMiddleware.Write(

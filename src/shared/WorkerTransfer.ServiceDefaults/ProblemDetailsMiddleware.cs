@@ -62,6 +62,7 @@ public sealed class ProblemDetailsMiddleware(
                 throw;
             }
 
+            // web/src/features/auth/api/registration.ts (REGISTER_CASES) matches "invalid: <fields>".
             await Write(context, StatusCodes.Status422UnprocessableEntity,
                 "Request failed",
                 fields.Length > 0 ? $"invalid: {fields}" : "validation failed");

@@ -117,6 +117,8 @@ export async function uploadAttachment(
         status: 0,
         title: i18n.t("errors.noConnectionShort"),
         detail: i18n.t("errors.noConnection"),
+        titleKey: "errors.noConnectionShort",
+        detailKey: "errors.noConnection",
       },
     };
   }
@@ -128,6 +130,8 @@ export async function uploadAttachment(
         status: answer.status,
         title: i18n.t("errors.fileRejected"),
         detail: i18n.t("errors.fileNotAccepted"),
+        titleKey: "errors.fileRejected",
+        detailKey: "errors.fileNotAccepted",
       },
     };
   }

@@ -18,6 +18,7 @@ import {
   saveLegalName,
   savePostalAddress,
 } from "../api/civilIdentity";
+import { failureKey } from "../../../shared/api/errors";
 
 /**
  * Legal name and postal address for applications — one source for profile and
@@ -54,12 +55,13 @@ export function CivilIdentity() {
     const name = await saveLegalName(givenName, familyName);
     const postal = await savePostalAddress(form);
     setSaving(false);
+    // A catalogue text, never identity-service's sentence (English on the wire).
     if (!name.ok) {
-      setError(name.detail);
+      setError(t(failureKey(name.error, "errors.settingsNotSaved")));
       return;
     }
     if (!postal.ok) {
-      setError(postal.detail);
+      setError(t(failureKey(postal.error, "errors.settingsNotSaved")));
       return;
     }
     setForm(postal.address);

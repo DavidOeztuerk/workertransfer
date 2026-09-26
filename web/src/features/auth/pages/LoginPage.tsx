@@ -7,11 +7,24 @@ import TextField from "@mui/material/TextField";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { ErrorBlock } from "../../../shared/components/ui";
+import type { ServerCase } from "../../../shared/api/errors";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
 import { errorCleared } from "../store/authSlice";
 import { login } from "../store/authThunks";
+
+
+/**
+ * A refused sign-in, by status alone: 401 is "these credentials" (the server
+ * does not say which half — one answer for an unknown address and a wrong
+ * password), 403 an address not yet confirmed, 429 the gateway's brake.
+ */
+const SIGN_IN_CASES: readonly ServerCase[] = [
+  { status: 401, key: "login.invalidCredentials" },
+  { status: 403, key: "login.notConfirmed" },
+  { status: 429, key: "errors.tooManyAttempts" },
+];
 
 /**
  * Sign in.
@@ -29,7 +42,8 @@ export function LoginPage() {
 
   const status = useAppSelector((state) => state.auth.status);
   const pending = useAppSelector((state) => state.auth.pending);
-  // The error text comes from the server and is never invented here.
+  // The failure comes from the server; what it SAYS comes from the catalogue,
+  // by status (`SIGN_IN_CASES`) — identity-service answers in English.
   const error = useAppSelector((state) => state.auth.error);
 
   const [email, setEmail] = useState("");
@@ -118,7 +132,9 @@ export function LoginPage() {
           required
         />
 
-        {error !== null ? <ErrorBlock error={error} /> : null}
+        {error !== null ? (
+          <ErrorBlock error={error} fallback="login.failed" cases={SIGN_IN_CASES} />
+        ) : null}
         {silentFailure !== null ? (
           <Alert severity="error">{silentFailure}</Alert>
         ) : null}

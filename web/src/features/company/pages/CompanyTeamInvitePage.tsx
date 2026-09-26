@@ -12,6 +12,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -98,7 +99,15 @@ export function CompanyTeamInvitePage() {
       setSent(true);
       setEmail("");
     } else {
-      setError(result.error.detail);
+      // An address the server does not take is the one 422 the form can
+      // produce; the status says it, the server's sentence is not shown.
+      setError(
+        t(
+          failureKey(result.error, "errors.invitationNotCreated", [
+            { status: 422, key: "team.inviteEmailInvalid" },
+          ]),
+        ),
+      );
       setSent(false);
     }
   }

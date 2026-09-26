@@ -15,7 +15,9 @@ import {
 } from "../../../shared/components/ui";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
+import { ADMIN_CASES, type ServerCase, failureKey } from "../../../shared/api/errors";
 import {
+  COMPANY_TRANSFER_CASES,
   type CompanyAction,
   RUNNING,
   type Transfer,
@@ -47,6 +49,13 @@ const STATUS_TITLES: Record<Transfer["status"], string> = {
  * outstanding.</strong> If the person must first be let go by their employer,
  * the last step is theirs; the company cannot take it for them.
  */
+
+/**
+ * Offer and complete demand an `admin` (PBI-2); every step can meet a transfer
+ * that moved on. A catalogue text either way, never the server's sentence.
+ */
+const CASES: readonly ServerCase[] = [...ADMIN_CASES, ...COMPANY_TRANSFER_CASES];
+
 export function CompanyTransfersPage() {
   const { t } = useTranslation();
   const { forCompany, tenantId } = useActor();
@@ -77,7 +86,7 @@ export function CompanyTransfersPage() {
     setRunning(true);
     const result = await companyMove(id, action);
     setRunning(false);
-    setError(result.ok ? null : result.error.detail);
+    setError(result.ok ? null : t(failureKey(result.error, "errors.stepFailed", CASES)));
     transfers.reload();
   }
 
@@ -97,7 +106,7 @@ export function CompanyTransfersPage() {
         fee.trim() === "" ? null : Math.round(Number(fee) * 100),
     });
     setRunning(false);
-    setError(result.ok ? null : result.error.detail);
+    setError(result.ok ? null : t(failureKey(result.error, "errors.offerNotMade", CASES)));
     transfers.reload();
   }
 
@@ -125,7 +134,7 @@ export function CompanyTransfersPage() {
       ) : null}
 
       {result !== null && !result.ok ? (
-        <Alert severity="error">{result.error.detail}</Alert>
+        <Alert severity="error">{t(failureKey(result.error, "errors.listNotLoaded"))}</Alert>
       ) : null}
 
       {result?.ok && list.length === 0 ? (

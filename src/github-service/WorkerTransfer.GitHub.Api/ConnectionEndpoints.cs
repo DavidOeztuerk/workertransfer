@@ -45,6 +45,7 @@ public static class ConnectionEndpoints
             }
             catch (GitHubSilent)
             {
+                // web/src/features/person/pages/GitHubPage.tsx (STEP_CASES) matches this sentence.
                 await ProblemDetailsMiddleware.Write(
                     call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "github unavailable");
@@ -53,6 +54,7 @@ public static class ConnectionEndpoints
             }
             catch (ConsentGateSilent)
             {
+                // web/src/features/person/pages/GitHubPage.tsx (STEP_CASES) matches this sentence.
                 await ProblemDetailsMiddleware.Write(
                     call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
@@ -293,6 +295,7 @@ public static class ConnectionEndpoints
                 // sign-in over GitHub stands beside it: whoever authorises a
                 // foreign account there would have read that their gist was
                 // missing.
+                // web/src/features/person/pages/GitHubPage.tsx (STEP_CASES) matches this sentence.
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "the account was not proven");

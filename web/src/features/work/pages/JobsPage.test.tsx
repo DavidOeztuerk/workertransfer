@@ -801,19 +801,25 @@ describe("JobsPage", () => {
     });
   });
 
+  /*
+   * The failure reads in the person's language. The service answers in English
+   * (a problem document describes a shape), and until 26.09.2026 this page
+   * drew its `detail` raw — this test then expected the server's sentence.
+   */
   it("shows a failed fetch as an error, not as an empty list", async () => {
     stubFetch(() => ({
       status: 500,
       body: {
-        title: "Kaputt",
-        detail: "Es ging schief.",
+        title: "Request failed",
+        detail: "internal error",
         correlationId: "abc-123",
       },
     }));
 
     renderWithStore(<JobsPage />);
 
-    expect(await screen.findByText("Es ging schief.")).toBeInTheDocument();
+    expect((await screen.findAllByText("Die Suche ist fehlgeschlagen.")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/internal error|Request failed/)).not.toBeInTheDocument();
     expect(
       screen.queryByText("Dazu wurde nichts gefunden."),
     ).not.toBeInTheDocument();

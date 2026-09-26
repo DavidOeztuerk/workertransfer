@@ -14,6 +14,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -97,7 +98,17 @@ export function ApplicationsPage() {
     const result = await withdrawApplication(id);
     setBusy(false);
 
-    setError(result.ok ? null : result.error.detail);
+    // A catalogue text, never the server's sentence: a 409 means the case has
+    // moved on (decided or already withdrawn), and that the status says alone.
+    setError(
+      result.ok
+        ? null
+        : t(
+            failureKey(result.error, "applications.withdrawFailed", [
+              { status: 409, key: "applications.withdrawNotPossible" },
+            ]),
+          ),
+    );
     applications.reload();
   }
 
@@ -132,7 +143,9 @@ export function ApplicationsPage() {
           ) : null}
 
           {result !== null && !result.ok ? (
-            <Alert severity="error">{result.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(result.error, "errors.listNotLoaded"))}
+            </Alert>
           ) : null}
 
           {result?.ok && list.length === 0 ? (

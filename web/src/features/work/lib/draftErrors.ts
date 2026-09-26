@@ -22,6 +22,7 @@ export type WritingReason =
   | "providerRejected"
   | "providerEmpty"
   | "stepNotNow"
+  | "nothingToRevise"
   | "providerNotWriting";
 
 export type WritingKey = `drafts.${WritingReason}`;
@@ -44,6 +45,13 @@ export function writingReason(error: string | null | undefined): WritingReason {
   }
   if (/kann nicht (geschrieben|geändert|überarbeitet) werden/i.test(err)) {
     return "stepNotNow";
+  }
+  // "There is no open comment — nothing to revise." (`ApplicationDraft.cs`,
+  // /revise, 409). Not the provider's doing: until 26.09.2026 it fell through
+  // to `providerNotWriting`, and a person who had simply left no comment read
+  // that the writing help did not write.
+  if (/no open comment/i.test(err)) {
+    return "nothingToRevise";
   }
   if (/antwortet mit \d+/i.test(err) || /\b[45]\d{2}\b/.test(err)) {
     return "providerRejected";

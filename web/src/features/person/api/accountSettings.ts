@@ -1,5 +1,12 @@
+import type { ApiError } from "../../../core/store/thunkHelpers";
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
+
+/**
+ * A 2xx without a body is no confirmation of what was stored. It reads as the
+ * step's own failure — there is no sentence of the server's to show anyway.
+ */
+const EMPTY_ANSWER: ApiError = { status: 500, title: "", detail: "" };
 
 /** Who may be asked. The server's labels, unchanged. */
 export type AiProvider = "none" | "openai_compatible" | "anthropic";
@@ -56,7 +63,7 @@ export async function getAccountSettings(
 
 export type AccountSettingsSaveResult =
   | { ok: true; settings: AccountSettings }
-  | { ok: false; detail: string };
+  | { ok: false; error: ApiError };
 
 /** Writes the settings — without the key, which goes separately. */
 export async function saveAccountSettings(
@@ -80,7 +87,7 @@ export async function saveAccountSettings(
 
   return answer.ok && answer.value !== undefined
     ? { ok: true, settings: toView(answer.value) }
-    : { ok: false, detail: answer.ok ? "" : answer.error.detail };
+    : { ok: false, error: answer.ok ? EMPTY_ANSWER : answer.error };
 }
 
 /**

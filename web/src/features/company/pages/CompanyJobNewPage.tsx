@@ -12,6 +12,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
+import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import {
   EMPLOYMENT_TYPES,
@@ -49,6 +50,28 @@ const skillsOf = (raw: string): string[] =>
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
+
+/**
+ * The rules an advert can break, as the company reads them — never
+ * jobs-service's sentence, which is English on the wire. Each pattern matches
+ * a sentence in jobs-service (`Job.cs`, `SkillList.cs`) that points back here.
+ */
+const CREATE_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /must not be empty/i, key: "companyJobs.fieldsRequired" },
+  { status: 422, pattern: /is longer than \d+ characters/i, key: "companyJobs.fieldTooLong" },
+  { status: 422, pattern: /skill may have at most/i, key: "companyJobs.skillTooLong" },
+  { status: 422, pattern: /at most \d+ skills/i, key: "companyJobs.tooManySkills" },
+];
+
+/**
+ * The drafting help names its CAUSE where somebody can change it: "no provider
+ * is set up" is a configuration, "not available" a refusal (jobs-journey pins
+ * the first). Every other silence reads as the general sentence. The pattern
+ * matches `HttpDrafter.cs` in jobs-service, which points back here.
+ */
+const HELP_CASES: readonly ServerCase[] = [
+  { status: 503, pattern: /no draft provider is set up/i, key: "companyJobs.helpNoProvider" },
+];
 
 /**
  * <c>/company/jobs/new</c> — create an advert.
@@ -101,7 +124,7 @@ export function CompanyJobNewPage() {
     setRunning(false);
 
     if (result.ok) void navigate("/company/jobs");
-    else setError(result.error.detail);
+    else setError(t(failureKey(result.error, "errors.jobNotSaved", CREATE_CASES)));
   }
 
   return (
@@ -293,7 +316,7 @@ function DraftingHelp({
               setProblem(null);
               onSuggestion(result.draft);
             } else {
-              setProblem(result.error.detail);
+              setProblem(t(failureKey(result.error, "errors.draftHelpUnavailableLong", HELP_CASES)));
             }
           });
         }}

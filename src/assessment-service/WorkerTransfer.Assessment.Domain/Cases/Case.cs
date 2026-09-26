@@ -190,12 +190,14 @@ public sealed record Assignment
 
         if (hours is < MinHours or > MaxHours)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new InputError(
                 $"the stated effort is between {MinHours} and {MaxHours} hours");
         }
 
         if (deadline - now < MinNotice)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new InputError(
                 $"a deadline lies at least {MinNotice.TotalHours:0} hours ahead");
         }
@@ -216,6 +218,8 @@ public sealed record Assignment
     {
         var value = (raw ?? string.Empty).Trim();
 
+        // web/src/features/work/api/assessments.ts (STEP_CASES) matches both
+        // sentences, with `what` being "a title" or "a task description".
         return value.Length switch
         {
             0 => throw new InputError($"{what} is required"),
@@ -277,11 +281,13 @@ public sealed record Submission
 
         if (accompanying.Length == 0 && target is null)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new InputError("a submission carries a text or a link");
         }
 
         if (accompanying.Length > MaxTextLength)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new InputError($"a submission text is at most {MaxTextLength} characters");
         }
 
@@ -301,6 +307,7 @@ public sealed record Submission
 
         if (raw.Length > MaxUrlLength)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new InputError($"a link is at most {MaxUrlLength} characters");
         }
 
@@ -310,6 +317,7 @@ public sealed record Submission
         return Uri.TryCreate(raw, UriKind.Absolute, out var address)
                && (address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps)
             ? address.ToString()
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             : throw new InputError("a link is an absolute http or https address");
     }
 }
@@ -354,8 +362,10 @@ public sealed record Evaluation
 
         return word.Length switch
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             0 => throw new InputError("an evaluation carries a text, a rejection too"),
             var length when length > MaxTextLength =>
+                // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
                 throw new InputError($"an evaluation is at most {MaxTextLength} characters"),
             _ => new Evaluation(word, outcome, now)
         };
@@ -476,11 +486,13 @@ public sealed class Case
 
         if (Submission is not null)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new StepNotPossible("this assessment has already been submitted");
         }
 
         if (now > Assignment.Deadline)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new StepNotPossible("the deadline for this assessment has passed");
         }
 
@@ -501,11 +513,13 @@ public sealed class Case
 
         if (Submission is null)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new StepNotPossible("there is nothing submitted to evaluate");
         }
 
         if (Evaluation is not null)
         {
+            // web/src/features/work/api/assessments.ts (STEP_CASES) matches this sentence.
             throw new StepNotPossible("this assessment has already been evaluated");
         }
 

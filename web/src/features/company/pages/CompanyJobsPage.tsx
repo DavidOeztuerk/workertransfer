@@ -13,6 +13,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { ADMIN_CASES, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -74,7 +75,18 @@ export function CompanyJobsPage() {
       ? await publishJob(id)
       : await closeJob(id);
     setRunning(false);
-    setError(result.ok ? null : result.error.detail);
+    // Publishing and closing demand an `admin` (PBI-2); a 409 means the advert
+    // already stands otherwise. A catalogue text, never the server's sentence.
+    setError(
+      result.ok
+        ? null
+        : t(
+            failureKey(result.error, "errors.jobNotSaved", [
+              ...ADMIN_CASES,
+              { status: 409, key: "companyJobs.stateMovedOn" },
+            ]),
+          ),
+    );
     jobs.reload();
   }
 
@@ -114,7 +126,9 @@ export function CompanyJobsPage() {
           ) : null}
 
           {result !== null && !result.ok ? (
-            <Alert severity="error">{result.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(result.error, "errors.listNotLoaded"))}
+            </Alert>
           ) : null}
 
           {result?.ok && list.length === 0 ? (

@@ -1,3 +1,4 @@
+import type { ApiError } from "../../../core/store/thunkHelpers";
 import {
   getApplication,
   listApplicationsForJob,
@@ -17,7 +18,7 @@ export interface CompanyApplicationRow {
 
 export type CompanyApplicationList =
   | { ok: true; items: CompanyApplicationRow[] }
-  | { ok: false; error: { detail: string } };
+  | { ok: false; error: ApiError };
 
 export async function listCompanyApplications(
   signal?: AbortSignal

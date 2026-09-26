@@ -42,6 +42,7 @@ public sealed class SendDraftHandler(
 
         if (draft.State != DraftState.Approved)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             return new DraftResult.StateConflict("Only an approved draft goes out.");
         }
 
@@ -51,6 +52,7 @@ public sealed class SendDraftHandler(
 
         if (job is null)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             return new DraftResult.StateConflict("This job is no longer advertised.");
         }
 

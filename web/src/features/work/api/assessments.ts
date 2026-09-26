@@ -16,6 +16,7 @@ import {
   type ErrorReading,
   type ErrorKey,
   type Failure,
+  type ServerCase,
   interpretError,
 } from "../../../shared/api/errors";
 
@@ -218,13 +219,37 @@ async function send(path: string, body: unknown, fallbackKey: ErrorKey): Promise
     // broken — "the stated effort is between 1 and 8 hours", "an evaluation
     // carries a text, a rejection too". That is exactly what somebody filling
     // in a form needs. A sentence of our own ("please check the entries") would
-    // be shorter and would cut the information off.
-    //
-    // The reason falls back to `invalid`: it serves only the branching, the
-    // SENTENCE comes from the server.
+    // be shorter and would cut the information off — so the pages sort it by
+    // its words (`STEP_CASES` below) into the rule, in the person's language.
     "invalid"
   );
 }
+
+/**
+ * The rules a step on a case can break, as the person reads them.
+ *
+ * <strong>The server names the rule, the catalogue says it.</strong> Until
+ * 26.09.2026 both pages drew the server's sentence raw — English since the
+ * backend translation. Every pattern below matches a sentence written in
+ * assessment-service's `Case.cs`, and each of those lines points back here.
+ * What no pattern knows falls to the step's own sentence (`errors.taskNotSet`,
+ * `errors.notSubmitted`, `errors.evaluationNotSent`), never to the server's.
+ */
+export const STEP_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /(a title|a task description) is required/i, key: "assessments.taskIncomplete" },
+  { status: 422, pattern: /(a title|a task description) is at most/i, key: "assessments.taskTooLong" },
+  { status: 422, pattern: /stated effort is between/i, key: "assessments.effortOutOfRange" },
+  { status: 422, pattern: /deadline lies at least/i, key: "assessments.deadlineTooSoon" },
+  { status: 422, pattern: /submission carries a text or a link/i, key: "assessments.solutionEmpty" },
+  { status: 422, pattern: /submission text is at most/i, key: "assessments.solutionTooLong" },
+  { status: 422, pattern: /link is (at most|an absolute)/i, key: "assessments.linkInvalid" },
+  { status: 422, pattern: /evaluation carries a text/i, key: "assessments.feedbackRequired" },
+  { status: 422, pattern: /evaluation is at most/i, key: "assessments.feedbackTooLong" },
+  { status: 409, pattern: /already been submitted/i, key: "assessments.alreadySubmitted" },
+  { status: 409, pattern: /deadline for this assessment has passed/i, key: "assessments.deadlinePassed" },
+  { status: 409, pattern: /nothing submitted to evaluate/i, key: "assessments.nothingSubmitted" },
+  { status: 409, pattern: /already been evaluated/i, key: "assessments.alreadyEvaluated" },
+];
 
 /** Set a task. Effort and deadline are required — the server invents none. */
 export const setTask = (input: TaskInput) =>

@@ -24,6 +24,7 @@ import {
   saveMyPortfolio,
   uploadAttachment,
 } from "../api/portfolio";
+import { failureKey } from "../../../shared/api/errors";
 
 /** The form's state: every field as typed, the year still a string. */
 interface ItemDraft {
@@ -171,7 +172,7 @@ export function PortfolioItemPage() {
     setRunning(false);
 
     if (result.ok) void navigate("/portfolio");
-    else setError(result.error.detail);
+    else setError(t(failureKey(result.error, "errors.portfolioNotSaved")));
   }
 
   async function remove() {
@@ -182,7 +183,7 @@ export function PortfolioItemPage() {
     setRunning(false);
 
     if (result.ok) void navigate("/portfolio");
-    else setError(result.error.detail);
+    else setError(t(failureKey(result.error, "errors.portfolioNotSaved")));
   }
 
   async function chooseFile(file: File) {
@@ -191,7 +192,7 @@ export function PortfolioItemPage() {
     setRunning(false);
 
     if (result.ok) change({ attachment: result.value.name });
-    else setError(result.error.detail);
+    else setError(t(failureKey(result.error, "errors.fileNotAccepted")));
   }
 
   // The local file name is NOT shown: it never travels to the server, and the

@@ -8,6 +8,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { listCompanyApplications } from "../api/applications";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
@@ -41,7 +42,7 @@ export function CompanyApplicationsPage() {
         <CardContent>
           {list.pending ? <LoadingBlock label={t("companyApplications.loading")} /> : null}
           {list.data !== null && !list.data.ok ? (
-            <Alert severity="error">{list.data.error.detail}</Alert>
+            <Alert severity="error">{t(failureKey(list.data.error, "errors.listNotLoaded"))}</Alert>
           ) : null}
           {list.data?.ok && items.length === 0 ? (
             <EmptyBlock title={t("companyApplications.listEmpty")} />

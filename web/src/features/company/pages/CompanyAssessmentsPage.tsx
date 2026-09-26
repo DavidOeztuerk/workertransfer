@@ -27,8 +27,10 @@ import {
   type Case,
   evaluate,
   getCompanyCases,
+  STEP_CASES,
   setTask,
 } from "../../work/api/assessments";
+import { failureKey } from "../../../shared/api/errors";
 
 /**
  * `/company/assessments` — set work samples and answer them.
@@ -150,7 +152,7 @@ function TaskForm({ onDone }: { onDone: () => void }) {
       return;
     }
 
-    setError(result.error.detail || result.error.title);
+    setError(t(failureKey(result.error, "errors.taskNotSet", STEP_CASES)));
   }
 
   const complete =
@@ -250,7 +252,7 @@ function CompanyCaseCard({ caseItem, onDone }: { caseItem: Case; onDone: () => v
       return;
     }
 
-    setError(result.error.detail || result.error.title);
+    setError(t(failureKey(result.error, "errors.evaluationNotSent", STEP_CASES)));
   }
 
   return (

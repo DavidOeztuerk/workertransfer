@@ -21,6 +21,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -51,6 +52,23 @@ const CHOICES: { value: Availability; label: string; hint: string }[] = [
  * <strong>The default is "not right now".</strong> Whoever opens the page and
  * saves without choosing anything must not become approachable by accident.
  */
+
+/**
+ * What a failed step on this page reads as — a catalogue text, never the
+ * server's sentence (transfer-service answers in English).
+ *
+ * A note that is too long is the one 422 the form can produce and the person
+ * can fix; its sentence is written in `MarketStatus.cs` (`RemarkTooLong`).
+ */
+const SAVE_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /note exceeds/i, key: "market.remarkTooLong" },
+];
+
+/** A 409 on a request means it was answered meanwhile — elsewhere, or in another tab. */
+const REQUEST_CASES: readonly ServerCase[] = [
+  { status: 409, key: "market.requestAlreadyAnswered" },
+];
+
 export function MarketPage() {
   const { t } = useTranslation();
   const { signedIn, subjectId } = useActor();
@@ -114,7 +132,7 @@ export function MarketPage() {
       setSaved(true);
       current.reload();
     } else {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.marketStatusNotSaved", SAVE_CASES)));
       setSaved(false);
     }
   }
@@ -123,7 +141,7 @@ export function MarketPage() {
     setRunning(true);
     const result = await answerMarketRequest(id, grant);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.requestNotAnswered", REQUEST_CASES)));
     requests.reload();
   }
 
@@ -131,7 +149,7 @@ export function MarketPage() {
     setRunning(true);
     const result = await revokeMarketAccess(id);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.consentNotChanged", REQUEST_CASES)));
     requests.reload();
   }
 
@@ -160,7 +178,9 @@ export function MarketPage() {
           ) : null}
 
           {requests.data !== null && !requests.data.ok ? (
-            <Alert severity="error">{requests.data.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(requests.data.error, "errors.requestsUnavailable"))}
+            </Alert>
           ) : null}
 
           {requests.data?.ok && list.length === 0 ? (

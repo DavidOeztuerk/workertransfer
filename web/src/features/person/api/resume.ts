@@ -1,7 +1,7 @@
 import { type ApiResult, request } from "../../../core/api/client";
 import { RESUME_BASE_URL } from "../../../env";
 import { i18n } from "../../../core/i18n/i18n";
-import { interpretError } from "../../../shared/api/errors";
+import { type ServerCase, interpretError } from "../../../shared/api/errors";
 
 /**
  * The CV — stricter than the profile, and that is the whole design.
@@ -243,6 +243,16 @@ export async function uploadDocument(
   return { ok: false, error: reading.error };
 }
 
+/**
+ * An upload refused for a reason the person can act on. `uploadDocument`'s
+ * table reads 413/415/422 by status; the one 422 that is not about the file
+ * itself — the folder is full — is told apart by its sentence
+ * (`ResumeEndpoints.cs`, which points back here).
+ */
+export const UPLOAD_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /at most \d+ documents/i, key: "resume.tooManyDocuments" },
+];
+
 export interface DocumentContent {
   url: string;
   contentType: string;
@@ -281,6 +291,8 @@ async function fetchDocumentContent(
           status: response.status,
           title: i18n.t("errors.documentsNotLoaded"),
           detail: i18n.t("errors.documentsNotLoaded"),
+          titleKey: "errors.documentsNotLoaded",
+          detailKey: "errors.documentsNotLoaded",
         },
       };
     }
@@ -296,6 +308,8 @@ async function fetchDocumentContent(
         status: 0,
         title: i18n.t("errors.noConnectionShort"),
         detail: i18n.t("errors.serviceUnreachable"),
+        titleKey: "errors.noConnectionShort",
+        detailKey: "errors.serviceUnreachable",
       },
     };
   }
@@ -421,6 +435,8 @@ async function act(path: string, signal?: AbortSignal): Promise<ApiResult<Resume
       error: {
         ...answer.error,
         detail: i18n.t("errors.ledgerSilentNothingChanged"),
+        titleKey: "errors.ledgerSilent",
+        detailKey: "errors.ledgerSilentNothingChanged",
       },
     };
   }

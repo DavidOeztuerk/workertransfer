@@ -14,6 +14,7 @@ public abstract class MarketError(string notification) : Exception(notification)
 /// does not have to, so it does not get a fourteenth.
 /// </remarks>
 public sealed class RemarkTooLong(int limit)
+    // web/src/features/work/pages/MarketPage.tsx (SAVE_CASES) matches "note exceeds".
     : MarketError($"The note exceeds {limit} characters");
 
 /// <summary>How approachable somebody is.</summary>

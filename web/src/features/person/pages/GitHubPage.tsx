@@ -19,6 +19,8 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type MessageKey, type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useAppSelector } from "../../../core/store/hooks";
 import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
@@ -35,6 +37,18 @@ import {
 } from "../api/github";
 import { getMyProfile, saveMyProfile } from "../api/profile";
 import { fromRepositories, suggestionsFrom } from "../lib/suggestions";
+
+
+/**
+ * What github-service refuses with, as the person reads it. Each pattern
+ * matches `ConnectionEndpoints.cs`, which points back here: the gist was not
+ * found, GitHub is silent, the ledger is silent.
+ */
+const STEP_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /account was not proven/i, key: "github.notProven" },
+  { status: 503, pattern: /github unavailable/i, key: "github.unavailable" },
+  { status: 503, pattern: /consent ledger did not answer/i, key: "errors.ledgerSilent" },
+];
 
 /**
  * <c>/github</c> — one's own, verified connection.
@@ -82,14 +96,20 @@ export function GitHubPage() {
     );
   }
 
+  /**
+   * One step on the connection, and what its failure says — a catalogue text
+   * chosen by status and sentence (`STEP_CASES`), never github-service's own
+   * sentence, which is English on the wire.
+   */
   async function run(
-    action: () => Promise<{ ok: boolean; error?: { detail: string } }>,
+    action: () => Promise<{ ok: boolean; error?: ApiError }>,
+    fallback: MessageKey = "errors.stepFailed",
   ) {
     setRunning(true);
     const result = await action();
     setRunning(false);
 
-    if (!result.ok && result.error) setError(result.error.detail);
+    if (!result.ok && result.error) setError(t(failureKey(result.error, fallback, STEP_CASES)));
     else setError(null);
 
     connection.again();
@@ -209,7 +229,7 @@ export function GitHubPage() {
       ) : null}
 
       {connection.value && !connection.value.ok ? (
-        <ErrorBlock error={connection.value.error} />
+        <ErrorBlock error={connection.value.error} fallback="errors.connectionNotLoaded" />
       ) : null}
 
       {loaded && (current === null || !current.verified) ? (
@@ -280,7 +300,7 @@ export function GitHubPage() {
                     component="form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void run(() => nameAccount(login));
+                      void run(() => nameAccount(login), "errors.accountNotAccepted");
                     }}
                     sx={{
                       display: "flex",
@@ -337,7 +357,7 @@ export function GitHubPage() {
                     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                       <Button
                         variant="contained"
-                        onClick={() => void run(() => verifyConnection())}
+                        onClick={() => void run(() => verifyConnection(), "errors.proofNotChecked")}
                         disabled={running}
                       >
                         {running ? t("github.proofChecking") : t("github.proofCheck")}

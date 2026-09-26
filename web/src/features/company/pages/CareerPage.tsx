@@ -15,6 +15,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { remoteLabel, searchJobs } from "../../work/api/jobs";
@@ -61,7 +62,7 @@ export function CareerPage() {
     try {
       const start = await startDrafts([jobId]);
       if (!start.ok) {
-        setApplyError(start.error);
+        setApplyError(start.error === null ? null : t(start.error));
         return;
       }
       const first = start.drafts[0];
@@ -106,7 +107,8 @@ export function CareerPage() {
     return (
       <PageShell title={t("careers.title")} narrow>
         <Alert severity="warning">
-          {company.data.error.detail} {t("careers.unavailable")}
+          {t(failureKey(company.data.error, "errors.pageUnavailable"))}{" "}
+          {t("careers.unavailable")}
         </Alert>
       </PageShell>
     );

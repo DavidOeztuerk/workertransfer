@@ -129,6 +129,9 @@ const fr: Catalog = {
     tabsLabel: "Se connecter ou créer un compte",
     tabSignIn: "Se connecter",
     tabRegister: "Créer un compte",
+    invalidCredentials: "L’adresse e-mail ou le mot de passe est incorrect.",
+    notConfirmed:
+      "Votre adresse e-mail n’est pas encore confirmée. Ouvrez d’abord le lien de l’e-mail de confirmation.",
   },
 
   logout: {
@@ -194,6 +197,9 @@ const fr: Catalog = {
     choiceListeningHint: "Je ne cherche pas, mais je suis ouvert à une bonne offre.",
     choiceUnavailable: "Pas en ce moment",
     choiceUnavailableHint: "Personne ne peut m’aborder, autorisation ou non.",
+    remarkTooLong: "La note est trop longue. Veuillez la raccourcir.",
+    requestAlreadyAnswered:
+      "Cette demande a déjà reçu une réponse. Rechargez la page pour voir où elle en est.",
   },
 
   transfer: {
@@ -459,6 +465,9 @@ const fr: Catalog = {
     refreshing: "Récupération…",
     adoptSkills: "Ajouter comme compétences au profil",
     disconnect: "Couper la connexion",
+    notProven:
+      "La preuve manque encore : aucun gist public avec exactement cette description n’a été trouvé. Créez-le, puis vérifiez à nouveau.",
+    unavailable: "GitHub ne répond pas pour le moment. Réessayez plus tard.",
   },
 
   resume: {
@@ -549,6 +558,8 @@ const fr: Catalog = {
     uploadedOn: "Téléversé le {{datum}}",
     viewFile: "Voir le fichier",
     uploading: "Téléversement en cours…",
+    tooManyDocuments:
+      "Il y a déjà ici autant de documents que de place. Supprimez-en d’abord un, puis le nouveau pourra être ajouté.",
   },
 
   errors: {
@@ -673,6 +684,8 @@ const fr: Catalog = {
     draftsNotLoaded: "Les brouillons n’ont pas pu être chargés.",
     draftNotDeleted: "Le brouillon n’a pas pu être supprimé.",
     companyApplicationNotLoaded: "La candidature de l’entreprise n’a pas pu être chargée.",
+    adminOnly: "Seul un administrateur de cette entreprise peut faire cela.",
+    tooManyAttempts: "Trop de tentatives en peu de temps. Attendez une minute, puis réessayez.",
   },
 
   drafts: {
@@ -793,6 +806,9 @@ const fr: Catalog = {
       failed:
         "La rédaction a échoué. Vous pouvez réessayer ou écrire la lettre vous-même.",
     },
+    nothingToRevise:
+      "Il n’y a aucune remarque ouverte — donc rien à réviser. Notez d’abord ce qui doit changer.",
+    quoted: "« {{quote}} »",
   },
 
   job: {
@@ -881,6 +897,9 @@ const fr: Catalog = {
     partProfile: "Profil",
     partResume: "CV",
     partPortfolio: "Réalisations",
+    withdrawFailed: "La candidature n’a pas pu être retirée.",
+    withdrawNotPossible:
+      "Cette candidature ne peut plus être retirée. Rechargez la page pour voir où elle en est.",
   },
 
   transfers: {
@@ -903,6 +922,8 @@ const fr: Catalog = {
     acceptConversation: "Accepter l’échange",
     acceptOffer: "Accepter l’offre",
     confirmRelease: "Confirmer la libération et terminer",
+    stepNotNow:
+      "Cette étape n’est plus possible — l’échange a évolué entre-temps. Rechargez la page.",
   },
 
   companyTransfers: {
@@ -926,6 +947,12 @@ const fr: Catalog = {
     feeHint: "Consignée, pas versée.",
     makeOffer: "Faire une offre",
     complete: "Terminer",
+    alreadyRunning:
+      "Un transfert avec cette personne est déjà en cours — vous le trouverez sous « Transferts ».",
+    stepNotNow:
+      "Cette étape n’est plus possible — le transfert a évolué entre-temps. Rechargez la page.",
+    textTooLong: "Le texte est trop long. Veuillez le raccourcir.",
+    feeNegative: "Une indemnité de transfert n’est pas négative.",
   },
 
   companyJobs: {
@@ -960,6 +987,15 @@ const fr: Catalog = {
     helpInProgress: "Rédaction…",
     helpButton: "Obtenir une proposition",
     helpButtonReplaces: "Obtenir une proposition (remplace la description)",
+    stateMovedOn:
+      "Cette annonce est déjà dans un autre état que celui qu’exige l’étape. Rechargez la page.",
+    fieldsRequired: "Le titre et la description ont tous deux besoin d’un texte.",
+    fieldTooLong: "L’un des champs est trop long. Veuillez le raccourcir.",
+    skillTooLong:
+      "L’une des compétences est trop longue — plus longue qu’un profil ne pourrait la contenir. Veuillez la raccourcir.",
+    tooManySkills: "Cela fait plus de compétences qu’une annonce ne peut en contenir.",
+    helpNoProvider:
+      "Aucun fournisseur de brouillon n’est configuré — il n’y a donc pas de suggestion. Votre description reste telle quelle.",
   },
 
   team: {
@@ -984,6 +1020,7 @@ const fr: Catalog = {
     role: "Rôle",
     sent: "Invitation envoyée.",
     sending: "Envoi…",
+    inviteEmailInvalid: "Cela ne ressemble pas à une adresse e-mail. Vérifiez l’orthographe.",
   },
 
   companyProfile: {
@@ -1008,6 +1045,10 @@ const fr: Catalog = {
     phone: "Téléphone",
     benefits: "Avantages",
     benefitsHint: "Séparés par des virgules, par exemple : télétravail, formation",
+    displayNameRequired: "Le nom affiché a besoin d’un texte.",
+    websiteInvalid: "Le site web doit être une adresse complète avec http:// ou https://.",
+    tooManyEntries: "Cela fait plus de sites ou d’avantages que le profil ne peut en contenir.",
+    fieldTooLong: "L’un des champs est trop long. Veuillez le raccourcir.",
   },
 
   companyApplications: {
@@ -1165,6 +1206,15 @@ const fr: Catalog = {
     salaryFromOnly: "à partir de {{von}} €",
     salaryToOnly: "jusqu’à {{bis}} €",
     salaryRange: "{{von}}–{{bis}} € / mois",
+    excludedPlaceholder: "employeur.fr",
+    entryMonthInvalid: "L’entrée est un mois, écrit AAAA-MM — par exemple 2026-11.",
+    workloadOutOfRange: "Le taux d’activité se situe entre 10 et 100 pour cent.",
+    salaryNegative: "Un salaire n’est pas négatif.",
+    salaryRangeReversed:
+      "La borne inférieure du salaire dépasse la borne supérieure. Veuillez les inverser.",
+    tooManyExclusions: "Vous avez exclu plus d’entreprises qu’un mandat ne peut en contenir.",
+    exclusionByDomain:
+      "Vous désignez une entreprise exclue par son domaine — sans @ ni espace, par exemple employeur.fr.",
   },
 
   assessments: {
@@ -1209,6 +1259,22 @@ const fr: Catalog = {
     feedbackField: "Votre retour",
     feedbackHint: "La personne lit exactement ce texte — y compris en cas de refus. Il n’y a pas de second champ à côté, ni de note.",
     sendFeedback: "Envoyer le retour",
+    taskIncomplete: "Le titre et la tâche ont tous deux besoin d’un texte.",
+    taskTooLong: "Le titre ou la tâche est trop long. Veuillez le raccourcir.",
+    effortOutOfRange:
+      "L’effort est en dehors de ce qui est permis — l’indication sous le champ en donne la limite.",
+    deadlineTooSoon:
+      "Le délai est trop court — l’indication sous le champ précise le préavis nécessaire.",
+    solutionEmpty: "Remettez quelque chose : un texte, un lien, ou les deux.",
+    solutionTooLong: "Votre solution est trop longue. Veuillez la raccourcir.",
+    linkInvalid:
+      "Le lien doit être une adresse complète commençant par http:// ou https:// — et pas démesurément longue.",
+    feedbackRequired: "Un retour a besoin d’un texte — un refus aussi.",
+    feedbackTooLong: "Le retour est trop long. Veuillez le raccourcir.",
+    alreadySubmitted: "Ce travail d’essai a déjà été remis.",
+    deadlinePassed: "Le délai de ce travail d’essai est écoulé.",
+    nothingSubmitted: "Rien n’a encore été remis à quoi l’on pourrait répondre.",
+    alreadyEvaluated: "Ce travail d’essai a déjà reçu une réponse — il n’y a pas de second retour.",
   },
   careers: {
     title: "Carrières",
@@ -1303,6 +1369,8 @@ const fr: Catalog = {
     resendFailed: "L’e-mail n’a pas pu être demandé pour le moment. Réessayez plus tard.",
     resent: "Si nécessaire, l’e-mail est de nouveau en route.",
     alreadyVerified: "Adresse déjà confirmée ? <1>Aller à la connexion</1>",
+    passwordRejected:
+      "Le mot de passe est trop court. Au moins 12 caractères — mieux vaut une suite de mots dont vous vous souvenez qu’un mot court avec des caractères spéciaux.",
   },
 
   verify: {
@@ -1337,6 +1405,7 @@ const fr: Catalog = {
     declinedTitle: "Invitation non acceptée",
     needsAccount: "<1>Se connecter</1> — ou d’abord <3>s’inscrire</3>, puis rouvrir le lien.",
     toHome: "Retour à l’accueil",
+    expired: "Cette invitation a expiré. Demandez-en une nouvelle.",
   },
 
   footer: {

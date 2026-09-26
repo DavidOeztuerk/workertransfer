@@ -48,8 +48,10 @@ import {
   revokeResumeRequest,
   saveMyCurriculumVitae,
   setTemplate,
+  UPLOAD_CASES,
   uploadDocument,
 } from "../api/resume";
+import { failureKey } from "../../../shared/api/errors";
 
 /**
  * How the CV is kept: not chosen yet, typed in by hand, or as an uploaded
@@ -229,7 +231,7 @@ export function ResumePage() {
       setSaved(true);
       curriculumVitae.set({ ok: true, value: result.value });
     } else {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.resumeNotSaved")));
       setSaved(false);
     }
   }
@@ -238,7 +240,7 @@ export function ResumePage() {
     setRunning(true);
     const result = await answerResumeRequest(id, grant);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.requestNotAnswered")));
     requests.again();
   }
 
@@ -246,7 +248,7 @@ export function ResumePage() {
     setRunning(true);
     const result = await revokeResumeRequest(id);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.consentNotChanged")));
     requests.again();
   }
 
@@ -254,7 +256,7 @@ export function ResumePage() {
     setRunning(true);
     const result = await setTemplate(newTemplate);
     setRunning(false);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.templateNotSet")));
     else setTemplateState(newTemplate);
   }
 
@@ -264,7 +266,7 @@ export function ResumePage() {
     const result = await uploadDocument(file, named, kind);
     setUploading(null);
 
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.documentNotUploaded", UPLOAD_CASES)));
     else {
       setError(null);
       setChosenFile(null);
@@ -278,7 +280,7 @@ export function ResumePage() {
   async function handlePreview(docId: string) {
     const result = await getOwnDocumentContent(docId);
     if (!result.ok) {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.documentsNotLoaded")));
       return;
     }
     const win = window.open(result.value.url, "_blank");
@@ -287,7 +289,7 @@ export function ResumePage() {
 
   async function handleMarkAsCurriculumVitae(id: string) {
     const result = await markAsCurriculumVitae(id);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.stepFailed")));
     else {
       setError(null);
       setMode("file");
@@ -300,7 +302,7 @@ export function ResumePage() {
     const id = toDelete;
     setToDelete(null);
     const result = await deleteDocument(id);
-    if (!result.ok) setError(result.error.detail);
+    if (!result.ok) setError(t(failureKey(result.error, "errors.documentNotDeleted")));
     else {
       setError(null);
       ownDocuments.again();
@@ -330,7 +332,7 @@ export function ResumePage() {
           ) : null}
 
           {requests.value && !requests.value.ok ? (
-            <ErrorBlock error={requests.value.error} />
+            <ErrorBlock error={requests.value.error} fallback="errors.requestsUnavailable" />
           ) : null}
 
           {requests.value?.ok && requests.value.value.length === 0 ? (
@@ -594,7 +596,7 @@ export function ResumePage() {
           ) : null}
 
           {ownDocuments.value && !ownDocuments.value.ok ? (
-            <ErrorBlock error={ownDocuments.value.error} />
+            <ErrorBlock error={ownDocuments.value.error} fallback="errors.documentsNotLoaded" />
           ) : null}
 
           {ownDocuments.value?.ok && enclosures.length === 0 ? (
@@ -668,7 +670,7 @@ export function ResumePage() {
       ) : null}
 
       {curriculumVitae.value && !curriculumVitae.value.ok ? (
-        <ErrorBlock error={curriculumVitae.value.error} />
+        <ErrorBlock error={curriculumVitae.value.error} fallback="errors.resumeUnavailable" />
       ) : null}
 
       {saved ? (

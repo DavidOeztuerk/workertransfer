@@ -14,7 +14,8 @@ import Typography from "@mui/material/Typography";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
-import { type Case, getMyCases, submitSolution } from "../api/assessments";
+import { failureKey } from "../../../shared/api/errors";
+import { type Case, STEP_CASES, getMyCases, submitSolution } from "../api/assessments";
 
 /**
  * `/assessments` — the work samples that were set for a human being.
@@ -118,7 +119,9 @@ function MyCaseCard({ caseItem, done }: { caseItem: Case; done: () => void }) {
       return;
     }
 
-    setError(result.error.detail || result.error.title);
+    // The rule that was broken, in the person's language — never the server's
+    // sentence (`STEP_CASES`).
+    setError(t(failureKey(result.error, "errors.notSubmitted", STEP_CASES)));
   }
 
   const open = caseItem.state === "set";

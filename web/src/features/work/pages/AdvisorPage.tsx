@@ -14,6 +14,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -62,6 +63,22 @@ function domains(raw: string): string[] {
  * price of the ledger knowing no negation, and the person must read it before,
  * not notice it after.
  */
+
+/**
+ * The rules a mandate can break, as the person reads them — never the server's
+ * sentence (advisor-service answers in English). Each pattern matches a
+ * sentence in advisor-service's `Mandate.cs`, which points back here; what none
+ * knows reads as `errors.mandateNotSaved`.
+ */
+const MANDATE_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /entry date is a month/i, key: "advisor.entryMonthInvalid" },
+  { status: 422, pattern: /workload is between/i, key: "advisor.workloadOutOfRange" },
+  { status: 422, pattern: /salary is not negative/i, key: "advisor.salaryNegative" },
+  { status: 422, pattern: /lower bound of a salary range/i, key: "advisor.salaryRangeReversed" },
+  { status: 422, pattern: /at most \d+ excluded companies/i, key: "advisor.tooManyExclusions" },
+  { status: 422, pattern: /excluded company is named by its domain/i, key: "advisor.exclusionByDomain" },
+];
+
 export function AdvisorPage() {
   const { t } = useTranslation();
   const { signedIn, loading, subjectId } = useActor();
@@ -141,7 +158,7 @@ export function AdvisorPage() {
     }
 
     setSaved(false);
-    setError(result.error.detail ?? result.error.title);
+    setError(t(failureKey(result.error, "errors.mandateNotSaved", MANDATE_CASES)));
   }
 
   async function moveStage(id: string, up: boolean, stage: number) {
@@ -149,7 +166,7 @@ export function AdvisorPage() {
     const result = up ? await advanceStage(id, stage) : await withdrawStage(id, stage);
     setBusy(false);
 
-    setError(result.ok ? null : (result.error.detail ?? result.error.title));
+    setError(result.ok ? null : t(failureKey(result.error, "errors.stageNotChanged")));
     // ALWAYS reload, also after a failure: what holds now, the ledger knows,
     // and not this page.
     conversations.reload();
@@ -160,7 +177,7 @@ export function AdvisorPage() {
     const result = what === "agree" ? await agree(id) : await endAsPerson(id);
     setBusy(false);
 
-    setError(result.ok ? null : (result.error.detail ?? result.error.title));
+    setError(result.ok ? null : t(failureKey(result.error, "errors.conversationStepFailed")));
     conversations.reload();
   }
 
@@ -235,7 +252,7 @@ export function AdvisorPage() {
                 label={t("advisor.excluded")}
                 helperText={t("advisor.excludedHint")}
                 value={excluded}
-                placeholder="arbeitgeber.de"
+                placeholder={t("advisor.excludedPlaceholder")}
                 onChange={(event) => setExcluded(event.target.value)}
               />
 

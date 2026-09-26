@@ -1,5 +1,4 @@
 import type { ApiError } from "../../core/store/thunkHelpers";
-import { i18n } from "../../core/i18n/i18n";
 import type { Catalog } from "../../core/i18n/catalogs/de";
 
 /**
@@ -18,8 +17,12 @@ import type { Catalog } from "../../core/i18n/catalogs/de";
  * thread along which a complaint can be traced back through every service — a
  * sentence of our own must not cut it off.
  *
- * If the table holds no entry, the server's sentence stays: its problem
- * document knows more about the case at `409` and `422` than we do here.
+ * If the table holds no entry, the server's sentence stays in `detail` — to be
+ * READ, not drawn. Its problem document knows more about the case at `409` and
+ * `422` than a status does, so a site may sort it by its words into a key
+ * (`failureKey` below). It is English on the wire (CLAUDE.md, "Frontend"), and
+ * until 26.09.2026 a dozen pages drew it raw: a German person read "No draft
+ * provider is set up." in the middle of a German page.
  *
  * <strong>This file existed twice</strong> — once under `work/api` and once
  * under `company/api`, word for word, and the comment there said itself that it
@@ -62,19 +65,80 @@ export function interpretError<R extends string>(
   const reading = table[error.status];
   if (reading === undefined) return { ok: false, reason: fallbackReason, error };
 
-  // Translated HERE and not when the table is built: the tables stand at module
-  // level, so their values would be built on load — long before anybody could
-  // choose a language.
-  const title = i18n.t(reading.titleKey);
+  // KEYS, not sentences: `title` and `detail` stay the server's words, so that
+  // a site can still sort a status the table names by its sentence. The keys
+  // are looked up where they are drawn — at the answer and in the language
+  // chosen then, not when this module loaded. Until 26.09.2026 the texts were
+  // written into `title`/`detail` here, and a page drawing `detail` could not
+  // tell a catalogue text from the server's English.
   return {
     ok: false,
     reason: reading.reason,
     error: {
       ...error,
-      title,
-      detail: reading.detailKey === undefined ? title : i18n.t(reading.detailKey),
+      titleKey: reading.titleKey,
+      detailKey: reading.detailKey ?? reading.titleKey,
     },
   };
+}
+
+/**
+ * Any text in the catalogue, by section — so that a sentence rule naming a
+ * key that does not exist is a compile error, not a key drawn as text.
+ */
+export type MessageKey = {
+  [S in keyof Catalog & string]: `${S}.${keyof Catalog[S] & string}`;
+}[keyof Catalog & string];
+
+/**
+ * One server case the person must answer differently from the step's own
+ * failure. Without `pattern` the status alone decides.
+ *
+ * A pattern matches a sentence the BACKEND writes, and that line carries a
+ * comment pointing back here — whoever rewords it there knows who reads it.
+ */
+export interface ServerCase {
+  status: number;
+  pattern?: RegExp;
+  key: MessageKey;
+}
+
+/**
+ * The refusal on the eight routes that demand an `admin` (PBI-2), as every
+ * service answers it — `RejectionShape.cs` in ServiceDefaults writes both
+ * sentences. A 403 there is about the ROLE, not about a missing company, and
+ * a silent role lookup is an outage, not a refusal.
+ */
+export const ADMIN_CASES: readonly ServerCase[] = [
+  { status: 403, pattern: /^not permitted$/i, key: "errors.adminOnly" },
+  { status: 503, pattern: /role lookup did not answer/i, key: "errors.serviceSilent" },
+];
+
+/**
+ * A failure as a catalogue key — <strong>never the server's sentence.</strong>
+ *
+ * In this order: the site's own cases (status, and the sentence only where
+ * the person has to act differently — "revise first" is not "the job is
+ * gone"); the key `interpretError` chose by status; no connection; an expired
+ * session; and otherwise the step's own `fallback`. An unknown
+ * English sentence stays unknown and is still English — so it falls to the
+ * step, not through to the page.
+ */
+export function failureKey(
+  error: Pick<ApiError, "status" | "detail" | "detailKey">,
+  fallback: MessageKey,
+  cases: readonly ServerCase[] = []
+): MessageKey {
+  const detail = (error.detail ?? "").trim();
+  const found = cases.find(
+    (entry) => entry.status === error.status && (entry.pattern?.test(detail) ?? true)
+  );
+  if (found !== undefined) return found.key;
+
+  if (error.detailKey !== undefined) return error.detailKey;
+  if (error.status === OFFLINE) return "errors.noConnection";
+  if (error.status === 401) return "errors.sessionExpiredLong";
+  return fallback;
 }
 
 /** A network error arrives as `status: 0` — there is no problem document there. */

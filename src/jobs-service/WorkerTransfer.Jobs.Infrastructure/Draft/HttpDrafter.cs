@@ -48,6 +48,7 @@ public sealed class NoDrafter : IDrafter
     /// <inheritdoc />
     public Task<string> DraftAsync(
         AdvertDraft draft, CancellationToken cancellationToken = default) =>
+        // web/src/features/company/pages/CompanyJobNewPage.tsx (HELP_CASES) matches this sentence.
         throw new DraftUnavailable("No draft provider is set up.");
 }
 
@@ -65,6 +66,7 @@ public sealed class HttpDrafter(
 
         if (string.IsNullOrEmpty(_settings.ApiKey))
         {
+            // web/src/features/company/pages/CompanyJobNewPage.tsx (HELP_CASES) matches this sentence.
             throw new DraftUnavailable("No draft provider is set up.");
         }
 

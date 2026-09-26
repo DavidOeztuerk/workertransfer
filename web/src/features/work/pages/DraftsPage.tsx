@@ -16,6 +16,7 @@ import { getJob } from "../api/jobs";
 import { remember } from "../lib/letterContext";
 import { writingStart } from "../lib/writingClock";
 import { draftStepErrorKey, writingKey } from "../lib/draftErrors";
+import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -150,7 +151,9 @@ export function DraftsPage() {
         <LoadingBlock label={t("drafts.loading")} />
       ) : null}
       {drafts.data !== null && !drafts.data.ok ? (
-        <Alert severity="error">{drafts.data.error.detail}</Alert>
+        <Alert severity="error">
+          {t(failureKey(drafts.data.error, "errors.draftsNotLoaded"))}
+        </Alert>
       ) : null}
       {drafts.data?.ok && list.length === 0 ? (
         <EmptyBlock

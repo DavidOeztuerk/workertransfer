@@ -97,11 +97,19 @@ describe("LoginPage", () => {
     expect(signIn?.body).not.toContain("tenant");
   });
 
+  /*
+   * The message is the CATALOGUE's, chosen by status — not the server's.
+   *
+   * Until 26.09.2026 this test fed the server a German sentence and expected
+   * exactly that sentence back, i.e. it pinned that the page draws `detail`
+   * raw. identity-service answers "invalid credentials" (English, a shape on
+   * the wire); a German person must read German all the same.
+   */
   it("shows the failure as a message and does not redirect", async () => {
     answer({
       "/auth/login": {
         status: 401,
-        body: { detail: "E-Mail oder Passwort stimmen nicht." },
+        body: { title: "Request failed", detail: "invalid credentials" },
       },
     });
     const user = userEvent.setup();
@@ -115,6 +123,7 @@ describe("LoginPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "E-Mail oder Passwort stimmen nicht.",
     );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/invalid credentials|Request failed/);
     expect(screen.queryByText("Overview target")).toBeNull();
   });
 

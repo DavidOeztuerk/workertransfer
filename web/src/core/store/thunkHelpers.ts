@@ -1,5 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 
+import type { ErrorKey } from "../../shared/api/errors";
 import type { AppDispatch, RootState } from "./store";
 
 /**
@@ -12,9 +13,20 @@ import type { AppDispatch, RootState } from "./store";
  */
 export interface ApiError {
   status: number;
+  /**
+   * The server's words (or the client's fallback). English on the wire since
+   * the backend translation — READ, never drawn: the UI draws a catalogue key
+   * (`failureKey` in `shared/api/errors.ts`).
+   */
   title: string;
   detail: string;
   correlationId?: string;
+  /**
+   * The keys `interpretError` chose by status. Absent where no table named the
+   * status — then the site's own key applies, never `detail`.
+   */
+  titleKey?: ErrorKey;
+  detailKey?: ErrorKey;
 }
 
 /**

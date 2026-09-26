@@ -17,6 +17,7 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { HitCard } from "../components/HitCard";
+import { type MessageKey, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync, usePages } from "../lib/useAsync";
 import {
@@ -82,7 +83,7 @@ export function ScoutPage() {
   const jobs =
     ownJobs.data?.ok === true ? ownJobs.data.jobs : [];
 
-  const pages = usePages<Hit, string>(
+  const pages = usePages<Hit, MessageKey>(
     (cursor, signal) =>
       searchCandidates(cursor, filter, signal, jobId).then((result) =>
         result.ok
@@ -91,7 +92,8 @@ export function ScoutPage() {
               items: result.items,
               nextCursor: result.nextCursor,
             }
-          : { ok: false as const, error: result.error.detail },
+          : // A key, never scout-service's sentence (English on the wire).
+            { ok: false as const, error: failureKey(result.error, "errors.searchFailed") },
       ),
     JSON.stringify({ filter, jobId }),
     forCompany,
@@ -136,7 +138,7 @@ export function ScoutPage() {
     >
       {pages.error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {pages.error}
+          {t(pages.error)}
         </Alert>
       ) : null}
 

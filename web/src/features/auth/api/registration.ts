@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../../../env";
 import { request } from "../../../core/api/client";
 import { i18n } from "../../../core/i18n/i18n";
+import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import type { OccupationalField } from "../../../shared/lib/occupationalFields";
 
 /**
@@ -118,8 +119,29 @@ export async function register(input: RegistrationInput): Promise<RegistrationRe
     "errors.registrationFailed"
   );
 
-  return answer.ok ? { ok: true } : { ok: false, message: answer.error.detail };
+  // A finished sentence from the catalogue — never identity-service's own,
+  // which is English on the wire. None of these cases depends on whether the
+  // address is known: the server answers 201 for a known one too, and a
+  // refusal here is about the input alone (enumeration, CLAUDE.md).
+  return answer.ok
+    ? { ok: true }
+    : { ok: false, message: i18n.t(failureKey(answer.error, "errors.registrationFailed", REGISTER_CASES)) };
 }
+
+/**
+ * The refusals of `/auth/register` a person can act on. Each pattern matches a
+ * sentence identity-service writes (`RegistrationEndpoints.cs`,
+ * `PasswordPolicy.cs`, and ServiceDefaults' `ProblemDetailsMiddleware.cs` for
+ * "invalid: <fields>"), and each of those lines points back here. 429 is the
+ * gateway's brake (5/min).
+ */
+const REGISTER_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /public email provider/i, key: "register.freemail" },
+  { status: 422, pattern: /^invalid:.*\bemail\b/i, key: "register.emailInvalid" },
+  { status: 400, pattern: /^Password rejected: exceeds/i, key: "register.passwordTooLong" },
+  { status: 400, pattern: /^Password rejected/i, key: "register.passwordRejected" },
+  { status: 429, key: "errors.tooManyAttempts" },
+];
 
 interface VerificationBody {
   company?: string;

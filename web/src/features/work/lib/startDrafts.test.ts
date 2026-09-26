@@ -145,14 +145,15 @@ describe("startDrafts", () => {
     vi.spyOn(api, "createDrafts").mockResolvedValue({
       ok: false,
       reason: "failed",
-      error: { status: 500, title: "kaputt", detail: "kaputt" },
+      error: { status: 500, title: "Request failed", detail: "internal error" },
     } as Awaited<ReturnType<typeof api.createDrafts>>);
     const write = vi.spyOn(api, "writeDraft");
     const reported: Array<[number, number]> = [];
 
     const start = await startDrafts(["job-0"], (done, total) => reported.push([done, total]));
 
-    expect(start).toEqual({ ok: false, drafts: [], error: "kaputt" });
+    // A catalogue key, never the server's English sentence.
+    expect(start).toEqual({ ok: false, drafts: [], error: "errors.draftsNotCreated" });
     expect(write).not.toHaveBeenCalled();
     expect(reported).toEqual([]);
   });

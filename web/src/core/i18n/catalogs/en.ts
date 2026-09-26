@@ -129,6 +129,9 @@ const en: Catalog = {
     tabsLabel: "Sign in or create a new account",
     tabSignIn: "Sign in",
     tabRegister: "Create account",
+    invalidCredentials: "The email address or the password is wrong.",
+    notConfirmed:
+      "Your email address is not confirmed yet. Open the link in the confirmation email first.",
   },
 
   logout: {
@@ -194,6 +197,9 @@ const en: Catalog = {
     choiceListeningHint: "I am not looking, but I am open to a good offer.",
     choiceUnavailable: "Not right now",
     choiceUnavailableHint: "Nobody may approach me, release or not.",
+    remarkTooLong: "The note is too long. Please shorten it.",
+    requestAlreadyAnswered:
+      "This request has already been answered. Reload the page to see where it stands.",
   },
 
   transfer: {
@@ -459,6 +465,9 @@ const en: Catalog = {
     refreshing: "Fetching…",
     adoptSkills: "Add as skills on my profile",
     disconnect: "Disconnect",
+    notProven:
+      "The proof is still missing: there is no public gist with exactly this description. Create it, then check again.",
+    unavailable: "GitHub is not answering right now. Try again later.",
   },
 
   resume: {
@@ -549,6 +558,8 @@ const en: Catalog = {
     uploadedOn: "Uploaded on {{datum}}",
     viewFile: "View file",
     uploading: "Uploading…",
+    tooManyDocuments:
+      "There are already as many documents here as there is room for. Delete one first, then the new one fits.",
   },
 
   errors: {
@@ -673,6 +684,8 @@ const en: Catalog = {
     draftsNotLoaded: "The drafts could not be loaded.",
     draftNotDeleted: "The draft could not be deleted.",
     companyApplicationNotLoaded: "The company application could not be loaded.",
+    adminOnly: "Only an administrator of this company may do that.",
+    tooManyAttempts: "Too many attempts in a short time. Wait a minute, then try again.",
   },
 
   drafts: {
@@ -793,6 +806,9 @@ const en: Catalog = {
       failed:
         "Writing failed. You can try again or write the letter yourself.",
     },
+    nothingToRevise:
+      "There is no open comment — so nothing to revise. Write down first what should change.",
+    quoted: "“{{quote}}”",
   },
 
   job: {
@@ -881,6 +897,9 @@ const en: Catalog = {
     partProfile: "Profile",
     partResume: "CV",
     partPortfolio: "Work",
+    withdrawFailed: "The application could not be withdrawn.",
+    withdrawNotPossible:
+      "This application can no longer be withdrawn. Reload the page to see where it stands.",
   },
 
   transfers: {
@@ -903,6 +922,8 @@ const en: Catalog = {
     acceptConversation: "Accept the conversation",
     acceptOffer: "Accept the offer",
     confirmRelease: "Confirm release and complete",
+    stepNotNow:
+      "This step is no longer possible — the conversation has moved on in the meantime. Reload the page.",
   },
 
   companyTransfers: {
@@ -926,6 +947,12 @@ const en: Catalog = {
     feeHint: "Recorded, not transferred.",
     makeOffer: "Make an offer",
     complete: "Complete",
+    alreadyRunning:
+      "A transfer with this person is already running — you will find it under “Transfers”.",
+    stepNotNow:
+      "This step is no longer possible — the transfer has moved on in the meantime. Reload the page.",
+    textTooLong: "The text is too long. Please shorten it.",
+    feeNegative: "A transfer fee is not negative.",
   },
 
   companyJobs: {
@@ -960,6 +987,15 @@ const en: Catalog = {
     helpInProgress: "Writing…",
     helpButton: "Get a suggestion",
     helpButtonReplaces: "Get a suggestion (replaces the description)",
+    stateMovedOn:
+      "This advert is already in a different state than the step expects. Reload the page.",
+    fieldsRequired: "The title and the description both need some text.",
+    fieldTooLong: "One of the fields is too long. Please shorten it.",
+    skillTooLong:
+      "One of the skills is too long — longer than a profile could hold. Please shorten it.",
+    tooManySkills: "That is more skills than an advert can hold.",
+    helpNoProvider:
+      "No draft provider is set up — so there is no suggestion. Your description stays as it is.",
   },
 
   team: {
@@ -984,6 +1020,7 @@ const en: Catalog = {
     role: "Role",
     sent: "Invitation sent.",
     sending: "Sending…",
+    inviteEmailInvalid: "That does not look like an email address. Check the spelling.",
   },
 
   companyProfile: {
@@ -1008,6 +1045,10 @@ const en: Catalog = {
     phone: "Phone",
     benefits: "Benefits",
     benefitsHint: "Comma-separated, for example: home office, training",
+    displayNameRequired: "The display name needs some text.",
+    websiteInvalid: "The website must be a complete address with http:// or https://.",
+    tooManyEntries: "That is more locations or benefits than the profile can hold.",
+    fieldTooLong: "One of the fields is too long. Please shorten it.",
   },
 
   companyApplications: {
@@ -1165,6 +1206,15 @@ const en: Catalog = {
     salaryFromOnly: "from {{von}} €",
     salaryToOnly: "up to {{bis}} €",
     salaryRange: "{{von}}–{{bis}} € / month",
+    excludedPlaceholder: "employer.com",
+    entryMonthInvalid: "The start is a month, written YYYY-MM — for example 2026-11.",
+    workloadOutOfRange: "The workload lies between 10 and 100 percent.",
+    salaryNegative: "A salary is not negative.",
+    salaryRangeReversed:
+      "The lower end of the salary range is above the upper one. Please swap them.",
+    tooManyExclusions: "You have excluded more companies than a mandate can hold.",
+    exclusionByDomain:
+      "You name an excluded company by its domain — without @ and without spaces, for example employer.com.",
   },
 
   assessments: {
@@ -1209,6 +1259,22 @@ const en: Catalog = {
     feedbackField: "Your reply",
     feedbackHint: "The person reads exactly this text — a rejection included. There is no second field beside it and no mark.",
     sendFeedback: "Send the reply",
+    taskIncomplete: "The headline and the task both need some text.",
+    taskTooLong: "The headline or the task is too long. Please shorten it.",
+    effortOutOfRange:
+      "The effort is outside what is allowed — the hint below the field names the limit.",
+    deadlineTooSoon:
+      "The deadline is too close — the hint below the field says how much notice it needs.",
+    solutionEmpty: "Hand something in: a text, a link or both.",
+    solutionTooLong: "Your solution is too long. Please shorten it.",
+    linkInvalid:
+      "The link must be a complete address starting with http:// or https:// — and not excessively long.",
+    feedbackRequired: "Feedback needs some text — a rejection too.",
+    feedbackTooLong: "The feedback is too long. Please shorten it.",
+    alreadySubmitted: "This work sample has already been handed in.",
+    deadlinePassed: "The deadline for this work sample has passed.",
+    nothingSubmitted: "Nothing has been handed in yet that could be answered.",
+    alreadyEvaluated: "This work sample has already been answered — there is no second feedback.",
   },
   careers: {
     title: "Careers",
@@ -1303,6 +1369,8 @@ const en: Catalog = {
     resendFailed: "The email could not be requested right now. Try again later.",
     resent: "If needed, the email is on its way again.",
     alreadyVerified: "Address already confirmed? <1>Go to sign-in</1>",
+    passwordRejected:
+      "The password is too short. At least 12 characters — better a phrase you can remember than something short with special characters.",
   },
 
   verify: {
@@ -1337,6 +1405,7 @@ const en: Catalog = {
     declinedTitle: "Invitation not accepted",
     needsAccount: "<1>Sign in</1> — or first <3>register</3> and open the link again afterwards.",
     toHome: "Back to the start page",
+    expired: "This invitation has expired. Please ask for a new one.",
   },
 
   footer: {

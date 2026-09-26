@@ -76,6 +76,7 @@ public abstract class CaseError(string notification) : Exception(notification);
 
 /// <summary>A text field is too long.</summary>
 public sealed class TextError(string field, int limit)
+    // web/src/features/work/api/transfers.ts (COMPANY_TRANSFER_CASES) matches this sentence.
     : CaseError($"{field} exceeds {limit} characters");
 
 /// <summary>Something about the offer is wrong.</summary>
@@ -283,6 +284,7 @@ public sealed class Transfer
 
         if (feeCents is < 0)
         {
+            // web/src/features/work/api/transfers.ts (COMPANY_TRANSFER_CASES) matches this sentence.
             throw new OfferError("A transfer fee cannot be negative");
         }
 

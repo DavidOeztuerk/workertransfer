@@ -10,6 +10,7 @@ import {
   type ErrorReading,
   type ErrorKey,
   type Failure,
+  type ServerCase,
   interpretError,
 } from "../../../shared/api/errors";
 
@@ -105,6 +106,23 @@ async function move(
   }
   return interpretError<TransferError>(answer.error, TRANSITION_ERRORS, "offline");
 }
+
+/**
+ * The company's steps on a transfer, as the person at the company reads them —
+ * never transfer-service's sentence, which is English on the wire.
+ *
+ * The status would say "conflict" twice where the company must do two
+ * different things: look for the transfer that already runs, or reload because
+ * the person moved it on. And an offer names what was wrong with it. Each
+ * pattern matches a sentence in transfer-service (`Transfer.cs`,
+ * `Responses.cs`) that points back here.
+ */
+export const COMPANY_TRANSFER_CASES: readonly ServerCase[] = [
+  { status: 409, pattern: /already a running transfer/i, key: "companyTransfers.alreadyRunning" },
+  { status: 409, key: "companyTransfers.stepNotNow" },
+  { status: 422, pattern: /exceeds \d+ characters/i, key: "companyTransfers.textTooLong" },
+  { status: 422, pattern: /fee cannot be negative/i, key: "companyTransfers.feeNegative" },
+];
 
 export function expressInterest(subjectId: string, message: string): Promise<TransferResult> {
   return move(

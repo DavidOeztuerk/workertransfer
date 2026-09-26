@@ -128,11 +128,13 @@ public sealed class Comment
 
         if (clean.Length == 0)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new DraftInputError("A comment without text says nothing.");
         }
 
         if (clean.Length > MaxTextLength)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new DraftInputError(
                 $"The comment is longer than {MaxTextLength} characters.");
         }
@@ -432,6 +434,7 @@ public sealed class ApplicationDraft
 
         if (_comments.Count >= MaxComments)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new DraftInputError(
                 $"A draft carries no more than {MaxComments} comments.");
         }
@@ -470,6 +473,7 @@ public sealed class ApplicationDraft
 
         if (!HasOpenComments)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new CommentConflict("There is no open comment — nothing to revise.");
         }
 
@@ -497,11 +501,13 @@ public sealed class ApplicationDraft
 
         if (HasOpenComments)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new CommentConflict("There are open comments — revise first.");
         }
 
         if (Text.Length == 0)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new DraftInputError("Nobody approves an empty cover letter.");
         }
 
@@ -539,6 +545,7 @@ public sealed class ApplicationDraft
 
         if (body.Length > MaxTextLength)
         {
+            // web/src/features/work/lib/draftErrors.ts matches this sentence.
             throw new DraftInputError(
                 $"The cover letter is longer than {MaxTextLength} characters.");
         }

@@ -183,9 +183,11 @@ public sealed class Mandate
         return DateTime.TryParseExact(
             value, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
             ? value
+            // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
             : throw new InputError("an entry date is a month, written YYYY-MM");
     }
 
+    // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
     private static int? Workload(int? raw) => raw switch
     {
         null => null,
@@ -198,11 +200,13 @@ public sealed class Mandate
     {
         if (min is < 0 || max is < 0)
         {
+            // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
             throw new InputError("a salary is not negative");
         }
 
         if (min is { } lower && max is { } upper && lower > upper)
         {
+            // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
             throw new InputError("the lower bound of a salary range is not above the upper");
         }
 
@@ -224,6 +228,7 @@ public sealed class Mandate
 
         if (clean.Length > MaxExclusions)
         {
+            // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
             throw new InputError(
                 $"at most {MaxExclusions} excluded companies");
         }
@@ -237,6 +242,7 @@ public sealed class Mandate
             {
                 // The rule, never the value: a domain in a message would end
                 // up in the log, and it says where somebody works.
+                // web/src/features/work/pages/AdvisorPage.tsx (MANDATE_CASES) matches this sentence.
                 throw new InputError("an excluded company is named by its domain");
             }
         }

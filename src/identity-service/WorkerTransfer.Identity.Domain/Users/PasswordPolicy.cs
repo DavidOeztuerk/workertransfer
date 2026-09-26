@@ -44,6 +44,7 @@ public static class PasswordPolicy
 
         if (System.Text.Encoding.UTF8.GetByteCount(password) > MaximumBytes)
         {
+            // web/src/features/auth/api/registration.ts (REGISTER_CASES) matches this sentence.
             throw new WeakPasswordException($"exceeds {MaximumBytes} bytes");
         }
     }

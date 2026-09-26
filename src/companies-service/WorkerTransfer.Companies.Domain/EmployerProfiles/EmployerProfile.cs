@@ -222,6 +222,7 @@ public sealed class EmployerProfile
             Text("phone", phone, required: false, 40));
     }
 
+    // web/src/features/company/pages/CompanyProfilePage.tsx (SAVE_CASES) matches this method's sentences.
     private static string Text(string field, string? value, bool required, int limit)
     {
         var trimmed = (value ?? string.Empty).Trim();
@@ -236,6 +237,7 @@ public sealed class EmployerProfile
             : trimmed;
     }
 
+    // web/src/features/company/pages/CompanyProfilePage.tsx (SAVE_CASES) matches this method's sentences.
     private static string? Link(string? value)
     {
         var trimmed = (value ?? string.Empty).Trim();
@@ -272,6 +274,7 @@ public sealed class EmployerProfile
     /// Deduplicate first, then count: otherwise somebody who wrote "remote"
     /// twenty-one times would be refused, although it collapses into one entry.
     /// </remarks>
+    // web/src/features/company/pages/CompanyProfilePage.tsx (SAVE_CASES) matches this method's sentences.
     private static IReadOnlyList<string> Entries(string field, IReadOnlyList<string>? raw)
     {
         if (raw is null)

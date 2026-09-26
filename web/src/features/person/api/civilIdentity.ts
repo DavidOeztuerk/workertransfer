@@ -1,5 +1,12 @@
+import type { ApiError } from "../../../core/store/thunkHelpers";
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
+
+/**
+ * A 2xx without a body is no confirmation of what was stored. It reads as the
+ * step's own failure — there is no sentence of the server's to show anyway.
+ */
+const EMPTY_ANSWER: ApiError = { status: 500, title: "", detail: "" };
 
 /** Postal address for applications — a template for the letterhead, never for search, never for AI. */
 export interface PostalAddress {
@@ -50,7 +57,7 @@ export async function getPostalAddress(signal?: AbortSignal): Promise<PostalAddr
 
 export async function savePostalAddress(
   address: PostalAddress,
-): Promise<{ ok: true; address: PostalAddress } | { ok: false; detail: string }> {
+): Promise<{ ok: true; address: PostalAddress } | { ok: false; error: ApiError }> {
   const answer = await request<PostalAddressWire>(
     API_BASE_URL,
     "/account/address",
@@ -68,7 +75,7 @@ export async function savePostalAddress(
     "errors.settingsNotSaved",
   );
   if (!answer.ok || answer.value === undefined) {
-    return { ok: false, detail: answer.ok ? "" : answer.error.detail };
+    return { ok: false, error: answer.ok ? EMPTY_ANSWER : answer.error };
   }
   return { ok: true, address: toView(answer.value) };
 }
@@ -76,7 +83,7 @@ export async function savePostalAddress(
 export async function saveLegalName(
   givenName: string,
   familyName: string,
-): Promise<{ ok: true } | { ok: false; detail: string }> {
+): Promise<{ ok: true } | { ok: false; error: ApiError }> {
   const answer = await request<unknown>(
     API_BASE_URL,
     "/account/name",
@@ -86,5 +93,5 @@ export async function saveLegalName(
     },
     "errors.settingsNotSaved",
   );
-  return answer.ok ? { ok: true } : { ok: false, detail: answer.error.detail };
+  return answer.ok ? { ok: true } : { ok: false, error: answer.error };
 }

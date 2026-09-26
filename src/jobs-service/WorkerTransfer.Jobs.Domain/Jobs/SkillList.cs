@@ -74,6 +74,7 @@ public sealed class SkillList
 
             if (enforceLimits && value.Length > MaxLength)
             {
+                // web/src/features/company/pages/CompanyJobNewPage.tsx (CREATE_CASES) matches this sentence.
                 throw new SkillError(
                     $"A skill may have at most {MaxLength} characters.");
             }
@@ -88,6 +89,7 @@ public sealed class SkillList
         }
 
         // De-duplicate first, then count.
+        // web/src/features/company/pages/CompanyJobNewPage.tsx (CREATE_CASES) matches this sentence.
         return enforceLimits && cleaned.Count > MaxEntries
             ? throw new SkillError($"At most {MaxEntries} skills are allowed.")
             : new SkillList(cleaned);

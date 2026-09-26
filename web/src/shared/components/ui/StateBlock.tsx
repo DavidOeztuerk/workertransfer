@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Typography from "@mui/material/Typography";
 
 import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type MessageKey, type ServerCase, failureKey } from "../../api/errors";
 
 /** While loading. With text, so that a screen reader announces it. */
 export function LoadingBlock({ label }: { label?: string }) {
@@ -25,14 +26,33 @@ export function LoadingBlock({ label }: { label?: string }) {
  * The correlation id stands small below — it is the only thread along which a
  * complaint can be traced back through every service. Whoever leaves it out
  * forces the person to guess the point in time.
+ *
+ * <strong>It draws keys, never the problem document's words.</strong> Title and
+ * sentence come from the keys `interpretError` chose by status, and where no
+ * table named the status, from `fallback` — the page's own sentence for what
+ * failed. Until 26.09.2026 it drew `error.title` and `error.detail`, and since
+ * the backend answers in English a German person read "Request failed" here.
  */
-export function ErrorBlock({ error, title }: { error: ApiError; title?: string }) {
+export function ErrorBlock({
+  error,
+  title,
+  fallback = "errors.requestFailed",
+  cases,
+}: {
+  error: ApiError;
+  title?: string;
+  fallback?: MessageKey;
+  /** The page's own server cases (`failureKey`). */
+  cases?: readonly ServerCase[];
+}) {
   const { t } = useTranslation();
+  const heading = title ?? t(error.titleKey ?? fallback);
+  const sentence = t(failureKey(error, fallback, cases));
 
   return (
     <Alert severity="error" sx={{ my: 2 }}>
-      <AlertTitle>{title ?? error.title}</AlertTitle>
-      {error.detail}
+      <AlertTitle>{heading}</AlertTitle>
+      {sentence !== heading ? sentence : null}
       {error.correlationId ? (
         <Box
           component="p"

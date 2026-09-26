@@ -208,7 +208,7 @@ export function ConsentsPage() {
       narrow
       lead={t("consents.lead")}
     >
-      {error !== null ? <ErrorBlock error={error} /> : null}
+      {error !== null ? <ErrorBlock error={error} fallback="errors.consentNotChanged" /> : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -280,7 +280,7 @@ export function ConsentsPage() {
           ) : null}
 
           {result !== undefined && !result.ok ? (
-            <ErrorBlock error={result.error} />
+            <ErrorBlock error={result.error} fallback="errors.consentsNotLoaded" />
           ) : null}
 
           {nothingReleased ? (

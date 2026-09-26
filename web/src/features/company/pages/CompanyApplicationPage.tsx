@@ -13,6 +13,7 @@ import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../api/companies";
 import { recipientFromCompany, senderFromContact } from "../../work/lib/letterHead";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { CurriculumVitaeSheet } from "../../person/components/resume/CurriculumVitaeSheet";
 import { getVisibleCurriculumVitae, getVisibleDocumentContent } from "../../person/api/resume";
 import { getCandidateProfile } from "../api/candidateProfile";
@@ -87,7 +88,9 @@ export function CompanyApplicationPage() {
   if (application.data !== null && !application.data.ok) {
     return (
       <PageShell title={t("companyApplications.title")} narrow>
-        <Alert severity="error">{application.data.error.detail}</Alert>
+        <Alert severity="error">
+          {t(failureKey(application.data.error, "errors.companyApplicationNotLoaded"))}
+        </Alert>
       </PageShell>
     );
   }

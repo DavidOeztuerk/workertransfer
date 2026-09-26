@@ -13,6 +13,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { ADMIN_CASES, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -80,7 +81,7 @@ export function CompanyTeamPage() {
     setRunning(true);
     const result = await removeMember(tenantId as string, userId);
     setRunning(false);
-    setError(result.ok ? null : result.error.detail);
+    setError(result.ok ? null : t(failureKey(result.error, "errors.memberNotRemoved")));
     members.reload();
   }
 
@@ -88,7 +89,9 @@ export function CompanyTeamPage() {
     setRunning(true);
     const result = await withdrawInvitation(tenantId as string, id);
     setRunning(false);
-    setError(result.ok ? null : result.error.detail);
+    setError(
+      result.ok ? null : t(failureKey(result.error, "errors.invitationNotWithdrawn", ADMIN_CASES)),
+    );
     invitations.reload();
   }
 
@@ -130,7 +133,9 @@ export function CompanyTeamPage() {
           ) : null}
 
           {members.data !== null && !members.data.ok ? (
-            <Alert severity="error">{members.data.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(members.data.error, "errors.teamNotLoaded"))}
+            </Alert>
           ) : null}
 
           {list.length > 0 ? (
@@ -188,7 +193,9 @@ export function CompanyTeamPage() {
           ) : null}
 
           {invitations.data !== null && !invitations.data.ok ? (
-            <Alert severity="error">{invitations.data.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(invitations.data.error, "errors.invitationsNotLoaded"))}
+            </Alert>
           ) : null}
 
           {invitations.data?.ok && open.length === 0 ? (

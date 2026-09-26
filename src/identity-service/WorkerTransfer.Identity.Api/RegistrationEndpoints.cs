@@ -107,6 +107,7 @@ public static class RegistrationEndpoints
                 case RegistrationResult.PublicDomain publicDomain:
                     // The same code POST /companies answers with, so one
                     // refusal is not called two things depending on the door.
+                    // web/src/features/auth/api/registration.ts (REGISTER_CASES) matches this sentence.
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status422UnprocessableEntity, "Request failed",
                         $"'{publicDomain.Domain}' is a public email provider "
@@ -114,6 +115,7 @@ public static class RegistrationEndpoints
                     return;
 
                 case RegistrationResult.WeakPassword weak:
+                    // web/src/features/auth/api/registration.ts (REGISTER_CASES) matches this sentence.
                     await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status400BadRequest, "Request failed",
                         $"Password rejected: {weak.Reason}");

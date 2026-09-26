@@ -26,6 +26,7 @@ public abstract class InputError(string message) : Exception(message);
 
 /// <summary>The message is too long.</summary>
 public sealed class MessageTooLong(int limit)
+    // web/src/features/work/lib/draftErrors.ts matches this sentence.
     : InputError($"The message is longer than {limit} characters.");
 
 /// <summary>This is another person's application.</summary>
@@ -33,6 +34,7 @@ public sealed class NotYours() : InputError("This application belongs to someone
 
 /// <summary>This step is not possible from here.</summary>
 public sealed class TransitionNotAllowed(ApplicationState now, ApplicationState wanted)
+    // web/src/features/work/lib/draftErrors.ts matches this sentence.
     : InputError($"A {now} application cannot become {wanted}.");
 
 /// <summary>What is sent along.</summary>

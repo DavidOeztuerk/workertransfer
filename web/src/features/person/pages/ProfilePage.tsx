@@ -21,6 +21,7 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type MessageKey, failureKey } from "../../../shared/api/errors";
 import {
   type CommuteReadiness,
   type Profile,
@@ -131,7 +132,9 @@ export function ProfilePage() {
   );
 
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [error, setError] = useState<ApiError | null>(null);
+  // The failure and the step's own sentence for it: what the person reads is
+  // a catalogue text chosen by status, never profile-service's sentence.
+  const [error, setError] = useState<{ error: ApiError; fallback: MessageKey } | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -183,7 +186,7 @@ export function ProfilePage() {
       dispatch(occupationalFieldSet(field));
     } else {
       // The display must not claim a choice the server refused.
-      setError({ status: 0, title: "", detail: result.detail });
+      setError({ error: result.error, fallback: "errors.occupationNotSaved" });
     }
   }
 
@@ -255,7 +258,7 @@ export function ProfilePage() {
     } else {
       // The display must not claim a finding that does not exist — it keeps
       // the old state and says beside it that the attempt failed.
-      setReadError(result.error.detail);
+      setReadError(t(failureKey(result.error, "errors.documentsNotRead")));
     }
   }
 
@@ -313,7 +316,7 @@ export function ProfilePage() {
       profile.set({ ok: true, profile: result.profile });
     } else {
       setSaved(false);
-      setError(result.error);
+      setError({ error: result.error, fallback: "errors.profileNotSaved" });
     }
   }
 
@@ -327,7 +330,7 @@ export function ProfilePage() {
       // The ledger says what holds — not the wish of the click.
       release.set(result.granted);
     } else {
-      setError(result.error);
+      setError({ error: result.error, fallback: "errors.consentNotChanged" });
       // Reset: a switch that shows "visible" although nothing was released
       // would be the more dangerous lie.
       release.set(!next);
@@ -365,7 +368,7 @@ export function ProfilePage() {
     // "nothing entered yet".
     return (
       <PageShell title={t("profile.title")} narrow>
-        <ErrorBlock error={loaded.error} />
+        <ErrorBlock error={loaded.error} fallback="errors.ownProfileNotLoaded" />
       </PageShell>
     );
   }
@@ -556,7 +559,9 @@ export function ProfilePage() {
               ))}
             </TextField>
 
-            {error !== null ? <ErrorBlock error={error} /> : null}
+            {error !== null ? (
+              <ErrorBlock error={error.error} fallback={error.fallback} />
+            ) : null}
             {saved && error === null ? (
               <Alert
                 severity="success"

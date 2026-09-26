@@ -1,3 +1,4 @@
+import { type MessageKey, failureKey } from "../../../shared/api/errors";
 import type { Draft } from "../api/applications";
 import { createDrafts, writeDraft } from "../api/applications";
 
@@ -19,8 +20,12 @@ import { createDrafts, writeDraft } from "../api/applications";
 export interface DraftStart {
   ok: boolean;
   drafts: Draft[];
-  /** The server's sentence when it went wrong. */
-  error: string | null;
+  /**
+   * What went wrong, as a catalogue KEY — never the server's sentence, which
+   * is English on the wire. Until 26.09.2026 the problem document's `detail`
+   * stood here, and both callers drew it raw.
+   */
+  error: MessageKey | null;
 }
 
 /**
@@ -48,7 +53,9 @@ export async function startDrafts(
   report?: ProgressReporter,
 ): Promise<DraftStart> {
   const result = await createDrafts(jobIds);
-  if (!result.ok) return { ok: false, drafts: [], error: result.error.detail };
+  if (!result.ok) {
+    return { ok: false, drafts: [], error: failureKey(result.error, "errors.draftsNotCreated") };
+  }
 
   const drafts = result.drafts;
   const open = drafts.filter(

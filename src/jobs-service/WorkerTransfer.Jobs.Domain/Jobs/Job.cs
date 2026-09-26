@@ -269,6 +269,8 @@ public sealed class Job
         UpdatedAt = now;
     }
 
+    // web/src/features/company/pages/CompanyJobNewPage.tsx (CREATE_CASES) matches
+    // "must not be empty" and "is longer than N characters".
     private static string Text(string field, string? value, bool required, int limit)
     {
         var trimmed = (value ?? string.Empty).Trim();

@@ -248,7 +248,7 @@ export function JobsPage() {
   async function create(jobIds: string[], report?: ProgressReporter) {
     const start = await startDrafts(jobIds, report);
     if (!start.ok) {
-      setBulkError(start.error);
+      setBulkError(start.error === null ? null : t(start.error));
       return null;
     }
     return start.drafts;
@@ -331,7 +331,9 @@ export function JobsPage() {
         <LoadingBlock label={t("jobs.searching")} />
       ) : null}
 
-      {list.error !== null ? <ErrorBlock error={list.error.error} /> : null}
+      {list.error !== null ? (
+        <ErrorBlock error={list.error.error} fallback="errors.searchFailed" />
+      ) : null}
 
       {!list.pending && list.error === null && list.items.length === 0 ? (
         <EmptyBlock

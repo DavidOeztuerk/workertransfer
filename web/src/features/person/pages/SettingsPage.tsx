@@ -27,6 +27,7 @@ import {
   saveAccountSettings,
   saveAiKey,
 } from "../api/accountSettings";
+import { failureKey } from "../../../shared/api/errors";
 import {
   ALL_ON,
   type NotificationPreferences,
@@ -111,7 +112,7 @@ export function SettingsPage() {
       setError(null);
       choice.set(result.choice);
     } else {
-      setError(result.error.detail);
+      setError(t(failureKey(result.error, "errors.settingsNotSaved")));
       // Back to what the service really has — the display must not claim a
       // setting that was not saved.
       choice.again();

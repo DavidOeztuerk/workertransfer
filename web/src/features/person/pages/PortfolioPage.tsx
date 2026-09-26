@@ -15,6 +15,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import type { ApiError } from "../../../core/store/thunkHelpers";
 import { useAppSelector } from "../../../core/store/hooks";
 import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
@@ -47,7 +48,7 @@ export function PortfolioPage() {
   const session = useAppSelector((state) => state.auth.session);
   const subjectId = session?.userId ?? null;
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [toggling, setToggling] = useState(false);
 
   const showcase = useAsync(
@@ -94,7 +95,7 @@ export function PortfolioPage() {
       setError(null);
       release.set(result.granted);
     } else {
-      setError(result.error.detail);
+      setError(result.error);
       release.again();
     }
   }
@@ -117,12 +118,9 @@ export function PortfolioPage() {
     >
       {error !== null ? (
         <ErrorBlock
-          error={{
-            status: 0,
-            title: t("portfolio.releaseFailed"),
-            detail: error,
-          }}
+          error={error}
           title={t("portfolio.releaseFailed")}
+          fallback="errors.consentNotChanged"
         />
       ) : null}
 
@@ -145,7 +143,7 @@ export function PortfolioPage() {
           ) : null}
 
           {showcase.value && !showcase.value.ok ? (
-            <ErrorBlock error={showcase.value.error} />
+            <ErrorBlock error={showcase.value.error} fallback="errors.portfolioUnavailable" />
           ) : null}
 
           {!showcase.loading && showcase.value?.ok && !hasItems ? (
