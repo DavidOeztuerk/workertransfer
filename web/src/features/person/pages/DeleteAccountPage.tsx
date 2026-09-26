@@ -11,7 +11,7 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { sitzungBeendet } from "../../auth/store/authSlice";
+import { sessionEnded } from "../../auth/store/authSlice";
 import { SignInRequired } from "../components/SignInRequired";
 import { requestErasure } from "../api/erasure";
 
@@ -123,7 +123,7 @@ export function DeleteAccountPage() {
       //
       // NOT `logout()`: that asks the server, and it answers a revoked session
       // with 401 — the store would stay as it is.
-      dispatch(sitzungBeendet());
+      dispatch(sessionEnded());
     } else {
       setError(result.error.detail);
     }

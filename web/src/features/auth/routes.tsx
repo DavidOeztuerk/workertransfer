@@ -4,16 +4,16 @@ import { lazyRoute } from "../../shared/components/routing/lazyRoute";
 
 
 /**
- * Die Routen des Anmeldebereichs.
+ * The routes of the sign-in area.
  *
- * `/login` und `/register` sind zwei eigene Adressen und kein Umschalter auf
- * einer: beide sind teilbar, der Zurück-Knopf tut was er soll, und der Wechsel
- * dazwischen steht als Reiter AUF der Seite — nicht in der Kopfzeile, wo er
- * vorher je nach Seite verschwand.
+ * `/login` and `/register` are two addresses of their own and not a toggle on
+ * one: both can be shared, the back button does what it should, and the switch
+ * between them stands as a tab ON the page — not in the header, where it used
+ * to vanish depending on the page.
  *
- * `/invitation` loest einen Einladungslink ein — genau einmal, denn ein
- * Token ist einmalig und ein zweiter Versuch zeigte einen Fehler fuer etwas,
- * das gerade gelungen ist.
+ * `/invitation` redeems an invitation link — exactly once, because a token is
+ * single-use and a second attempt showed an error for something that had just
+ * succeeded.
  */
 export const authRoutes: RouteObject[] = [
   { path: "/login", element: lazyRoute(() => import("./pages/LoginPage"), "LoginPage") },

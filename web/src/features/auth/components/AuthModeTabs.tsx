@@ -4,15 +4,15 @@ import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 
 /**
- * Der Wechsel zwischen Anmelden und Registrieren — HIER, nicht in der Kopfzeile.
+ * The switch between signing in and registering — HERE, not in the header.
  *
- * Vorher standen beide Wege oben und blendeten sich gegenseitig je nach Seite
- * aus. Das ist die falsche Stelle: oben sind sie zwei konkurrierende Angebote,
- * hier sind sie <em>eine Entscheidung mit zwei Antworten</em> — und wer sich
- * vertan hat, sieht den anderen Weg genau dort, wo er gerade hinschaut.
+ * Before, both paths stood at the top and hid each other depending on the
+ * page. That is the wrong place: at the top they are two competing offers,
+ * here they are <em>one decision with two answers</em> — and whoever got it
+ * wrong sees the other path exactly where they are looking.
  *
- * Echte Verweise und keine Umschalter: beide Zustände haben eine eigene
- * Adresse, sind teilbar, und der Zurück-Knopf tut, was er soll.
+ * Real links and no toggles: both states have an address of their own, can be
+ * shared, and the back button does what it should.
  */
 export function AuthModeTabs({ current }: { current: "login" | "register" }) {
   const { t } = useTranslation();

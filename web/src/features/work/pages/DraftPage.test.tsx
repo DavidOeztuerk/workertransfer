@@ -86,7 +86,7 @@ function draw() {
           displayName: "Anna Beispiel",
           givenName: "",
           familyName: "",
-          berufsfeld: null,
+          occupationalField: null,
         },
         memberships: [],
         error: null,

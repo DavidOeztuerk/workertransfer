@@ -157,9 +157,9 @@ const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
   "resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}Hint": () =>
     each("templ", constantArray(`${PAGES}/ResumePage.tsx`, "TEMPLATES")),
   "home.principle${number}Title": () =>
-    each("number", constantArray("features/public/pages/HomePage.tsx", "grundlagen")),
+    each("number", constantArray("features/public/pages/HomePage.tsx", "PRINCIPLES")),
   "home.principle${number}Text": () =>
-    each("number", constantArray("features/public/pages/HomePage.tsx", "grundlagen")),
+    each("number", constantArray("features/public/pages/HomePage.tsx", "PRINCIPLES")),
   "drafts.${WritingReason}": () =>
     each("WritingReason", unionMembers(`${WORK}/lib/draftErrors.ts`, "WritingReason")),
   "drafts.${writingReason(error)}": () =>

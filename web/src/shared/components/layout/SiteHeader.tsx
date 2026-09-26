@@ -264,7 +264,7 @@ function AccountMenu() {
   // The menu follows the occupational field (ADR-0039). It only hides — the
   // route stays reachable, and without an occupational field the entry stays.
   const occupationalField = useAppSelector(
-    (state) => state.auth.session?.berufsfeld ?? null,
+    (state) => state.auth.session?.occupationalField ?? null,
   );
   const github = offersGitHub(occupationalField);
 

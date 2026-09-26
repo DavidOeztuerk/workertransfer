@@ -1,12 +1,12 @@
 import { useAppDispatch } from "../../../core/store/hooks";
 import { useActor, type Actor } from "../../work/lib/session";
-import { erneuern, loadSession, login, logout } from "../store/authThunks";
+import { loadSession, login, logout, refreshSession } from "../store/authThunks";
 
 /**
- * Dünne Fassade über Redux — Login, Logout, Refresh, Sitzung.
+ * A thin facade over Redux — login, logout, refresh, session.
  *
- * Keine Rollen aus dem Token (ADR-0018: Mitgliedschaft je Vorgang). Kein
- * JWT-Decode, kein Speicher. Tokens bleiben httpOnly-Cookies.
+ * No roles from the token (ADR-0018: membership per operation). No JWT decode,
+ * no storage. Tokens stay httpOnly cookies.
  */
 export function useAuth(): Actor & {
   login: (email: string, password: string) => void;
@@ -26,7 +26,7 @@ export function useAuth(): Actor & {
       void dispatch(logout());
     },
     refresh: () => {
-      void dispatch(erneuern());
+      void dispatch(refreshSession());
     },
     load: () => {
       void dispatch(loadSession());

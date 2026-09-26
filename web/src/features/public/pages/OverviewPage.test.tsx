@@ -1,67 +1,67 @@
 import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMitStore } from "../test/render";
+import { renderWithStore } from "../test/render";
 import { OverviewPage } from "./OverviewPage";
 
 const SUBJECT = "11111111-1111-1111-1111-111111111111";
 const TENANT = "22222222-2222-2222-2222-222222222222";
 
-interface VorgangZeile {
+interface TransferRow {
   status: string;
   requires_release: boolean;
   release_confirmed: boolean;
 }
 
-function vorgang(werte: Partial<VorgangZeile> = {}): VorgangZeile {
+function transfer(values: Partial<TransferRow> = {}): TransferRow {
   return {
     status: "interested",
     requires_release: false,
     release_confirmed: false,
-    ...werte,
+    ...values,
   };
 }
 
 /**
- * Die vier Lesezugriffe, nach Pfad beantwortet.
+ * The four reads, answered by path.
  *
- * `endsWith` und nicht `includes`: `/transfers` ist ein Teilstring von
- * `/transfers/me`, und mit `includes` bekäme die eigene Liste die Antwort der
- * Firmenliste — ein Test, der dann grün ist, ohne etwas zu belegen.
+ * `endsWith` and not `includes`: `/transfers` is a substring of
+ * `/transfers/me`, and with `includes` one's own list would get the answer of
+ * the company list — a test that is then green without proving anything.
  */
-type Antwort = { status?: number; body?: unknown };
+type Answer = { status?: number; body?: unknown };
 
-function antworten(karte: Record<string, Antwort>) {
+function answer(byPath: Record<string, Answer>) {
   const asked: string[] = [];
   const stub = vi.fn(async (url: string) => {
     const path = new URL(url).pathname;
     asked.push(path);
-    const answer = karte[path] ?? { body: [] };
-    return new Response(JSON.stringify(answer.body ?? []), {
-      status: answer.status ?? 200,
+    const reply = byPath[path] ?? { body: [] };
+    return new Response(JSON.stringify(reply.body ?? []), {
+      status: reply.status ?? 200,
     });
   });
   vi.stubGlobal("fetch", stub);
   return asked;
 }
 
-const ANGEMELDET = {
+const SIGNED_IN = {
   status: "authenticated" as const,
-  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null, language: "de", displayName: "Anna Beispiel", givenName: "", familyName: "", berufsfeld: null },
+  session: { userId: SUBJECT, email: "anna@example.com", tenantId: null, language: "de", displayName: "Anna Example", givenName: "", familyName: "", occupationalField: null },
 };
 
-const MIT_FIRMA = {
+const FOR_COMPANY = {
   status: "authenticated" as const,
   session: {
     userId: SUBJECT,
     email: "anna@example.com",
     tenantId: TENANT,
-    language: "de", displayName: "Anna Beispiel", givenName: "", familyName: "", berufsfeld: null,
+    language: "de", displayName: "Anna Example", givenName: "", familyName: "", occupationalField: null,
   },
 };
 
 beforeEach(() => {
-  antworten({});
+  answer({});
 });
 
 afterEach(() => {
@@ -69,40 +69,40 @@ afterEach(() => {
 });
 
 describe("OverviewPage", () => {
-  it("sagt klar, wenn gerade nichts wartet", async () => {
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+  it("says clearly when nothing is waiting right now", async () => {
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText("Gerade wartet nichts auf dich."),
     ).toBeInTheDocument();
   });
 
-  it("zählt nur, was auf eine Entscheidung wartet, nicht was von selbst läuft", async () => {
-    // Eine Übersicht, die auch anzeigt, was von selbst läuft, ist eine Liste —
-    // und Listen übersieht man.
-    antworten({
+  it("counts only what waits for a decision, not what runs by itself", async () => {
+    // An overview that also shows what runs by itself is a list — and lists get
+    // overlooked.
+    answer({
       "/transfers/me": {
         body: [
-          vorgang({ status: "interested" }), // wartet auf mich
-          vorgang({ status: "talking" }), // läuft, das Unternehmen ist dran
-          vorgang({ status: "completed" }), // vorbei
+          transfer({ status: "interested" }), // waits for me
+          transfer({ status: "talking" }), // running, the company is to move
+          transfer({ status: "completed" }), // over
         ],
       },
     });
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText("1 Gespräch wartet auf dich"),
     ).toBeInTheDocument();
   });
 
-  it("zählt eine ausstehende Freigabe, eine bestätigte nicht", async () => {
-    antworten({
+  it("counts an outstanding release, not a confirmed one", async () => {
+    answer({
       "/transfers/me": {
         body: [
-          vorgang({ status: "accepted", requires_release: true }),
-          vorgang({
+          transfer({ status: "accepted", requires_release: true }),
+          transfer({
             status: "accepted",
             requires_release: true,
             release_confirmed: true,
@@ -111,22 +111,22 @@ describe("OverviewPage", () => {
       },
     });
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText("1 Gespräch wartet auf dich"),
     ).toBeInTheDocument();
   });
 
-  it("zählt offene Anfragen beider Arten getrennt", async () => {
-    antworten({
+  it("counts open requests of both kinds separately", async () => {
+    answer({
       "/market/me/requests": {
         body: [{ status: "PENDING" }, { status: "GRANTED" }],
       },
       "/resumes/me/requests": { body: [{ status: "PENDING" }] },
     });
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText(
@@ -138,22 +138,22 @@ describe("OverviewPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("fragt ohne aktives Unternehmen nicht nach Firmenvorgängen", async () => {
-    // Ohne Firma antwortet der Dienst 403 — und ein Fehler, den die Anfrage
-    // selbst erzeugt hat, dürfte die Übersicht als unvollständig markieren.
-    const asked = antworten({});
+  it("does not ask for company transfers without an active company", async () => {
+    // Without a company the service answers 403 — and an error the request
+    // itself produced would mark the overview as incomplete.
+    const asked = answer({});
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     await screen.findByText("Gerade wartet nichts auf dich.");
     expect(asked).not.toContain("/transfers");
     expect(asked).toContain("/transfers/me");
   });
 
-  it("hält die Sache des Unternehmens von der der Person getrennt", async () => {
-    antworten({ "/transfers": { body: [vorgang({ status: "talking" })] } });
+  it("keeps the company's business apart from the person's", async () => {
+    answer({ "/transfers": { body: [transfer({ status: "talking" })] } });
 
-    renderMitStore(<OverviewPage />, { auth: MIT_FIRMA });
+    renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
 
     expect(
       await screen.findByText("1 Transfer wartet auf euch"),
@@ -162,33 +162,33 @@ describe("OverviewPage", () => {
     expect(screen.queryByText("Für dich")).toBeNull();
   });
 
-  it("gibt ein unvollständiges Bild zu, statt zu behaupten, nichts warte", async () => {
-    // „Nichts liegt an" ist die eine Aussage, die nach einer fehlgeschlagenen
-    // Abfrage falsch sein kann — und sie wiegt in Sicherheit.
-    antworten({
+  it("admits an incomplete picture instead of claiming nothing waits", async () => {
+    // "Nothing is pending" is the one statement that can be false after a
+    // failed read — and it lulls into safety.
+    answer({
       "/market/me/requests": {
         status: 503,
         body: { detail: "Ledger schweigt" },
       },
     });
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("Gerade wartet nichts auf dich.")).toBeNull();
   });
 
-  it("benutzt Singular und Plural, weil ein '1 Gespräche' nach kaputt aussieht", async () => {
-    antworten({
+  it("uses singular and plural, because a '1 Gespräche' looks broken", async () => {
+    answer({
       "/transfers/me": {
         body: [
-          vorgang({ status: "interested" }),
-          vorgang({ status: "offered" }),
+          transfer({ status: "interested" }),
+          transfer({ status: "offered" }),
         ],
       },
     });
 
-    renderMitStore(<OverviewPage />, { auth: ANGEMELDET });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
       await screen.findByText("2 Gespräche warten auf dich"),
@@ -196,14 +196,13 @@ describe("OverviewPage", () => {
   });
 
   /**
-   * Abgemeldet ist „nichts wartet auf dich" keine leere Übersicht, sondern eine
-   * falsche Auskunft: sie sagt nichts über die Person, sondern über das
-   * fehlende Token.
+   * Signed out, "nichts wartet auf dich" is no empty overview but a false
+   * statement: it says nothing about the person, only about the missing token.
    */
-  it("zeigt einer abgemeldeten Besucherin keine leere Übersicht", async () => {
-    const asked = antworten({});
+  it("shows a signed-out visitor no empty overview", async () => {
+    const asked = answer({});
 
-    renderMitStore(<OverviewPage />, { auth: { status: "anonymous" } });
+    renderWithStore(<OverviewPage />, { auth: { status: "anonymous" } });
 
     expect(screen.queryByText("Gerade wartet nichts auf dich.")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Was liegt an" })).toBeNull();

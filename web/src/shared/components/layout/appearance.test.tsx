@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { renderMitStore } from "../../../features/auth/test/render";
+import { renderWithStore } from "../../../features/auth/test/render";
 import { AppearanceSections } from "./appearance";
 
 /**
@@ -13,7 +13,7 @@ import { AppearanceSections } from "./appearance";
 describe("appearance and language", () => {
   async function open(field: string) {
     const user = userEvent.setup();
-    renderMitStore(<AppearanceSections />);
+    renderWithStore(<AppearanceSections />);
     await user.click(screen.getByRole("combobox", { name: field }));
     return user;
   }

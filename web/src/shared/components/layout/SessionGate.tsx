@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { onSessionExpired } from "../../../core/api/client";
-import { sitzungBeendet } from "../../../features/auth/store/authSlice";
+import { sessionEnded } from "../../../features/auth/store/authSlice";
 import { loadSession } from "../../../features/auth/store/authThunks";
 
 /**
@@ -57,7 +57,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   // once and navigate to the start page.
   useEffect(() => {
     return onSessionExpired(() => {
-      dispatch(sitzungBeendet());
+      dispatch(sessionEnded());
       navigate("/", { replace: true });
     });
   }, [dispatch, navigate]);

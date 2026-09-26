@@ -13,34 +13,33 @@ import auth from "../../auth/store/authSlice";
 import type { Membership, Session, SessionStatus } from "../../auth/types/session";
 
 /**
- * Die Hülle, die eine Seite dieses Bereichs zum Leben braucht: Store, Theme,
- * Router.
+ * The shell a page of this area needs to come alive: store, theme, router.
  *
- * Sie steht hier und nicht in `src/shared/test/`, wo sie hingehörte — dieser
- * Durchgang darf `shared/` nicht anfassen. Wer die Bereiche später
- * zusammenzieht, legt sie dorthin und wirft diese Datei und ihr Gegenstück in
- * `features/auth/test/` weg.
+ * It stands here and not in `src/shared/test/`, where it would belong — this
+ * pass was not allowed to touch `shared/`. Whoever later merges the areas puts
+ * it there and throws this file and its counterpart in `features/auth/test/`
+ * away.
  *
- * <strong>Ein eigener Store je Aufruf.</strong> Der echte Store ist ein
- * Einzelstück; über Testgrenzen hinweg trüge er den Zustand des vorigen Tests
- * weiter, und dann hängt ein Ergebnis an der Reihenfolge der Tests.
+ * <strong>A store of its own per call.</strong> The real store is a singleton;
+ * across test boundaries it would carry the previous test's state along, and a
+ * result would then depend on the order of the tests.
  */
-export interface AuthVorgabe {
+export interface AuthPreset {
   status?: SessionStatus;
   session?: Session | null;
   memberships?: Membership[];
 }
 
-export function testStore(fallback: AuthVorgabe = {}) {
+export function testStore(preset: AuthPreset = {}) {
   return configureStore({
     reducer: { auth, preferences },
     preloadedState: {
       auth: {
-        // Voreinstellung „anonymous" und nicht „unknown": `unknown` heisst „noch
-        // nicht gefragt", und Seiten, die darauf warten, rendern dann nichts.
-        status: fallback.status ?? "anonymous",
-        session: fallback.session ?? null,
-        memberships: fallback.memberships ?? [],
+        // Default "anonymous" and not "unknown": `unknown` means "not asked
+        // yet", and pages waiting for it then render nothing.
+        status: preset.status ?? "anonymous",
+        session: preset.session ?? null,
+        memberships: preset.memberships ?? [],
         error: null,
         pending: false,
       },
@@ -54,15 +53,15 @@ export function testStore(fallback: AuthVorgabe = {}) {
  * `language.label` then says nothing about the UI. German is pinned, like in the
  * Playwright configuration and for the same reason (ADR-0031).
  */
-export function renderMitStore(
+export function renderWithStore(
   ui: ReactElement,
   {
-    auth: fallback,
+    auth: preset,
     route = "/",
     ...options
-  }: RenderOptions & { auth?: AuthVorgabe; route?: string } = {}
+  }: RenderOptions & { auth?: AuthPreset; route?: string } = {}
 ) {
-  const store = testStore(fallback);
+  const store = testStore(preset);
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (

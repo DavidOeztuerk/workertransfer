@@ -30,7 +30,7 @@ const SESSION = {
     displayName: "Anna Beispiel",
     givenName: "",
     familyName: "",
-    berufsfeld: null,
+    occupationalField: null,
   },
 };
 

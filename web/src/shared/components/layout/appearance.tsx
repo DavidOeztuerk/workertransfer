@@ -14,7 +14,7 @@ import {
   languageSet,
   type LanguagePreference,
 } from "../../../core/store/preferencesSlice";
-import { spracheSpeichern } from "../../../features/auth/store/authThunks";
+import { saveLanguage } from "../../../features/auth/store/authThunks";
 import { useThemeMode } from "../../hooks/useThemeMode";
 import { ChoiceField, type ChoiceOption } from "../ui/ChoiceField";
 
@@ -88,7 +88,7 @@ export function usePreferences(): {
     // The account gets the resolved language, not "system": a mail must have
     // a language.
     if (signedIn) {
-      void dispatch(spracheSpeichern(resolveLanguage(chosen)));
+      void dispatch(saveLanguage(resolveLanguage(chosen)));
     }
   }
 

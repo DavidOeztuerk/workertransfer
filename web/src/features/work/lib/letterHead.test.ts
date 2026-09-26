@@ -13,7 +13,7 @@ describe("letterHead", () => {
         displayName: "Anna",
         givenName: "Anna",
         familyName: "Beispiel",
-        berufsfeld: null,
+        occupationalField: null,
       },
       {
         line1: "Weg 2",

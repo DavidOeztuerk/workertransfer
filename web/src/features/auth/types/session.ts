@@ -1,52 +1,52 @@
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 
 /**
- * Wer gerade handelt.
+ * Who is acting right now.
  *
- * `tenantId === null` heisst "handelt als Person", NICHT "fehlt" (ADR-0017).
- * Auf einem Transfermarkt ist die Person ohne Firma der Normalfall, und die
- * beiden Zustände zu vermischen wäre genau der Fehler, der später eine
- * Firmenansicht für jemanden zeigt, der keine hat.
+ * `tenantId === null` means "acting as a person", NOT "missing" (ADR-0017). On
+ * a transfer market the person without a company is the normal case, and
+ * mixing the two states would be exactly the defect that later shows a company
+ * view to someone who has none.
  */
 export interface Session {
   userId: string;
   email: string;
   tenantId: string | null;
   /**
-   * Die Sprache, die am KONTO steht.
+   * The language that stands on the ACCOUNT.
    *
-   * Sie kommt mit, damit die Wahl den Browser überlebt: wer auf einem
-   * englischen Rechner Deutsch gewählt hat, sieht nach dem Anmelden auf einem
-   * anderen Gerät wieder Deutsch. Der lokale Speicher weiss davon nichts.
+   * It travels along so the choice survives the browser: whoever chose German
+   * on an English machine sees German again after signing in on another
+   * device. Local storage knows nothing about that.
    */
   language: string;
   /**
-   * Der Name, unter dem die Person auftritt.
+   * The name the person appears under.
    *
-   * Für die Initialen im Kopf. Aus der Adresse liesse er sich nicht ableiten:
-   * `max.werber@…` ergäbe „M" und nicht „MW".
+   * For the initials in the header. It could not be derived from the address:
+   * `max.werber@…` would give "M" and not "MW".
    */
   displayName: string;
-  /** Bürgerlicher Vorname, oder leer. Nie im Token, nie an die KI als Anschrift. */
+  /** Legal given name, or empty. Never in the token, never to the AI as an address. */
   givenName: string;
-  /** Bürgerlicher Nachname, oder leer. */
+  /** Legal family name, or empty. */
   familyName: string;
   /**
-   * In welcher Arbeitswelt die Person steht, oder `null` für „nicht angegeben".
-   * Daraus folgt nur, was die Oberfläche anbietet (ADR-0039).
+   * Which working world the person stands in, or `null` for "not stated".
+   * Only what the UI offers follows from it (ADR-0039).
    */
-  berufsfeld: OccupationalFieldChoice;
+  occupationalField: OccupationalFieldChoice;
 }
 
 /**
- * Was `GET /auth/session` über den Zustand sagt — unabhängig vom User-Objekt.
+ * What `GET /auth/session` says about the state — independent of the user object.
  *
- * `renewable` heisst: Access tot, Refresh-Cookie da. Die Oberfläche muss dann
- * `POST /auth/refresh` rufen, sonst wirkt die Sitzung nach 15 Minuten tot.
+ * `renewable` means: access dead, refresh cookie present. The UI must then call
+ * `POST /auth/refresh`, or the session looks dead after 15 minutes.
  */
 export type SessionWireState = "active" | "renewable" | "anonymous";
 
-/** Eine Firma, für die jemand handeln darf. */
+/** A company someone may act for. */
 export interface Membership {
   id: string;
   name: string;
@@ -54,10 +54,10 @@ export interface Membership {
 }
 
 /**
- * Der Sitzungszustand kennt DREI Fälle, nicht zwei.
+ * The session state knows THREE cases, not two.
  *
- * `unknown` ist der Zustand vor der ersten Antwort und darf nicht als
- * "abgemeldet" gezeichnet werden: sonst blitzt beim Laden jeder Seite kurz die
- * Anmeldeaufforderung auf, obwohl die Person angemeldet ist.
+ * `unknown` is the state before the first answer and must not be drawn as
+ * "signed out": otherwise the sign-in prompt briefly flashes on every page load
+ * although the person is signed in.
  */
 export type SessionStatus = "unknown" | "authenticated" | "anonymous";

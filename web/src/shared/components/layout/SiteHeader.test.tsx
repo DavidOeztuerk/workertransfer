@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { renderMitStore } from "../../../features/auth/test/render";
+import { renderWithStore } from "../../../features/auth/test/render";
 import type { Session } from "../../../features/auth/types/session";
 import type { OccupationalFieldChoice } from "../../lib/occupationalFields";
 import { SiteHeader } from "./SiteHeader";
@@ -22,13 +22,13 @@ describe("SiteHeader and the occupational field", () => {
       displayName: "Anna Beispiel",
       givenName: "",
       familyName: "",
-      berufsfeld: occupationalField,
+      occupationalField,
     };
   }
 
   async function openAccountMenu(occupationalField: OccupationalFieldChoice) {
     const user = userEvent.setup();
-    renderMitStore(<SiteHeader />, {
+    renderWithStore(<SiteHeader />, {
       auth: { status: "authenticated", session: account(occupationalField) },
     });
     await user.click(screen.getByRole("button", { name: "Mein Konto" }));
@@ -62,7 +62,7 @@ describe("SiteHeader and the occupational field", () => {
   it("goes one level deeper instead of opening a second overlay", async () => {
     // The same surface swaps its content instead of opening a second overlay.
     const user = userEvent.setup();
-    renderMitStore(<SiteHeader />, {
+    renderWithStore(<SiteHeader />, {
       auth: { status: "authenticated", session: account(null) },
     });
     await user.click(screen.getByRole("button", { name: "Mein Konto" }));
@@ -103,7 +103,7 @@ describe("SiteHeader and the occupational field", () => {
   it("does NOT call the signed-out button \"Mein Konto\"", async () => {
     // The name is also the signal by which the E2E sign-in recognises its
     // success — it must not stand there while signed out.
-    renderMitStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
+    renderWithStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
 
     expect(screen.queryByRole("button", { name: "Mein Konto" })).not.toBeInTheDocument();
     expect(
@@ -116,7 +116,7 @@ describe("SiteHeader and the occupational field", () => {
       { status: "authenticated" as const, session: account(null) },
       { status: "anonymous" as const, session: null },
     ]) {
-      const { unmount } = renderMitStore(<SiteHeader />, { auth });
+      const { unmount } = renderWithStore(<SiteHeader />, { auth });
 
       expect(
         screen.queryByRole("button", { name: /Darstellung und Sprache/i }),
@@ -130,7 +130,7 @@ describe("SiteHeader and the occupational field", () => {
     // Whoever switches the language because they cannot read the UI must be
     // able to do so before signing in.
     const user = userEvent.setup();
-    renderMitStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
+    renderWithStore(<SiteHeader />, { auth: { status: "anonymous", session: null } });
 
     await user.click(screen.getByRole("button", { name: "Einstellungen und Anmeldung" }));
 

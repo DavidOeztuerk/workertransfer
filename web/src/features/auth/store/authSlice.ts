@@ -11,7 +11,7 @@ interface AuthState {
   status: SessionStatus;
   session: Session | null;
   memberships: Membership[];
-  /** Der letzte Fehler einer BEWUSSTEN Handlung — nie der der Hintergrundprüfung. */
+  /** The last error of a DELIBERATE action — never that of the background check. */
   error: ApiError | null;
   pending: boolean;
 }
@@ -28,29 +28,29 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    /** Räumt die Fehlermeldung weg, sobald jemand das Formular wieder anfasst. */
+    /** Clears the error message as soon as someone touches the form again. */
     errorCleared(state) {
       state.error = null;
     },
 
-    /**
-     * Die Sitzung ist auf dem Server schon weg — der Speicher zieht nach.
-     *
-     * Nicht dasselbe wie `logout`: das *bittet* den Server abzumelden. Nach
-     * einer angenommenen Kontolöschung ist jede Sitzung bereits widerrufen, ein
-     * `POST /auth/logout` bekäme 401, `logout.fulfilled` liefe nie, und der
-     * Speicher bliebe auf „angemeldet" stehen. Genau das war zu sehen: die
-     * Löschseite sagte „Du bist abgemeldet", während der Kopf weiter das
-     * Konto-Menü zeigte.
-     */
-    /** Das Berufsfeld hat sich geändert — die Navigation zieht sofort nach. */
-    berufsfeldGesetzt(state, action: PayloadAction<OccupationalFieldChoice>) {
+    /** The occupational field changed — the navigation follows at once. */
+    occupationalFieldSet(state, action: PayloadAction<OccupationalFieldChoice>) {
       if (state.session !== null) {
-        state.session = { ...state.session, berufsfeld: action.payload };
+        state.session = { ...state.session, occupationalField: action.payload };
       }
     },
 
-    sitzungBeendet(state) {
+    /**
+     * The session is already gone on the server — the store follows.
+     *
+     * Not the same as `logout`: that *asks* the server to sign out. After an
+     * accepted account erasure every session is already revoked, a
+     * `POST /auth/logout` would get 401, `logout.fulfilled` would never run, and
+     * the store would stay on "signed in". Exactly that was seen: the erasure
+     * page said "You are signed out" while the header kept showing the account
+     * menu.
+     */
+    sessionEnded(state) {
       state.session = null;
       state.memberships = [];
       state.status = "anonymous";
@@ -59,9 +59,9 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Die Sitzungsprüfung setzt NIE `error`: sie läuft im Hintergrund, und
-      // ein roter Kasten für etwas, das niemand angestossen hat, erschreckt
-      // ohne Anlass. Sie setzt nur den Status.
+      // The session check NEVER sets `error`: it runs in the background, and a
+      // red box for something nobody started alarms without cause. It sets
+      // only the status.
       .addCase(loadSession.fulfilled, (state, action) => {
         state.session = action.payload;
         state.status = action.payload ? "authenticated" : "anonymous";
@@ -104,5 +104,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { berufsfeldGesetzt, errorCleared, sitzungBeendet } = authSlice.actions;
+export const { errorCleared, occupationalFieldSet, sessionEnded } = authSlice.actions;
 export default authSlice.reducer;

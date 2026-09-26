@@ -33,7 +33,7 @@ export interface AuthPreset {
 export const PERSON: Session = {
   userId: "11111111-1111-1111-1111-111111111111",
   email: "anna@example.com",
-  tenantId: null, language: "de", displayName: "Anna Example", givenName: "", familyName: "", berufsfeld: null,
+  tenantId: null, language: "de", displayName: "Anna Example", givenName: "", familyName: "", occupationalField: null,
 };
 
 export function testStore(preset: AuthPreset = {}) {

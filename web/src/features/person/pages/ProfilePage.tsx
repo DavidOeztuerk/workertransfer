@@ -54,7 +54,7 @@ import { FromDocuments } from "../components/FromDocuments";
 import { offersGitHub } from "../../../shared/lib/occupationalFields";
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { berufsfeldGesetzt } from "../../auth/store/authSlice";
+import { occupationalFieldSet } from "../../auth/store/authSlice";
 import { saveOccupationalField } from "../api/occupationalField";
 import { DraftHelp } from "../components/DraftHelp";
 import { CivilIdentity } from "../components/CivilIdentity";
@@ -161,7 +161,7 @@ export function ProfilePage() {
   // The occupational field decides what is offered — never what is allowed
   // (ADR-0039).
   const occupationalField = useAppSelector(
-    (state) => state.auth.session?.berufsfeld ?? null,
+    (state) => state.auth.session?.occupationalField ?? null,
   );
   const github = offersGitHub(occupationalField);
   const dispatch = useAppDispatch();
@@ -180,7 +180,7 @@ export function ProfilePage() {
     const result = await saveOccupationalField(field);
 
     if (result.ok) {
-      dispatch(berufsfeldGesetzt(field));
+      dispatch(occupationalFieldSet(field));
     } else {
       // The display must not claim a choice the server refused.
       setError({ status: 0, title: "", detail: result.detail });
