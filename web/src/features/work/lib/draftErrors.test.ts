@@ -40,6 +40,17 @@ describe("writingReason", () => {
     );
   });
 
+  it("does not blame the provider when there was nothing to revise", () => {
+    // `ApplicationDraft.cs`, /revise, 409 — it used to fall through to
+    // providerNotWriting, and the person read that the writing help failed.
+    expect(writingReason("There is no open comment — nothing to revise.")).toBe(
+      "nothingToRevise",
+    );
+    expect(writingKey("There is no open comment — nothing to revise.")).toBe(
+      "drafts.nothingToRevise",
+    );
+  });
+
   it("does not attribute a forbidden step to the provider", () => {
     expect(
       writingReason("Ein Entwurf im Stand Fehlgeschlagen kann nicht geschrieben werden."),

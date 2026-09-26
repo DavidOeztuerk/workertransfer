@@ -239,6 +239,44 @@ describe("RegisterPage — person or company", () => {
   });
 });
 
+/*
+ * A GERMAN PERSON READS GERMAN when identity-service refuses.
+ *
+ * Until 26.09.2026 this page drew the problem document's `detail` raw, and
+ * since the backend answers in English a German person read "Password rejected:
+ * exceeds 72 bytes". The refusal is chosen by status and sentence now
+ * (`api/registration.ts`); none of the cases depends on whether the address is
+ * known — the server answers 201 for a known one, too.
+ */
+describe("RegisterPage — a refusal in the person's language", () => {
+  it("names the gateway's brake in German", async () => {
+    answerInOrder({ status: 429, body: { title: "Request failed", detail: "Too many requests" } });
+    const user = userEvent.setup();
+    renderWithStore(<RegisterPage />, { route: "/register" });
+
+    await fillAndSubmit(user, "a@b.com");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Zu viele Versuche in kurzer Zeit.",
+    );
+    expect(document.body.textContent).not.toMatch(/Too many requests/);
+  });
+
+  it("names a password the server refuses as too long", async () => {
+    answerInOrder({
+      status: 400,
+      body: { title: "Request failed", detail: "Password rejected: exceeds 72 bytes" },
+    });
+    const user = userEvent.setup();
+    renderWithStore(<RegisterPage />, { route: "/register" });
+
+    await fillAndSubmit(user, "a@b.com");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Das Passwort ist zu lang.");
+    expect(document.body.textContent).not.toMatch(/Password rejected/);
+  });
+});
+
 describe("RegisterPage — requesting the mail again", () => {
   it("says so when the mail could not even be requested", async () => {
     // On a network error the button visibly did NOTHING.
