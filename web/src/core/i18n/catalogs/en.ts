@@ -754,6 +754,15 @@ const en: Catalog = {
       "Writing help is set up, but the provider refused. Check the model and address under Settings.",
     providerEmpty: "Writing help returned no text. Try again or write it yourself.",
     stepNotNow: "This step is not allowed from here. Reload the page and try again.",
+    stepOpenComments:
+      "There are still open comments. Have the letter revised first — or change it yourself.",
+    stepApproveFirst: "Sending only works once the letter is approved.",
+    applicationExists: "You have already applied for this job.",
+    commentEmpty: "A comment needs some text.",
+    commentTooLong: "The comment is too long. Please shorten it.",
+    tooManyComments: "This draft already carries as many comments as it can hold.",
+    approveEmpty: "An empty letter cannot be approved.",
+    letterTooLong: "The letter is too long. Please shorten it.",
     providerNotWriting:
       "Writing help is set up but did not write. Try again or write the letter yourself.",
     jobUnknown: "Position",

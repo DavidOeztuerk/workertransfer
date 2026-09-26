@@ -1,4 +1,5 @@
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@mui/material/styles";
 import { configureStore } from "@reduxjs/toolkit";
 import { render } from "@testing-library/react";
@@ -224,5 +225,51 @@ describe("DraftPage", () => {
     expect(asked.some((url) => url.includes("/companies/") && url.includes("/profile"))).toBe(
       false,
     );
+  });
+
+  /*
+   * A GERMAN PERSON READS GERMAN when a step fails.
+   *
+   * applications-service answers in English since 62e819e, and until
+   * 26.09.2026 this page put the problem document's `detail` straight into the
+   * alert: "This job is no longer advertised." in the middle of a German page.
+   * The page now reads the status and the sentence and shows the catalogue text
+   * (`lib/draftErrors.ts`). The server's sentence must not appear at all — not
+   * even beside the German one.
+   */
+  it("shows a German sentence and not the server's English when sending fails", async () => {
+    stubFetch((url, init) => {
+      if (url.includes(`/applications/drafts/${ID}/send`) && init?.method === "POST") {
+        return {
+          status: 409,
+          body: {
+            title: "Request failed",
+            detail: "This job is no longer advertised.",
+            correlationId: "abc-123",
+          },
+        };
+      }
+      if (url.includes(`/applications/drafts/${ID}`)) {
+        return {
+          body: {
+            ...DRAFT,
+            status: "approved",
+            error: "",
+            subject: "Bewerbung",
+            body: "Sehr geehrte Damen und Herren",
+            shares_resume: true,
+          },
+        };
+      }
+      if (url.includes("/documents")) return { body: [] };
+      return { status: 404 };
+    });
+
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Senden$/ }));
+
+    expect(await screen.findByText("Diese Stelle ist nicht mehr offen.")).toBeInTheDocument();
+    expect(screen.queryByText(/no longer advertised/i)).not.toBeInTheDocument();
   });
 });

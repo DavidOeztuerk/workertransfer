@@ -15,7 +15,7 @@ import { WritingProgress } from "../components/WritingProgress";
 import { getJob } from "../api/jobs";
 import { remember } from "../lib/letterContext";
 import { writingStart } from "../lib/writingClock";
-import { writingKey } from "../lib/draftErrors";
+import { draftStepErrorKey, writingKey } from "../lib/draftErrors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -118,7 +118,9 @@ export function DraftsPage() {
     setRunning(id);
     const result = await deleteDraft(id);
     setRunning(null);
-    if (!result.ok) setError(result.error.detail);
+    // A catalogue text chosen by status, never the server's sentence
+    // (`lib/draftErrors.ts`).
+    if (!result.ok) setError(t(draftStepErrorKey("delete", result.error)));
     drafts.reload();
   }
 

@@ -757,6 +757,15 @@ const de = {
       "Die Entwurfshilfe ist eingerichtet, der Anbieter hat aber abgelehnt. Prüfe Modell und Adresse unter Einstellungen.",
     providerEmpty: "Die Entwurfshilfe hat keinen Text geliefert. Versuch es noch einmal oder schreib selbst.",
     stepNotNow: "Dieser Schritt geht von hier aus nicht. Lade die Seite neu und versuch es noch einmal.",
+    stepOpenComments:
+      "Es gibt noch offene Anmerkungen. Lass den Brief zuerst überarbeiten — oder ändere ihn selbst.",
+    stepApproveFirst: "Senden geht erst, wenn der Brief freigegeben ist.",
+    applicationExists: "Für diese Stelle liegt schon eine Bewerbung von dir vor.",
+    commentEmpty: "Eine Anmerkung braucht einen Text.",
+    commentTooLong: "Die Anmerkung ist zu lang. Kürze sie bitte.",
+    tooManyComments: "Dieser Entwurf trägt schon so viele Anmerkungen, wie er fassen kann.",
+    approveEmpty: "Ein leerer Brief lässt sich nicht freigeben.",
+    letterTooLong: "Der Brief ist zu lang. Kürze ihn bitte.",
     providerNotWriting:
       "Die Entwurfshilfe ist eingerichtet, hat aber nicht geschrieben. Versuch es noch einmal oder schreib den Text selbst.",
     jobUnknown: "Stelle",

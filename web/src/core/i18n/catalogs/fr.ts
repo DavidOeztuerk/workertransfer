@@ -754,6 +754,15 @@ const fr: Catalog = {
       "L’aide à la rédaction est configurée, mais le prestataire a refusé. Vérifiez le modèle et l’adresse dans les paramètres.",
     providerEmpty: "L’aide à la rédaction n’a fourni aucun texte. Réessayez ou rédigez vous-même.",
     stepNotNow: "Cette étape n’est pas possible ici. Rechargez la page et réessayez.",
+    stepOpenComments:
+      "Il reste des remarques ouvertes. Faites d’abord réviser la lettre — ou modifiez-la vous-même.",
+    stepApproveFirst: "L’envoi n’est possible qu’une fois la lettre approuvée.",
+    applicationExists: "Vous avez déjà postulé à cette offre.",
+    commentEmpty: "Une remarque a besoin d’un texte.",
+    commentTooLong: "La remarque est trop longue. Veuillez la raccourcir.",
+    tooManyComments: "Ce brouillon contient déjà autant de remarques qu’il peut en accueillir.",
+    approveEmpty: "Une lettre vide ne peut pas être approuvée.",
+    letterTooLong: "La lettre est trop longue. Veuillez la raccourcir.",
     providerNotWriting:
       "L’aide à la rédaction est configurée mais n’a pas écrit. Réessayez ou rédigez la lettre vous-même.",
     jobUnknown: "Poste",

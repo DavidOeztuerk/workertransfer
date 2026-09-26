@@ -45,7 +45,12 @@ import {
 } from "../../person/api/resume";
 import { WritingProgress } from "../components/WritingProgress";
 import { getJob } from "../api/jobs";
-import { emptyLetterHintKey, writingKey } from "../lib/draftErrors";
+import {
+  type DraftStep,
+  draftStepErrorKey,
+  emptyLetterHintKey,
+  writingKey,
+} from "../lib/draftErrors";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -236,8 +241,18 @@ export function DraftPage() {
   const title = job.data?.title ?? (draft.subject || t("drafts.title"));
   const draftId = draft.id;
 
+  /**
+   * One step on the draft, and what its failure says.
+   *
+   * <strong>Never the server's `detail` itself.</strong> `write` and `revise`
+   * (and every silent provider) are about the writing help and read as a hint;
+   * every other step reads as a catalogue text chosen by status and — where
+   * the person has to act — by the sentence (`lib/draftErrors.ts`). The raw
+   * detail stood here until 26.09.2026, and since applications-service answers
+   * in English a German person read English.
+   */
   async function run(
-    step: string,
+    step: "write" | "revise" | DraftStep,
     action: () => Promise<{ ok: true } | Failure<DraftError>>,
   ) {
     setRunning(step);
@@ -249,7 +264,7 @@ export function DraftPage() {
       if (step === "write" || step === "revise" || result.reason === "unavailable") {
         setHint(t(writingKey(result.error.detail)));
       } else {
-        setError(result.error.detail);
+        setError(t(draftStepErrorKey(step, result.error)));
       }
     }
     // write/revise keep running in the service — the state arrives by GET.
@@ -294,7 +309,10 @@ export function DraftPage() {
     setToDelete(null);
     const result = await deleteDocument(id);
     if (!result.ok) {
-      setError(result.error.detail);
+      // resume-service's own sentence is English too; the step names itself.
+      setError(
+        t(result.error.status === 0 ? "errors.noConnection" : "errors.documentNotDeleted"),
+      );
       return;
     }
     const next = chosen.filter((x) => x !== id);
