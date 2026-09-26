@@ -4,19 +4,18 @@ import { lazyRoute } from "../../shared/components/routing/lazyRoute";
 
 
 /**
- * Die Routen dessen, was ein Unternehmen tut.
+ * The routes of what a company does.
  *
- * <strong>Alle Seiten dieses Bereichs sind migriert.</strong>
+ * <strong>All pages of this area are migrated.</strong>
  *
- * `/careers/<slug>` liegt hier und nicht in `work`: sie zeigt ein
- * Unternehmensprofil samt seiner Stellen und gehoert sachlich hierher.
+ * `/careers/<slug>` lies here and not in `work`: it shows a company profile
+ * with its jobs and belongs here by subject.
  *
- * Zwei Dinge, die man beim Bauen sonst falsch macht und die deshalb
- * stehenbleiben: die Suche nach Menschen liegt auf `GET /scout/candidates` bei
- * scout-service und nicht mehr auf `/candidates` bei profile-service (dieser
- * Pfad ist am 11.09.2026 gefallen, ADR-0036), und `/company/jobs` und
- * `/company/jobs/new` sind zwei Seiten — eine E2E-Reise sucht das Formular
- * heute noch auf der Liste.
+ * Two things one otherwise gets wrong when building, and which therefore stay:
+ * the search for people lies on `GET /scout/candidates` at scout-service and no
+ * longer on `/candidates` at profile-service (that path fell on 11.09.2026,
+ * ADR-0036), and `/company/jobs` and `/company/jobs/new` are two pages — an E2E
+ * journey still looks for the form on the list today.
  */
 export const companyRoutes: RouteObject[] = [
   { path: "/careers/:slug", element: lazyRoute(() => import("./pages/CareerPage"), "CareerPage") },

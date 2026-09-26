@@ -13,7 +13,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type CompanyAction,
@@ -25,8 +25,8 @@ import {
   makeOffer,
 } from "../../work/api/transfers";
 
-/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
-const TITEL: Record<Transfer["status"], string> = {
+/** The state as a catalogue key — the wording lies in the catalogues. */
+const STATUS_TITLES: Record<Transfer["status"], string> = {
   interested: "companyTransfers.statusInterested",
   talking: "companyTransfers.statusTalking",
   offered: "companyTransfers.statusOffered",
@@ -37,30 +37,29 @@ const TITEL: Record<Transfer["status"], string> = {
 };
 
 /**
- * <c>/company/transfers</c> — die Gespräche aus Sicht des Unternehmens.
+ * <c>/company/transfers</c> — the conversations from the company's side.
  *
- * <strong>Die Ablöse wird festgehalten, nicht bewegt.</strong> Diese Plattform
- * führt kein Geld. Die Zahl steht da, damit beide Seiten dieselbe im Blick
- * haben — nicht, weil hier etwas überwiesen würde.
+ * <strong>The placement fee is recorded, not moved.</strong> This platform
+ * handles no money. The figure stands there so both sides have the same one in
+ * view — not because anything would be transferred here.
  *
- * <strong>Abschliessen darf das Unternehmen nur, wenn keine Freigabe
- * aussteht.</strong> Muss die Person erst von ihrem Arbeitgeber gelassen
- * werden, gehört der letzte Schritt ihr; das Unternehmen kann ihn nicht für sie
- * tun.
+ * <strong>The company may only complete when no release is
+ * outstanding.</strong> If the person must first be let go by their employer,
+ * the last step is theirs; the company cannot take it for them.
  */
 export function CompanyTransfersPage() {
   const { t } = useTranslation();
-  const { fuerFirma, tenantId } = useHandelnder();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const { forCompany, tenantId } = useActor();
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   const transfers = useAsync(
     (signal) => listCompanyTransfers(signal),
     [tenantId],
-    fuerFirma,
+    forCompany,
   );
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
       <PageShell title={t("companyTransfers.title")} narrow>
         <Card>
@@ -74,31 +73,31 @@ export function CompanyTransfersPage() {
     );
   }
 
-  async function ziehen(id: string, move: CompanyAction) {
-    setLaeuft(true);
-    const result = await companyMove(id, move);
-    setLaeuft(false);
-    setFehler(result.ok ? null : result.error.detail);
+  async function move(id: string, action: CompanyAction) {
+    setRunning(true);
+    const result = await companyMove(id, action);
+    setRunning(false);
+    setError(result.ok ? null : result.error.detail);
     transfers.reload();
   }
 
-  async function anbieten(
+  async function offer(
     id: string,
     text: string,
     start: string,
-    abloese: string,
+    fee: string,
   ) {
-    setLaeuft(true);
+    setRunning(true);
     const result = await makeOffer(id, {
       note: text,
       start_on: start.trim() === "" ? null : start.trim(),
-      // Euro im Feld, Cent auf dem Draht — gerundet, damit "1,005" nicht als
-      // Bruchteil eines Cents ankommt.
+      // Euros in the field, cents on the wire — rounded so "1,005" does not
+      // arrive as a fraction of a cent.
       fee_cents:
-        abloese.trim() === "" ? null : Math.round(Number(abloese) * 100),
+        fee.trim() === "" ? null : Math.round(Number(fee) * 100),
     });
-    setLaeuft(false);
-    setFehler(result.ok ? null : result.error.detail);
+    setRunning(false);
+    setError(result.ok ? null : result.error.detail);
     transfers.reload();
   }
 
@@ -111,9 +110,9 @@ export function CompanyTransfersPage() {
       narrow
       lead={t("companyTransfers.lead")}
     >
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
@@ -145,13 +144,13 @@ export function CompanyTransfersPage() {
         }}
       >
         {list.map((transfer: Transfer) => (
-          <Transferkarte
+          <TransferCard
             key={transfer.id}
             transfer={transfer}
             locked={running}
-            onZug={(move) => void ziehen(transfer.id, move)}
-            onAngebot={(text, start, abloese) =>
-              void anbieten(transfer.id, text, start, abloese)
+            onMove={(action) => void move(transfer.id, action)}
+            onOffer={(text, start, fee) =>
+              void offer(transfer.id, text, start, fee)
             }
           />
         ))}
@@ -160,39 +159,39 @@ export function CompanyTransfersPage() {
   );
 }
 
-function Transferkarte({
+function TransferCard({
   transfer,
   locked,
-  onZug,
-  onAngebot,
+  onMove,
+  onOffer,
 }: {
   transfer: Transfer;
   locked: boolean;
-  onZug: (move: CompanyAction) => void;
-  onAngebot: (text: string, start: string, abloese: string) => void;
+  onMove: (action: CompanyAction) => void;
+  onOffer: (text: string, start: string, fee: string) => void;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [start, setStart] = useState("");
-  const [abloese, setAbloese] = useState("");
+  const [fee, setFee] = useState("");
 
-  const laeuftNoch = RUNNING.includes(transfer.status);
+  const stillRunning = RUNNING.includes(transfer.status);
   // The rule is SAID, not only enforced: silently dropping the completion
   // button looks like a defect from outside, and whoever does not know the rule
   // hunts for it in the wrong place. The sentence beside it says two things that
   // both belong to the company — that the last step is not theirs, and that the
   // platform does NOT ask the current employer. The second is the promise this
   // market hangs on for the person.
-  const darfAbschliessen =
+  const mayComplete =
     transfer.status === "accepted" && !transfer.requires_release;
-  const zeigtAngebot =
+  const showsOffer =
     transfer.status === "offered" || transfer.status === "accepted";
 
   return (
     <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t(TITEL[transfer.status])}
+          {t(STATUS_TITLES[transfer.status])}
         </Typography>
 
         {transfer.requires_release && !transfer.release_confirmed ? (
@@ -203,7 +202,7 @@ function Transferkarte({
           </Alert>
         ) : null}
 
-        {zeigtAngebot ? (
+        {showsOffer ? (
           <Box
             component="dl"
             sx={{
@@ -240,7 +239,7 @@ function Transferkarte({
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              onAngebot(text, start, abloese);
+              onOffer(text, start, fee);
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}
           >
@@ -263,8 +262,8 @@ function Transferkarte({
             <TextField
               label={t("companyTransfers.fee")}
               helperText={t("companyTransfers.feeHint")}
-              value={abloese}
-              onChange={(e) => setAbloese(e.target.value)}
+              value={fee}
+              onChange={(e) => setFee(e.target.value)}
             />
             <Box>
               <Button type="submit" variant="contained" disabled={locked}>
@@ -275,19 +274,19 @@ function Transferkarte({
         ) : null}
 
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-          {darfAbschliessen ? (
+          {mayComplete ? (
             <Button
               variant="contained"
-              onClick={() => onZug("complete")}
+              onClick={() => onMove("complete")}
               disabled={locked}
             >
               {t("companyTransfers.complete")}
             </Button>
           ) : null}
-          {laeuftNoch ? (
+          {stillRunning ? (
             <Button
               variant="text"
-              onClick={() => onZug("withdraw")}
+              onClick={() => onMove("withdraw")}
               disabled={locked}
             >
               {t("common.withdraw")}

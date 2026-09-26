@@ -12,7 +12,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import {
   EMPLOYMENT_TYPES,
   type EmploymentType,
@@ -24,7 +24,7 @@ import {
   remoteLabel,
 } from "../../work/api/jobs";
 
-interface Entwurf {
+interface JobDraft {
   title: string;
   description: string;
   location: string;
@@ -34,7 +34,7 @@ interface Entwurf {
   skills: string;
 }
 
-const LEER: Entwurf = {
+const EMPTY: JobDraft = {
   title: "",
   description: "",
   location: "",
@@ -44,27 +44,27 @@ const LEER: Entwurf = {
   skills: "",
 };
 
-const faehigkeiten = (raw: string): string[] =>
+const skillsOf = (raw: string): string[] =>
   raw
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry !== "");
 
 /**
- * <c>/company/jobs/new</c> — eine Anzeige anlegen.
+ * <c>/company/jobs/new</c> — create an advert.
  *
- * <strong>Sie entsteht als Entwurf.</strong> Veröffentlicht wird sie erst in
- * der Liste, mit einem eigenen Klick — was hier entsteht, sieht niemand ausser
- * dem Unternehmen.
+ * <strong>It comes into being as a draft.</strong> It is only published in the
+ * list, with a click of its own — what comes into being here is seen by nobody
+ * but the company.
  */
 export function CompanyJobNewPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { fuerFirma } = useHandelnder();
+  const { forCompany } = useActor();
 
-  const [draft, setEntwurf] = useState<Entwurf>(LEER);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const [draft, setDraft] = useState<JobDraft>(EMPTY);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
   const back = (
     <Link component={RouterLink} to="/company/jobs" variant="body2">
@@ -72,7 +72,7 @@ export function CompanyJobNewPage() {
     </Link>
   );
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
       <PageShell title={t("companyJobs.new")} narrow>
         <Box sx={{ mb: 2 }}>{back}</Box>
@@ -87,8 +87,8 @@ export function CompanyJobNewPage() {
     );
   }
 
-  async function anlegen() {
-    setLaeuft(true);
+  async function create() {
+    setRunning(true);
     const result = await createJob({
       title: draft.title,
       description: draft.description,
@@ -96,12 +96,12 @@ export function CompanyJobNewPage() {
       postal_code: draft.postalCode,
       remote: draft.remote,
       employment: draft.employment,
-      skills: faehigkeiten(draft.skills),
+      skills: skillsOf(draft.skills),
     });
-    setLaeuft(false);
+    setRunning(false);
 
     if (result.ok) void navigate("/company/jobs");
-    else setFehler(result.error.detail);
+    else setError(result.error.detail);
   }
 
   return (
@@ -110,9 +110,9 @@ export function CompanyJobNewPage() {
 
       <Card>
         <CardContent>
-          {fehler !== null ? (
+          {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {fehler}
+              {error}
             </Alert>
           ) : null}
 
@@ -120,7 +120,7 @@ export function CompanyJobNewPage() {
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              void anlegen();
+              void create();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
@@ -128,7 +128,7 @@ export function CompanyJobNewPage() {
               label={t("companyJobs.fieldTitle")}
               value={draft.title}
               onChange={(e) =>
-                setEntwurf({ ...draft, title: e.target.value })
+                setDraft({ ...draft, title: e.target.value })
               }
               required
             />
@@ -136,7 +136,7 @@ export function CompanyJobNewPage() {
               label={t("companyJobs.description")}
               value={draft.description}
               onChange={(e) =>
-                setEntwurf({ ...draft, description: e.target.value })
+                setDraft({ ...draft, description: e.target.value })
               }
               multiline
               minRows={5}
@@ -155,7 +155,7 @@ export function CompanyJobNewPage() {
                 value={draft.postalCode}
                 slotProps={{ htmlInput: { maxLength: 10, inputMode: "numeric" } }}
                 onChange={(e) =>
-                  setEntwurf({ ...draft, postalCode: e.target.value })
+                  setDraft({ ...draft, postalCode: e.target.value })
                 }
               />
               <TextField
@@ -163,7 +163,7 @@ export function CompanyJobNewPage() {
                 helperText={t("companyJobs.locationHint")}
                 value={draft.location}
                 onChange={(e) =>
-                  setEntwurf({ ...draft, location: e.target.value })
+                  setDraft({ ...draft, location: e.target.value })
                 }
               />
             </Box>
@@ -172,7 +172,7 @@ export function CompanyJobNewPage() {
               label={t("companyJobs.workMode")}
               value={draft.remote}
               onChange={(e) =>
-                setEntwurf({ ...draft, remote: e.target.value as RemoteMode })
+                setDraft({ ...draft, remote: e.target.value as RemoteMode })
               }
             >
               {REMOTE_MODES.map((value) => (
@@ -186,7 +186,7 @@ export function CompanyJobNewPage() {
               label={t("companyJobs.employment")}
               value={draft.employment}
               onChange={(e) =>
-                setEntwurf({
+                setDraft({
                   ...draft,
                   employment: e.target.value as EmploymentType,
                 })
@@ -203,14 +203,14 @@ export function CompanyJobNewPage() {
               helperText={t("companyJobs.skillsHint")}
               value={draft.skills}
               onChange={(e) =>
-                setEntwurf({ ...draft, skills: e.target.value })
+                setDraft({ ...draft, skills: e.target.value })
               }
             />
 
-            <Formulierungshilfe
+            <DraftingHelp
               draft={draft}
-              onVorschlag={(text) =>
-                setEntwurf({ ...draft, description: text })
+              onSuggestion={(text) =>
+                setDraft({ ...draft, description: text })
               }
             />
 
@@ -229,41 +229,41 @@ export function CompanyJobNewPage() {
 }
 
 /**
- * Die Formulierungshilfe.
+ * The drafting help.
  *
- * <strong>Sie hilft dem Unternehmen, SEINEN EIGENEN Text zu schreiben</strong> —
- * sie sagt nie etwas über einen Menschen. Genau das macht sie baubar, wo ein
- * Kandidatenranking es nicht wäre.
+ * <strong>It helps the company write ITS OWN text</strong> — it never says
+ * anything about a person. Exactly that makes it buildable where a candidate
+ * ranking would not be.
  *
- * <strong><c>type="button"</c> ausgeschrieben</strong>, obwohl MUI es ohnehin so
- * vorgibt: dieser Knopf steht im selben Formular wie „Entwurf anlegen", und wer
- * hier liest, soll nicht erst die Bibliothek aufschlagen müssen, um zu wissen,
- * welcher der beiden absendet. Änderte sich die Vorgabe, legte dieser Knopf
- * sonst die Stelle an.
+ * <strong><c>type="button"</c> spelled out</strong>, although MUI defaults to
+ * it anyway: this button stands in the same form as "Entwurf anlegen", and
+ * whoever reads here should not have to open the library to know which of the
+ * two submits. If the default changed, this button would otherwise create the
+ * job.
  */
-function Formulierungshilfe({
+function DraftingHelp({
   draft,
-  onVorschlag,
+  onSuggestion,
 }: {
-  draft: Entwurf;
-  onVorschlag: (text: string) => void;
+  draft: JobDraft;
+  onSuggestion: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const [wish, setWunsch] = useState("");
+  const [wish, setWish] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const [running, setRunning] = useState(false);
 
-  const hatText = draft.description.trim() !== "";
+  const hasText = draft.description.trim() !== "";
 
   return (
     <Box sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
       <TextField
         label={t(
-          hatText ? "companyJobs.helpRephrase" : "companyJobs.helpNew",
+          hasText ? "companyJobs.helpRephrase" : "companyJobs.helpNew",
         )}
         helperText={t("companyJobs.helpHint")}
         value={wish}
-        onChange={(e) => setWunsch(e.target.value)}
+        onChange={(e) => setWish(e.target.value)}
         slotProps={{ htmlInput: { maxLength: 200 } }}
         sx={{ mb: 1.5 }}
       />
@@ -280,18 +280,18 @@ function Formulierungshilfe({
         size="small"
         disabled={running}
         onClick={() => {
-          setLaeuft(true);
+          setRunning(true);
           void draftJobText({
             title: draft.title,
             description: draft.description,
             location: draft.location,
-            skills: faehigkeiten(draft.skills),
+            skills: skillsOf(draft.skills),
             wish: wish,
           }).then((result) => {
-            setLaeuft(false);
+            setRunning(false);
             if (result.ok) {
               setProblem(null);
-              onVorschlag(result.draft);
+              onSuggestion(result.draft);
             } else {
               setProblem(result.error.detail);
             }
@@ -301,7 +301,7 @@ function Formulierungshilfe({
         {running
           ? t("companyJobs.helpInProgress")
           : t(
-              hatText
+              hasText
                 ? "companyJobs.helpButtonReplaces"
                 : "companyJobs.helpButton",
             )}

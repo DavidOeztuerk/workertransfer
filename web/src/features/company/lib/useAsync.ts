@@ -1,72 +1,72 @@
 import { type DependencyList, useEffect, useRef, useState } from "react";
 
 /*
- * Zwilling von `features/work/lib/useAsync.ts`. Er gehörte nach `src/shared/hooks/` —
- * das ist in diesem Durchgang fremdes Territorium. Beim Zusammenlegen der
- * Ströme: dorthin ziehen, beide Kopien löschen.
+ * Twin of `features/work/lib/useAsync.ts`. It belonged in `src/shared/hooks/` —
+ * that was foreign territory in this pass. When the streams are merged: move it
+ * there, delete both copies.
  */
 
 
 /**
- * Ein Abruf, der zur Seite gehört — mehr braucht es hier nicht.
+ * A fetch that belongs to the page — nothing more is needed here.
  *
- * <strong>Warum kein TanStack Query.</strong> Es liegt zwar im Paketbaum, aber
- * es gibt keinen `QueryClientProvider`: `AppRoot.tsx` ist `ThemeProvider` +
- * `RouterProvider`, sonst nichts. Ein `useQuery` würde in der echten Anwendung
- * werfen („No QueryClient set") — und der Testhelfer stellt einen bereit, also
- * wäre der Test grün, während die Seite weiß bleibt. Das ist die schlechteste
- * Sorte Fehler: einer, den die Prüfung deckt.
+ * <strong>Why no TanStack Query.</strong> It is in the package tree, but there
+ * is no `QueryClientProvider`: `AppRoot.tsx` is `ThemeProvider` +
+ * `RouterProvider`, nothing else. A `useQuery` would throw in the real
+ * application ("No QueryClient set") — and the test helper provides one, so the
+ * test would be green while the page stays white. That is the worst kind of
+ * defect: one the check covers up.
  *
- * <strong>Warum kein Slice.</strong> `core/store/store.ts` meldet `auth` und
- * `preferences` an und liegt außerhalb jedes Feature-Territoriums. Ein
- * `workSlice` wäre nirgends registriert, und `useAppSelector(s => s.work)` käme
- * als `undefined` zurück.
+ * <strong>Why no slice.</strong> `core/store/store.ts` registers `auth` and
+ * `preferences` and lies outside every feature's territory. A `workSlice` would
+ * be registered nowhere, and `useAppSelector(s => s.work)` would come back as
+ * `undefined`.
  *
- * Bleibt: `useState` + `useEffect` + `AbortController`. Der Abbruch ist kein
- * Beiwerk — wer während eines laufenden Abrufs weiterklickt, bekommt sonst die
- * Antwort der verlassenen Seite in die neue geschrieben.
+ * What remains: `useState` + `useEffect` + `AbortController`. The abort is no
+ * accessory — whoever clicks on during a running fetch otherwise gets the
+ * answer of the page they left written into the new one.
  */
-export interface Abruf<T> {
-  /** Läuft der erste oder ein erneuter Abruf? */
+export interface AsyncState<T> {
+  /** Is the first or a repeated fetch running? */
   pending: boolean;
-  /** Die letzte Antwort, oder `null`, solange keine da ist. */
+  /** The last answer, or `null` as long as there is none. */
   data: T | null;
-  /** Noch einmal fragen — nach einer Änderung, die die Antwort verschiebt. */
+  /** Ask again — after a change that shifts the answer. */
   reload: () => void;
 }
 
 export function useAsync<T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: DependencyList,
-  aktiv = true
-): Abruf<T> {
+  active = true
+): AsyncState<T> {
   const [data, setData] = useState<T | null>(null);
-  const [pending, setPending] = useState(aktiv);
-  const [runde, setRunde] = useState(0);
+  const [pending, setPending] = useState(active);
+  const [round, setRound] = useState(0);
 
-  // Die Funktion wechselt bei jedem Rendern die Identität; stünde sie in den
-  // Abhängigkeiten, liefe der Abruf endlos. Der Aufrufer nennt stattdessen die
-  // Werte, an denen die Antwort wirklich hängt.
-  const ladenRef = useRef(load);
-  ladenRef.current = load;
+  // The function changes identity on every render; if it stood in the
+  // dependencies, the fetch would run endlessly. The caller names instead the
+  // values the answer really depends on.
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
-    if (!aktiv) {
+    if (!active) {
       setPending(false);
       return;
     }
     const abort = new AbortController();
     let alive = true;
     setPending(true);
-    void ladenRef.current(abort.signal).then(
+    void loadRef.current(abort.signal).then(
       (value) => {
         if (!alive) return;
         setData(value);
         setPending(false);
       },
       () => {
-        // Die Clients werfen nicht; kommt hier trotzdem etwas an, ist es der
-        // Abbruch selbst. Ein hängender Ladezustand wäre die schlechtere Folge.
+        // The clients do not throw; if something arrives here anyway, it is the
+        // abort itself. A hanging loading state would be the worse consequence.
         if (alive) setPending(false);
       }
     );
@@ -75,116 +75,114 @@ export function useAsync<T>(
       abort.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, runde, aktiv]);
+  }, [...deps, round, active]);
 
-  return { pending, data, reload: () => setRunde((n) => n + 1) };
+  return { pending, data, reload: () => setRound((n) => n + 1) };
 }
 
 /**
- * Eine Liste, die am Cursor weiterblättert — und die vorigen Seiten behält.
+ * A list that pages on at the cursor — and keeps the previous pages.
  *
- * Das Behalten ist die eigentliche Zusage: wer „Mehr laden" drückt, will
- * dazubekommen, nicht ersetzt bekommen. Scheitert eine spätere Seite, bleiben
- * die früheren stehen — sie waren echt.
+ * Keeping is the actual promise: whoever presses "load more" wants to get more,
+ * not get something replaced. If a later page fails, the earlier ones stay —
+ * they were real.
  *
- * `schluessel` ist die Suche in einer Zeichenkette. Ändert er sich, beginnt die
- * Liste von vorn: neuer Cursor, leere Sammlung, neuer Ladezustand.
+ * `key` is the search as a string. If it changes, the list starts over: new
+ * cursor, empty collection, new loading state.
  */
-export interface Seite<T> {
+export interface Page<T> {
   items: T[];
   nextCursor: string | null;
 }
 
-export type SeitenErgebnis<T, F> = ({ ok: true } & Seite<T>) | { ok: false; fehler: F };
+export type PageFetch<T, F> = ({ ok: true } & Page<T>) | { ok: false; error: F };
 
-export interface Blaettern<T, F> {
+export interface Paging<T, F> {
   items: T[];
   pending: boolean;
-  fehler: F | null;
-  /** Gibt es eine weitere Seite? */
-  mehr: boolean;
-  weiter: () => void;
+  error: F | null;
+  /** Is there a further page? */
+  hasMore: boolean;
+  loadMore: () => void;
 }
 
-interface Lage<T, F> {
+interface PagingState<T, F> {
   key: string;
   cursor: string | undefined;
   items: T[];
   next: string | null;
   pending: boolean;
-  fehler: F | null;
+  error: F | null;
 }
 
-export function useSeiten<T, F>(
-  load: (cursor: string | undefined, signal: AbortSignal) => Promise<SeitenErgebnis<T, F>>,
+export function usePages<T, F>(
+  load: (cursor: string | undefined, signal: AbortSignal) => Promise<PageFetch<T, F>>,
   key: string,
-  aktiv = true
-): Blaettern<T, F> {
-  const empty = (forKey: string): Lage<T, F> => ({
+  active = true
+): Paging<T, F> {
+  const empty = (forKey: string): PagingState<T, F> => ({
     key: forKey,
     cursor: undefined,
     items: [],
     next: null,
-    pending: aktiv,
-    fehler: null,
+    pending: active,
+    error: null,
   });
 
-  const [state, setLage] = useState<Lage<T, F>>(() => empty(key));
+  const [state, setState] = useState<PagingState<T, F>>(() => empty(key));
 
-  // Zurücksetzen WÄHREND des Renderns, nicht in einem Effekt. Ein Effekt liefe
-  // erst nach dem Festschreiben — der Abruf-Effekt hätte dann schon einmal mit
-  // dem alten Cursor und dem neuen Schlüssel gefeuert, und zwei Anfragen
-  // lieferten sich ein Rennen um dieselbe Liste. React verwirft das laufende
-  // Rendern und beginnt neu; ein zusätzlicher Durchlauf, keine zusätzliche
-  // Anfrage.
-  if (state.key !== key) setLage(empty(key));
+  // Reset DURING the render, not in an effect. An effect would only run after
+  // the commit — the fetch effect would then already have fired once with the
+  // old cursor and the new key, and two requests would race for the same list.
+  // React discards the running render and starts again; one extra pass, no
+  // extra request.
+  if (state.key !== key) setState(empty(key));
 
-  const ladenRef = useRef(load);
-  ladenRef.current = load;
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
-  // Der Schlüssel, den der ZUSTAND trägt — nicht der verlangte. Während
-  // eines Wechsels sind das zwei verschiedene, und genau darauf beruht
-  // die Prüfung weiter unten.
+  // The key the STATE carries — not the one asked for. During a switch those
+  // are two different ones, and the check further down rests on exactly that.
   const stateKey = state.key;
   const cursor = state.cursor;
 
   useEffect(() => {
-    if (!aktiv) return;
+    if (!active) return;
     const abort = new AbortController();
     let alive = true;
-    void ladenRef.current(cursor, abort.signal).then(
+    void loadRef.current(cursor, abort.signal).then(
       (result) => {
         if (!alive) return;
-        setLage((previous) => {
+        setState((previous) => {
           if (previous.key !== stateKey || previous.cursor !== cursor) return previous;
-          if (!result.ok) return { ...previous, pending: false, fehler: result.fehler };
+          if (!result.ok) return { ...previous, pending: false, error: result.error };
           return {
             ...previous,
             pending: false,
-            fehler: null,
-            // Ohne Cursor ist es eine neue Suche; mit Cursor kommt sie dazu.
+            error: null,
+            // Without a cursor it is a new search; with a cursor it adds on.
             items: cursor === undefined ? result.items : [...previous.items, ...result.items],
             next: result.nextCursor,
           };
         });
       },
       () => {
-        if (alive) setLage((previous) => ({ ...previous, pending: false }));
+        if (alive) setState((previous) => ({ ...previous, pending: false }));
       }
     );
     return () => {
       alive = false;
       abort.abort();
     };
-  }, [stateKey, cursor, aktiv]);
+  }, [stateKey, cursor, active]);
 
   return {
     items: state.items,
     pending: state.pending,
-    fehler: state.fehler,
-    mehr: state.next !== null,
-    weiter: () =>
-      setLage((previous) =>
+    error: state.error,
+    hasMore: state.next !== null,
+    loadMore: () =>
+      setState((previous) =>
         previous.next === null ? previous : { ...previous, cursor: previous.next, pending: true }
       ),
   };

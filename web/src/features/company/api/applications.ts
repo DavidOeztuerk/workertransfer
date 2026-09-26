@@ -6,7 +6,7 @@ import { listOwnJobs } from "../../work/api/jobs";
 
 export { getApplication as getCompanyApplication };
 
-export interface FirmenbewerbungZeile {
+export interface CompanyApplicationRow {
   id: string;
   job_id: string;
   job_title: string;
@@ -15,32 +15,32 @@ export interface FirmenbewerbungZeile {
   created_at: string;
 }
 
-export type Firmenliste =
-  | { ok: true; items: FirmenbewerbungZeile[] }
+export type CompanyApplicationList =
+  | { ok: true; items: CompanyApplicationRow[] }
   | { ok: false; error: { detail: string } };
 
 export async function listCompanyApplications(
   signal?: AbortSignal
-): Promise<Firmenliste> {
-  const stellen = await listOwnJobs(signal);
-  if (!stellen.ok) return { ok: false, error: stellen.error };
+): Promise<CompanyApplicationList> {
+  const jobs = await listOwnJobs(signal);
+  if (!jobs.ok) return { ok: false, error: jobs.error };
 
-  const zeilen: FirmenbewerbungZeile[] = [];
-  for (const stelle of stellen.jobs) {
-    const bewerbungen = await listApplicationsForJob(stelle.id, signal);
-    if (!bewerbungen.ok) continue;
-    for (const b of bewerbungen.applications) {
-      zeilen.push({
-        id: b.id,
-        job_id: b.job_id,
-        job_title: stelle.title,
-        subject_id: b.subject_id,
-        status: b.status,
-        created_at: b.created_at,
+  const rows: CompanyApplicationRow[] = [];
+  for (const job of jobs.jobs) {
+    const applications = await listApplicationsForJob(job.id, signal);
+    if (!applications.ok) continue;
+    for (const application of applications.applications) {
+      rows.push({
+        id: application.id,
+        job_id: application.job_id,
+        job_title: job.title,
+        subject_id: application.subject_id,
+        status: application.status,
+        created_at: application.created_at,
       });
     }
   }
 
-  zeilen.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return { ok: true, items: zeilen };
+  rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return { ok: true, items: rows };
 }

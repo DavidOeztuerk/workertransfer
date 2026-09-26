@@ -1,9 +1,8 @@
-// Mannschaft eines Unternehmens: Mitglieder und Einladungen.
+// A company's team: members and invitations.
 //
-// Der Einladungs-Token taucht hier nirgends auf. Er steht weder in der Antwort
-// aufs Einladen noch in der Liste der offenen Einladungen — angenommen wird
-// eine Einladung in `features/auth`, und dort kommt er aus der URL, in die ihn
-// die Mail geschrieben hat.
+// The invitation token appears nowhere here. It stands neither in the answer to
+// inviting nor in the list of open invitations — an invitation is accepted in
+// `features/auth`, and there it comes from the URL the mail wrote it into.
 
 import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
@@ -26,30 +25,30 @@ export interface Invitation {
   expires_at: string;
 }
 
-export type MitgliederErgebnis =
+export type MembersResult =
   | { ok: true; members: CompanyMember[] }
-  | Failure<"fehlgeschlagen">;
-export type EinladungenErgebnis =
+  | Failure<"failed">;
+export type InvitationsResult =
   | { ok: true; invitations: Invitation[] }
-  | Failure<"fehlgeschlagen">;
-export type EinladenErgebnis =
+  | Failure<"failed">;
+export type InviteResult =
   | { ok: true; invitation: Invitation }
   | Failure<"not-admin" | "not-yours" | "invalid" | "offline">;
-export type EntfernenErgebnis =
+export type RemoveResult =
   | { ok: true }
   | Failure<"last-admin" | "not-admin" | "offline">;
 
 /**
- * Die Mannschaft. Ein `404` heißt „nicht deins", nicht „kaputt".
+ * The team. A `404` means "not yours", not "broken".
  *
- * Der Server antwortet absichtlich `404` statt `403`, damit niemand erfragen
- * kann, welche Unternehmen es gibt. Die Oberfläche macht daraus einen ruhigen
- * leeren Zustand statt einer Fehlermeldung, die nichts erklärt.
+ * The server deliberately answers `404` instead of `403`, so nobody can ask
+ * which companies exist. The UI turns that into a calm empty state instead of
+ * an error message that explains nothing.
  */
 export async function listMembers(
   tenantId: string,
   signal?: AbortSignal
-): Promise<MitgliederErgebnis> {
+): Promise<MembersResult> {
   const answer = await request<CompanyMember[]>(
     API_BASE_URL,
     `/companies/${tenantId}/members`,
@@ -58,17 +57,17 @@ export async function listMembers(
   );
   if (answer.ok) return { ok: true, members: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, members: [] };
-  return interpretError<"fehlgeschlagen">(
+  return interpretError<"failed">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
-    "fehlgeschlagen"
+    { 0: { reason: "failed", titleKey: "errors.noConnection" } },
+    "failed"
   );
 }
 
 export async function listInvitations(
   tenantId: string,
   signal?: AbortSignal
-): Promise<EinladungenErgebnis> {
+): Promise<InvitationsResult> {
   const answer = await request<Invitation[]>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
@@ -77,10 +76,10 @@ export async function listInvitations(
   );
   if (answer.ok) return { ok: true, invitations: answer.value ?? [] };
   if (answer.error.status === 404) return { ok: true, invitations: [] };
-  return interpretError<"fehlgeschlagen">(
+  return interpretError<"failed">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
-    "fehlgeschlagen"
+    { 0: { reason: "failed", titleKey: "errors.noConnection" } },
+    "failed"
   );
 }
 
@@ -88,12 +87,12 @@ export async function inviteMember(
   tenantId: string,
   email: string,
   role: Role
-): Promise<EinladenErgebnis> {
+): Promise<InviteResult> {
   const answer = await request<Invitation>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations`,
-    // Kein Unternehmen im Rumpf: es steht im Pfad und wird gegen die
-    // Mitgliedschaft des Aufrufers geprüft.
+    // No company in the body: it stands in the path and is checked against the
+    // caller's membership.
     { method: "POST", body: { email, role } },
     "errors.invitationNotCreated"
   );
@@ -115,9 +114,9 @@ export async function inviteMember(
 export async function withdrawInvitation(
   tenantId: string,
   invitationId: string
-): Promise<{ ok: true } | Failure<"fehlgeschlagen">> {
-  // `204` ohne Rumpf — `request()` gibt dafür `undefined` zurück, statt den
-  // Parser in einen Fehler laufen zu lassen, der wie ein Serverfehler aussähe.
+): Promise<{ ok: true } | Failure<"failed">> {
+  // `204` without a body — `request()` returns `undefined` for it instead of
+  // running the parser into an error that would look like a server error.
   const answer = await request<void>(
     API_BASE_URL,
     `/companies/${tenantId}/invitations/${invitationId}`,
@@ -125,25 +124,24 @@ export async function withdrawInvitation(
     "errors.invitationNotWithdrawn"
   );
   if (answer.ok) return { ok: true };
-  return interpretError<"fehlgeschlagen">(
+  return interpretError<"failed">(
     answer.error,
-    { 0: { reason: "fehlgeschlagen", titleKey: "errors.noConnection" } },
-    "fehlgeschlagen"
+    { 0: { reason: "failed", titleKey: "errors.noConnection" } },
+    "failed"
   );
 }
 
 /**
- * Ein Mitglied entfernen — oder sich selbst.
+ * Remove a member — or oneself.
  *
- * `409` heißt nicht „du darfst nicht", sondern „nicht dieses Mitglied, nicht
- * jetzt": der letzte Administrator kann nicht gehen. Das getrennt zu halten ist
- * der Unterschied zwischen „such dir jemanden mit mehr Rechten" und „mach
- * vorher jemanden zum Administrator".
+ * `409` does not mean "you may not" but "not this member, not now": the last
+ * administrator cannot leave. Keeping that apart is the difference between
+ * "find someone with more rights" and "make somebody administrator first".
  */
 export async function removeMember(
   tenantId: string,
   memberId: string
-): Promise<EntfernenErgebnis> {
+): Promise<RemoveResult> {
   const answer = await request<void>(
     API_BASE_URL,
     `/companies/${tenantId}/members/${memberId}`,

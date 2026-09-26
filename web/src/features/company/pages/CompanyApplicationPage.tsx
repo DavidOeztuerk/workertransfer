@@ -15,47 +15,47 @@ import { recipientFromCompany, senderFromContact } from "../../work/lib/letterHe
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { CurriculumVitaeSheet } from "../../person/components/resume/CurriculumVitaeSheet";
 import { getVisibleCurriculumVitae, getVisibleDocumentContent } from "../../person/api/resume";
-import { getCandidateProfile } from "../api/fremdprofil";
+import { getCandidateProfile } from "../api/candidateProfile";
 import { getCompanyApplication } from "../api/applications";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { getJob } from "../../work/api/jobs";
 
 export function CompanyApplicationPage() {
   const { t } = useTranslation();
-  const { fuerFirma } = useHandelnder();
+  const { forCompany } = useActor();
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState(0);
 
-  const bewerbung = useAsync(
+  const application = useAsync(
     (signal) => getCompanyApplication(id!, signal),
     [id],
-    fuerFirma && !!id,
+    forCompany && !!id,
   );
 
-  const e = bewerbung.data?.ok ? bewerbung.data.application : null;
+  const e = application.data?.ok ? application.data.application : null;
 
-  const stelle = useAsync(
+  const job = useAsync(
     (signal) => (e ? getJob(e.job_id, signal) : Promise.resolve(null)),
     [e?.job_id],
     e !== null,
   );
-  const firma = useAsync(
+  const company = useAsync(
     (signal) =>
-      stelle.data
-        ? getCompanyProfile(stelle.data.tenant_id, signal)
+      job.data
+        ? getCompanyProfile(job.data.tenant_id, signal)
         : Promise.resolve(null),
-    [stelle.data?.tenant_id],
-    stelle.data !== null,
+    [job.data?.tenant_id],
+    job.data !== null,
   );
 
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => (e ? getCandidateProfile(e.subject_id, signal) : Promise.resolve(null)),
     [e?.subject_id],
     e !== null,
   );
 
-  const lebenslauf = useAsync(
+  const curriculumVitae = useAsync(
     (signal) =>
       e?.shares_resume
         ? getVisibleCurriculumVitae(e.subject_id, signal)
@@ -64,7 +64,7 @@ export function CompanyApplicationPage() {
     e !== null,
   );
 
-  if (!fuerFirma || !id) {
+  if (!forCompany || !id) {
     return (
       <PageShell title={t("companyApplications.title")} narrow>
         <Card>
@@ -76,7 +76,7 @@ export function CompanyApplicationPage() {
     );
   }
 
-  if (bewerbung.pending && e === null) {
+  if (application.pending && e === null) {
     return (
       <PageShell title={t("companyApplications.title")} narrow>
         <LoadingBlock label={t("companyApplications.loading")} />
@@ -84,10 +84,10 @@ export function CompanyApplicationPage() {
     );
   }
 
-  if (bewerbung.data !== null && !bewerbung.data.ok) {
+  if (application.data !== null && !application.data.ok) {
     return (
       <PageShell title={t("companyApplications.title")} narrow>
-        <Alert severity="error">{bewerbung.data.error.detail}</Alert>
+        <Alert severity="error">{application.data.error.detail}</Alert>
       </PageShell>
     );
   }
@@ -103,28 +103,28 @@ export function CompanyApplicationPage() {
     );
   }
 
-  const cv = lebenslauf.data?.ok ? lebenslauf.data.value : null;
-  const reiter: { key: string; label: string }[] = [
+  const cv = curriculumVitae.data?.ok ? curriculumVitae.data.value : null;
+  const tabs: { key: string; label: string }[] = [
     { key: "letter", label: t("companyApplications.tabCoverLetter") },
   ];
   if (e.shares_resume && cv) {
-    reiter.push({ key: "resume", label: t("companyApplications.tabResume") });
+    tabs.push({ key: "resume", label: t("companyApplications.tabResume") });
   }
   for (const docId of e.documents) {
-    reiter.push({ key: `doc-${docId}`, label: t("companyApplications.tabDocument") });
+    tabs.push({ key: `doc-${docId}`, label: t("companyApplications.tabDocument") });
   }
 
-  const aktuell = reiter[tab] ?? reiter[0] ?? { key: "letter", label: t("companyApplications.tabCoverLetter") };
+  const current = tabs[tab] ?? tabs[0] ?? { key: "letter", label: t("companyApplications.tabCoverLetter") };
 
   return (
-    <PageShell title={stelle.data?.title ?? t("companyApplications.title")}>
+    <PageShell title={job.data?.title ?? t("companyApplications.title")}>
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {profil.data?.headline || t("companyApplications.noHeadline")}
+            {profile.data?.headline || t("companyApplications.noHeadline")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {stelle.data?.title ?? t("companyApplications.jobUnknown")}
+            {job.data?.title ?? t("companyApplications.jobUnknown")}
           </Typography>
         </CardContent>
       </Card>
@@ -138,38 +138,38 @@ export function CompanyApplicationPage() {
             scrollButtons="auto"
             sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
           >
-            {reiter.map((r) => (
-              <Tab key={r.key} label={r.label} />
+            {tabs.map((entry) => (
+              <Tab key={entry.key} label={entry.label} />
             ))}
           </Tabs>
 
-          {aktuell.key === "letter" ? (
+          {current.key === "letter" ? (
             <LetterSheet
               subject={undefined}
               text={e.message}
               sender={senderFromContact(e.applicant_contact)}
-              recipient={recipientFromCompany(firma.data, stelle.data)}
+              recipient={recipientFromCompany(company.data, job.data)}
             />
           ) : null}
 
-          {aktuell.key === "resume" && cv ? (
+          {current.key === "resume" && cv ? (
             <CurriculumVitaeSheet
               template={cv.template}
               data={{
-                headline: profil.data?.headline ?? "",
-                bio: profil.data?.bio ?? "",
-                location: profil.data?.location ?? "",
-                skills: profil.data?.skills ?? [],
+                headline: profile.data?.headline ?? "",
+                bio: profile.data?.bio ?? "",
+                location: profile.data?.location ?? "",
+                skills: profile.data?.skills ?? [],
                 positions: cv.positions,
                 education: cv.education,
               }}
             />
           ) : null}
 
-          {aktuell.key.startsWith("doc-") ? (
-            <Unterlagenansicht
+          {current.key.startsWith("doc-") ? (
+            <DocumentView
               subjectId={e.subject_id}
-              documentId={aktuell.key.slice(4)}
+              documentId={current.key.slice(4)}
             />
           ) : null}
         </CardContent>
@@ -178,7 +178,7 @@ export function CompanyApplicationPage() {
   );
 }
 
-function Unterlagenansicht({
+function DocumentView({
   subjectId,
   documentId,
 }: {
@@ -187,20 +187,20 @@ function Unterlagenansicht({
 }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
-  const [typ, setTyp] = useState<string>("");
+  const [type, setType] = useState<string>("");
 
   useEffect(() => {
-    let frei: string | null = null;
-    let weg = false;
+    let objectUrl: string | null = null;
+    let gone = false;
     void getVisibleDocumentContent(subjectId, documentId).then((result) => {
-      if (weg || !result.ok) return;
-      frei = result.value.url;
+      if (gone || !result.ok) return;
+      objectUrl = result.value.url;
       setUrl(result.value.url);
-      setTyp(result.value.contentType);
+      setType(result.value.contentType);
     });
     return () => {
-      weg = true;
-      if (frei) URL.revokeObjectURL(frei);
+      gone = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [subjectId, documentId]);
 
@@ -208,7 +208,7 @@ function Unterlagenansicht({
     return <LoadingBlock label={t("companyApplications.loading")} />;
   }
 
-  if (typ.startsWith("image/")) {
+  if (type.startsWith("image/")) {
     return (
       <Box
         component="img"

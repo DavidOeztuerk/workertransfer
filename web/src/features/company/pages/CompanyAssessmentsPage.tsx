@@ -31,36 +31,36 @@ import {
 } from "../../work/api/assessments";
 
 /**
- * `/company/assessments` — Arbeitsproben stellen und beantworten.
+ * `/company/assessments` — set work samples and answer them.
  *
- * <strong>Drei Zusagen, und alle drei sind hier sichtbar</strong> (ADR-0042):
+ * <strong>Three promises, and all three are visible here</strong> (ADR-0042):
  *
- * 1. Die Rückmeldung hat ein Textfeld und <em>keine Note</em>. Es gibt keinen
- *    Sternebalken, keine Skala und kein zweites, internes Feld — wo es zwei
- *    gäbe, stünde im zweiten die Wahrheit.
- * 2. <strong>Der Absageknopf ist gesperrt, solange kein Text dasteht.</strong>
- *    Der Server weist eine Absage ohne Begründung ohnehin ab; dieses Formular
- *    sagt es vorher, statt es jemanden ausprobieren zu lassen. Ablehnen und
- *    Begründen sind ein Schritt.
- * 3. Der Umfang ist ein Pflichtfeld mit einer Obergrenze von acht Stunden, und
- *    der Hinweis darunter sagt, warum.
+ * 1. The feedback has a text field and <em>no mark</em>. There is no star bar,
+ *    no scale and no second, internal field — where there were two, the truth
+ *    would stand in the second.
+ * 2. <strong>The reject button is locked as long as no text stands
+ *    there.</strong> The server refuses a rejection without a reason anyway;
+ *    this form says so beforehand instead of letting someone try it out.
+ *    Rejecting and giving a reason are one step.
+ * 3. The effort is a required field with an upper bound of eight hours, and the
+ *    hint below it says why.
  *
- * <strong>Diese Liste zeigt nur, wer gerade freigegeben hat.</strong> Wer
- * widerruft, fällt heraus — beim nächsten Aufruf, nicht beim übernächsten. Eine
- * Gesamtzahl gibt es deshalb nicht: sie verriete über die Differenz zur Länge,
- * wie viele Menschen die Sicht entzogen haben (ADR-0026).
+ * <strong>This list shows only who has released right now.</strong> Whoever
+ * revokes drops out — at the next call, not the one after. That is why there is
+ * no total: through the difference to the length it would reveal how many
+ * people withdrew the view (ADR-0026).
  */
 export function CompanyAssessmentsPage() {
   const { t } = useTranslation();
-  const { signedIn, loading: laedt, forCompany: fuerFirma, tenantId } = useActor();
+  const { signedIn, loading, forCompany, tenantId } = useActor();
 
-  const vorgaenge = useAsync(
+  const cases = useAsync(
     (signal) => getCompanyCases(signal),
     [tenantId],
-    signedIn && fuerFirma
+    signedIn && forCompany
   );
 
-  if (laedt) {
+  if (loading) {
     return (
       <PageShell title={t("assessments.companyTitle")} narrow>
         <LoadingBlock label={t("assessments.loading")} />
@@ -68,7 +68,7 @@ export function CompanyAssessmentsPage() {
     );
   }
 
-  if (!signedIn || !fuerFirma) {
+  if (!signedIn || !forCompany) {
     return (
       <PageShell title={t("assessments.companyTitle")} narrow>
         <Card>
@@ -84,29 +84,29 @@ export function CompanyAssessmentsPage() {
     <PageShell title={t("assessments.companyTitle")} narrow>
       <Typography sx={{ mb: 3 }}>{t("assessments.companyLead")}</Typography>
 
-      <Stellformular fertig={() => vorgaenge.reload()} />
+      <TaskForm onDone={() => cases.reload()} />
 
-      {vorgaenge.pending && <LoadingBlock label={t("assessments.loading")} />}
+      {cases.pending && <LoadingBlock label={t("assessments.loading")} />}
 
-      {vorgaenge.data?.ok === false && (
+      {cases.data?.ok === false && (
         <Alert severity="warning" sx={{ mt: 3 }}>
-          {vorgaenge.data.reason === "no-company"
+          {cases.data.reason === "no-company"
             ? t("assessments.companyOnly")
             : t("errors.ledgerSilent")}
         </Alert>
       )}
 
-      {vorgaenge.data?.ok === true && vorgaenge.data.items.length === 0 && (
+      {cases.data?.ok === true && cases.data.items.length === 0 && (
         <EmptyBlock title={t("assessments.companyEmpty")} hint={t("assessments.companyEmptyHint")} />
       )}
 
       <Stack spacing={2} sx={{ mt: 3 }}>
-        {vorgaenge.data?.ok === true &&
-          vorgaenge.data.items.map((vorgang) => (
-            <Firmenkarte
-              key={vorgang.id}
-              vorgang={vorgang}
-              fertig={() => vorgaenge.reload()}
+        {cases.data?.ok === true &&
+          cases.data.items.map((caseItem) => (
+            <CompanyCaseCard
+              key={caseItem.id}
+              caseItem={caseItem}
+              onDone={() => cases.reload()}
             />
           ))}
       </Stack>
@@ -114,50 +114,50 @@ export function CompanyAssessmentsPage() {
   );
 }
 
-/** Eine Aufgabe stellen — Umfang und Frist sind Pflicht. */
-function Stellformular({ fertig }: { fertig: () => void }) {
+/** Set a task — effort and deadline are required. */
+function TaskForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
-  const [wer, setWer] = useState("");
-  const [titel, setTitel] = useState("");
-  const [aufgabe, setAufgabe] = useState("");
-  const [stunden, setStunden] = useState("4");
-  const [frist, setFrist] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const [title, setTitle] = useState("");
+  const [task, setTaskText] = useState("");
+  const [hours, setHours] = useState("4");
+  const [deadline, setDeadline] = useState("");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function stellen() {
-    setLaeuft(true);
+  async function submitTask() {
+    setRunning(true);
 
-    const ergebnis = await setTask({
-      subject_id: wer.trim(),
-      title: titel,
-      task: aufgabe,
-      hours: Number(stunden),
-      // Der Tag endet abends: eine Frist auf Mitternacht naehme der Person
-      // den letzten Tag, ohne es zu sagen.
-      due_at: new Date(`${frist}T23:59:00`).toISOString(),
+    const result = await setTask({
+      subject_id: recipient.trim(),
+      title,
+      task,
+      hours: Number(hours),
+      // The day ends in the evening: a deadline at midnight would take the
+      // last day from the person without saying so.
+      due_at: new Date(`${deadline}T23:59:00`).toISOString(),
     });
 
-    setLaeuft(false);
+    setRunning(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      setWer("");
-      setTitel("");
-      setAufgabe("");
-      setFrist("");
-      fertig();
+    if (result.ok) {
+      setError(null);
+      setRecipient("");
+      setTitle("");
+      setTaskText("");
+      setDeadline("");
+      onDone();
       return;
     }
 
-    setFehler(ergebnis.error.detail || ergebnis.error.title);
+    setError(result.error.detail || result.error.title);
   }
 
-  const vollstaendig =
-    wer.trim().length > 0 &&
-    titel.trim().length > 0 &&
-    aufgabe.trim().length > 0 &&
-    frist.length > 0;
+  const complete =
+    recipient.trim().length > 0 &&
+    title.trim().length > 0 &&
+    task.trim().length > 0 &&
+    deadline.length > 0;
 
   return (
     <Card>
@@ -166,9 +166,9 @@ function Stellformular({ fertig }: { fertig: () => void }) {
           {t("assessments.setTask")}
         </Typography>
 
-        {fehler !== null && (
+        {error !== null && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {fehler}
+            {error}
           </Alert>
         )}
 
@@ -176,20 +176,20 @@ function Stellformular({ fertig }: { fertig: () => void }) {
           <TextField
             label={t("assessments.recipient")}
             helperText={t("assessments.recipientHint")}
-            value={wer}
-            onChange={(event) => setWer(event.target.value)}
+            value={recipient}
+            onChange={(event) => setRecipient(event.target.value)}
             fullWidth
           />
           <TextField
             label={t("assessments.headline")}
-            value={titel}
-            onChange={(event) => setTitel(event.target.value)}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             fullWidth
           />
           <TextField
             label={t("assessments.task")}
-            value={aufgabe}
-            onChange={(event) => setAufgabe(event.target.value)}
+            value={task}
+            onChange={(event) => setTaskText(event.target.value)}
             multiline
             minRows={4}
             fullWidth
@@ -199,8 +199,8 @@ function Stellformular({ fertig }: { fertig: () => void }) {
             // Required, with an upper bound, and the hint says WHY — not "please
             // fill in" but what eight hours mean.
             helperText={t("assessments.effortHint", { max: MAX_HOURS })}
-            value={stunden}
-            onChange={(event) => setStunden(event.target.value)}
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
             type="number"
             slotProps={{
               htmlInput: { min: MIN_HOURS, max: MAX_HOURS, step: 1 },
@@ -210,8 +210,8 @@ function Stellformular({ fertig }: { fertig: () => void }) {
           <TextField
             label={t("assessments.deadlineField")}
             helperText={t("assessments.deadlineHint", { tage: MIN_NOTICE_DAYS })}
-            value={frist}
-            onChange={(event) => setFrist(event.target.value)}
+            value={deadline}
+            onChange={(event) => setDeadline(event.target.value)}
             type="date"
             slotProps={{ inputLabel: { shrink: true } }}
             fullWidth
@@ -219,8 +219,8 @@ function Stellformular({ fertig }: { fertig: () => void }) {
           <Stack direction="row">
             <Button
               variant="contained"
-              disabled={laeuft || !vollstaendig}
-              onClick={() => void stellen()}
+              disabled={running || !complete}
+              onClick={() => void submitTask()}
             >
               {t("assessments.setTaskButton")}
             </Button>
@@ -231,88 +231,88 @@ function Stellformular({ fertig }: { fertig: () => void }) {
   );
 }
 
-/** Eine Karte je Vorgang — mit dem Bewertungsfeld, sobald etwas eingereicht ist. */
-function Firmenkarte({ vorgang, fertig }: { vorgang: Case; fertig: () => void }) {
+/** One card per case — with the evaluation field as soon as something was submitted. */
+function CompanyCaseCard({ caseItem, onDone }: { caseItem: Case; onDone: () => void }) {
   const { t } = useTranslation();
-  const [ausgang, setAusgang] = useState<Outcome>("accepted");
+  const [outcome, setOutcome] = useState<Outcome>("accepted");
   const [text, setText] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function bewerten() {
-    setLaeuft(true);
-    const ergebnis = await evaluate(vorgang.id, ausgang, text);
-    setLaeuft(false);
+  async function submitEvaluation() {
+    setRunning(true);
+    const result = await evaluate(caseItem.id, outcome, text);
+    setRunning(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      fertig();
+    if (result.ok) {
+      setError(null);
+      onDone();
       return;
     }
 
-    setFehler(ergebnis.error.detail || ergebnis.error.title);
+    setError(result.error.detail || result.error.title);
   }
 
   return (
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Chip label={t(`assessments.state_${vorgang.state}`)} size="small" />
+          <Chip label={t(`assessments.state_${caseItem.state}`)} size="small" />
           <Chip
-            label={t("assessments.effort", { stunden: vorgang.hours })}
+            label={t("assessments.effort", { stunden: caseItem.hours })}
             size="small"
             variant="outlined"
           />
         </Stack>
 
         <Typography variant="h3" sx={{ mb: 1 }}>
-          {vorgang.title}
+          {caseItem.title}
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 2 }}>
-          {vorgang.subject_id}
+          {caseItem.subject_id}
         </Typography>
 
-        {vorgang.submission !== undefined && (
+        {caseItem.submission !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2">{t("assessments.submitted")}</Typography>
-            {vorgang.submission.text.length > 0 && (
+            {caseItem.submission.text.length > 0 && (
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                {vorgang.submission.text}
+                {caseItem.submission.text}
               </Typography>
             )}
-            {vorgang.submission.url !== null && (
+            {caseItem.submission.url !== null && (
               <Link
                 // A reference, never embedded content: a stranger chose this
                 // address, and neither the server nor the page fetches it.
-                href={vorgang.submission.url}
+                href={caseItem.submission.url}
                 rel="noreferrer noopener"
                 target="_blank"
               >
-                {vorgang.submission.url}
+                {caseItem.submission.url}
               </Link>
             )}
           </>
         )}
 
-        {vorgang.evaluation !== undefined && (
+        {caseItem.evaluation !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2">
-              {t(`assessments.outcome_${vorgang.evaluation.outcome}`)}
+              {t(`assessments.outcome_${caseItem.evaluation.outcome}`)}
             </Typography>
-            <Typography sx={{ whiteSpace: "pre-wrap" }}>{vorgang.evaluation.text}</Typography>
+            <Typography sx={{ whiteSpace: "pre-wrap" }}>{caseItem.evaluation.text}</Typography>
           </>
         )}
 
-        {vorgang.state === "submitted" && (
+        {caseItem.state === "submitted" && (
           <>
             <Divider sx={{ my: 2 }} />
 
-            {fehler !== null && (
+            {error !== null && (
               <Alert severity="error" sx={{ mb: 2 }}>
-                {fehler}
+                {error}
               </Alert>
             )}
 
@@ -321,8 +321,8 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Case; fertig: () => void })
                 <FormLabel>{t("assessments.outcomeQuestion")}</FormLabel>
                 <RadioGroup
                   row
-                  value={ausgang}
-                  onChange={(event) => setAusgang(event.target.value as Outcome)}
+                  value={outcome}
+                  onChange={(event) => setOutcome(event.target.value as Outcome)}
                 >
                   <FormControlLabel
                     value="accepted"
@@ -352,8 +352,8 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Case; fertig: () => void })
               <Stack direction="row">
                 <Button
                   variant="contained"
-                  disabled={laeuft || text.trim().length === 0}
-                  onClick={() => void bewerten()}
+                  disabled={running || text.trim().length === 0}
+                  onClick={() => void submitEvaluation()}
                 >
                   {t("assessments.sendFeedback")}
                 </Button>

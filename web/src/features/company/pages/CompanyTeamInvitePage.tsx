@@ -12,7 +12,7 @@ import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type CompanyMember,
@@ -22,31 +22,30 @@ import {
 } from "../api/team";
 
 /**
- * <c>/company/team/invite</c> — jemanden einladen.
+ * <c>/company/team/invite</c> — invite someone.
  *
- * <strong>Nur Administratoren dürfen es</strong>, und die Prüfung steht auch
- * hier, nicht nur auf der Mannschaftsseite: wer die Adresse direkt aufruft,
- * bekommt denselben Satz statt eines Formulars, das der Server anschliessend
- * ablehnt. Die eigene Rolle steht in der Mitgliederliste, deshalb fragt auch
- * diese Seite sie ab.
+ * <strong>Only administrators may</strong>, and the check stands here too, not
+ * only on the team page: whoever calls the address directly gets the same
+ * sentence instead of a form the server then refuses. One's own role stands in
+ * the member list, which is why this page asks for it too.
  *
- * <strong>Die Rollenprüfung hier ist Bequemlichkeit, kein Schutz.</strong> Ob
- * jemand einladen darf, entscheidet der Server je Anfrage.
+ * <strong>The role check here is convenience, not protection.</strong> Whether
+ * someone may invite is decided by the server per request.
  */
 export function CompanyTeamInvitePage() {
   const { t } = useTranslation();
-  const { fuerFirma, tenantId, subjectId } = useHandelnder();
+  const { forCompany, tenantId, subjectId } = useActor();
 
   const [email, setEmail] = useState("");
-  const [rolle, setRolle] = useState<Role>("member");
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [sent, setVerschickt] = useState(false);
-  const [running, setLaeuft] = useState(false);
+  const [role, setRole] = useState<Role>("member");
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const [running, setRunning] = useState(false);
 
-  const mitglieder = useAsync(
+  const members = useAsync(
     (signal) => listMembers(tenantId as string, signal),
     [tenantId],
-    fuerFirma,
+    forCompany,
   );
 
   const back = (
@@ -55,7 +54,7 @@ export function CompanyTeamInvitePage() {
     </Link>
   );
 
-  const rahmen = (content: React.ReactNode) => (
+  const frame = (content: React.ReactNode) => (
     <PageShell title={t("team.invite")} narrow>
       <Box sx={{ mb: 2 }}>{back}</Box>
       <Card>
@@ -64,52 +63,52 @@ export function CompanyTeamInvitePage() {
     </PageShell>
   );
 
-  if (!fuerFirma) {
-    return rahmen(
+  if (!forCompany) {
+    return frame(
       <Typography>
         {t("team.inviteWithoutCompany")}
       </Typography>,
     );
   }
 
-  if (mitglieder.pending) {
-    return rahmen(<LoadingBlock label={t("team.membersLoading")} />);
+  if (members.pending) {
+    return frame(<LoadingBlock label={t("team.membersLoading")} />);
   }
 
-  const list = mitglieder.data?.ok ? mitglieder.data.members : [];
-  const istAdmin =
+  const list = members.data?.ok ? members.data.members : [];
+  const isAdmin =
     list.find((entry: CompanyMember) => entry.user_id === subjectId)
       ?.role === "admin";
 
-  if (!istAdmin) {
-    return rahmen(
+  if (!isAdmin) {
+    return frame(
       <Typography>
         {t("team.inviteAdminOnly")}
       </Typography>,
     );
   }
 
-  async function einladen() {
-    setLaeuft(true);
-    const result = await inviteMember(tenantId as string, email, rolle);
-    setLaeuft(false);
+  async function invite() {
+    setRunning(true);
+    const result = await inviteMember(tenantId as string, email, role);
+    setRunning(false);
 
     if (result.ok) {
-      setFehler(null);
-      setVerschickt(true);
+      setError(null);
+      setSent(true);
       setEmail("");
     } else {
-      setFehler(result.error.detail);
-      setVerschickt(false);
+      setError(result.error.detail);
+      setSent(false);
     }
   }
 
-  return rahmen(
+  return frame(
     <Box
       component="form"
       onSubmit={(event) => {
         event.preventDefault();
-        void einladen();
+        void invite();
       }}
       sx={{
         display: "flex",
@@ -125,7 +124,7 @@ export function CompanyTeamInvitePage() {
         value={email}
         onChange={(e) => {
           setEmail(e.target.value);
-          setVerschickt(false);
+          setSent(false);
         }}
         required
         fullWidth
@@ -134,17 +133,17 @@ export function CompanyTeamInvitePage() {
       <TextField
         select
         label={t("team.role")}
-        value={rolle}
-        onChange={(e) => setRolle(e.target.value as Role)}
+        value={role}
+        onChange={(e) => setRole(e.target.value as Role)}
         fullWidth
       >
         <MenuItem value="member">{t("team.roleMember")}</MenuItem>
         <MenuItem value="admin">{t("team.roleAdmin")}</MenuItem>
       </TextField>
 
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ alignSelf: "stretch" }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 

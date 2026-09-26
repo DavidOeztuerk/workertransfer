@@ -9,19 +9,19 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { listCompanyApplications } from "../api/applications";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 
 export function CompanyApplicationsPage() {
   const { t } = useTranslation();
-  const { fuerFirma } = useHandelnder();
-  const liste = useAsync(
+  const { forCompany } = useActor();
+  const list = useAsync(
     (signal) => listCompanyApplications(signal),
     [],
-    fuerFirma,
+    forCompany,
   );
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
       <PageShell title={t("companyApplications.listTitle")} narrow>
         <Card>
@@ -33,34 +33,34 @@ export function CompanyApplicationsPage() {
     );
   }
 
-  const items = liste.data?.ok ? liste.data.items : [];
+  const items = list.data?.ok ? list.data.items : [];
 
   return (
     <PageShell title={t("companyApplications.listTitle")} narrow lead={t("companyApplications.listLead")}>
       <Card>
         <CardContent>
-          {liste.pending ? <LoadingBlock label={t("companyApplications.loading")} /> : null}
-          {liste.data !== null && !liste.data.ok ? (
-            <Alert severity="error">{liste.data.error.detail}</Alert>
+          {list.pending ? <LoadingBlock label={t("companyApplications.loading")} /> : null}
+          {list.data !== null && !list.data.ok ? (
+            <Alert severity="error">{list.data.error.detail}</Alert>
           ) : null}
-          {liste.data?.ok && items.length === 0 ? (
+          {list.data?.ok && items.length === 0 ? (
             <EmptyBlock title={t("companyApplications.listEmpty")} />
           ) : null}
           <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "grid", gap: 1.5 }}>
-            {items.map((zeile) => (
-              <Card key={zeile.id} component="li" variant="outlined">
+            {items.map((row) => (
+              <Card key={row.id} component="li" variant="outlined">
                 <CardContent
                   sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}
                 >
                   <Box>
-                    <Typography variant="h4">{zeile.job_title}</Typography>
+                    <Typography variant="h4">{row.job_title}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {t(`applications.status${zeile.status.charAt(0).toUpperCase()}${zeile.status.slice(1)}`)}
+                      {t(`applications.status${row.status.charAt(0).toUpperCase()}${row.status.slice(1)}`)}
                     </Typography>
                   </Box>
                   <Button
                     component={RouterLink}
-                    to={`/company/applications/${zeile.id}`}
+                    to={`/company/applications/${row.id}`}
                     variant="contained"
                     size="small"
                   >

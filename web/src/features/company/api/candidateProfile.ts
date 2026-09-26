@@ -1,13 +1,13 @@
-// Ein einzelnes fremdes Profil — profile-service.
+// A single profile of somebody else — profile-service.
 //
-// <strong>Was hier NICHT mehr steht, ist die Liste.</strong> Sie lag auf
-// `GET /candidates` und ist am 11.09.2026 mit dem Umzug auf scout-service
-// gefallen (ADR-0036); der Pfad beantwortet seither nichts mehr, und
-// `docs/routenkarte.yml` hält das mit 404 in allen vier Spalten fest.
+// <strong>What does NOT stand here any more is the list.</strong> It lay on
+// `GET /candidates` and fell on 11.09.2026 with the move to scout-service
+// (ADR-0036); the path has answered nothing since, and `docs/routenkarte.yml`
+// records that with 404 in all four columns.
 //
-// Geblieben ist der Einzelabruf: `GET /profiles/{id}`, am Ledger, für die
-// Ansicht einer Bewerbung. Er gehört profile-service und ist von der Suche
-// unabhängig.
+// What remained is the single read: `GET /profiles/{id}`, at the ledger, for
+// the view of an application. It belongs to profile-service and is independent
+// of the search.
 
 import { request } from "../../../core/api/client";
 import { PROFILE_BASE_URL } from "../../../env";
@@ -22,7 +22,7 @@ export interface Profile {
   updated_at: string;
 }
 
-/** Ein einzelnes Profil — 404 heißt verborgen oder nicht vorhanden. */
+/** A single profile — 404 means hidden or non-existent. */
 export async function getCandidateProfile(
   subjectId: string,
   signal?: AbortSignal

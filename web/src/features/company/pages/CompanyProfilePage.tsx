@@ -9,11 +9,11 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { getOwnCompanyProfile, saveCompanyProfile } from "../api/companies";
 
-interface Entwurf {
+interface ProfileDraft {
   display_name: string;
   about: string;
   website: string;
@@ -26,7 +26,7 @@ interface Entwurf {
   phone: string;
 }
 
-const LEER: Entwurf = {
+const EMPTY: ProfileDraft = {
   display_name: "",
   about: "",
   website: "",
@@ -39,7 +39,7 @@ const LEER: Entwurf = {
   phone: "",
 };
 
-/** Mit Komma getrennt, Leeres fällt weg — „nichts angegeben" ist keine leere Zeile. */
+/** Comma-separated, empties drop out — "nothing stated" is no empty line. */
 const list = (raw: string): string[] =>
   raw
     .split(",")
@@ -47,36 +47,36 @@ const list = (raw: string): string[] =>
     .filter((entry) => entry !== "");
 
 /**
- * <c>/company/profile</c> — wie ein Unternehmen auftritt.
+ * <c>/company/profile</c> — how a company presents itself.
  *
- * <strong>Solange hier nichts steht, bleibt eine Ausschreibung anonym</strong>
- * — Titel und Beschreibung, sonst nichts. Das ist kein Mangel, sondern die
- * Voreinstellung: ein Unternehmen entscheidet selbst, ob es sich zeigt.
+ * <strong>As long as nothing stands here, an advert stays anonymous</strong> —
+ * title and description, nothing else. That is no shortcoming but the default:
+ * a company decides itself whether it shows itself.
  *
- * <strong>Der Stand füllt das Formular genau einmal.</strong> Liefe das bei
- * jeder Antwort, überschriebe ein Neuladen den gerade getippten Text.
+ * <strong>The stored state fills the form exactly once.</strong> If that ran on
+ * every answer, a reload would overwrite the text just typed.
  */
 export function CompanyProfilePage() {
   const { t } = useTranslation();
-  const { fuerFirma, tenantId } = useHandelnder();
+  const { forCompany, tenantId } = useActor();
 
-  const [draft, setEntwurf] = useState<Entwurf>(LEER);
-  const [adopted, setUebernommen] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [saved, setGespeichert] = useState(false);
-  const [running, setLaeuft] = useState(false);
+  const [draft, setDraft] = useState<ProfileDraft>(EMPTY);
+  const [adopted, setAdopted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const profile = useAsync(
     (signal) => getOwnCompanyProfile(signal),
     [tenantId],
-    fuerFirma,
+    forCompany,
   );
 
   useEffect(() => {
     if (adopted || !profile.data?.ok) return;
     const current = profile.data.profile;
     if (current !== null) {
-      setEntwurf({
+      setDraft({
         display_name: current.display_name,
         about: current.about,
         website: current.website ?? "",
@@ -89,10 +89,10 @@ export function CompanyProfilePage() {
         phone: current.phone ?? "",
       });
     }
-    setUebernommen(true);
+    setAdopted(true);
   }, [adopted, profile.data]);
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
       <PageShell title={t("companyProfile.title")} narrow>
         <Card>
@@ -106,8 +106,8 @@ export function CompanyProfilePage() {
     );
   }
 
-  async function speichern() {
-    setLaeuft(true);
+  async function save() {
+    setRunning(true);
     const result = await saveCompanyProfile({
       display_name: draft.display_name,
       about: draft.about,
@@ -120,14 +120,14 @@ export function CompanyProfilePage() {
       country: draft.country,
       phone: draft.phone,
     });
-    setLaeuft(false);
+    setRunning(false);
 
     if (result.ok) {
-      setFehler(null);
-      setGespeichert(true);
+      setError(null);
+      setSaved(true);
     } else {
-      setFehler(result.error.detail);
-      setGespeichert(false);
+      setError(result.error.detail);
+      setSaved(false);
     }
   }
 
@@ -143,9 +143,9 @@ export function CompanyProfilePage() {
             <LoadingBlock label={t("companyProfile.loading")} />
           ) : null}
 
-          {fehler !== null ? (
+          {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {fehler}
+              {error}
             </Alert>
           ) : null}
 
@@ -159,7 +159,7 @@ export function CompanyProfilePage() {
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              void speichern();
+              void save();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
@@ -168,8 +168,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.displayNameHint")}
               value={draft.display_name}
               onChange={(e) => {
-                setEntwurf({ ...draft, display_name: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, display_name: e.target.value });
+                setSaved(false);
               }}
               required
             />
@@ -178,8 +178,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.aboutUsHint")}
               value={draft.about}
               onChange={(e) => {
-                setEntwurf({ ...draft, about: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, about: e.target.value });
+                setSaved(false);
               }}
               multiline
               minRows={4}
@@ -189,8 +189,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.websiteHint")}
               value={draft.website}
               onChange={(e) => {
-                setEntwurf({ ...draft, website: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, website: e.target.value });
+                setSaved(false);
               }}
             />
             <TextField
@@ -198,8 +198,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.locationsHint")}
               value={draft.locations}
               onChange={(e) => {
-                setEntwurf({ ...draft, locations: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, locations: e.target.value });
+                setSaved(false);
               }}
             />
             <TextField
@@ -207,8 +207,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.streetHint")}
               value={draft.line1}
               onChange={(e) => {
-                setEntwurf({ ...draft, line1: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, line1: e.target.value });
+                setSaved(false);
               }}
             />
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
@@ -216,24 +216,24 @@ export function CompanyProfilePage() {
                 label={t("companyProfile.postalCode")}
                 value={draft.postal_code}
                 onChange={(e) => {
-                  setEntwurf({ ...draft, postal_code: e.target.value });
-                  setGespeichert(false);
+                  setDraft({ ...draft, postal_code: e.target.value });
+                  setSaved(false);
                 }}
               />
               <TextField
                 label={t("companyProfile.city")}
                 value={draft.city}
                 onChange={(e) => {
-                  setEntwurf({ ...draft, city: e.target.value });
-                  setGespeichert(false);
+                  setDraft({ ...draft, city: e.target.value });
+                  setSaved(false);
                 }}
               />
               <TextField
                 label={t("companyProfile.country")}
                 value={draft.country}
                 onChange={(e) => {
-                  setEntwurf({ ...draft, country: e.target.value });
-                  setGespeichert(false);
+                  setDraft({ ...draft, country: e.target.value });
+                  setSaved(false);
                 }}
                 slotProps={{ htmlInput: { maxLength: 2 } }}
               />
@@ -242,8 +242,8 @@ export function CompanyProfilePage() {
               label={t("companyProfile.phone")}
               value={draft.phone}
               onChange={(e) => {
-                setEntwurf({ ...draft, phone: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, phone: e.target.value });
+                setSaved(false);
               }}
             />
             <TextField
@@ -251,8 +251,8 @@ export function CompanyProfilePage() {
               helperText={t("companyProfile.benefitsHint")}
               value={draft.benefits}
               onChange={(e) => {
-                setEntwurf({ ...draft, benefits: e.target.value });
-                setGespeichert(false);
+                setDraft({ ...draft, benefits: e.target.value });
+                setSaved(false);
               }}
             />
 

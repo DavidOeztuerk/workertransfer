@@ -1,14 +1,13 @@
-// Nach dem Lebenslauf fragen.
+// Asking for the CV.
 //
-// Die Anfrage nennt nur die Subject-ID — welches Unternehmen fragt, steht im
-// Token, und welche Berechtigung daraus folgt, entscheidet der Server. Die
-// Oberfläche baut nie einen Capability-String.
+// The request names only the subject id — which company asks stands in the
+// token, and which permission follows from it the server decides. The UI never
+// builds a capability string.
 //
-// <strong>Die Anfrage ist nicht die Erlaubnis.</strong> „Gewährt" heißt „wurde
-// einmal gewährt", nicht „gilt jetzt" — deshalb hat ein Vorgang weder ein
-// Aktiv-Kennzeichen noch einen Widerrufszeitpunkt. Nach einem Widerruf bleibt
-// er gewährt und der Abruf kommt trotzdem leer zurück. Das ist der Entwurf,
-// kein Fehler.
+// <strong>The request is not the permission.</strong> "Granted" means "was
+// granted once", not "holds now" — that is why a request has neither an active
+// flag nor a revocation time. After a revocation it stays granted and the read
+// still comes back empty. That is the design, not a defect.
 
 import { request } from "../../../core/api/client";
 import { RESUME_BASE_URL } from "../../../env";
@@ -23,16 +22,16 @@ export interface ResumeRequest {
   answered_at: string | null;
 }
 
-export type AnfrageFehler =
+export type ResumeRequestError =
   | "already-asked"
   | "no-company"
   | "not-available"
   | "unavailable"
   | "offline";
 
-export type AnfrageErgebnis = { ok: true; request: ResumeRequest } | Failure<AnfrageFehler>;
+export type ResumeRequestResult = { ok: true; request: ResumeRequest } | Failure<ResumeRequestError>;
 
-export async function requestResume(subjectId: string): Promise<AnfrageErgebnis> {
+export async function requestResume(subjectId: string): Promise<ResumeRequestResult> {
   const answer = await request<ResumeRequest>(
     RESUME_BASE_URL,
     `/resumes/${subjectId}/requests`,
@@ -40,7 +39,7 @@ export async function requestResume(subjectId: string): Promise<AnfrageErgebnis>
     "errors.requestNotSent"
   );
   if (answer.ok) return { ok: true, request: answer.value };
-  return interpretError<AnfrageFehler>(
+  return interpretError<ResumeRequestError>(
     answer.error,
     {
       0: { reason: "offline", titleKey: "errors.noConnection" },
@@ -50,9 +49,9 @@ export async function requestResume(subjectId: string): Promise<AnfrageErgebnis>
         titleKey: "errors.onlyCompaniesRequestResume",
         detailKey: "errors.chooseCompany",
       },
-      // Fragen setzt die PROFIL-Freigabe voraus, nie die Existenz eines
-      // Lebenslaufs: „hat schon einen geschrieben" ist eine Tatsache über die
-      // Person, nach der niemand tasten können soll.
+      // Asking requires the PROFILE release, never the existence of a CV: "has
+      // already written one" is a fact about the person nobody should be able
+      // to probe for.
       404: { reason: "not-available", titleKey: "errors.personNotRequestable" },
       503: {
         reason: "unavailable",

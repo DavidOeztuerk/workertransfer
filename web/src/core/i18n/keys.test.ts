@@ -150,8 +150,8 @@ const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
     each("readiness", constantArray(`${PAGES}/ProfilePage.tsx`, "COMMUTE_READINESS")),
   "profile.relocate_${value}": () =>
     each("value", constantArray(`${PAGES}/ProfilePage.tsx`, "RELOCATION_READINESS")),
-  "profile.commute_${treffer.reach_commute}": () =>
-    nested("treffer", "reach_commute", unionMembers("features/person/api/profile.ts", "CommuteReadiness")),
+  "profile.commute_${hit.reach_commute}": () =>
+    nested("hit", "reach_commute", unionMembers("features/person/api/profile.ts", "CommuteReadiness")),
   "resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}": () =>
     each("templ", constantArray(`${PAGES}/ResumePage.tsx`, "TEMPLATES")),
   "resume.template${templ.charAt(0).toUpperCase()}${templ.slice(1)}Hint": () =>
@@ -176,36 +176,26 @@ const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
   // The two job labels look a word up in a local table; the real function runs.
   "job.remote${key[value]}": () => captured(() => REMOTE_MODES.map(remoteLabel)),
   "job.employment${key[value]}": () => captured(() => EMPLOYMENT_TYPES.map(employmentLabel)),
-  // `caseItem` and `conversation` are the person's pages (features/work),
-  // `vorgang` and `gespraech` the company's (features/company) — two sites, one
-  // union each.
+  // `caseItem` and `conversation` stand on the person's pages (features/work)
+  // and on the company's (features/company) — two sites, one template each.
   "assessments.state_${caseItem.state}": () =>
     nested("caseItem", "state", unionMembers(`${WORK}/api/assessments.ts`, "CaseState")),
-  "assessments.state_${vorgang.state}": () =>
-    nested("vorgang", "state", unionMembers(`${WORK}/api/assessments.ts`, "CaseState")),
   "assessments.outcome_${caseItem.evaluation.outcome}": () =>
     unionMembers(`${WORK}/api/assessments.ts`, "Outcome").map((outcome) => ({
       caseItem: { evaluation: { outcome } },
     })),
-  "assessments.outcome_${vorgang.evaluation.outcome}": () =>
-    unionMembers(`${WORK}/api/assessments.ts`, "Outcome").map((outcome) => ({
-      vorgang: { evaluation: { outcome } },
-    })),
   "advisor.state_${conversation.state}": () =>
     nested("conversation", "state", unionMembers(`${WORK}/api/advisor.ts`, "ConversationState")),
-  "advisor.state_${gespraech.state}": () =>
-    nested("gespraech", "state", unionMembers(`${WORK}/api/advisor.ts`, "ConversationState")),
   "advisor.stage${conversation.stage}Short": () =>
     nested("conversation", "stage", [0, 1, 2, 3]),
-  "advisor.stage${gespraech.stage}Short": () => nested("gespraech", "stage", [0, 1, 2, 3]),
   "advisor.stage${Math.min(conversation.stage + 1, 3)}": () =>
     nested("conversation", "stage", [0, 1, 2, 3]),
-  "scout.attendance_${treffer.reach_attendance}": () =>
-    nested("treffer", "reach_attendance", ["remote", "hybrid", "vor_ort"]),
-  "scout.reach_${treffer.reach}": () =>
-    nested("treffer", "reach", unionMembers("features/company/api/scout.ts", "Erreichbarkeit")),
-  "applications.status${zeile.status.charAt(0).toUpperCase()}${zeile.status.slice(1)}": () =>
-    nested("zeile", "status", unionMembers(`${WORK}/api/applications.ts`, "ApplicationStatus")),
+  "scout.attendance_${hit.reach_attendance}": () =>
+    nested("hit", "reach_attendance", ["remote", "hybrid", "vor_ort"]),
+  "scout.reach_${hit.reach}": () =>
+    nested("hit", "reach", unionMembers("features/company/api/scout.ts", "AvailabilityState")),
+  "applications.status${row.status.charAt(0).toUpperCase()}${row.status.slice(1)}": () =>
+    nested("row", "status", unionMembers(`${WORK}/api/applications.ts`, "ApplicationStatus")),
   "occupation.field.${field}": () => each("field", [...OCCUPATIONAL_FIELDS]),
   "language.${language}": () => each("language", [...LANGUAGES]),
   // A type derived from the catalogue itself: tsc checks every use of it.
