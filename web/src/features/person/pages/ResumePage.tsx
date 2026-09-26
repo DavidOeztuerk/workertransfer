@@ -16,6 +16,7 @@ import IconButton from "@mui/material/IconButton";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { i18n } from "../../../core/i18n/i18n";
 import { Delete as DeleteIcon, Description as DocIcon, Visibility as ViewIcon } from "@mui/icons-material";
 
 import {
@@ -492,7 +493,8 @@ export function ResumePage() {
                         <Box>
                           <Typography variant="body1">{doc.name}</Typography>
                           <Typography variant="body2" color="text.secondary">
-                            {t("resume.documentKindResume")} · {Math.round(doc.size_bytes / 1024)} KB
+                            {t("resume.documentKindResume")} ·{" "}
+                            {t("resume.sizeKb", { kb: Math.round(doc.size_bytes / 1024) })}
                           </Typography>
                         </Box>
                       </Box>
@@ -620,7 +622,11 @@ export function ResumePage() {
                                 ? "resume.documentKindCertificate"
                                 : "resume.documentKindOther",
                           )}{" "}
-                          · {Math.round(doc.size_bytes / 1024)} KB · {t("resume.uploadedOn", { datum: new Date(doc.uploaded_at).toLocaleDateString("de-DE") })}
+                          · {t("resume.sizeKb", { kb: Math.round(doc.size_bytes / 1024) })} ·{" "}
+                          {/* The CHOSEN language, not a fixed "de-DE": a French person read a German date. */}
+                          {t("resume.uploadedOn", {
+                            datum: new Date(doc.uploaded_at).toLocaleDateString(i18n.language),
+                          })}
                         </Typography>
                       </Box>
                     </Box>

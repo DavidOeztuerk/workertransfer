@@ -11,6 +11,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+import { i18n } from "../../../core/i18n/i18n";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
@@ -230,9 +231,12 @@ function MyCaseCard({ caseItem, done }: { caseItem: Case; done: () => void }) {
   );
 }
 
-/** A date as it stands. The language comes from the session, not from here. */
+/**
+ * A date in the CHOSEN language. Without the argument it followed the device,
+ * and beside a German sentence stood an American date.
+ */
 function formatDate(raw: string): string {
-  return new Date(raw).toLocaleDateString();
+  return new Date(raw).toLocaleDateString(i18n.language);
 }
 
 export default AssessmentsPage;

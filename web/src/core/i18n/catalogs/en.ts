@@ -267,6 +267,20 @@ const en: Catalog = {
     download: "Download as JSON",
     deleteTitle: "Delete account",
     deleteText: "Deleting is a path of its own, and you do not have to download anything first. What disappears is stated in full on the deletion page.",
+    sectionAccount: "Account",
+    sectionNotifications: "Notifications",
+    sectionProfile: "Profile",
+    sectionResume: "Résumé",
+    sectionResumeRequests: "Requests for the résumé",
+    sectionPortfolio: "Work samples",
+    sectionGitHub: "GitHub connection",
+    sectionMarketStatus: "Market status",
+    sectionMarketRequests: "Requests for the market status",
+    sectionTransfers: "Transfers",
+    sectionApplications: "Applications",
+    sectionConsents: "Releases",
+    sectionConsentHistory: "History of releases",
+    sectionOther: "Further section",
   },
 
   profile: {
@@ -560,6 +574,7 @@ const en: Catalog = {
     uploading: "Uploading…",
     tooManyDocuments:
       "There are already as many documents here as there is room for. Delete one first, then the new one fits.",
+    sizeKb: "{{kb}} KB",
   },
 
   errors: {

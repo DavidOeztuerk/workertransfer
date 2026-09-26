@@ -270,6 +270,20 @@ const de = {
     download: "Als JSON herunterladen",
     deleteTitle: "Konto löschen",
     deleteText: "Löschen ist ein eigener Weg, und du musst vorher nichts herunterladen. Was dabei verschwindet, steht vollständig auf der Löschseite.",
+    sectionAccount: "Konto",
+    sectionNotifications: "Benachrichtigungen",
+    sectionProfile: "Profil",
+    sectionResume: "Lebenslauf",
+    sectionResumeRequests: "Anfragen nach dem Lebenslauf",
+    sectionPortfolio: "Arbeiten",
+    sectionGitHub: "GitHub-Verbindung",
+    sectionMarketStatus: "Marktstatus",
+    sectionMarketRequests: "Anfragen nach dem Marktstatus",
+    sectionTransfers: "Transfers",
+    sectionApplications: "Bewerbungen",
+    sectionConsents: "Freigaben",
+    sectionConsentHistory: "Verlauf der Freigaben",
+    sectionOther: "Weiterer Abschnitt",
   },
 
   profile: {
@@ -563,6 +577,7 @@ const de = {
     uploading: "Wird hochgeladen…",
     tooManyDocuments:
       "Hier liegen schon so viele Unterlagen, wie Platz haben. Lösche zuerst eine, dann geht die neue.",
+    sizeKb: "{{kb}} KB",
   },
 
   errors: {

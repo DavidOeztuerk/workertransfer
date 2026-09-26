@@ -17,6 +17,7 @@ import {
   fileName,
   section,
 } from "../lib/export";
+import type { MessageKey } from "../../../shared/api/errors";
 import { listMyConsentHistory, listMyConsents } from "../api/consent";
 import { getMyProfile } from "../api/profile";
 import { getMyCurriculumVitae, getMyResumeRequests } from "../api/resume";
@@ -44,13 +45,45 @@ import { listMyApplications } from "../../work/api/applications";
  * can be clicked wrongly that could not be undone. The link goes in both
  * directions, so that nobody believes there is a mandatory order.
  */
+/**
+ * What the page CALLS each section — the catalogue's word, in the person's
+ * language.
+ *
+ * <strong>The file keeps its German section names</strong> (`profil`,
+ * `freigaben_verlauf` …): they are keys of a data format somebody may already
+ * have parsed, and consents-journey reads them from the downloaded file. The
+ * page drew exactly those keys until 26.09.2026 (`name.replace(/_/g, " ")`),
+ * so an English or French person read "freigaben verlauf". The type makes the
+ * two lists one: a section without a label does not compile.
+ */
+const SECTION_LABELS = {
+  konto: "myData.sectionAccount",
+  benachrichtigungen: "myData.sectionNotifications",
+  profil: "myData.sectionProfile",
+  lebenslauf: "myData.sectionResume",
+  lebenslauf_anfragen: "myData.sectionResumeRequests",
+  portfolio: "myData.sectionPortfolio",
+  github: "myData.sectionGitHub",
+  marktstatus: "myData.sectionMarketStatus",
+  markt_anfragen: "myData.sectionMarketRequests",
+  transfers: "myData.sectionTransfers",
+  bewerbungen: "myData.sectionApplications",
+  freigaben: "myData.sectionConsents",
+  freigaben_verlauf: "myData.sectionConsentHistory",
+} as const satisfies Record<string, MessageKey>;
+
+type SectionName = keyof typeof SECTION_LABELS;
+
+const labelOf = (name: string): MessageKey =>
+  SECTION_LABELS[name as SectionName] ?? "myData.sectionOther";
+
 export function MyDataPage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
   const dataExport = useAsync(
-    async (signal): Promise<Record<string, ExportSection>> => {
+    async (signal): Promise<Record<SectionName, ExportSection>> => {
       const [
         notifications,
         postalAddress,
@@ -181,7 +214,9 @@ export function MyDataPage() {
 
           {missing.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("myData.incomplete", { teile: missing.join(", ") })}
+              {t("myData.incomplete", {
+                teile: missing.map((name) => t(labelOf(name))).join(", "),
+              })}
             </Alert>
           ) : null}
 
@@ -203,7 +238,7 @@ export function MyDataPage() {
                 {Object.entries(result.abschnitte).map(([name, entry]) => (
                   <Box key={name} sx={{ display: "contents" }}>
                     <Typography component="dt" variant="body2">
-                      {name.replace(/_/g, " ")}
+                      {t(labelOf(name))}
                     </Typography>
                     <Typography
                       component="dd"

@@ -267,6 +267,20 @@ const fr: Catalog = {
     download: "Télécharger en JSON",
     deleteTitle: "Supprimer le compte",
     deleteText: "La suppression est une démarche à part, et vous n'avez rien à télécharger au préalable. Ce qui disparaît est indiqué en entier sur la page de suppression.",
+    sectionAccount: "Compte",
+    sectionNotifications: "Notifications",
+    sectionProfile: "Profil",
+    sectionResume: "Curriculum vitæ",
+    sectionResumeRequests: "Demandes de CV",
+    sectionPortfolio: "Travaux",
+    sectionGitHub: "Connexion GitHub",
+    sectionMarketStatus: "Statut sur le marché",
+    sectionMarketRequests: "Demandes de statut sur le marché",
+    sectionTransfers: "Transferts",
+    sectionApplications: "Candidatures",
+    sectionConsents: "Autorisations",
+    sectionConsentHistory: "Historique des autorisations",
+    sectionOther: "Autre section",
   },
 
   profile: {
@@ -560,6 +574,7 @@ const fr: Catalog = {
     uploading: "Téléversement en cours…",
     tooManyDocuments:
       "Il y a déjà ici autant de documents que de place. Supprimez-en d’abord un, puis le nouveau pourra être ajouté.",
+    sizeKb: "{{kb}} Ko",
   },
 
   errors: {

@@ -42,6 +42,9 @@ describe("the catalogues", () => {
       // invented difference would be wrong.
       "en:jobs.kilometers",
       "fr:jobs.kilometers",
+      // "KB" is KB in English too; French writes "Ko" and stands on no
+      // exemption.
+      "en:resume.sizeKb",
       // Language names stand in their own language, in every catalogue.
       "en:language.de",
       "en:language.en",
@@ -71,6 +74,7 @@ describe("the catalogues", () => {
       "en:transfers.start",
       "en:companyTransfers.start",
       "en:companyTransfers.title",
+      "en:myData.sectionTransfers",
       "en:team.roleAdmin",
       // "System" is the same word in English. French does not stand beside
       // it — there it is "Systeme", and an exemption per key would let exactly
@@ -84,6 +88,7 @@ describe("the catalogues", () => {
       "fr:consents.areaGithub",
       "fr:applications.partProfile",
       "fr:header.profile",
+      "fr:myData.sectionProfile",
       "fr:header.github",
       // Product names, the same in every language.
       "en:scout.skillsExample",

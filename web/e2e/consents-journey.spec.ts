@@ -5,6 +5,7 @@
 // ways (profile switch, market status request, portfolio switch), and the page
 // has to know all three.
 
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 import {
@@ -228,14 +229,19 @@ test("the data disclosure names every section — the empty ones too", async ({ 
   // check on it could not fail when the PAIRING slipped. This helper moves along
   // the same relation a screen reader uses.
   //
-  // The section names ("profil", "lebenslauf", "freigaben verlauf") are keys of
-  // the export file format and stay German; "enthalten" is the catalogue text.
+  // The page names each section in the person's language (catalogue labels,
+  // since 26.09.2026 — before, it drew the file's German keys raw, and an
+  // English person read "freigaben verlauf"). The FILE keeps those keys; that
+  // is checked on the download below.
   const entry = (section: string) =>
-    person.getByText(section, { exact: true }).locator("xpath=following-sibling::dd[1]");
-  await expect(entry("profil")).toHaveText("enthalten");
-  await expect(entry("lebenslauf")).toHaveText("enthalten");
-  await expect(entry("portfolio")).toHaveText("enthalten");
-  await expect(entry("freigaben verlauf")).toHaveText("enthalten");
+    person
+      .locator("dl")
+      .getByText(section, { exact: true })
+      .locator("xpath=following-sibling::dd[1]");
+  await expect(entry("Profil")).toHaveText("enthalten");
+  await expect(entry("Lebenslauf")).toHaveText("enthalten");
+  await expect(entry("Arbeiten")).toHaveText("enthalten");
+  await expect(entry("Verlauf der Freigaben")).toHaveText("enthalten");
   // Nothing is missing: with the stack running there is no warning.
   await expect(person.getByRole("alert")).toHaveCount(0);
 
@@ -244,6 +250,16 @@ test("the data disclosure names every section — the empty ones too", async ({ 
   await person.getByRole("button", { name: /Als JSON herunterladen/i }).click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/^workertransfer-meine-daten-\d{4}-\d{2}-\d{2}\.json$/);
+
+  // The section names are keys of the export FILE format and stay German — a
+  // data contract, whatever language the page speaks.
+  const saved = await file.path();
+  const content = JSON.parse(await readFile(saved, "utf8")) as {
+    abschnitte: Record<string, { status: string }>;
+  };
+  for (const key of ["profil", "lebenslauf", "portfolio", "freigaben_verlauf"]) {
+    expect(content.abschnitte[key]?.status, key).toBe("ok");
+  }
 
   await context.close();
 });

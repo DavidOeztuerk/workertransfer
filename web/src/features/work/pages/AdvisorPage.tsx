@@ -11,6 +11,7 @@ import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { i18n } from "../../../core/i18n/i18n";
 import { Link as RouterLink } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
@@ -353,7 +354,7 @@ function ConversationCard({
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
           {t("advisor.openedOn", {
-            datum: new Date(conversation.opened_at).toLocaleDateString(),
+            datum: new Date(conversation.opened_at).toLocaleDateString(i18n.language),
           })}
         </Typography>
 

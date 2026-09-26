@@ -315,6 +315,8 @@ export function GitHubPage() {
                     <TextField
                       label={t("github.username")}
                       helperText={t("github.usernameHint")}
+                      // A user NAME as an example, not a text: it reads the
+                      // same in every language, as a login on GitHub does.
                       placeholder="anna"
                       value={login}
                       onChange={(e) => setLogin(e.target.value)}
