@@ -1,8 +1,8 @@
-// Der Lebenslauf durch den Browser: anfragen, freigeben, zurückziehen.
+// The resume through the browser: request, release, withdraw.
 //
-// Was der Integrationstest auf HTTP-Ebene belegt, prüft dieser Test dort, wo es
-// ankommt — ein Knopf, der die Anfrage nicht stellt, wäre auf beiden Ebenen
-// darunter unsichtbar.
+// What the integration test proves at the HTTP level, this test checks where it
+// arrives — a button that does not make the request would be invisible on both
+// levels below.
 
 import { expect, test } from "@playwright/test";
 
@@ -12,28 +12,28 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", async ({
+test("a resume reaches only the company it was released to", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Arbeitgeber ${Date.now()}`;
-  const headline = `E2E CV-Kandidat ${Date.now()}`;
-  const employer = `Frühere Firma ${Date.now()}`;
+  const companyName = `E2E Employer ${Date.now()}`;
+  const headline = `E2E CV candidate ${Date.now()}`;
+  const employer = `Former Company ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
-  // Profil anlegen und freigeben — ohne das darf niemand nach dem Lebenslauf
-  // fragen, sonst wäre die Anfrage ein Kanal, um die Existenz zu erfahren.
+  // Create the profile and release it — without that nobody may ask for the
+  // resume, otherwise the request would be a channel for learning it exists.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
@@ -42,18 +42,18 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   await expect(candidate.getByRole("switch")).toBeChecked();
 
   await candidate.goto("/resume");
-  // Die Seite fragt zuerst, WIE der Lebenslauf vorliegen soll — selbst
-  // geschrieben oder als Datei. Diese Reise schreibt ihn selbst.
-  const wegManuell = candidate.getByRole("button", { name: /Selbst schreiben/i });
-  await expect(wegManuell).toBeVisible();
-  await wegManuell.click();
-  // KEIN Klick auf „hinzufügen": die Wahl „selbst schreiben" legt bereits eine
-  // leere Zeile an. Ein zusätzlicher Klick erzeugte eine zweite, und
-  // `getByLabel(/Arbeitgeber/i)` träfe dann beide. (Der Knopf heisst inzwischen
-  // ohnehin „Stelle hinzufügen" — Beruf, Ausbildung und Schule sind getrennt.)
+  // The page first asks HOW the resume should come — written by hand or as a
+  // file. This journey writes it by hand.
+  const writeByHand = candidate.getByRole("button", { name: /Selbst schreiben/i });
+  await expect(writeByHand).toBeVisible();
+  await writeByHand.click();
+  // NO click on "hinzufügen" (add): choosing "selbst schreiben" already creates
+  // an empty row. An extra click created a second one, and
+  // `getByLabel(/Arbeitgeber/i)` would then match both. (The button is called
+  // "Stelle hinzufügen" by now anyway — work, training and school are separate.)
   await expect(candidate.getByLabel(/Arbeitgeber/i)).toBeVisible();
   await candidate.getByLabel(/Arbeitgeber/i).fill(employer);
-  await candidate.getByLabel(/Tätigkeit/i).fill("Backend-Entwicklerin");
+  await candidate.getByLabel(/Tätigkeit/i).fill("Backend developer");
   await candidate.getByLabel("Von").fill("2020-01");
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
   await expect(candidate.getByText(/Lebenslauf gespeichert/i)).toBeVisible();
@@ -63,45 +63,45 @@ test("ein Lebenslauf erreicht nur das Unternehmen, dem er freigegeben wurde", as
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
-  // Warten, bis der Wechsel wirklich gilt. Die Wahl stößt ihn nur an: der
-  // Server stellt ein neues Token aus, das Cookie wird ersetzt, die Sitzung neu
-  // geladen. Sofort weiterzuklicken gewinnt das Rennen etwa jedes zweite Mal —
-  // /scout zeigt dann "Profile sehen nur Unternehmen", die Karte fehlt,
-  // und der Test läuft in einen Timeout an einer Stelle, die mit der Ursache
-  // nichts zu tun hat. Der Kandidatenlink erscheint erst mit aktivem
-  // Unternehmen und ist damit das ehrliche Signal.
+  await pickOption(recruiter, /Handeln als/i, companyName);
+  // Wait until the switch really holds. The choice only sets it off: the server
+  // issues a new token, the cookie is replaced, the session reloaded. Clicking
+  // on immediately wins the race about every second time — /scout then shows
+  // "Profile sehen nur Unternehmen", the card is missing, and the test runs
+  // into a timeout at a place that has nothing to do with the cause. The
+  // company menu appears only with an active company and is therefore the
+  // honest signal.
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Lebenslauf anfragen/i }).click();
   await expect(card.getByText(/Anfrage gestellt/i)).toBeVisible();
 
-  // Die Anfrage muss die Person erreichen, ohne dass sie danach sucht.
+  // The request has to reach the person without them looking for it.
   await candidate.goto("/");
-  // Die Uebersicht sagt seit dem Umbau, WORUM es geht, statt nur "1 offene
-  // Anfrage" an einem Abzeichen. Die Zusage dieser Reise ist unveraendert: die
-  // Anfrage muss die Person erreichen, ohne dass sie danach sucht.
+  // Since the rebuild the overview says WHAT it is about instead of only "1
+  // offene Anfrage" on a badge. The promise of this journey is unchanged: the
+  // request has to reach the person without them looking for it.
   await expect(
     candidate.getByText("1 Anfrage nach deinem Lebenslauf")
   ).toBeVisible();
 
-  // Die Person entscheidet — vorher gibt es nichts zu sehen.
+  // The person decides — before that there is nothing to see.
   await candidate.goto("/resume");
   const row = candidate.locator("li").filter({ hasText: /fragt nach deinem Lebenslauf/i });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
-  // Zurückziehen wirkt sofort; die Anfrage selbst bleibt als Vorgang stehen.
+  // Withdrawing takes effect immediately; the request itself remains as a case.
   await row.getByRole("button", { name: /Zurückziehen/i }).click();
   await expect(row.getByText(/zurückgezogen/i)).toBeVisible();
   await expect(row.getByRole("button", { name: /Zurückziehen/i })).toHaveCount(0);

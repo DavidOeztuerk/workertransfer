@@ -1,21 +1,21 @@
-// Der ganze Weg der Löschung: verlangen → Kaskade läuft → die Daten sind weg →
-// der Nachweis im Ledger steht noch (ADR-0027).
+// The whole path of an erasure: request it → the cascade runs → the data is
+// gone → the proof in the ledger still stands (ADR-0027).
 //
-// Diese Reise prüft etwas, das keine der anderen prüfen kann: dass eine
-// Zusage, die die Oberfläche gibt, am Ende auch in den DATENBANKEN eingelöst
-// ist — über sieben Dienstgrenzen hinweg und ohne dass jemand nachhilft. Genau
-// dieser Zusammenhang fehlte, als ROADMAP 10.5 noch ⛔ stand: der Endpunkt sagte
-// „angenommen", und niemand tat etwas.
+// This journey checks something none of the others can: that a promise the UI
+// makes is in the end also kept in the DATABASES — across seven service
+// boundaries and without anybody helping along. Exactly this connection was
+// missing while ROADMAP 10.5 still stood at ⛔: the endpoint said "accepted",
+// and nobody did anything.
 //
-// WARUM DER TOKEN NACH DER LÖSCHUNG NOCH TRÄGT — und warum das kein Schlupfloch
-// ist, sondern der einzige Weg, hinterher überhaupt nachzusehen: profile- und
-// consent-service prüfen die SIGNATUR eines Zugangstokens, sie fragen
-// identity-service nicht nach der Sitzung (ADR-0015). Der Token überlebt die
-// Löschung deshalb bis zu seinem Ablauf. Für die Person ändert das nichts —
-// ihr Browser bekommt beim Löschen ein leeres Cookie und kann sich nie wieder
-// anmelden. Für diesen Test ist es die Sonde, mit der sich beweisen lässt, dass
-// die Zeilen wirklich fallen: sonst müsste er das Löschgeheimnis kennen, und
-// eine Testreihe, die das Löschgeheimnis hält, wäre ein schlechterer Tausch.
+// WHY THE TOKEN STILL CARRIES AFTER THE ERASURE — and why that is not a loophole
+// but the only way to look afterwards at all: profile- and consent-service
+// check the SIGNATURE of an access token, they do not ask identity-service
+// about the session (ADR-0015). The token therefore survives the erasure until
+// it expires. For the person that changes nothing — their browser gets an empty
+// cookie on erasure and can never sign in again. For this test it is the probe
+// with which it can be proved that the rows really fall: otherwise it would
+// have to know the erasure secret, and a test suite holding the erasure secret
+// would be a worse trade.
 
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext, Page } from "@playwright/test";
@@ -35,16 +35,16 @@ import {
 
 skipWithoutStack();
 
-//: Die Kaskade läuft über drei Takte des Zustellers (Voreinstellung 5 s):
-//: sieben Empfänger → Abschlussnachricht → Konto. Großzügig bemessen, weil die
-//: Frage „kommt sie an?" lautet und nicht „ist die Maschine schnell?" — ein zu
-//: knapper Rahmen macht daraus eine Aussage über die Auslastung des Rechners.
+// The cascade runs over three dispatcher ticks (default 5 s): seven recipients
+// → final message → account. Generously sized, because the question is "does it
+// arrive?" and not "is the machine fast?" — a frame that is too tight turns it
+// into a statement about the machine's load.
 const CASCADE_TIMEOUT_MS = 120_000;
 
 async function accessTokenOf(page: Page): Promise<string> {
   const cookies = await page.context().cookies();
   const access = cookies.find((cookie) => cookie.name === "access");
-  expect(access, "kein access-Cookie — die Anmeldung hat nicht getragen").toBeTruthy();
+  expect(access, "no access cookie — the sign-in did not hold").toBeTruthy();
   return access!.value;
 }
 
@@ -69,12 +69,12 @@ async function ledgerOf(api: APIRequestContext, token: string): Promise<string[]
 }
 
 /**
- * Ein Bestätigungstoken aus einer Mail, die NACH `mark` zugestellt wurde.
+ * A confirmation token from a mail delivered AFTER `mark`.
  *
- * Der Zeitstempel ist der ganze Punkt: nach einer Löschung liegt die alte
- * Bestätigungsmail derselben Adresse noch in Mailpit, und ihr Token ist längst
- * verbraucht. Ohne die Schranke greift der Test sie — und scheitert an einem
- * „Bestätigung fehlgeschlagen", das mit der Sache nichts zu tun hat.
+ * The timestamp is the whole point: after an erasure the old confirmation mail
+ * to the same address still lies in Mailpit, and its token is long used up.
+ * Without the barrier the test picks it — and fails on a "Bestätigung
+ * fehlgeschlagen" (confirmation failed) that has nothing to do with the matter.
  */
 async function verificationTokenAfter(
   email: string,
@@ -107,22 +107,22 @@ async function verificationTokenAfter(
   return null;
 }
 
-test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", async ({
+test("an erasure is requested, runs through — and the proof remains", async ({
   browser,
   request,
 }) => {
   test.setTimeout(CASCADE_TIMEOUT_MS + 120_000);
 
   const email = uniqueEmail("example.com");
-  const headline = `E2E Löschkandidat ${Date.now()}`;
+  const headline = `E2E Erasure candidate ${Date.now()}`;
 
   const context = await browser.newContext();
   const page = await context.newPage();
-  await registerAndConfirm(page, email, "E2E Löschkandidat");
+  await registerAndConfirm(page, email, "E2E Erasure candidate");
   await login(page, email);
 
-  // Etwas anlegen, das verschwinden kann — sonst prüfte die Reise am Ende, dass
-  // nichts weg ist, wo nie etwas war.
+  // Create something that can disappear — otherwise the journey would in the
+  // end check that nothing is gone where nothing ever was.
   await page.goto("/profile");
   await page.getByLabel(/Überschrift/i).fill(headline);
   await page.getByLabel("Standort", { exact: true }).fill("Bremen");
@@ -130,7 +130,7 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
   await page.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText(/Profil gespeichert/i)).toBeVisible();
 
-  // Eine Freigabe erteilen: sie ist später der BELEG, dass gelöscht wurde.
+  // Grant a release: later it is the EVIDENCE that the erasure happened.
   const release = page.getByRole("switch");
   await expect(release).toBeEnabled();
   await release.click();
@@ -138,7 +138,7 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
 
   const token = await accessTokenOf(page);
 
-  // Der Zustand VOR der Löschung — sonst sagt „ist weg" am Ende nichts.
+  // The state BEFORE the erasure — otherwise "is gone" says nothing at the end.
   expect(await profileOf(request, token)).not.toBeNull();
   expect(await ledgerOf(request, token)).toContain("GRANT");
 
@@ -146,73 +146,72 @@ test("eine Löschung wird verlangt, läuft durch — und der Nachweis bleibt", a
 
   await page.goto("/delete-account");
 
-  // Auf den KNOPF warten, nicht auf die Überschrift: „Konto löschen" steht
-  // auch über der Anmeldeaufforderung, die diese Seite zeigt, solange die
-  // Sitzung noch lädt. Auf sie zu warten hieße, den Text zu lesen, bevor es
-  // ihn gibt — genau der Teilstring-Fehler, den `stack.ts` schon zweimal
-  // teuer bezahlt hat.
+  // Wait for the BUTTON, not the heading: "Konto löschen" also stands above the
+  // sign-in prompt this page shows while the session is still loading. Waiting
+  // for it would mean reading the text before it exists — exactly the substring
+  // fault `stack.ts` has already paid for dearly twice.
   await expect(page.getByRole("button", { name: /^Konto löschen$/ })).toBeVisible();
 
-  // Die Seite sagt VOR dem Klick, was passiert — nicht in einer
-  // Datenschutzerklärung (ADR-0024, dieselbe Regel).
-  const seite = await page.locator("main").first().innerText();
-  expect(seite).toMatch(/unwiderruflich/i);
-  expect(seite).toMatch(/nicht sofort/i);
-  expect(seite, "die unbequeme Folge gehört sichtbar auf diese Seite").toMatch(/eingestellt/i);
+  // The page says BEFORE the click what happens — not in a privacy policy
+  // (ADR-0024, the same rule).
+  const pageText = await page.locator("main").first().innerText();
+  expect(pageText).toMatch(/unwiderruflich/i);
+  expect(pageText).toMatch(/nicht sofort/i);
+  expect(pageText, "the uncomfortable consequence belongs visibly on this page").toMatch(/eingestellt/i);
 
-  // Zwei bewusste Schritte, kein Hürdenlauf: der erste Klick löscht nichts.
+  // Two deliberate steps, no obstacle course: the first click deletes nothing.
   await page.getByRole("button", { name: /^Konto löschen$/ }).click();
   await expect(page.getByRole("button", { name: /Ja, endgültig löschen/i })).toBeVisible();
-  expect(await profileOf(request, token), "der erste Klick darf nichts löschen").not.toBeNull();
+  expect(await profileOf(request, token), "the first click must delete nothing").not.toBeNull();
 
   await page.getByRole("button", { name: /Ja, endgültig löschen/i }).click();
 
-  // „Angenommen und läuft" — nicht „erledigt".
+  // "Accepted and running" — not "done".
   const done = page.getByRole("status");
   await expect(done).toBeVisible();
   await expect(done).toContainText(/läuft/i);
 
-  // Sofort abgemeldet: ab hier passiert nichts mehr unter diesem Namen.
+  // Signed out at once: from here on nothing happens under this name any more.
   await expect(page.getByRole("button", { name: /Einstellungen und Anmeldung/i })).toBeVisible();
 
-  // ---- Die Kaskade läuft ----------------------------------------------------
+  // ---- The cascade runs ----------------------------------------------------
 
   await expect
     .poll(async () => await profileOf(request, token), {
       timeout: CASCADE_TIMEOUT_MS,
-      message: "das Profil ist nach der Löschung immer noch da",
+      message: "the profile is still there after the erasure",
     })
     .toBeNull();
 
-  // ---- Und jetzt der Nachweis ----------------------------------------------
+  // ---- And now the proof ---------------------------------------------------
 
-  // Die Daten sind weg.
+  // The data is gone.
   expect(await profileOf(request, token)).toBeNull();
 
-  // Der Beleg steht noch: die Kette aus Erteilung UND Löschung.
+  // The evidence still stands: the chain of grant AND deletion.
   await expect
     .poll(async () => await ledgerOf(request, token), {
       timeout: CASCADE_TIMEOUT_MS,
-      message: "im Ledger fehlt die DELETE-Zeile",
+      message: "the DELETE row is missing from the ledger",
     })
     .toContain("DELETE");
   const actions = await ledgerOf(request, token);
-  expect(actions, "die Erteilung muss stehen bleiben — sonst ist nichts beweisbar").toContain(
+  expect(actions, "the grant must remain — otherwise nothing is provable").toContain(
     "GRANT"
   );
 
-  // Genau eine Abschlussnachricht, und sie sagt nur, DASS es fertig ist.
+  // Exactly one final message, and it says only THAT it is done.
   const mail = await lastMailFor(email, { after: startedAt });
-  expect(mail, "keine Abschlussnachricht").not.toBeNull();
+  expect(mail, "no final message").not.toBeNull();
   expect(mail!.subject).toMatch(/gelöscht/i);
-  // Keine Aufstellung dessen, was die Person hatte: das wäre eine Kopie der
-  // Daten in einem Postfach, das womöglich nicht nur ihr gehört.
+  // No list of what the person had: that would be a copy of the data in a
+  // mailbox that may not be hers alone.
   expect(mail!.text).not.toContain(headline);
 
   await context.close();
 });
 
-test("nach der Löschung ist die Anmeldung zu — und die Adresse wieder frei", async ({
+test("after the erasure sign-in is closed — and the address is free again", async ({
   browser,
   request,
 }) => {
@@ -221,7 +220,7 @@ test("nach der Löschung ist die Anmeldung zu — und die Adresse wieder frei", 
   const email = uniqueEmail("example.com");
   const context = await browser.newContext();
   const page = await context.newPage();
-  await registerAndConfirm(page, email, "E2E Zweitkonto");
+  await registerAndConfirm(page, email, "E2E Second account");
   await login(page, email);
 
   const startedAt = Date.now();
@@ -232,43 +231,41 @@ test("nach der Löschung ist die Anmeldung zu — und die Adresse wieder frei", 
   await page.getByRole("button", { name: /Ja, endgültig löschen/i }).click();
   await expect(page.getByRole("status")).toBeVisible();
 
-  // Das Fertig-Signal ist die Abschlussnachricht — nicht eine `DELETE`-Zeile
-  // im Ledger.
+  // The done signal is the final message — not a `DELETE` row in the ledger.
   //
-  // Dieses Konto hat NIE eine Freigabe erteilt, und deshalb entsteht dort auch
-  // keine `DELETE`-Zeile: die gibt es je Capability, die die Person einmal
-  // hielt (ADR-0027 §5). Über jemanden, der nichts erlaubt hat, steht danach
-  // gar nichts im Ledger — und das ist richtig so, nicht ein fehlender Fall.
+  // This account NEVER granted a release, and so no `DELETE` row comes into
+  // being there either: there is one per capability the person once held
+  // (ADR-0027 §5). About somebody who allowed nothing, nothing at all stands in
+  // the ledger afterwards — and that is right, not a missing case.
   const done = await lastMailFor(email, { after: startedAt });
-  expect(done, "keine Abschlussnachricht — die Kaskade wurde nie fertig").not.toBeNull();
+  expect(done, "no final message — the cascade never finished").not.toBeNull();
   expect(done!.subject).toMatch(/gelöscht/i);
 
-  // Der eigentliche Prüfgegenstand: die Adresse ist wieder frei.
+  // What is actually checked: the address is free again.
   //
-  // Die Alternative wäre ein dauerhafter Rest ausgerechnet der Angabe, die
-  // gelöscht werden sollte — ein E-Mail-Hash, der weiterlebt, um
-  // Neuanmeldungen zu erkennen („Kein Grabstein", ADR-0027).
+  // The alternative would be a permanent remnant of precisely the item that was
+  // to be deleted — an email hash that lives on to recognise new registrations
+  // ("no tombstone", ADR-0027).
   //
-  // WIEDERHOLT VERSUCHT, und das ist kein Schönheitsfehler, sondern die
-  // Bauart: zwischen „fertig" gesagt und der gefallenen Kontozeile liegt ein
-  // Takt des Zustellers (§6) — die Nachricht braucht die Adresse, die gleich
-  // gelöscht wird, also geht sie zwangsläufig vorher raus. In genau diesem
-  // Fenster ist die Adresse noch belegt. Gemessen: das Konto fällt rund fünf
-  // Sekunden nach der Nachricht.
+  // TRIED REPEATEDLY, and that is not a blemish but the design: between "done"
+  // being said and the account row falling lies one dispatcher tick (§6) — the
+  // message needs the address that is about to be deleted, so it necessarily
+  // goes out before. In exactly this window the address is still taken.
+  // Measured: the account falls about five seconds after the message.
   //
-  // Geprüft wird am stärksten verfügbaren Zeichen: es kommt wieder eine NEUE
-  // Bestätigungsmail. Eine abgelehnte Anmeldung wäre KEIN Beweis — die wird
-  // schon abgelehnt, solange das Konto nur gesperrt ist.
+  // It is checked on the strongest sign available: a NEW confirmation mail
+  // arrives again. A refused sign-in would be NO proof — that is refused already
+  // while the account is merely disabled.
   let token: string | null = null;
   const deadline = Date.now() + CASCADE_TIMEOUT_MS;
   while (token === null && Date.now() < deadline) {
     const mark = Date.now();
     await request.post(`${IDENTITY_URL}/auth/register`, {
-      data: { email, password: E2E_PASSWORD, display_name: "E2E Zweitkonto, zweiter Anlauf" },
+      data: { email, password: E2E_PASSWORD, display_name: "E2E Second account, second attempt" },
     });
     token = await verificationTokenAfter(email, mark, 6_000);
   }
-  expect(token, "die Adresse wurde nach der Löschung nie wieder frei").not.toBeNull();
+  expect(token, "the address never became free again after the erasure").not.toBeNull();
 
   const fresh = await context.newPage();
   await fresh.goto(`/verify?token=${token}`);

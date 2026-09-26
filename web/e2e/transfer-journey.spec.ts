@@ -1,9 +1,10 @@
-// Der Transfermarkt durch den Browser, vom Marktstatus bis zum Abschluss.
+// The transfer market through the browser, from the market status to the
+// completion.
 //
-// Der Weg aus der Definition of Done, einmal ganz: Status setzen → Anfrage →
-// Freigabe → Interesse → Gespräch → Angebot → Annahme → Freigabe bestätigen →
-// Abschluss. Zwei Browser-Kontexte, weil es zwei Seiten sind und jede nur ihre
-// eigenen Knöpfe haben darf.
+// The path from the definition of done, once in full: set the status → request
+// → release → interest → conversation → offer → acceptance → confirm the
+// release → completion. Two browser contexts, because there are two sides and
+// each may only have its own buttons.
 
 import { expect, test } from "@playwright/test";
 
@@ -13,27 +14,28 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gefragt", async ({
+test("a transfer comes only from three yeses — and the employer is never asked", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Transfermarkt ${Date.now()}`;
-  const headline = `E2E Transfer-Kandidat ${Date.now()}`;
+  const companyName = `E2E Transfer market ${Date.now()}`;
+  const headline = `E2E Transfer candidate ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
-  // Profil anlegen und freigeben — ohne das darf niemand nach dem Marktstatus
-  // fragen, sonst wäre die Anfrage ein Kanal, um die Existenz zu erfahren.
+  // Create the profile and release it — without that nobody may ask for the
+  // market status, otherwise the request would be a channel for learning it
+  // exists.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
@@ -41,8 +43,9 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  // „Ich höre zu" UND „ich arbeite gerade irgendwo" — der Normalfall auf einem
-  // Transfermarkt, und der Weg, auf dem eine Freigabe nötig wird.
+  // "Ich höre zu" (listening) AND "ich arbeite gerade irgendwo" (currently
+  // employed) — the normal case on a transfer market, and the path on which a
+  // release becomes necessary.
   await candidate.goto("/market");
   await candidate.getByRole("radio", { name: /Ich höre zu/ }).check();
   await candidate.getByRole("checkbox", { name: /Ich arbeite gerade irgendwo/ }).check();
@@ -54,55 +57,55 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
-  // Warten, bis der Wechsel wirklich gilt: Die Wahl stößt ihn nur an.
+  await pickOption(recruiter, /Handeln als/i, companyName);
+  // Wait until the switch really holds: the choice only sets it off.
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout.
+  // Wait first, then click: `click()` has only the actionTimeout.
   await expect(card).toBeVisible();
-  // Der Marktstatus ist eine eigene Freigabe, getrennt vom Lebenslauf. Vorher
-  // gibt es hier nichts zu sehen und nichts anzubieten.
+  // The market status is a release of its own, separate from the resume.
+  // Before it, there is nothing to see here and nothing to offer.
   await expect(card.getByRole("button", { name: /Interesse zeigen/i })).toHaveCount(0);
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
-  // Die Startseite sagt der Person, dass etwas ansteht — ohne dass sie danach
-  // sucht. Zusammengesetzt im Browser aus vier Diensten.
+  // The start page tells the person that something is pending — without them
+  // looking for it. Assembled in the browser from four services.
   await candidate.goto("/");
   await expect(
     candidate.getByText(/Unternehmen möchte(n)? sehen, ob du ansprechbar bist/)
   ).toBeVisible();
 
-  // Die Person entscheidet.
+  // The person decides.
   await candidate.goto("/market");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Freigeben/i }).click();
   await expect(row.getByText(/Freigegeben/i)).toBeVisible();
 
-  // Beantwortet heißt: verschwindet aus „Was liegt an".
+  // Answered means: disappears from "Was liegt an" (what is pending).
   await candidate.goto("/");
   await expect(
     candidate.getByText(/Unternehmen möchte(n)? sehen, ob du ansprechbar bist/)
   ).toHaveCount(0);
 
-  // Jetzt erst sieht das Unternehmen den Status — und darf zugehen.
+  // Only now does the company see the status — and may approach.
   await recruiter.goto("/scout");
   const openCard = recruiter.locator("li").filter({ hasText: headline });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(openCard).toBeVisible();
   await expect(openCard.getByText(/Hört zu/)).toBeVisible();
   await openCard.getByRole("button", { name: /Interesse zeigen/i }).click();
   await expect(openCard.getByText(/Interesse hinterlegt/i)).toBeVisible();
 
-  // Die Person nimmt das Gespräch an.
+  // The person accepts the conversation.
   await candidate.goto("/transfers");
   await expect(
     candidate.getByRole("heading", { name: /Ein Unternehmen hat Interesse/ })
@@ -110,37 +113,37 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await candidate.getByRole("button", { name: /Gespräch annehmen/i }).click();
   await expect(candidate.getByRole("heading", { name: /Ihr seid im Gespräch/ })).toBeVisible();
 
-  // Das Unternehmen macht ein Angebot. Die Ablöse wird festgehalten, nicht
-  // bewegt — die Plattform führt kein Geld.
+  // The company makes an offer. The placement fee is recorded, not moved — the
+  // platform handles no money.
   await recruiter.goto("/company/transfers");
   await expect(recruiter.getByText(/Braucht eine Freigabe/)).toBeVisible();
-  await recruiter.getByLabel(/^Angebot/).fill("Teamleitung Backend");
+  await recruiter.getByLabel(/^Angebot/).fill("Backend team lead");
   await recruiter.getByLabel(/^Start/).fill("2026-11");
   await recruiter.getByLabel(/Ablöse in Euro/).fill("5000");
   await recruiter.getByRole("button", { name: /Angebot machen/i }).click();
   await expect(recruiter.getByRole("heading", { name: /Angebot abgegeben/ })).toBeVisible();
 
-  // Die Person nimmt an — und muss danach selbst bestätigen, dass ihr
-  // Arbeitgeber sie gehen lässt. Diese Plattform fragt ihn nicht.
+  // The person accepts — and afterwards has to confirm herself that her
+  // employer lets her go. This platform does not ask him.
   await candidate.goto("/transfers");
   await expect(candidate.getByText("5.000,00 €")).toBeVisible();
   await candidate.getByRole("button", { name: /Angebot annehmen/i }).click();
   await expect(candidate.getByText(/Diese Plattform fragt ihn nicht/)).toBeVisible();
 
-  // Das Unternehmen kann hier nicht abschließen — und zwar nie. Braucht der
-  // Vorgang eine Freigabe, gehört der letzte Schritt der Person: sie ist die
-  // einzige, die weiß, ob sie gehen darf.
+  // The company cannot complete here — never. If the case needs a release, the
+  // last step belongs to the person: she is the only one who knows whether she
+  // may go.
   await recruiter.goto("/company/transfers");
   await expect(recruiter.getByRole("button", { name: /^Abschließen$/ })).toHaveCount(0);
 
-  // Ihre Bestätigung schließt den Transfer ab.
+  // Her confirmation completes the transfer.
   await candidate.getByRole("button", { name: /Freigabe bestätigen und abschließen/i }).click();
   await expect(candidate.getByRole("heading", { name: /^Abgeschlossen$/ })).toBeVisible();
 
   await recruiter.goto("/company/transfers");
   await expect(recruiter.getByRole("heading", { name: /^Abgeschlossen$/ })).toBeVisible();
 
-  // Aus einem endgültigen Ausgang führt kein Weg zurück.
+  // From a final outcome there is no way back.
   await expect(recruiter.getByRole("button", { name: /Zurückziehen/i })).toHaveCount(0);
   await candidate.goto("/transfers");
   await expect(candidate.getByRole("button", { name: /Ablehnen/i })).toHaveCount(0);
@@ -149,18 +152,18 @@ test("ein Transfer entsteht nur aus drei Ja — und der Arbeitgeber wird nie gef
   await recruiterContext.close();
 });
 
-test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", async ({
+test("without a market status release there is nothing to see and nothing to do", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Abgelehnt ${Date.now()}`;
-  const headline = `E2E Nein-Kandidat ${Date.now()}`;
+  const companyName = `E2E Declined ${Date.now()}`;
+  const headline = `E2E Declining candidate ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -180,39 +183,39 @@ test("ohne Freigabe des Marktstatus gibt es nichts zu sehen und nichts zu tun", 
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/scout");
   const card = recruiter.locator("li").filter({ hasText: headline });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
-  // Die Person lehnt ab. „Sucht aktiv" bleibt damit unsichtbar — und dass sie
-  // sucht, ist die heikelste Angabe im ganzen System.
+  // The person declines. "Sucht aktiv" (actively looking) thus stays invisible
+  // — and that she is looking is the most delicate item in the whole system.
   await candidate.goto("/market");
   const row = candidate.locator("li").filter({ hasText: /ob du ansprechbar bist/i });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: /Ablehnen/i }).click();
   await expect(row.getByText(/Abgelehnt/i)).toBeVisible();
 
   await recruiter.goto("/scout");
   const shut = recruiter.locator("li").filter({ hasText: headline });
-  // Erst warten, dann klicken: `click()` hat nur das actionTimeout (15 s),
-  // `expect(...).toBeVisible()` das großzügigere expect-Budget. Unter Last
-  // scheiterte der Test sonst am Klick statt am Prüfgegenstand.
+  // Wait first, then click: `click()` has only the actionTimeout (15 s),
+  // `expect(...).toBeVisible()` the more generous expect budget. Under load the
+  // test otherwise failed at the click instead of at what it checks.
   await expect(shut).toBeVisible();
   await expect(shut.getByText(/Marktstatus abgelehnt/)).toBeVisible();
   await expect(shut.getByText(/Sucht aktiv/)).toHaveCount(0);
   await expect(shut.getByRole("button", { name: /Interesse zeigen/i })).toHaveCount(0);
-  // Und erneut fragen geht nicht: ein Nein, das man umgehen kann, ist keins.
+  // And asking again is not possible: a no that can be bypassed is none.
   await expect(shut.getByRole("button", { name: /Marktstatus anfragen/i })).toHaveCount(0);
 
   await candidateContext.close();
