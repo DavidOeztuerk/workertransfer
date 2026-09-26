@@ -101,7 +101,7 @@ describe("RegisterPage", () => {
     const user = userEvent.setup();
     renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fillAndSubmit(user, "schon-da@firma.de");
+    await fillAndSubmit(user, "already-there@company.de");
 
     expect(await screen.findByText(/E-Mail geschickt/i)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -199,7 +199,7 @@ describe("RegisterPage — person or company", () => {
     // The whole form: the button is also locked while required fields are
     // empty, and this test speaks about freemail.
     await user.type(screen.getByLabelText(/E-Mail/i), "max@gmail.com");
-    await user.type(screen.getByLabelText(/Passwort/i), "ein-langes-passwort");
+    await user.type(screen.getByLabelText(/Passwort/i), "a-long-password");
     await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
 
     expect(screen.queryByRole("alert")).toBeNull();
@@ -214,16 +214,16 @@ describe("RegisterPage — person or company", () => {
     await user.click(
       screen.getByRole("radio", { name: "Für ein Unternehmen" }),
     );
-    await user.type(screen.getByLabelText(/E-Mail/i), "chef@firma.de");
+    await user.type(screen.getByLabelText(/E-Mail/i), "boss@company.de");
     await user.type(
       screen.getByLabelText(/Name des Unternehmens/i),
-      "Firma GmbH",
+      "Example GmbH",
     );
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
-    await user.type(screen.getByLabelText(/Anzeigename/i), "Chef");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Boss");
     await user.click(screen.getByRole("button", { name: /Registrieren/i }));
 
-    expect(asked[0]?.body).toContain('"company_name":"Firma GmbH"');
+    expect(asked[0]?.body).toContain('"company_name":"Example GmbH"');
     expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
@@ -232,7 +232,7 @@ describe("RegisterPage — person or company", () => {
     const user = userEvent.setup();
     renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fillAndSubmit(user, "mensch@example.com");
+    await fillAndSubmit(user, "person@example.com");
 
     // No `"company_name":null` — a null would be a statement nobody made.
     expect(asked[0]?.body).not.toContain("company_name");
@@ -266,7 +266,7 @@ describe("RegisterPage — requesting the mail again", () => {
   it("reports a non-2xx as a failure too, instead of claiming a dispatch", async () => {
     answerInOrder(
       { status: 201 },
-      { status: 429, body: { detail: "Zu viele Anfragen" } },
+      { status: 429, body: { detail: "Too many requests" } },
     );
     const user = userEvent.setup();
     renderWithStore(<RegisterPage />, { route: "/register" });

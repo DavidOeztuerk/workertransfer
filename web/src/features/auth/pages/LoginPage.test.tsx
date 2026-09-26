@@ -108,7 +108,7 @@ describe("LoginPage", () => {
     renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
-    await user.type(screen.getByLabelText(/Passwort/i), "falsch");
+    await user.type(screen.getByLabelText(/Passwort/i), "wrong-password");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
     // E2E waits for exactly this role.

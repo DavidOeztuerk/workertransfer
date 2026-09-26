@@ -168,7 +168,7 @@ describe("OverviewPage", () => {
     answer({
       "/market/me/requests": {
         status: 503,
-        body: { detail: "Ledger schweigt" },
+        body: { detail: "consent ledger silent" },
       },
     });
 
