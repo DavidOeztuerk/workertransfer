@@ -17,18 +17,18 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../../work/lib/session";
+import { useActor } from "../../work/lib/session";
 import { useAsync } from "../../work/lib/useAsync";
 import {
-  type Ausgang,
-  HOECHSTER_UMFANG,
-  KLEINSTER_UMFANG,
-  MINDESTFRIST_TAGE,
-  type Vorgang,
-  bewerte,
-  ladeFirmenvorgaenge,
-  stelleAufgabe,
-} from "../../work/api/arbeitsproben";
+  type Outcome,
+  MAX_HOURS,
+  MIN_HOURS,
+  MIN_NOTICE_DAYS,
+  type Case,
+  evaluate,
+  getCompanyCases,
+  setTask,
+} from "../../work/api/assessments";
 
 /**
  * `/company/assessments` — Arbeitsproben stellen und beantworten.
@@ -52,10 +52,10 @@ import {
  */
 export function CompanyAssessmentsPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, fuerFirma, tenantId } = useHandelnder();
+  const { signedIn, loading: laedt, forCompany: fuerFirma, tenantId } = useActor();
 
   const vorgaenge = useAsync(
-    (signal) => ladeFirmenvorgaenge(signal),
+    (signal) => getCompanyCases(signal),
     [tenantId],
     signedIn && fuerFirma
   );
@@ -128,7 +128,7 @@ function Stellformular({ fertig }: { fertig: () => void }) {
   async function stellen() {
     setLaeuft(true);
 
-    const ergebnis = await stelleAufgabe({
+    const ergebnis = await setTask({
       subject_id: wer.trim(),
       title: titel,
       task: aufgabe,
@@ -198,18 +198,18 @@ function Stellformular({ fertig }: { fertig: () => void }) {
             label={t("assessments.effortField")}
             // Required, with an upper bound, and the hint says WHY — not "please
             // fill in" but what eight hours mean.
-            helperText={t("assessments.effortHint", { max: HOECHSTER_UMFANG })}
+            helperText={t("assessments.effortHint", { max: MAX_HOURS })}
             value={stunden}
             onChange={(event) => setStunden(event.target.value)}
             type="number"
             slotProps={{
-              htmlInput: { min: KLEINSTER_UMFANG, max: HOECHSTER_UMFANG, step: 1 },
+              htmlInput: { min: MIN_HOURS, max: MAX_HOURS, step: 1 },
             }}
             fullWidth
           />
           <TextField
             label={t("assessments.deadlineField")}
-            helperText={t("assessments.deadlineHint", { tage: MINDESTFRIST_TAGE })}
+            helperText={t("assessments.deadlineHint", { tage: MIN_NOTICE_DAYS })}
             value={frist}
             onChange={(event) => setFrist(event.target.value)}
             type="date"
@@ -232,16 +232,16 @@ function Stellformular({ fertig }: { fertig: () => void }) {
 }
 
 /** Eine Karte je Vorgang — mit dem Bewertungsfeld, sobald etwas eingereicht ist. */
-function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void }) {
+function Firmenkarte({ vorgang, fertig }: { vorgang: Case; fertig: () => void }) {
   const { t } = useTranslation();
-  const [ausgang, setAusgang] = useState<Ausgang>("accepted");
+  const [ausgang, setAusgang] = useState<Outcome>("accepted");
   const [text, setText] = useState("");
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   async function bewerten() {
     setLaeuft(true);
-    const ergebnis = await bewerte(vorgang.id, ausgang, text);
+    const ergebnis = await evaluate(vorgang.id, ausgang, text);
     setLaeuft(false);
 
     if (ergebnis.ok) {
@@ -322,7 +322,7 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
                 <RadioGroup
                   row
                   value={ausgang}
-                  onChange={(event) => setAusgang(event.target.value as Ausgang)}
+                  onChange={(event) => setAusgang(event.target.value as Outcome)}
                 >
                   <FormControlLabel
                     value="accepted"

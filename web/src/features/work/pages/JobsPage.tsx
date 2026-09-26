@@ -24,64 +24,65 @@ import {
   type Job,
   remoteLabel,
   type SearchFilters,
-  type SucheFehlschlag,
-  ortZuPunkt,
+  type SearchFailure,
+  placeNear,
   searchJobs,
 } from "../api/jobs";
 import { getDrafts, listMyApplications } from "../api/applications";
 import { getMyProfile } from "../api/profile";
-import { merke } from "../lib/kontext";
+import { remember } from "../lib/letterContext";
 import { Requirements } from "../components/Requirements";
-import { type Fortschrittsmelder, starteEntwuerfe } from "../lib/entwuerfe";
-import { useHandelnder } from "../lib/session";
+import { type ProgressReporter, startDrafts } from "../lib/startDrafts";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
-import { useFirmenprofile } from "../lib/useFirmenprofile";
+import { useCompanyProfiles } from "../lib/useCompanyProfiles";
 import {
   type PageResult,
   usePagination,
 } from "../../../shared/hooks/usePagination";
 import { size } from "../../../styles/tokens/spacing";
 import {
+  EMPTY_FILTER,
   JobFilterSidebar,
-  LEERER_FILTER,
-  type Stellenfilter,
+  type JobFilter,
 } from "../components/JobFilterSidebar";
 import { useGeolocation } from "../../../shared/hooks/useGeolocation";
+import type { DraftsRouteState } from "./DraftsPage";
 
 /**
- * Was gesucht wurde: die Filter des Formulars UND der Punkt, der beim Absenden
- * bekannt war.
+ * What was searched for: the form's filters AND the point known at submit.
  *
- * Der Standort steht getrennt, weil er kein Formularfeld ist: er kommt vom
- * Browser, nicht aus einer Eingabe. Er gehört aber in denselben Zustand wie die
- * Filter, damit ein Wechsel des Standorts dieselbe Wirkung hat wie ein
- * Filterwechsel — nämlich eine neue Suche ab Seite eins.
+ * The location stands apart because it is no form field: it comes from the
+ * browser, not from an input. It belongs in the same state as the filters,
+ * though, so that a change of location has the same effect as a change of
+ * filter — namely a new search from page one.
  */
-interface Angewandt extends Stellenfilter {
+interface AppliedFilter extends JobFilter {
   lat: number | null;
   lon: number | null;
 }
 
-const NICHTS_GESUCHT: Angewandt = { ...LEERER_FILTER, lat: null, lon: null };
+const NOTHING_SEARCHED: AppliedFilter = { ...EMPTY_FILTER, lat: null, lon: null };
 
 /**
- * Aus dem Formularzustand wird die Anfrage.
+ * The form state becomes the request.
  *
- * Die Fähigkeiten stehen im Formular als EINE Zeichenkette, weil man sie so
- * tippt, und gehen als Liste hinaus, weil der Server sie so erwartet. Die
- * Trennung passiert genau hier und nirgends sonst.
+ * The skills stand in the form as ONE string, because one types them that way,
+ * and go out as a list, because the server expects them that way. The splitting
+ * happens exactly here and nowhere else.
  */
-function zuFiltern(filter: Angewandt): SearchFilters {
+function toSearchFilters(filter: AppliedFilter): SearchFilters {
   const radiusKm = Number(filter.radius);
 
   /*
-   * Der Radius geht mit, sobald einer gewählt wurde. Die Koordinaten nur, wenn
-   * es welche gibt — sonst ist der ORT die Mitte, und der Dienst löst ihn auf.
+   * The radius goes along as soon as one was chosen. The coordinates only when
+   * there are any — otherwise the PLACE is the centre, and the service resolves
+   * it.
    *
-   * Die Oberfläche lässt eine Entfernung ohnehin erst zu, wenn eine Mitte da
-   * ist: ein Standort oder ein getippter Ort.
+   * The UI allows a distance only once there is a centre anyway: a location or
+   * a typed place.
    */
-  const umkreis =
+  const radiusFilter =
     Number.isFinite(radiusKm) && radiusKm > 0
       ? {
           radiusKm,
@@ -98,111 +99,107 @@ function zuFiltern(filter: Angewandt): SearchFilters {
     employment: filter.employment,
     skills: filter.skills
       .split(",")
-      .map((einzeln) => einzeln.trim())
-      .filter((einzeln) => einzeln !== ""),
-    ...umkreis,
+      .map((part) => part.trim())
+      .filter((part) => part !== ""),
+    ...radiusFilter,
   };
 }
 
 /**
- * Die offenen Stellen — die einzige Liste dieser Anwendung, die ohne Konto
- * vollständig ist.
+ * The open jobs — the only list in this application that is complete without
+ * an account.
  *
- * Zwei Filterzustände mit Absicht: was im Formular steht und wonach gesucht
- * wurde. Sonst liefe bei jedem Tastendruck eine Abfrage, und die Liste
- * flackerte, während jemand ein Wort tippt.
+ * Two filter states on purpose: what stands in the form and what was searched
+ * for. Otherwise a query would run on every keystroke, and the list would
+ * flicker while somebody types a word.
  */
 export function JobsPage() {
-  // OHNE Vorspann. Hier stand „Was hier steht, haben Unternehmen selbst
-  // veröffentlicht. Zum Lesen brauchst du kein Konto — erst zum Bewerben."
-  // Beide Sätze erklären, was die Seite selbst schon zeigt: dass sie ohne
-  // Anmeldung dasteht, und dass unter jeder Karte ein Knopf „Bewerben" sitzt.
-  // Zwei Zeilen, die den ersten Treffer nach unten schieben.
+  // WITHOUT a lead. "Was hier steht, haben Unternehmen selbst veröffentlicht.
+  // Zum Lesen brauchst du kein Konto — erst zum Bewerben." stood here. Both
+  // sentences explain what the page already shows itself: that it stands there
+  // without sign-in, and that a button "Bewerben" sits under every card. Two
+  // lines that push the first hit down.
   const { t } = useTranslation();
-  const { signedIn, laedt } = useHandelnder();
-  const meineBewerbungen = useAsync(
+  const { signedIn, loading } = useActor();
+  const myApplications = useAsync(
     (signal) => listMyApplications(signal),
     [],
     signedIn,
   );
-  const meineEntwuerfe = useAsync((signal) => getDrafts(signal), [], signedIn);
-  const schonGesendet = new Set(
-    (meineBewerbungen.data?.ok ? meineBewerbungen.data.applications : [])
+  const myDrafts = useAsync((signal) => getDrafts(signal), [], signedIn);
+  const alreadySent = new Set(
+    (myApplications.data?.ok ? myApplications.data.applications : [])
       .filter((a) => a.status !== "withdrawn")
       .map((a) => a.job_id),
   );
-  const offeneEntwuerfe = new Map(
-    (meineEntwuerfe.data?.ok ? meineEntwuerfe.data.drafts : [])
+  const openDrafts = new Map(
+    (myDrafts.data?.ok ? myDrafts.data.drafts : [])
       .filter((d) => d.status !== "sent")
       .map((d) => [d.job_id, d.id]),
   );
-  const [form, setForm] = useState<Stellenfilter>(LEERER_FILTER);
-  const [applied, setApplied] = useState<Angewandt>(NICHTS_GESUCHT);
+  const [form, setForm] = useState<JobFilter>(EMPTY_FILTER);
+  const [applied, setApplied] = useState<AppliedFilter>(NOTHING_SEARCHED);
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [creatingDrafts, setCreatingDrafts] = useState(false);
-  const [laeuftJob, setLaeuftJob] = useState<string | null>(null);
+  const [runningJob, setRunningJob] = useState<string | null>(null);
   /*
-   * Wie weit das Schreiben ist — `null`, solange nichts laeuft.
+   * How far the writing is — `null` as long as nothing runs.
    *
-   * Er wird nur beim Sammelweg gesetzt: dort dauert es lange genug, dass
-   * jemand wissen will, ob noch etwas passiert. Fuer eine einzelne Stelle
-   * genuegt der Kreisel im Knopf, und die Leiste unten steht ohnehin nur bei
-   * einer Auswahl da.
+   * It is set only on the bulk path: there it takes long enough that somebody
+   * wants to know whether something is still happening. For a single job the
+   * spinner in the button suffices, and the bar below only stands there with a
+   * selection anyway.
    */
-  const [fortschritt, setFortschritt] = useState<{ fertig: number; gesamt: number } | null>(
-    null,
-  );
-  const [bulkFehler, setBulkFehler] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Der Standort wird nie beim Laden erfragt — nur auf Knopfdruck in der
-  // Seitenleiste, und er wird nirgends gespeichert. Siehe `useGeolocation`.
-  const ortung = useGeolocation();
+  // The location is never asked for on load — only at the press of a button in
+  // the sidebar, and it is stored nowhere. See `useGeolocation`.
+  const geolocation = useGeolocation();
 
   /*
-   * DER GEFUNDENE STANDORT WIRD SICHTBAR — er landet im Ortsfeld.
+   * THE FOUND LOCATION BECOMES VISIBLE — it lands in the place field.
    *
-   * Ein Umkreis um einen unsichtbaren Punkt ist eine Zumutung: die Liste würde
-   * sich ändern, und niemand könnte sagen, wovon aus gemessen wurde. Der Name
-   * kommt aus derselben Tabelle wie die Suche selbst, nicht von einem
-   * Fremdanbieter.
+   * A radius around an invisible point is an imposition: the list would change,
+   * and nobody could say from where the distance was measured. The name comes
+   * from the same table as the search itself, not from a third party.
    *
-   * Der Merker verhindert die Schleife: das Setzt ändert das Formular, das
-   * Formular ist aber keine Abhängigkeit dieses Effekts — geholt wird je
-   * Position genau einmal.
+   * The marker prevents the loop: setting changes the form, but the form is no
+   * dependency of this effect — fetched exactly once per position.
    */
-  const geholtFuer = useRef<string | null>(null);
+  const fetchedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    const standort = ortung.position;
+    const position = geolocation.position;
 
-    if (standort === null) {
-      geholtFuer.current = null;
+    if (position === null) {
+      fetchedFor.current = null;
       return;
     }
 
-    const schluessel = `${standort.lat},${standort.lon}`;
+    const key = `${position.lat},${position.lon}`;
 
-    if (geholtFuer.current === schluessel) return;
-    geholtFuer.current = schluessel;
+    if (fetchedFor.current === key) return;
+    fetchedFor.current = key;
 
-    const abbruch = new AbortController();
+    const abort = new AbortController();
 
-    void ortZuPunkt(standort.lat, standort.lon, abbruch.signal).then((name) => {
-      // `null` heisst „nichts in der Nähe" — dann bleibt das Feld, wie es war,
-      // statt einen Ort zu behaupten.
+    void placeNear(position.lat, position.lon, abort.signal).then((name) => {
+      // `null` means "nothing nearby" — then the field stays as it was, instead
+      // of claiming a place.
       if (name !== null) {
-        setForm((vorher) => ({ ...vorher, location: name }));
+        setForm((previous) => ({ ...previous, location: name }));
       }
     });
 
-    return () => abbruch.abort();
-  }, [ortung.position]);
+    return () => abort.abort();
+  }, [geolocation.position]);
 
   const load = useCallback(
     (page: number, pageSize: number, signal: AbortSignal) =>
-      searchJobs(zuFiltern(applied), page, pageSize, signal).then(
-        (result): PageResult<Job, SucheFehlschlag> =>
+      searchJobs(toSearchFilters(applied), page, pageSize, signal).then(
+        (result): PageResult<Job, SearchFailure> =>
           result.ok
             ? { ok: true, page: result }
             : { ok: false, error: result },
@@ -210,31 +207,31 @@ export function JobsPage() {
     [applied],
   );
 
-  const list = usePagination<Job, SucheFehlschlag>(load, JSON.stringify(applied));
+  const list = usePagination<Job, SearchFailure>(load, JSON.stringify(applied));
 
-  // Einmal für die ganze Seite, nicht je Stelle. Solange die Sitzung unbekannt
-  // ist, wird NICHT gefragt — sonst liefe beim Kaltstart ein Abruf, dessen
-  // Antwort feststeht (401), und die Passung flackerte kurz auf.
+  // Once for the whole page, not per job. As long as the session is unknown it
+  // does NOT ask — otherwise a fetch would run on a cold start whose answer is
+  // settled (401), and the fit would flicker briefly.
   const profile = useAsync(
-    () => merke("profile:me", () => getMyProfile()),
+    () => remember("profile:me", () => getMyProfile()),
     [signedIn],
     signedIn,
   );
 
   /*
-   * Drei Zustände, und die Unterscheidung trägt:
-   *   `null`     — nichts zu vergleichen: nicht angemeldet, oder die Antwort
-   *                steht noch aus. Dann schweigt die Seite dazu, statt eine
-   *                Lücke zu behaupten, die sie nicht kennt.
-   *   `[]`       — angemeldet, Antwort da, aber nichts eingetragen. Darüber MUSS
-   *                die Seite sprechen, sonst bliebe sie stumm, wo ein Satz die
-   *                ganze Funktion erklärt — und niemals als „0 von 3".
-   *   eine Liste — abgleichen.
+   * Three states, and the distinction carries:
+   *   `null`   — nothing to compare: not signed in, or the answer is still
+   *              pending. Then the page stays silent about it instead of
+   *              claiming a gap it does not know.
+   *   `[]`     — signed in, answer there, but nothing entered. The page MUST
+   *              speak about that, otherwise it would stay mute where one
+   *              sentence explains the whole function — and never as "0 of 3".
+   *   a list   — compare.
    */
-  const meineSkills: string[] | null =
+  const mySkills: string[] | null =
     !signedIn || profile.pending ? null : (profile.data?.skills ?? []);
 
-  const firmen = useFirmenprofile(list.items.map((job) => job.tenant_id));
+  const companies = useCompanyProfiles(list.items.map((job) => job.tenant_id));
 
   const toggleJob = useCallback((jobId: string) => {
     setSelectedJobs((prev) => {
@@ -248,24 +245,24 @@ export function JobsPage() {
     });
   }, []);
 
-  async function anlegen(jobIds: string[], melde?: Fortschrittsmelder) {
-    const start = await starteEntwuerfe(jobIds, melde);
+  async function create(jobIds: string[], report?: ProgressReporter) {
+    const start = await startDrafts(jobIds, report);
     if (!start.ok) {
-      setBulkFehler(start.fehler);
+      setBulkError(start.error);
       return null;
     }
     return start.drafts;
   }
 
-  async function bewerbenAufEine(jobId: string) {
-    setLaeuftJob(jobId);
-    setBulkFehler(null);
+  async function applyToOne(jobId: string) {
+    setRunningJob(jobId);
+    setBulkError(null);
     try {
-      const drafts = await anlegen([jobId]);
-      const erster = drafts?.[0];
-      if (erster) navigate(`/applications/drafts/${erster.id}`);
+      const drafts = await create([jobId]);
+      const first = drafts?.[0];
+      if (first) navigate(`/applications/drafts/${first.id}`);
     } finally {
-      setLaeuftJob(null);
+      setRunningJob(null);
     }
   }
 
@@ -277,31 +274,30 @@ export function JobsPage() {
     if (!signedIn || selectedJobs.size === 0) return;
 
     setCreatingDrafts(true);
-    setBulkFehler(null);
+    setBulkError(null);
     try {
-      const jobIds = Array.from(selectedJobs).filter((id) => !offeneEntwuerfe.has(id));
+      const jobIds = Array.from(selectedJobs).filter((id) => !openDrafts.has(id));
       if (jobIds.length === 0) {
         clearSelection();
         return;
       }
-      const drafts = await anlegen(jobIds, (fertig, gesamt) =>
-        setFortschritt({ fertig, gesamt }),
-      );
+      const drafts = await create(jobIds, (done, total) => setProgress({ done, total }));
       if (drafts === null) return;
 
       clearSelection();
-      navigate("/applications/drafts", { state: { schreiben: "ok" } });
+      const state: DraftsRouteState = { writing: "ok" };
+      navigate("/applications/drafts", { state });
     } finally {
       setCreatingDrafts(false);
-      setFortschritt(null);
+      setProgress(null);
     }
   }, [signedIn, selectedJobs, navigate, clearSelection]);
 
   return (
     <PageShell title={t("jobs.title")}>
-      {bulkFehler ? (
+      {bulkError ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {bulkFehler}
+          {bulkError}
         </Alert>
       ) : null}
       <Box
@@ -313,20 +309,20 @@ export function JobsPage() {
         }}
       >
         <JobFilterSidebar
-          entwurf={form}
+          filter={form}
           onChange={setForm}
-          ortung={ortung}
+          geolocation={geolocation}
           onSubmit={() =>
             setApplied({
               ...form,
-              lat: ortung.position?.lat ?? null,
-              lon: ortung.position?.lon ?? null,
+              lat: geolocation.position?.lat ?? null,
+              lon: geolocation.position?.lon ?? null,
             })
           }
           onReset={() => {
-            setForm(LEERER_FILTER);
-            setApplied(NICHTS_GESUCHT);
-            ortung.forget();
+            setForm(EMPTY_FILTER);
+            setApplied(NOTHING_SEARCHED);
+            geolocation.forget();
           }}
         />
 
@@ -369,11 +365,10 @@ export function JobsPage() {
               display: "grid",
               gap: 2,
               pb: signedIn && selectedJobs.size > 0 ? 10 : 0,
-              // EINE Spalte, auf jeder Breite. Zwei nebeneinander waren kürzer
-              // und schlechter: Stellen sind verschieden lang, also entstanden
-              // ungleiche Karten mit Löchern dazwischen, und der Blick musste
-              // nach jeder Karte zurück nach links springen. Eine Liste liest man
-              // von oben nach unten.
+              // ONE column, on every width. Two side by side were shorter and
+              // worse: jobs differ in length, so uneven cards with holes between
+              // them came about, and the eye had to jump back to the left after
+              // every card. A list is read from top to bottom.
             }}
           >
             {list.items.map((job) => (
@@ -381,10 +376,10 @@ export function JobsPage() {
                 <Card>
                   <CardContent>
                     <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, mb: 1 }}>
-                      {!laedt && signedIn && !schonGesendet.has(job.id) && (
+                      {!loading && signedIn && !alreadySent.has(job.id) && (
                         <Checkbox
                           checked={selectedJobs.has(job.id)}
-                          disabled={offeneEntwuerfe.has(job.id) || creatingDrafts || laeuftJob !== null}
+                          disabled={openDrafts.has(job.id) || creatingDrafts || runningJob !== null}
                           onChange={() => toggleJob(job.id)}
                           slotProps={{ input: { "aria-label": t("jobs.select") } }}
                           sx={{ mt: 0.5 }}
@@ -394,7 +389,7 @@ export function JobsPage() {
                         <Typography variant="h3" sx={{ mb: 0.5 }}>
                           {job.title}
                         </Typography>
-                        <Hiring profile={firmen[job.tenant_id]} />
+                        <Hiring profile={companies[job.tenant_id]} />
                         <Typography
                           variant="body2"
                           color="text.secondary"
@@ -408,19 +403,19 @@ export function JobsPage() {
                         <Typography sx={{ whiteSpace: "pre-line" }}>
                           {job.description}
                         </Typography>
-                        <Requirements skills={job.skills} mine={meineSkills} />
+                        <Requirements skills={job.skills} mine={mySkills} />
                       </Box>
                     </Box>
 
-                    {laedt ? null : signedIn ? (
-                      schonGesendet.has(job.id) ? (
+                    {loading ? null : signedIn ? (
+                      alreadySent.has(job.id) ? (
                         <Button variant="contained" disabled sx={{ mt: 2 }}>
                           {t("jobs.alreadyApplied")}
                         </Button>
-                      ) : offeneEntwuerfe.has(job.id) ? (
+                      ) : openDrafts.has(job.id) ? (
                         <Button
                           component={RouterLink}
-                          to={`/applications/drafts/${offeneEntwuerfe.get(job.id)}`}
+                          to={`/applications/drafts/${openDrafts.get(job.id)}`}
                           variant="contained"
                           sx={{ mt: 2 }}
                         >
@@ -430,10 +425,10 @@ export function JobsPage() {
                       <Button
                         variant="contained"
                         sx={{ mt: 2 }}
-                        disabled={creatingDrafts || laeuftJob !== null}
-                        onClick={() => void bewerbenAufEine(job.id)}
+                        disabled={creatingDrafts || runningJob !== null}
+                        onClick={() => void applyToOne(job.id)}
                         startIcon={
-                          laeuftJob === job.id ? (
+                          runningJob === job.id ? (
                             <CircularProgress color="inherit" size={16} />
                           ) : null
                         }
@@ -443,16 +438,16 @@ export function JobsPage() {
                       )
                     ) : (
                       /*
-                        Derselbe Knopf wie für Angemeldete, und OHNE den Satz
-                        „dafür brauchst du ein Konto". Er stand unter jeder Karte
-                        und erklärte etwas, das im nächsten Augenblick ohnehin auf
-                        dem Bildschirm steht: wer klickt, landet in der Anmeldung
-                        und sieht dort, warum. Zwölf Karten mit zwölf Hinweisen auf
-                        dieselbe Sache sind Lärm.
+                        The same button as for signed-in people, and WITHOUT the
+                        sentence "you need an account for that". It stood under
+                        every card and explained something that is on the screen
+                        a moment later anyway: whoever clicks lands at the sign-in
+                        and sees there why. Twelve cards with twelve hints at the
+                        same thing are noise.
 
-                        Ein KNOPF und kein Wort in einem Satz: wer bewerben will,
-                        sucht einen Knopf, und er muss dasselbe Gewicht haben wie
-                        der für Angemeldete.
+                        A BUTTON and not a word in a sentence: whoever wants to
+                        apply looks for a button, and it must carry the same
+                        weight as the one for signed-in people.
                       */
                       <Button
                         type="button"
@@ -490,10 +485,10 @@ export function JobsPage() {
               }}
             >
               <Typography variant="body1">
-                {fortschritt
+                {progress
                   ? t("jobs.progress", {
-                      fertig: fortschritt.fertig,
-                      gesamt: fortschritt.gesamt,
+                      fertig: progress.done,
+                      gesamt: progress.total,
                     })
                   : t("jobs.selected", { count: selectedJobs.size })}
               </Typography>
@@ -536,12 +531,11 @@ export function JobsPage() {
 }
 
 /**
- * Wer sucht.
+ * Who is hiring.
  *
- * Ohne Profil zeigt die Karte hier nichts — eine Stelle bleibt dann anonym.
- * Das ist ein Zustand, den das Unternehmen selbst herbeigeführt hat, und ihn mit
- * einem Platzhalter wie „Unbekanntes Unternehmen" zu füllen wäre eine Aussage,
- * die niemand gemacht hat.
+ * Without a profile the card shows nothing here — a job then stays anonymous.
+ * That is a state the company brought about itself, and filling it with a
+ * placeholder like "Unknown company" would be a statement nobody made.
  */
 function Hiring({ profile }: { profile: CompanyProfile | null | undefined }) {
   const { t } = useTranslation();

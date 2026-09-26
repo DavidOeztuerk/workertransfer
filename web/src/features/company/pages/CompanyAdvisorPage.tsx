@@ -10,13 +10,13 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../../work/lib/session";
+import { useActor } from "../../work/lib/session";
 import { useAsync } from "../../work/lib/useAsync";
 import {
-  type Gespraech,
-  beendeAlsFirma,
-  ladeFirmengespraeche,
-  uebergib,
+  type Conversation,
+  endAsCompany,
+  getCompanyConversations,
+  handOver,
 } from "../../work/api/advisor";
 
 /**
@@ -34,10 +34,10 @@ import {
  */
 export function CompanyAdvisorPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, fuerFirma, tenantId } = useHandelnder();
+  const { signedIn, loading: laedt, forCompany: fuerFirma, tenantId } = useActor();
 
   const gespraeche = useAsync(
-    (signal) => ladeFirmengespraeche(signal),
+    (signal) => getCompanyConversations(signal),
     [tenantId],
     signedIn && fuerFirma,
   );
@@ -68,7 +68,7 @@ export function CompanyAdvisorPage() {
 
   async function zug(id: string, was: "hand-over" | "end") {
     setLaeuft(true);
-    const ergebnis = was === "hand-over" ? await uebergib(id) : await beendeAlsFirma(id);
+    const ergebnis = was === "hand-over" ? await handOver(id) : await endAsCompany(id);
     setLaeuft(false);
 
     setFehler(ergebnis.ok ? null : (ergebnis.error.detail ?? ergebnis.error.title));
@@ -127,7 +127,7 @@ function Firmenkarte({
   laeuft,
   zug,
 }: {
-  gespraech: Gespraech;
+  gespraech: Conversation;
   laeuft: boolean;
   zug: (was: "hand-over" | "end") => void;
 }) {

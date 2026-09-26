@@ -18,7 +18,7 @@ import {
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { remoteLabel, searchJobs } from "../../work/api/jobs";
-import { starteEntwuerfe } from "../../work/lib/entwuerfe";
+import { startDrafts } from "../../work/lib/startDrafts";
 import { useHandelnder } from "../lib/session";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -38,7 +38,7 @@ import { Trans, useTranslation } from "react-i18next";
  * sie legte einen Entwurf an und leitete weiter. Eine Adresse, die keine
  * Ansicht hat, ist ein Zwischenhalt, den niemand sehen soll — und sie trug ein
  * totes Formular mit Freigabekästchen mit sich, das nach ihr niemand mehr
- * erreichte. Der Vorgang steht jetzt in <c>lib/entwuerfe</c>, an EINER Stelle,
+ * erreichte. Der Vorgang steht jetzt in <c>work/lib/startDrafts</c>, an EINER Stelle,
  * und dieser Knopf ruft genau denselben wie der auf der Stellenliste.
  */
 export function CareerPage() {
@@ -59,9 +59,9 @@ export function CareerPage() {
     setLaeuftStelle(stellenId);
     setBewerbungsfehler(null);
     try {
-      const start = await starteEntwuerfe([stellenId]);
+      const start = await startDrafts([stellenId]);
       if (!start.ok) {
-        setBewerbungsfehler(start.fehler);
+        setBewerbungsfehler(start.error);
         return;
       }
       const erster = start.drafts[0];

@@ -11,7 +11,7 @@ import { useParams } from "react-router-dom";
 
 import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../api/companies";
-import { empfaengerAusFirma, kopfAusKontakt } from "../../work/lib/briefkopf";
+import { recipientFromCompany, senderFromContact } from "../../work/lib/letterHead";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { CurriculumVitaeSheet } from "../../person/components/resume/CurriculumVitaeSheet";
 import { getVisibleCurriculumVitae, getVisibleDocumentContent } from "../../person/api/resume";
@@ -147,8 +147,8 @@ export function CompanyApplicationPage() {
             <LetterSheet
               subject={undefined}
               text={e.message}
-              sender={kopfAusKontakt(e.applicant_contact)}
-              recipient={empfaengerAusFirma(firma.data, stelle.data)}
+              sender={senderFromContact(e.applicant_contact)}
+              recipient={recipientFromCompany(firma.data, stelle.data)}
             />
           ) : null}
 

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { empfaengerAusFirma, kopfAusSitzung } from "./briefkopf";
+import { recipientFromCompany, senderFromSession } from "./letterHead";
 
-describe("briefkopf", () => {
-  it("setzt Absender linksbündig aus Konto und Anschrift", () => {
-    const kopf = kopfAusSitzung(
+describe("letterHead", () => {
+  it("sets the sender left-aligned from account and postal address", () => {
+    const head = senderFromSession(
       {
         userId: "1",
         email: "a@b.de",
@@ -25,12 +25,12 @@ describe("briefkopf", () => {
       },
     );
 
-    expect(kopf.name).toBe("Anna Beispiel");
-    expect(kopf.lines).toEqual(["Weg 2", "", "80331 München", "DE", "+4989123"]);
+    expect(head.name).toBe("Anna Beispiel");
+    expect(head.lines).toEqual(["Weg 2", "", "80331 München", "DE", "+4989123"]);
   });
 
-  it("nimmt Firmenanschrift, sobald das Unternehmen sie eingetragen hat", () => {
-    const an = empfaengerAusFirma(
+  it("takes the company address as soon as the company has entered it", () => {
+    const recipient = recipientFromCompany(
       {
         tenant_id: "t",
         slug: "muster",
@@ -62,12 +62,12 @@ describe("briefkopf", () => {
       },
     );
 
-    expect(an.name).toBe("Muster GmbH");
-    expect(an.lines).toEqual(["Musterstraße 1", "10115 Berlin", "DE"]);
+    expect(recipient.name).toBe("Muster GmbH");
+    expect(recipient.lines).toEqual(["Musterstraße 1", "10115 Berlin", "DE"]);
   });
 
-  it("fällt auf den Stellenort zurück, solange kein Firmenprofil da ist", () => {
-    const an = empfaengerAusFirma(null, {
+  it("falls back to the job's place while there is no company profile", () => {
+    const recipient = recipientFromCompany(null, {
       id: "j",
       tenant_id: "t",
       title: "Stelle",
@@ -82,7 +82,7 @@ describe("briefkopf", () => {
       updated_at: "",
     });
 
-    expect(an.name).toBe("");
-    expect(an.lines).toEqual(["", "20095 Hamburg", ""]);
+    expect(recipient.name).toBe("");
+    expect(recipient.lines).toEqual(["", "20095 Hamburg", ""]);
   });
 });

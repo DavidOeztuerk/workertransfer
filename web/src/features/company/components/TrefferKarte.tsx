@@ -17,7 +17,7 @@ import {
   requestMarketStatus,
 } from "../../work/api/market";
 import { expressInterest } from "../../work/api/transfers";
-import { eroeffne } from "../../work/api/advisor";
+import { openConversation } from "../../work/api/advisor";
 
 /** Als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
 const ANSPRECHBARKEIT: Record<string, string> = {
@@ -296,7 +296,7 @@ function Gespraechseroeffnung({ subjectId }: { subjectId: string }) {
         disabled={running}
         onClick={() => {
           setLaeuft(true);
-          void eroeffne(subjectId, t("scout.interestText")).then((result) => {
+          void openConversation(subjectId, t("scout.interestText")).then((result) => {
             setLaeuft(false);
             if (result.ok) {
               setMeldung(null);

@@ -12,38 +12,37 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
-import { type Vorgang, ladeMeineVorgaenge, reicheEin } from "../api/arbeitsproben";
+import { type Case, getMyCases, submitSolution } from "../api/assessments";
 
 /**
- * `/assessments` — die Arbeitsproben, die einem Menschen gestellt wurden.
+ * `/assessments` — the work samples that were set for a human being.
  *
- * <strong>Der Umfang steht vorne, und er steht gross.</strong> Eine
- * Arbeitsprobe ohne genannten Umfang ist eine Aufgabe, deren Preis man erst
- * kennt, wenn man ihn bezahlt hat (ADR-0042 §3). Deshalb ist „4 Stunden" auf
- * dieser Seite keine Randnotiz, sondern steht neben der Überschrift.
+ * <strong>The effort stands in front, and it stands large.</strong> A work
+ * sample without a stated effort is a task whose price one only learns after
+ * paying it (ADR-0042 §3). That is why "4 hours" on this page is no side note
+ * but stands beside the heading.
  *
- * <strong>Es gibt keinen Ablehnen-Knopf, und das ist Absicht.</strong> Wer
- * nicht will, tut nichts; die Frist läuft ab. Ein höflicher Absageknopf wäre
- * freundlicher zum Unternehmen und erzeugte den Vermerk, den ADR-0042 §3
- * verbietet — „hat dreimal abgelehnt" ist eine Tatsache über einen Menschen,
- * und sie entstünde aus lauter einzelnen berechtigten Klicks. Der Satz im Kopf
- * sagt das ausdrücklich, damit niemand rät, ob ein fehlender Knopf ein Versehen
- * ist.
+ * <strong>There is no decline button, and that is deliberate.</strong> Whoever
+ * does not want to does nothing; the deadline passes. A polite decline button
+ * would be kinder to the company and would create the record ADR-0042 §3
+ * forbids — "declined three times" is a fact about a human being, and it would
+ * come about from individually reasonable clicks. The sentence at the top says
+ * so expressly, so that nobody guesses whether a missing button is an accident.
  *
- * <strong>Und die Bewertung steht hier, immer.</strong> Auch bei einer Absage,
- * auch nachdem jemand seine Sichtbarkeit widerrufen hat: diese Liste fragt den
- * Ledger nicht. Eine Beurteilung, die der Beurteilte nie liest, ist genau das,
- * was diese Plattform nicht baut.
+ * <strong>And the evaluation stands here, always.</strong> Also on a
+ * rejection, also after somebody revoked their visibility: this list does not
+ * ask the ledger. A judgement the judged never reads is exactly what this
+ * platform does not build.
  */
 export function AssessmentsPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, subjectId } = useHandelnder();
+  const { signedIn, loading, subjectId } = useActor();
 
-  const vorgaenge = useAsync((signal) => ladeMeineVorgaenge(signal), [subjectId], signedIn);
+  const cases = useAsync((signal) => getMyCases(signal), [subjectId], signedIn);
 
-  if (laedt) {
+  if (loading) {
     return (
       <PageShell title={t("assessments.title")} narrow>
         <LoadingBlock label={t("assessments.loading")} />
@@ -76,23 +75,23 @@ export function AssessmentsPage() {
         {t("assessments.noDecline")}
       </Alert>
 
-      {vorgaenge.pending && <LoadingBlock label={t("assessments.loading")} />}
+      {cases.pending && <LoadingBlock label={t("assessments.loading")} />}
 
-      {vorgaenge.data?.ok === false && (
+      {cases.data?.ok === false && (
         <Alert severity="warning">{t("errors.ledgerSilent")}</Alert>
       )}
 
-      {vorgaenge.data?.ok === true && vorgaenge.data.items.length === 0 && (
+      {cases.data?.ok === true && cases.data.items.length === 0 && (
         <EmptyBlock title={t("assessments.empty")} hint={t("assessments.emptyHint")} />
       )}
 
       <Stack spacing={2}>
-        {vorgaenge.data?.ok === true &&
-          vorgaenge.data.items.map((vorgang) => (
-            <MeineKarte
-              key={vorgang.id}
-              vorgang={vorgang}
-              fertig={() => vorgaenge.reload()}
+        {cases.data?.ok === true &&
+          cases.data.items.map((caseItem) => (
+            <MyCaseCard
+              key={caseItem.id}
+              caseItem={caseItem}
+              done={() => cases.reload()}
             />
           ))}
       </Stack>
@@ -100,97 +99,97 @@ export function AssessmentsPage() {
   );
 }
 
-/** Eine Karte je Vorgang — Aufgabe, Umfang, eigene Lösung, Rückmeldung. */
-function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void }) {
+/** One card per case — task, effort, one's own solution, feedback. */
+function MyCaseCard({ caseItem, done }: { caseItem: Case; done: () => void }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
-  const [adresse, setAdresse] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function abgeben() {
-    setLaeuft(true);
-    const ergebnis = await reicheEin(vorgang.id, text, adresse.trim() || null);
-    setLaeuft(false);
+  async function submit() {
+    setBusy(true);
+    const result = await submitSolution(caseItem.id, text, url.trim() || null);
+    setBusy(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      fertig();
+    if (result.ok) {
+      setError(null);
+      done();
       return;
     }
 
-    setFehler(ergebnis.error.detail || ergebnis.error.title);
+    setError(result.error.detail || result.error.title);
   }
 
-  const offen = vorgang.state === "set";
-  const leer = text.trim().length === 0 && adresse.trim().length === 0;
+  const open = caseItem.state === "set";
+  const empty = text.trim().length === 0 && url.trim().length === 0;
 
   return (
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Chip label={t(`assessments.state_${vorgang.state}`)} size="small" />
+          <Chip label={t(`assessments.state_${caseItem.state}`)} size="small" />
           <Chip
             // The effort, BESIDE the state and not in the small print.
-            label={t("assessments.effort", { stunden: vorgang.hours })}
+            label={t("assessments.effort", { stunden: caseItem.hours })}
             size="small"
             color="primary"
             variant="outlined"
           />
           <Chip
-            label={t("assessments.deadline", { datum: datum(vorgang.due_at) })}
+            label={t("assessments.deadline", { datum: formatDate(caseItem.due_at) })}
             size="small"
             variant="outlined"
           />
         </Stack>
 
         <Typography variant="h3" sx={{ mb: 1 }}>
-          {vorgang.title}
+          {caseItem.title}
         </Typography>
 
-        <Typography sx={{ mb: 2, whiteSpace: "pre-wrap" }}>{vorgang.task}</Typography>
+        <Typography sx={{ mb: 2, whiteSpace: "pre-wrap" }}>{caseItem.task}</Typography>
 
-        {vorgang.submission !== undefined && (
+        {caseItem.submission !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2">{t("assessments.yourSolution")}</Typography>
-            {vorgang.submission.text.length > 0 && (
+            {caseItem.submission.text.length > 0 && (
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                {vorgang.submission.text}
+                {caseItem.submission.text}
               </Typography>
             )}
-            {vorgang.submission.url !== null && (
-              <Link href={vorgang.submission.url} rel="noreferrer noopener" target="_blank">
-                {vorgang.submission.url}
+            {caseItem.submission.url !== null && (
+              <Link href={caseItem.submission.url} rel="noreferrer noopener" target="_blank">
+                {caseItem.submission.url}
               </Link>
             )}
           </>
         )}
 
-        {vorgang.evaluation !== undefined && (
+        {caseItem.evaluation !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Alert
               // THE EVALUATION. It stands here as soon as it exists — on an
               // acceptance as on a rejection, and regardless of what is released
               // right now (ADR-0042 §2).
-              severity={vorgang.evaluation.outcome === "accepted" ? "success" : "info"}
+              severity={caseItem.evaluation.outcome === "accepted" ? "success" : "info"}
               sx={{ mb: 1 }}
             >
-              {t(`assessments.outcome_${vorgang.evaluation.outcome}`)}
+              {t(`assessments.outcome_${caseItem.evaluation.outcome}`)}
             </Alert>
             <Typography variant="subtitle2">{t("assessments.feedback")}</Typography>
-            <Typography sx={{ whiteSpace: "pre-wrap" }}>{vorgang.evaluation.text}</Typography>
+            <Typography sx={{ whiteSpace: "pre-wrap" }}>{caseItem.evaluation.text}</Typography>
           </>
         )}
 
-        {offen && (
+        {open && (
           <>
             <Divider sx={{ my: 2 }} />
 
-            {fehler !== null && (
+            {error !== null && (
               <Alert severity="error" sx={{ mb: 2 }}>
-                {fehler}
+                {error}
               </Alert>
             )}
 
@@ -207,15 +206,15 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
               <TextField
                 label={t("assessments.solutionLink")}
                 helperText={t("assessments.solutionLinkHint")}
-                value={adresse}
-                onChange={(event) => setAdresse(event.target.value)}
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
                 fullWidth
               />
               <Stack direction="row">
                 <Button
                   variant="contained"
-                  disabled={laeuft || leer}
-                  onClick={() => void abgeben()}
+                  disabled={busy || empty}
+                  onClick={() => void submit()}
                 >
                   {t("assessments.submit")}
                 </Button>
@@ -228,9 +227,9 @@ function MeineKarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void 
   );
 }
 
-/** Ein Datum, wie es dasteht. Die Sprache kommt aus der Sitzung, nicht von hier. */
-function datum(roh: string): string {
-  return new Date(roh).toLocaleDateString();
+/** A date as it stands. The language comes from the session, not from here. */
+function formatDate(raw: string): string {
+  return new Date(raw).toLocaleDateString();
 }
 
 export default AssessmentsPage;

@@ -2,33 +2,32 @@ import { useAppSelector } from "../../../core/store/hooks";
 import type { Session, SessionStatus } from "../../auth/types/session";
 
 /**
- * Wer gerade handelt — für eine Seite lesbar.
+ * Who is acting right now — readable for a page.
  *
- * <strong>Drei Zustände, nicht zwei.</strong> `status === "unknown"` heißt
- * „noch nicht gefragt" und muss als LADEZUSTAND gezeichnet werden. Zeichnet
- * eine Seite ihn als „abgemeldet", blitzt beim Kaltstart auf jeder Seite kurz
- * „Bitte anmelden" auf, obwohl die Person angemeldet ist. Die alten Seiten
- * kannten diesen Fall nicht: sie bekamen `principal` als Prop injiziert, und es
- * war entweder da oder `null`.
+ * <strong>Three states, not two.</strong> `status === "unknown"` means "not
+ * asked yet" and must be drawn as a LOADING state. If a page draws it as
+ * "signed out", every page briefly flashes "Please sign in" on a cold start
+ * although the person is signed in. The old pages did not know this case: they
+ * got `principal` injected as a prop, and it was either there or `null`.
  *
- * `tenantId === null` heißt „handelt als Person", nicht „fehlt" (ADR-0017).
- * Auf einem Transfermarkt ist das der Normalfall.
+ * `tenantId === null` means "acting as a person", not "missing" (ADR-0017). On
+ * a transfer market that is the normal case.
  */
-export interface Handelnder {
+export interface Actor {
   status: SessionStatus;
   session: Session | null;
-  /** Die Sitzung ist noch unbekannt — zeichne einen Ladezustand. */
-  laedt: boolean;
+  /** The session is still unknown — draw a loading state. */
+  loading: boolean;
   signedIn: boolean;
-  /** Die eigene Subject-ID, oder `null`. */
+  /** One's own subject id, or `null`. */
   subjectId: string | null;
-  /** Das Unternehmen, für das gerade gehandelt wird, oder `null`. */
+  /** The company being acted for right now, or `null`. */
   tenantId: string | null;
-  /** Handelt gerade für ein Unternehmen. */
-  fuerFirma: boolean;
+  /** Acting for a company right now. */
+  forCompany: boolean;
 }
 
-export function useHandelnder(): Handelnder {
+export function useActor(): Actor {
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
   const signedIn = status === "authenticated" && session !== null;
@@ -36,10 +35,10 @@ export function useHandelnder(): Handelnder {
   return {
     status,
     session,
-    laedt: status === "unknown",
+    loading: status === "unknown",
     signedIn,
     subjectId: signedIn ? session.userId : null,
     tenantId: signedIn ? session.tenantId : null,
-    fuerFirma: signedIn && session.tenantId !== null,
+    forCompany: signedIn && session.tenantId !== null,
   };
 }

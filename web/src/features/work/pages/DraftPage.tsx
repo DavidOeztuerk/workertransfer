@@ -22,11 +22,12 @@ import { Delete as DeleteIcon, Visibility as ViewIcon } from "@mui/icons-materia
 import { useNavigate, useParams } from "react-router-dom";
 
 import { LetterSheet } from "../../../shared/components/LetterSheet";
+import type { Failure } from "../../../shared/api/errors";
 import { getCompanyProfile } from "../../company/api/companies";
 import { getPostalAddress } from "../../person/api/civilIdentity";
-import { empfaengerAusFirma, kopfAusSitzung } from "../lib/briefkopf";
-import { merke } from "../lib/kontext";
-import { schreibbeginn, schreibende } from "../lib/schreibuhr";
+import { recipientFromCompany, senderFromSession } from "../lib/letterHead";
+import { remember } from "../lib/letterContext";
+import { writingEnded, writingStart } from "../lib/writingClock";
 import {
   EmptyBlock,
   LoadingBlock,
@@ -39,14 +40,16 @@ import {
   getMyDocuments,
   getOwnDocumentContent,
   uploadDocument,
+  type DocumentKind,
   type DocumentRecordV1,
 } from "../../person/api/resume";
-import { Schreibfortschritt } from "../components/Schreibfortschritt";
+import { WritingProgress } from "../components/WritingProgress";
 import { getJob } from "../api/jobs";
-import { leerBriefHinweisSchluessel, schreibschluessel } from "../lib/schreibfehler";
-import { useHandelnder } from "../lib/session";
+import { emptyLetterHintKey, writingKey } from "../lib/draftErrors";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
+  type DraftError,
   type DraftStatus,
   addComment,
   approveDraft,
@@ -59,7 +62,7 @@ import {
   writeDraft,
 } from "../api/applications";
 
-const STATUS_FARBE: Record<
+const STATUS_COLOUR: Record<
   DraftStatus,
   "default" | "primary" | "warning" | "info" | "error"
 > = {
@@ -71,104 +74,109 @@ const STATUS_FARBE: Record<
   failed: "error",
 };
 
+/** What can be uploaded beside the CV here. The words are the wire's. */
+type EnclosureKind = Exclude<DocumentKind, "lebenslauf">;
+
 export function DraftPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt: sitzungLaedt, session } = useHandelnder();
+  const { signedIn, loading: sessionLoading, session } = useActor();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [hinweis, setHinweis] = useState<string | null>(null);
-  const [laeuft, setLaeuft] = useState<string | null>(null);
-  const [kommentar, setKommentar] = useState("");
-  const [zitat, setZitat] = useState("");
-  const [bearbeiten, setBearbeiten] = useState(false);
-  const [betreff, setBetreff] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [quote, setQuote] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
-  const [gewaehlt, setGewaehlt] = useState<string[]>([]);
-  const [datei, setDatei] = useState<File | null>(null);
-  const [dateiname, setDateiname] = useState("");
-  const [dateiart, setDateiart] = useState<"zeugnis" | "zertifikat" | "sonstiges">("zeugnis");
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [fileKind, setFileKind] = useState<EnclosureKind>("zeugnis");
   const [uploading, setUploading] = useState<string | null>(null);
-  const [zuLoeschen, setZuLoeschen] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<string | null>(null);
 
-  const entwurf = useAsync(
+  const draftFetch = useAsync(
     (signal) => getDraft(id!, signal),
     [id],
     signedIn && !!id,
   );
 
-  const e = entwurf.data?.ok ? entwurf.data.draft : null;
-  const schreibt = e?.status === "generating";
+  const draft = draftFetch.data?.ok ? draftFetch.data.draft : null;
+  const writing = draft?.status === "generating";
 
   useEffect(() => {
-    if (!e || e.status !== "generating") return;
-    const timer = window.setInterval(() => entwurf.poll(), 1000);
+    if (!draft || draft.status !== "generating") return;
+    const timer = window.setInterval(() => draftFetch.poll(), 1000);
     return () => window.clearInterval(timer);
-  }, [e?.status, e?.id]);
+  }, [draft?.status, draft?.id]);
 
   useEffect(() => {
-    if (!e) return;
-    if (e.status === "generating") schreibbeginn(e.id, e.writing_started_at);
-    else schreibende(e.id);
-  }, [e?.id, e?.status, e?.writing_started_at]);
+    if (!draft) return;
+    if (draft.status === "generating") writingStart(draft.id, draft.writing_started_at);
+    else writingEnded(draft.id);
+  }, [draft?.id, draft?.status, draft?.writing_started_at]);
 
-  const unterlagen = useAsync(
+  const documents = useAsync(
     (signal) => getMyDocuments(signal),
     [session?.userId],
-    signedIn && e !== null && !schreibt,
+    signedIn && draft !== null && !writing,
   );
-  const lebenslauf = useAsync(
-    () => merke(`resume:${session?.userId ?? ""}`, () => getMyCurriculumVitae()),
+  const curriculumVitae = useAsync(
+    () => remember(`resume:${session?.userId ?? ""}`, () => getMyCurriculumVitae()),
     [session?.userId],
-    signedIn && e !== null && !schreibt,
+    signedIn && draft !== null && !writing,
   );
-  const anschrift = useAsync(
-    () => merke(`anschrift:${session?.userId ?? ""}`, () => getPostalAddress()),
+  const address = useAsync(
+    () => remember(`address:${session?.userId ?? ""}`, () => getPostalAddress()),
     [session?.userId],
     signedIn && !!session?.userId,
   );
 
-  const stelle = useAsync(
-    () => merke(`job:${e!.job_id}`, () => getJob(e!.job_id)),
-    [e?.job_id],
-    e !== null,
+  const job = useAsync(
+    () => remember(`job:${draft!.job_id}`, () => getJob(draft!.job_id)),
+    [draft?.job_id],
+    draft !== null,
   );
-  const firma = useAsync(
+  const company = useAsync(
     () =>
-      merke(`firma:${stelle.data!.tenant_id}`, () =>
-        getCompanyProfile(stelle.data!.tenant_id),
+      remember(`company:${job.data!.tenant_id}`, () =>
+        getCompanyProfile(job.data!.tenant_id),
       ),
-    [stelle.data?.tenant_id],
-    stelle.data !== null && !schreibt,
+    [job.data?.tenant_id],
+    job.data !== null && !writing,
   );
 
   useEffect(() => {
-    if (!e) return;
-    setGewaehlt(Array.isArray(e.documents) ? e.documents : []);
-    setBetreff(e.subject ?? "");
-    setText(e.body ?? "");
-  }, [e?.id, e?.subject, e?.body, e?.documents]);
+    if (!draft) return;
+    setChosen(Array.isArray(draft.documents) ? draft.documents : []);
+    setSubject(draft.subject ?? "");
+    setText(draft.body ?? "");
+  }, [draft?.id, draft?.subject, draft?.body, draft?.documents]);
 
   useEffect(() => {
-    if (!e || e.status === "generating" || e.shares_resume === true) return;
-    void chooseAttachments(e.id, true, Array.isArray(e.documents) ? e.documents : []).then(
-      () => entwurf.reload(),
-    );
-  }, [e?.id, e?.shares_resume, e?.status]);
+    if (!draft || draft.status === "generating" || draft.shares_resume === true) return;
+    void chooseAttachments(
+      draft.id,
+      true,
+      Array.isArray(draft.documents) ? draft.documents : [],
+    ).then(() => draftFetch.reload());
+  }, [draft?.id, draft?.shares_resume, draft?.status]);
 
   useEffect(() => {
-    if (!e || schreibt || !unterlagen.data?.ok) return;
-    const cvIds = unterlagen.data.value
+    if (!draft || writing || !documents.data?.ok) return;
+    const cvIds = documents.data.value
       .filter((d) => d.kind === "lebenslauf")
       .map((d) => d.id);
     if (cvIds.length === 0) return;
-    const bisher = Array.isArray(e.documents) ? e.documents : [];
-    if (cvIds.every((id) => bisher.includes(id))) return;
-    const next = [...new Set([...bisher, ...cvIds])];
-    void chooseAttachments(e.id, true, next).then(() => entwurf.reload());
-  }, [e?.id, e?.status, unterlagen.data, schreibt]);
+    const current = Array.isArray(draft.documents) ? draft.documents : [];
+    if (cvIds.every((id) => current.includes(id))) return;
+    const next = [...new Set([...current, ...cvIds])];
+    void chooseAttachments(draft.id, true, next).then(() => draftFetch.reload());
+  }, [draft?.id, draft?.status, documents.data, writing]);
 
-  if (sitzungLaedt) {
+  if (sessionLoading) {
     return (
       <PageShell title={t("drafts.title")} narrow>
         <LoadingBlock label={t("drafts.loading")} />
@@ -180,7 +188,7 @@ export function DraftPage() {
     return <SignInRequired title={t("drafts.title")} sentenceKey="drafts.signInRequired" />;
   }
 
-  if (entwurf.pending && !e) {
+  if (draftFetch.pending && !draft) {
     return (
       <PageShell title={t("drafts.title")} narrow>
         <LoadingBlock label={t("drafts.loading")} />
@@ -188,19 +196,19 @@ export function DraftPage() {
     );
   }
 
-  if (entwurf.data !== null && !entwurf.data.ok) {
+  if (draftFetch.data !== null && !draftFetch.data.ok) {
     return (
       <PageShell title={t("drafts.title")} narrow>
-        {entwurf.data.reason === "unavailable" ? (
-          <Alert severity="info">{t(schreibschluessel(entwurf.data.error.detail))}</Alert>
+        {draftFetch.data.reason === "unavailable" ? (
+          <Alert severity="info">{t(writingKey(draftFetch.data.error.detail))}</Alert>
         ) : (
-          <Alert severity="error">{entwurf.data.error.detail}</Alert>
+          <Alert severity="error">{draftFetch.data.error.detail}</Alert>
         )}
       </PageShell>
     );
   }
 
-  if (!e) {
+  if (!draft) {
     return (
       <PageShell title={t("drafts.title")} narrow>
         <EmptyBlock
@@ -211,67 +219,69 @@ export function DraftPage() {
     );
   }
 
-  const offen = e.comments.filter((c) => !c.resolved);
-  const erledigt = e.comments.filter((c) => c.resolved);
-  const leer = e.body.trim() === "";
-  const stand: DraftStatus = e.status;
-  const canWrite = (e.status === "generating" || e.status === "failed") && !schreibt;
-  const canRevise = e.status === "needs_changes" && offen.length > 0 && !leer && !schreibt;
-  const canApprove = e.status === "review" && offen.length === 0 && !leer && !schreibt;
-  const canSend = e.status === "approved" && !schreibt;
-  const canDelete = e.status !== "sent";
-  const canEdit = !leer && e.status !== "sent" && e.status !== "generating" && !schreibt;
-  const canSelfWrite = leer && e.status === "failed" && !schreibt;
-  const canComment = !leer && e.status !== "generating" && e.status !== "sent" && !schreibt;
-  const titel = stelle.data?.title ?? (e.subject || t("drafts.title"));
-  const entwurfsId = e.id;
+  const openComments = draft.comments.filter((c) => !c.resolved);
+  const resolvedComments = draft.comments.filter((c) => c.resolved);
+  const empty = draft.body.trim() === "";
+  const status: DraftStatus = draft.status;
+  const canWrite = (draft.status === "generating" || draft.status === "failed") && !writing;
+  const canRevise =
+    draft.status === "needs_changes" && openComments.length > 0 && !empty && !writing;
+  const canApprove =
+    draft.status === "review" && openComments.length === 0 && !empty && !writing;
+  const canSend = draft.status === "approved" && !writing;
+  const canDelete = draft.status !== "sent";
+  const canEdit = !empty && draft.status !== "sent" && draft.status !== "generating" && !writing;
+  const canSelfWrite = empty && draft.status === "failed" && !writing;
+  const canComment = !empty && draft.status !== "generating" && draft.status !== "sent" && !writing;
+  const title = job.data?.title ?? (draft.subject || t("drafts.title"));
+  const draftId = draft.id;
 
-  async function lauf(
-    name: string,
-    aktion: () => Promise<{ ok: boolean; error?: { detail: string }; reason?: string }>,
+  async function run(
+    step: string,
+    action: () => Promise<{ ok: true } | Failure<DraftError>>,
   ) {
-    setLaeuft(name);
-    setFehler(null);
-    setHinweis(null);
-    const result = await aktion();
-    setLaeuft(null);
+    setRunning(step);
+    setError(null);
+    setHint(null);
+    const result = await action();
+    setRunning(null);
     if (!result.ok) {
-      const detail = result.error?.detail ?? "";
-      if (name === "write" || name === "revise" || result.reason === "unavailable") {
-        setHinweis(t(schreibschluessel(detail)));
-      } else setFehler(detail);
-    } else if (name !== "write" && name !== "revise") {
-      /* write/revise laufen im Dienst weiter — der Stand kommt per GET. */
+      if (step === "write" || step === "revise" || result.reason === "unavailable") {
+        setHint(t(writingKey(result.error.detail)));
+      } else {
+        setError(result.error.detail);
+      }
     }
-    entwurf.reload();
+    // write/revise keep running in the service — the state arrives by GET.
+    draftFetch.reload();
   }
 
   async function handleUpload() {
-    if (!datei) return;
-    const name = dateiname.trim() || datei.name.replace(/\.[^/.]+$/, "");
+    if (!file) return;
+    const name = fileName.trim() || file.name.replace(/\.[^/.]+$/, "");
     setUploading(name);
-    setFehler(null);
-    const result = await uploadDocument(datei, name, dateiart);
+    setError(null);
+    const result = await uploadDocument(file, name, fileKind);
     setUploading(null);
     if (!result.ok) {
-      setFehler(result.error.detail);
+      setError(result.error.detail);
       return;
     }
-    setDatei(null);
-    setDateiname("");
-    const cvIds = (unterlagen.data?.ok ? unterlagen.data.value : [])
+    setFile(null);
+    setFileName("");
+    const cvIds = (documents.data?.ok ? documents.data.value : [])
       .filter((d) => d.kind === "lebenslauf")
       .map((d) => d.id);
-    const next = [...new Set([...gewaehlt, result.value.id, ...cvIds])];
-    setGewaehlt(next);
-    unterlagen.reload();
-    void lauf("attachments", () => chooseAttachments(entwurfsId, true, next));
+    const next = [...new Set([...chosen, result.value.id, ...cvIds])];
+    setChosen(next);
+    documents.reload();
+    void run("attachments", () => chooseAttachments(draftId, true, next));
   }
 
   async function handlePreview(docId: string) {
     const result = await getOwnDocumentContent(docId);
     if (!result.ok) {
-      setFehler(result.error.detail);
+      setError(result.error.detail);
       return;
     }
     const win = window.open(result.value.url, "_blank");
@@ -279,38 +289,38 @@ export function DraftPage() {
   }
 
   async function handleDeleteDocument() {
-    if (zuLoeschen === null) return;
-    const id = zuLoeschen;
-    setZuLoeschen(null);
+    if (toDelete === null) return;
+    const id = toDelete;
+    setToDelete(null);
     const result = await deleteDocument(id);
     if (!result.ok) {
-      setFehler(result.error.detail);
+      setError(result.error.detail);
       return;
     }
-    const next = gewaehlt.filter((x) => x !== id);
-    setGewaehlt(next);
-    unterlagen.reload();
-    void lauf("attachments", () => chooseAttachments(entwurfsId, true, next));
+    const next = chosen.filter((x) => x !== id);
+    setChosen(next);
+    documents.reload();
+    void run("attachments", () => chooseAttachments(draftId, true, next));
   }
 
   return (
     <PageShell
-      title={titel}
-      lead={t(`drafts.statusHint.${stand}`)}
+      title={title}
+      lead={t(`drafts.statusHint.${status}`)}
       actions={
         <Button variant="outlined" onClick={() => navigate("/applications/drafts")}>
           {t("drafts.backToList")}
         </Button>
       }
     >
-      {fehler && !schreibt ? (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setFehler(null)}>
-          {fehler}
+      {error && !writing ? (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
         </Alert>
       ) : null}
-      {hinweis && !schreibt ? (
-        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setHinweis(null)}>
-          {hinweis}
+      {hint && !writing ? (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setHint(null)}>
+          {hint}
         </Alert>
       ) : null}
 
@@ -326,34 +336,34 @@ export function DraftPage() {
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, flexWrap: "wrap" }}>
               <Typography variant="h4" sx={{ flex: 1 }}>
-                {e.subject || t("drafts.noSubject")}
+                {draft.subject || t("drafts.noSubject")}
               </Typography>
               <Chip
-                label={t(`drafts.status.${stand}`)}
-                color={STATUS_FARBE[stand]}
+                label={t(`drafts.status.${status}`)}
+                color={STATUS_COLOUR[status]}
                 size="small"
               />
               <Typography variant="body2" color="text.secondary">
-                {t("drafts.version", { version: e.version })}
+                {t("drafts.version", { version: draft.version })}
               </Typography>
             </Box>
 
-            {!leer && stand === "failed" && !schreibt ? (
+            {!empty && status === "failed" && !writing ? (
               <Alert severity="info" sx={{ mb: 2 }}>
-                {t(schreibschluessel(e.error))}
+                {t(writingKey(draft.error))}
               </Alert>
             ) : null}
 
-            {schreibt ? (
-              <Schreibfortschritt seit={schreibbeginn(e.id, e.writing_started_at)} />
+            {writing ? (
+              <WritingProgress since={writingStart(draft.id, draft.writing_started_at)} />
             ) : null}
 
-            {bearbeiten ? (
+            {editing ? (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                 <TextField
                   label={t("drafts.subject")}
-                  value={betreff ?? ""}
-                  onChange={(ev) => setBetreff(ev.target.value)}
+                  value={subject ?? ""}
+                  onChange={(ev) => setSubject(ev.target.value)}
                 />
                 <TextField
                   label={t("drafts.text")}
@@ -365,31 +375,31 @@ export function DraftPage() {
                 <Box sx={{ display: "flex", gap: 1 }}>
                   <Button
                     variant="contained"
-                    disabled={laeuft === "save"}
+                    disabled={running === "save"}
                     onClick={() =>
-                      void lauf("save", () => updateDraft(e.id, betreff, text)).then(() =>
-                        setBearbeiten(false),
+                      void run("save", () => updateDraft(draft.id, subject, text)).then(() =>
+                        setEditing(false),
                       )
                     }
                   >
                     {t("common.save")}
                   </Button>
-                  <Button onClick={() => setBearbeiten(false)}>{t("common.cancel")}</Button>
+                  <Button onClick={() => setEditing(false)}>{t("common.cancel")}</Button>
                 </Box>
               </Box>
-            ) : leer && !schreibt ? (
+            ) : empty && !writing ? (
               <EmptyBlock
                 title={t("drafts.emptyLetter")}
-                hint={t(leerBriefHinweisSchluessel(e.error))}
+                hint={t(emptyLetterHintKey(draft.error))}
                 action={
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center" }}>
                     {canWrite ? (
                       <Button
                         variant="contained"
-                        disabled={laeuft !== null}
-                        onClick={() => void lauf("write", () => writeDraft(e.id))}
+                        disabled={running !== null}
+                        onClick={() => void run("write", () => writeDraft(draft.id))}
                         startIcon={
-                          laeuft === "write" ? (
+                          running === "write" ? (
                             <CircularProgress color="inherit" size={16} />
                           ) : null
                         }
@@ -398,7 +408,7 @@ export function DraftPage() {
                       </Button>
                     ) : null}
                     {canSelfWrite ? (
-                      <Button variant="outlined" onClick={() => setBearbeiten(true)}>
+                      <Button variant="outlined" onClick={() => setEditing(true)}>
                         {t("drafts.writeYourself")}
                       </Button>
                     ) : null}
@@ -407,23 +417,23 @@ export function DraftPage() {
               />
             ) : (
               <LetterSheet
-                subject={e.subject}
-                text={e.body}
-                emptyHint={schreibt ? t("drafts.writingNow") : t("drafts.emptyLetter")}
-                sender={kopfAusSitzung(session, anschrift.data)}
-                recipient={empfaengerAusFirma(firma.data, stelle.data)}
+                subject={draft.subject}
+                text={draft.body}
+                emptyHint={writing ? t("drafts.writingNow") : t("drafts.emptyLetter")}
+                sender={senderFromSession(session, address.data)}
+                recipient={recipientFromCompany(company.data, job.data)}
               />
             )}
 
-            {leer || bearbeiten || schreibt ? null : (
+            {empty || editing || writing ? null : (
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
                 {canWrite ? (
                   <Button
                     variant="contained"
-                    disabled={laeuft !== null}
-                    onClick={() => void lauf("write", () => writeDraft(e.id))}
+                    disabled={running !== null}
+                    onClick={() => void run("write", () => writeDraft(draft.id))}
                     startIcon={
-                      laeuft === "write" ? <CircularProgress color="inherit" size={16} /> : null
+                      running === "write" ? <CircularProgress color="inherit" size={16} /> : null
                     }
                   >
                     {t("drafts.retry")}
@@ -432,8 +442,8 @@ export function DraftPage() {
                 {canRevise ? (
                   <Button
                     variant="contained"
-                    disabled={laeuft !== null}
-                    onClick={() => void lauf("revise", () => reviseDraft(e.id))}
+                    disabled={running !== null}
+                    onClick={() => void run("revise", () => reviseDraft(draft.id))}
                   >
                     {t("drafts.revise")}
                   </Button>
@@ -441,8 +451,8 @@ export function DraftPage() {
                 {canApprove ? (
                   <Button
                     variant="contained"
-                    disabled={laeuft !== null}
-                    onClick={() => void lauf("approve", () => approveDraft(e.id))}
+                    disabled={running !== null}
+                    onClick={() => void run("approve", () => approveDraft(draft.id))}
                   >
                     {t("drafts.approve")}
                   </Button>
@@ -450,23 +460,23 @@ export function DraftPage() {
                 {canSend ? (
                   <Button
                     variant="contained"
-                    disabled={laeuft !== null}
-                    onClick={() => void lauf("send", () => sendDraft(e.id))}
+                    disabled={running !== null}
+                    onClick={() => void run("send", () => sendDraft(draft.id))}
                   >
                     {t("drafts.send")}
                   </Button>
                 ) : null}
                 {canEdit ? (
-                  <Button variant="outlined" onClick={() => setBearbeiten(true)}>
+                  <Button variant="outlined" onClick={() => setEditing(true)}>
                     {t("drafts.edit")}
                   </Button>
                 ) : null}
                 {canDelete ? (
                   <Button
                     color="error"
-                    disabled={laeuft !== null}
+                    disabled={running !== null}
                     onClick={() =>
-                      void lauf("delete", () => deleteDraft(e.id)).then(() =>
+                      void run("delete", () => deleteDraft(draft.id)).then(() =>
                         navigate("/applications/drafts"),
                       )
                     }
@@ -476,13 +486,13 @@ export function DraftPage() {
                 ) : null}
               </Box>
             )}
-            {leer && !bearbeiten && !schreibt && canDelete ? (
+            {empty && !editing && !writing && canDelete ? (
               <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
                 <Button
                   color="error"
-                  disabled={laeuft !== null}
+                  disabled={running !== null}
                   onClick={() =>
-                    void lauf("delete", () => deleteDraft(e.id)).then(() =>
+                    void run("delete", () => deleteDraft(draft.id)).then(() =>
                       navigate("/applications/drafts"),
                     )
                   }
@@ -491,7 +501,7 @@ export function DraftPage() {
                 </Button>
               </Box>
             ) : null}
-            {e.status === "review" || e.status === "approved" ? (
+            {draft.status === "review" || draft.status === "approved" ? (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                 {t("drafts.steps")}
               </Typography>
@@ -509,17 +519,17 @@ export function DraftPage() {
                 {t("drafts.resumeAlways")}
               </Typography>
               {(() => {
-                const alle = unterlagen.data?.ok ? unterlagen.data.value : [];
-                const cvDateien = alle.filter((doc) => doc.kind === "lebenslauf");
-                const beilagen = alle.filter((doc) => doc.kind !== "lebenslauf");
-                const hatFormular = lebenslauf.data?.ok && lebenslauf.data.value !== null;
-                const hatCv = cvDateien.length > 0;
-                const cvIds = cvDateien.map((d) => d.id);
+                const all = documents.data?.ok ? documents.data.value : [];
+                const cvFiles = all.filter((doc) => doc.kind === "lebenslauf");
+                const enclosures = all.filter((doc) => doc.kind !== "lebenslauf");
+                const hasForm = curriculumVitae.data?.ok && curriculumVitae.data.value !== null;
+                const hasCv = cvFiles.length > 0;
+                const cvIds = cvFiles.map((d) => d.id);
                 return (
               <>
-              {hatCv ? (
+              {hasCv ? (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-                  {cvDateien.map((doc) => (
+                  {cvFiles.map((doc) => (
                     <Box
                       key={doc.id}
                       sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}
@@ -558,15 +568,15 @@ export function DraftPage() {
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    {hatFormular ? t("drafts.resumePresent") : t("drafts.resumeMissing")}
+                    {hasForm ? t("drafts.resumePresent") : t("drafts.resumeMissing")}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                     <Button
                       size="small"
-                      variant={hatFormular ? "outlined" : "contained"}
+                      variant={hasForm ? "outlined" : "contained"}
                       onClick={() => navigate("/resume", { state: { mode: "manual" } })}
                     >
-                      {hatFormular ? t("drafts.resumeEdit") : t("drafts.resumeCreate")}
+                      {hasForm ? t("drafts.resumeEdit") : t("drafts.resumeCreate")}
                     </Button>
                     <Button
                       size="small"
@@ -579,7 +589,7 @@ export function DraftPage() {
                 </Box>
               )}
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: 2 }}>
-                {beilagen.map((doc: DocumentRecordV1) => (
+                {enclosures.map((doc: DocumentRecordV1) => (
                   <Box
                     key={doc.id}
                     sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}
@@ -588,14 +598,14 @@ export function DraftPage() {
                       sx={{ flex: 1, mr: 0, minWidth: 0 }}
                       control={
                         <Checkbox
-                          checked={gewaehlt.includes(doc.id)}
-                          onChange={(_, an) => {
-                            const next = an
-                              ? [...new Set([...gewaehlt, doc.id, ...cvIds])]
-                              : [...new Set([...gewaehlt.filter((x) => x !== doc.id), ...cvIds])];
-                            setGewaehlt(next);
-                            void lauf("attachments", () =>
-                              chooseAttachments(e.id, true, next),
+                          checked={chosen.includes(doc.id)}
+                          onChange={(_, checked) => {
+                            const next = checked
+                              ? [...new Set([...chosen, doc.id, ...cvIds])]
+                              : [...new Set([...chosen.filter((x) => x !== doc.id), ...cvIds])];
+                            setChosen(next);
+                            void run("attachments", () =>
+                              chooseAttachments(draft.id, true, next),
                             );
                           }}
                         />
@@ -612,15 +622,15 @@ export function DraftPage() {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => setZuLoeschen(doc.id)}
-                      disabled={laeuft !== null || schreibt}
+                      onClick={() => setToDelete(doc.id)}
+                      disabled={running !== null || writing}
                       aria-label={t("resume.documentDelete")}
                     >
                       <DeleteIcon />
                     </IconButton>
                   </Box>
                 ))}
-                {unterlagen.data?.ok && beilagen.length === 0 ? (
+                {documents.data?.ok && enclosures.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
                     {t("drafts.noDocuments")}
                   </Typography>
@@ -631,7 +641,7 @@ export function DraftPage() {
                   size="small"
                   variant="outlined"
                   component="label"
-                  disabled={uploading !== null || schreibt}
+                  disabled={uploading !== null || writing}
                   sx={{ alignSelf: "flex-start" }}
                 >
                   {t("resume.addDocument")}
@@ -640,35 +650,33 @@ export function DraftPage() {
                     hidden
                     accept="application/pdf,image/png,image/jpeg"
                     onChange={(ev) => {
-                      const gewaehltDatei = ev.target.files?.[0] ?? null;
+                      const picked = ev.target.files?.[0] ?? null;
                       ev.target.value = "";
-                      setDatei(gewaehltDatei);
-                      if (gewaehltDatei) {
-                        setDateiname(gewaehltDatei.name.replace(/\.[^/.]+$/, ""));
-                        setFehler(null);
+                      setFile(picked);
+                      if (picked) {
+                        setFileName(picked.name.replace(/\.[^/.]+$/, ""));
+                        setError(null);
                       }
                     }}
                   />
                 </Button>
-                {datei ? (
+                {file ? (
                   <>
                     <Typography variant="body2" color="text.secondary">
-                      {datei.name}
+                      {file.name}
                     </Typography>
                     <TextField
                       size="small"
                       label={t("resume.documentName")}
-                      value={dateiname}
-                      onChange={(ev) => setDateiname(ev.target.value)}
+                      value={fileName}
+                      onChange={(ev) => setFileName(ev.target.value)}
                     />
                     <TextField
                       select
                       size="small"
                       label={t("resume.documentKind")}
-                      value={dateiart}
-                      onChange={(ev) =>
-                        setDateiart(ev.target.value as "zeugnis" | "zertifikat" | "sonstiges")
-                      }
+                      value={fileKind}
+                      onChange={(ev) => setFileKind(ev.target.value as EnclosureKind)}
                     >
                       <MenuItem value="zeugnis">{t("resume.documentKindReference")}</MenuItem>
                       <MenuItem value="zertifikat">{t("resume.documentKindCertificate")}</MenuItem>
@@ -710,26 +718,26 @@ export function DraftPage() {
                     fullWidth
                     label={t("drafts.commentAdd")}
                     placeholder={t("drafts.commentPlaceholder")}
-                    value={kommentar}
-                    onChange={(ev) => setKommentar(ev.target.value)}
+                    value={comment}
+                    onChange={(ev) => setComment(ev.target.value)}
                     sx={{ mb: 1 }}
                   />
-                  {zitat ? (
+                  {quote ? (
                     <Alert severity="info" sx={{ mb: 1 }}>
-                      {t("drafts.markedQuote")} „{zitat}“
+                      {t("drafts.markedQuote")} „{quote}“
                     </Alert>
                   ) : null}
                   <Button
                     variant="contained"
-                    disabled={!kommentar.trim() || laeuft !== null}
+                    disabled={!comment.trim() || running !== null}
                     onClick={() => {
-                      const markierung = window.getSelection()?.toString().trim() ?? "";
-                      const quote = markierung || zitat;
-                      setZitat(quote);
-                      void lauf("comment", () => addComment(e.id, kommentar.trim(), quote)).then(
+                      const selection = window.getSelection()?.toString().trim() ?? "";
+                      const marked = selection || quote;
+                      setQuote(marked);
+                      void run("comment", () => addComment(draft.id, comment.trim(), marked)).then(
                         () => {
-                          setKommentar("");
-                          setZitat("");
+                          setComment("");
+                          setQuote("");
                         },
                       );
                     }}
@@ -743,7 +751,7 @@ export function DraftPage() {
                 </Typography>
               )}
 
-              {offen.map((c) => (
+              {openComments.map((c) => (
                 <Box key={c.id} sx={{ mt: 2, p: 1.5, border: 1, borderColor: "divider" }}>
                   {c.quote ? (
                     <Typography variant="body2" sx={{ fontStyle: "italic", mb: 0.5 }}>
@@ -753,7 +761,7 @@ export function DraftPage() {
                   <Typography>{c.text}</Typography>
                 </Box>
               ))}
-              {erledigt.map((c) => (
+              {resolvedComments.map((c) => (
                 <Box
                   key={c.id}
                   sx={{ mt: 1, p: 1.5, opacity: 0.6, textDecoration: "line-through" }}
@@ -767,21 +775,21 @@ export function DraftPage() {
       </Box>
 
       <Dialog
-        open={zuLoeschen !== null}
-        onClose={() => setZuLoeschen(null)}
-        aria-labelledby="entwurf-unterlage-loeschen-titel"
-        aria-describedby="entwurf-unterlage-loeschen-text"
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
+        aria-labelledby="draft-document-delete-title"
+        aria-describedby="draft-document-delete-text"
       >
-        <DialogTitle id="entwurf-unterlage-loeschen-titel">
+        <DialogTitle id="draft-document-delete-title">
           {t("resume.documentDeleteTitle")}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="entwurf-unterlage-loeschen-text">
+          <DialogContentText id="draft-document-delete-text">
             {t("resume.documentDeleteConfirm")}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setZuLoeschen(null)}>
+          <Button onClick={() => setToDelete(null)}>
             {t("common.cancel")}
           </Button>
           <Button

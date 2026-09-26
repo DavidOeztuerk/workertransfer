@@ -1,7 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import { renderMitStore } from "../../work/test/render";
+import { renderWithStore } from "../../work/test/render";
 import { CompanyAdvisorPage } from "./CompanyAdvisorPage";
 
 /**
@@ -70,7 +70,7 @@ it("zeigt auf Stufe 1 weder Gehalt noch Namen — und keinen Hinweis darauf", as
     ],
   });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: alsFirma });
 
   await waitFor(() => expect(screen.getByText(/2026-11/)).toBeInTheDocument());
 
@@ -109,7 +109,7 @@ it("zeigt auf Stufe 3 Name, Adresse und Spanne", async () => {
     ],
   });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: alsFirma });
 
   await waitFor(() => expect(screen.getByText("Anna Beispiel")).toBeInTheDocument());
 
@@ -123,7 +123,7 @@ it("zeigt auf Stufe 3 Name, Adresse und Spanne", async () => {
 it("eine leere Liste ist eine Antwort, kein Fehler", async () => {
   stubFetch({ items: [] });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: alsFirma });
 
   await waitFor(() =>
     expect(screen.getByText("Es läuft gerade kein Gespräch.")).toBeInTheDocument(),
@@ -133,7 +133,7 @@ it("eine leere Liste ist eine Antwort, kein Fehler", async () => {
 it("ohne Unternehmen gibt es hier nichts zu sehen", async () => {
   const spion = stubFetch({ items: [] });
 
-  renderMitStore(<CompanyAdvisorPage />, {
+  renderWithStore(<CompanyAdvisorPage />, {
     auth: {
       status: "authenticated",
       session: {

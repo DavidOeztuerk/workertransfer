@@ -14,7 +14,7 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type Application,
@@ -23,8 +23,8 @@ import {
   withdrawApplication,
 } from "../api/applications";
 
-/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
-const STAND: Record<ApplicationStatus, string> = {
+/** The status as a catalogue key — the wording lies in the catalogues. */
+const STATUS_KEY: Record<ApplicationStatus, string> = {
   submitted: "applications.statusSubmitted",
   reviewing: "applications.statusReviewing",
   rejected: "applications.statusRejected",
@@ -32,45 +32,44 @@ const STAND: Record<ApplicationStatus, string> = {
   hired: "applications.statusHired",
 };
 
-/** Läuft die Bewerbung noch — also sieht das Unternehmen gerade etwas? */
+/** Is the application still running — that is, does the company see something right now? */
 const running = (current: ApplicationStatus) =>
   current === "submitted" || current === "reviewing";
 
 /**
- * Was mit dieser Bewerbung geöffnet wurde.
+ * What was opened with this application.
  *
- * Das Profil ist immer dabei — ohne es gäbe es nichts zu lesen. Lebenslauf und
- * Arbeiten nur, wenn die Person sie beim Bewerben ausdrücklich mitgegeben hat.
+ * The profile is always included — without it there would be nothing to read.
+ * CV and work only if the person expressly gave them along when applying.
  */
-function freigegeben(
-  bewerbung: Application,
+function releasedParts(
+  application: Application,
   t: (key: string) => string,
 ): string {
   const parts = [t("applications.partProfile")];
-  if (bewerbung.shares_resume) parts.push(t("applications.partResume"));
-  if (bewerbung.shares_portfolio) parts.push(t("applications.partPortfolio"));
+  if (application.shares_resume) parts.push(t("applications.partResume"));
+  if (application.shares_portfolio) parts.push(t("applications.partPortfolio"));
   return parts.join(", ");
 }
 
 /**
- * <c>/applications</c> — die eigenen Bewerbungen.
+ * <c>/applications</c> — one's own applications.
  *
- * <strong>Eine Bewerbung öffnet Daten, und die Seite sagt welche.</strong>
- * Solange sie läuft, sieht das Unternehmen das Profil und was sonst freigegeben
- * wurde; wird sie zurückgezogen, ist der Zugriff sofort zu. Der Vorgang bleibt
- * beim Unternehmen als das stehen, was er war — zurückziehen löscht keine
- * Geschichte, es schliesst nur den Zugang.
+ * <strong>An application opens data, and the page says which.</strong> While
+ * it runs, the company sees the profile and whatever else was released; once it
+ * is withdrawn, access is closed immediately. The case stays with the company
+ * as what it was — withdrawing deletes no history, it only closes the access.
  *
- * <strong>Nur laufende bekommen „Zurückziehen".</strong> Bei einer abgelehnten
- * oder bereits zurückgezogenen wäre der Knopf eine Handlung ohne Wirkung.
+ * <strong>Only running ones get "Zurückziehen".</strong> On a rejected or
+ * already withdrawn one the button would be an act without effect.
  */
 export function ApplicationsPage() {
   const { t } = useTranslation();
-  const { signedIn, subjectId } = useHandelnder();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [laeuftGerade, setLaeuftGerade] = useState(false);
+  const { signedIn, subjectId } = useActor();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const bewerbungen = useAsync(
+  const applications = useAsync(
     (signal) => listMyApplications(signal),
     [subjectId],
     signedIn,
@@ -93,16 +92,16 @@ export function ApplicationsPage() {
     );
   }
 
-  async function zurueckziehen(id: string) {
-    setLaeuftGerade(true);
+  async function withdraw(id: string) {
+    setBusy(true);
     const result = await withdrawApplication(id);
-    setLaeuftGerade(false);
+    setBusy(false);
 
-    setFehler(result.ok ? null : result.error.detail);
-    bewerbungen.reload();
+    setError(result.ok ? null : result.error.detail);
+    applications.reload();
   }
 
-  const result = bewerbungen.data;
+  const result = applications.data;
   const list = result?.ok ? result.applications : [];
 
   return (
@@ -116,15 +115,15 @@ export function ApplicationsPage() {
           {t("applications.toDrafts")}
         </Link>
       </Typography>
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
       <Card>
         <CardContent>
-          {bewerbungen.pending ? (
+          {applications.pending ? (
             <LoadingBlock
               // Its own branch, before error and empty: without it no branch
               // matched while the list was in flight and the card stayed empty.
@@ -159,8 +158,8 @@ export function ApplicationsPage() {
                 m: 0,
               }}
             >
-              {list.map((bewerbung: Application) => (
-                <Card key={bewerbung.id} component="li" variant="outlined">
+              {list.map((application: Application) => (
+                <Card key={application.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",
@@ -172,23 +171,23 @@ export function ApplicationsPage() {
                   >
                     <Box>
                       <Typography variant="h4">
-                        {t(STAND[bewerbung.status])}
+                        {t(STATUS_KEY[application.status])}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {running(bewerbung.status)
+                        {running(application.status)
                           ? t("applications.released", {
-                              teile: freigegeben(bewerbung, t),
+                              teile: releasedParts(application, t),
                             })
                           : t("applications.noLongerVisible")}
                       </Typography>
                     </Box>
 
-                    {running(bewerbung.status) ? (
+                    {running(application.status) ? (
                       <Button
                         variant="text"
                         size="small"
-                        onClick={() => void zurueckziehen(bewerbung.id)}
-                        disabled={laeuftGerade}
+                        onClick={() => void withdraw(application.id)}
+                        disabled={busy}
                         sx={{ flexShrink: 0 }}
                       >
                         {t("common.withdraw")}

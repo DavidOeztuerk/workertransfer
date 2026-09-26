@@ -57,7 +57,7 @@ public enum DraftStep
 /// <remarks>
 /// <strong>The sentence stays German, and that is a contract.</strong> It
 /// reaches the interface as the problem detail of <c>/write</c> and
-/// <c>/revise</c>, and <c>web/src/features/work/lib/schreibfehler.ts</c>
+/// <c>/revise</c>, and <c>web/src/features/work/lib/draftErrors.ts</c>
 /// recognises it by "kann nicht (geschrieben|geändert|überarbeitet) werden" —
 /// an English sentence would silently turn "this step is not possible now" into
 /// "the provider answers".

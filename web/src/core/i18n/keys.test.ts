@@ -160,33 +160,46 @@ const DYNAMIC: Record<string, () => Record<string, unknown>[] | string[]> = {
     each("number", constantArray("features/public/pages/HomePage.tsx", "grundlagen")),
   "home.principle${number}Text": () =>
     each("number", constantArray("features/public/pages/HomePage.tsx", "grundlagen")),
-  "drafts.${Schreibgrund}": () =>
-    each("Schreibgrund", unionMembers(`${WORK}/lib/schreibfehler.ts`, "Schreibgrund")),
-  "drafts.${schreibgrund(error)}": () =>
-    unionMembers(`${WORK}/lib/schreibfehler.ts`, "Schreibgrund").map((error) => ({
-      schreibgrund: (reason: string) => reason,
+  "drafts.${WritingReason}": () =>
+    each("WritingReason", unionMembers(`${WORK}/lib/draftErrors.ts`, "WritingReason")),
+  "drafts.${writingReason(error)}": () =>
+    unionMembers(`${WORK}/lib/draftErrors.ts`, "WritingReason").map((error) => ({
+      writingReason: (reason: string) => reason,
       error,
     })),
-  "drafts.${grund}": () =>
-    each("grund", unionMembers(`${WORK}/lib/schreibfehler.ts`, "Schreibgrund")),
-  "drafts.status.${stand}": () =>
-    each("stand", unionMembers(`${WORK}/api/applications.ts`, "DraftStatus")),
-  "drafts.statusHint.${stand}": () =>
-    each("stand", unionMembers(`${WORK}/api/applications.ts`, "DraftStatus")),
+  "drafts.${reason}": () =>
+    each("reason", unionMembers(`${WORK}/lib/draftErrors.ts`, "WritingReason")),
+  "drafts.status.${status}": () =>
+    each("status", unionMembers(`${WORK}/api/applications.ts`, "DraftStatus")),
+  "drafts.statusHint.${status}": () =>
+    each("status", unionMembers(`${WORK}/api/applications.ts`, "DraftStatus")),
   // The two job labels look a word up in a local table; the real function runs.
   "job.remote${key[value]}": () => captured(() => REMOTE_MODES.map(remoteLabel)),
   "job.employment${key[value]}": () => captured(() => EMPLOYMENT_TYPES.map(employmentLabel)),
+  // `caseItem` and `conversation` are the person's pages (features/work),
+  // `vorgang` and `gespraech` the company's (features/company) — two sites, one
+  // union each.
+  "assessments.state_${caseItem.state}": () =>
+    nested("caseItem", "state", unionMembers(`${WORK}/api/assessments.ts`, "CaseState")),
   "assessments.state_${vorgang.state}": () =>
-    nested("vorgang", "state", unionMembers(`${WORK}/api/arbeitsproben.ts`, "Vorgangsstand")),
+    nested("vorgang", "state", unionMembers(`${WORK}/api/assessments.ts`, "CaseState")),
+  "assessments.outcome_${caseItem.evaluation.outcome}": () =>
+    unionMembers(`${WORK}/api/assessments.ts`, "Outcome").map((outcome) => ({
+      caseItem: { evaluation: { outcome } },
+    })),
   "assessments.outcome_${vorgang.evaluation.outcome}": () =>
-    unionMembers(`${WORK}/api/arbeitsproben.ts`, "Ausgang").map((outcome) => ({
+    unionMembers(`${WORK}/api/assessments.ts`, "Outcome").map((outcome) => ({
       vorgang: { evaluation: { outcome } },
     })),
+  "advisor.state_${conversation.state}": () =>
+    nested("conversation", "state", unionMembers(`${WORK}/api/advisor.ts`, "ConversationState")),
   "advisor.state_${gespraech.state}": () =>
-    nested("gespraech", "state", unionMembers(`${WORK}/api/advisor.ts`, "Gespraechsstand")),
+    nested("gespraech", "state", unionMembers(`${WORK}/api/advisor.ts`, "ConversationState")),
+  "advisor.stage${conversation.stage}Short": () =>
+    nested("conversation", "stage", [0, 1, 2, 3]),
   "advisor.stage${gespraech.stage}Short": () => nested("gespraech", "stage", [0, 1, 2, 3]),
-  "advisor.stage${Math.min(gespraech.stage + 1, 3)}": () =>
-    nested("gespraech", "stage", [0, 1, 2, 3]),
+  "advisor.stage${Math.min(conversation.stage + 1, 3)}": () =>
+    nested("conversation", "stage", [0, 1, 2, 3]),
   "scout.attendance_${treffer.reach_attendance}": () =>
     nested("treffer", "reach_attendance", ["remote", "hybrid", "vor_ort"]),
   "scout.reach_${treffer.reach}": () =>

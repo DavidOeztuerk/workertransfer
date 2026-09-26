@@ -75,7 +75,7 @@ test("bewerben öffnet die eigenen Daten, zurückziehen schließt sie", async ({
   // mehr. `/jobs/{id}/apply` war zuletzt nur eine Weiche — sie legte einen
   // Entwurf an und leitete weiter —, und darunter lag ein unerreichbares
   // Formular mit zwei Freigabekästchen. Adresse und Formular sind gefallen;
-  // was sie tat, tut jetzt `lib/entwuerfe`, gerufen von der Stellenliste UND
+  // was sie tat, tut jetzt `lib/startDrafts`, gerufen von der Stellenliste UND
   // von der Karriereseite.
   //
   // Geklickt wird deshalb der Knopf auf der Karte. Das Ziel bleibt dasselbe:

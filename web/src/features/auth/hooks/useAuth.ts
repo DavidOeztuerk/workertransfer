@@ -1,5 +1,5 @@
 import { useAppDispatch } from "../../../core/store/hooks";
-import { useHandelnder, type Handelnder } from "../../work/lib/session";
+import { useActor, type Actor } from "../../work/lib/session";
 import { erneuern, loadSession, login, logout } from "../store/authThunks";
 
 /**
@@ -8,17 +8,17 @@ import { erneuern, loadSession, login, logout } from "../store/authThunks";
  * Keine Rollen aus dem Token (ADR-0018: Mitgliedschaft je Vorgang). Kein
  * JWT-Decode, kein Speicher. Tokens bleiben httpOnly-Cookies.
  */
-export function useAuth(): Handelnder & {
+export function useAuth(): Actor & {
   login: (email: string, password: string) => void;
   logout: () => void;
   refresh: () => void;
   load: () => void;
 } {
-  const handelnder = useHandelnder();
+  const actor = useActor();
   const dispatch = useAppDispatch();
 
   return {
-    ...handelnder,
+    ...actor,
     login: (email, password) => {
       void dispatch(login({ email, password }));
     },

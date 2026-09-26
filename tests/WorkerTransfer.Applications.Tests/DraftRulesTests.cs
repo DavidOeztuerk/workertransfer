@@ -223,7 +223,7 @@ public sealed class DraftRulesTests
     /// The reason a failure leaves behind is read by the interface, by its words.
     /// </summary>
     /// <remarks>
-    /// <c>web/src/features/work/lib/schreibfehler.ts</c> recognises "nothing set
+    /// <c>web/src/features/work/lib/draftErrors.ts</c> recognises "nothing set
     /// up" by <c>/no writing-help provider/i</c> (or the German sentence it
     /// replaced). A reworded constant would silently turn "set up a provider"
     /// into "the provider answers".

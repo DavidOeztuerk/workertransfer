@@ -1,49 +1,45 @@
-// Der Abgleich zwischen dem eigenen Profil und dem, was eine Stelle verlangt.
+// The comparison between one's own profile and what a job asks for.
 //
-// Er steht hier und nicht auf dem Server, und das ist die tragende
-// Entscheidung dieses Schnitts: **die Passung existiert nirgends als
-// Datensatz.** Kein Feld, keine Tabelle, keine Kennzahl, die später jemand
-// auswertet oder einem Unternehmen zeigt. Sie lebt, solange die Seite offen
-// ist, und verschwindet mit ihr — was es nicht gibt, kann auch nicht
-// ausgewertet werden.
+// It stands here and not on the server, and that is the load-bearing decision
+// of this cut: **the fit exists nowhere as a record.** No field, no table, no
+// figure that somebody evaluates later or shows to a company. It lives while
+// the page is open and disappears with it — what does not exist cannot be
+// evaluated either.
 //
-// Und sie geht in die andere Richtung als das übliche „Matching": sie ordnet
-// Stellen für eine Person, nicht Menschen für ein Unternehmen. Eine Rangfolge
-// von Menschen bliebe eine Rangfolge von Menschen, gleich woraus sie gerechnet
-// wurde (ADR-0022).
+// And it goes in the other direction from the usual "matching": it orders jobs
+// for a person, not people for a company. A ranking of people would stay a
+// ranking of people, whatever it was computed from (ADR-0022).
 
 export interface SkillMatch {
-  /** Aus der Liste der Stelle: was die Person laut Profil kann. */
+  /** From the job's list: what the person can do according to the profile. */
   have: string[];
-  /** Aus derselben Liste: was fehlt. Das ist der Teil, der etwas nützt. */
+  /** From the same list: what is missing. That is the part that helps. */
   missing: string[];
 }
 
-// `toLowerCase` statt `toLocaleLowerCase`: letzteres macht aus „I" im
-// Türkischen ein „ı", und die Sprache des Browsers hätte dann Einfluss darauf,
-// ob jemand als passend gilt.
+// `toLowerCase` instead of `toLocaleLowerCase`: the latter turns "I" into "ı" in
+// Turkish, and the browser's language would then influence whether somebody
+// counts as a fit.
 const key = (skill: string): string => skill.trim().toLowerCase();
 
 /**
- * Teilt die Liste der Stelle in Haken und Lücken.
+ * Splits the job's list into ticks and gaps.
  *
- * Bewusst **keine** Prozentzahl: eine sieht aus wie eine Messung und ist eine
- * Division — und sie verschweigt genau das, was zählt, nämlich WELCHE
- * Fähigkeit fehlt. Die Liste sagt es, und damit weiß die Person, was sie tun
- * könnte.
+ * Deliberately **no** percentage: one looks like a measurement and is a
+ * division — and it hides exactly what counts, namely WHICH skill is missing.
+ * The list says it, and with it the person knows what they could do.
  *
- * Verglichen wird auf Gleichheit, nicht auf Enthaltensein: „Java" ist nicht
- * „JavaScript", und ein Treffer, den niemand behauptet hat, schickt jemanden
- * mit einer falschen Auskunft in ein Gespräch.
+ * Compared for equality, not containment: "Java" is not "JavaScript", and a
+ * hit that nobody claimed sends somebody into a conversation with false
+ * information.
  */
 export function matchSkills(jobSkills: string[], profileSkills: string[]): SkillMatch {
   const owned = new Set(profileSkills.map(key).filter((skill) => skill !== ""));
   const have: string[] = [];
   const missing: string[] = [];
 
-  // Die Reihenfolge und die Schreibweise sind die der Ausschreibung. Sie mit
-  // den Wörtern der Person zu überschreiben wäre eine stille Umdeutung dessen,
-  // was das Unternehmen geschrieben hat.
+  // Order and spelling are those of the advert. Overwriting them with the
+  // person's words would silently reinterpret what the company wrote.
   for (const skill of jobSkills) {
     const cleaned = skill.trim();
     if (cleaned === "") continue;

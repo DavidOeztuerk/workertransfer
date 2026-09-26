@@ -17,7 +17,7 @@ import { configure } from "@testing-library/react";
  * BACK TO 5 SECONDS. On 09.09.2026 it stood at 10, on the grounds that
  * `DraftPage` failed on the runner because of a fetch chain that was too long.
  * That was wrong: the increase changed nothing, and the test fell the same way
- * in the next run. The cause lay in `features/work/lib/kontext.ts` — an answer
+ * in the next run. The cause lay in `features/work/lib/letterContext.ts` — an answer
  * that arrived after the discard filled the cache again. It was never too
  * slow, it was the wrong value.
  *

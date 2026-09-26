@@ -6,7 +6,7 @@ namespace WorkerTransfer.Applications.Application.Ports;
 /// <remarks>
 /// The message lands in the draft's <c>error</c> field and in the problem detail
 /// of <c>/write</c> and <c>/revise</c>, and the interface classifies it by its
-/// words (<c>web/src/features/work/lib/schreibfehler.ts</c>): "no writing-help
+/// words (<c>web/src/features/work/lib/draftErrors.ts</c>): "no writing-help
 /// provider", "timeout", "empty response", a 4xx/5xx number. Whoever rewords a
 /// reason checks it against that file — otherwise the person reads "the
 /// provider answers" where she should read "nothing is set up".
