@@ -15,7 +15,8 @@ const string serviceName = "companies-service";
 
 // No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 // The employer profile is how the company presents itself and stands
 // publicly — writing it demands an `admin`. Who that is, the MEMBERSHIP TABLE

@@ -14,7 +14,8 @@ const string serviceName = "consent-service";
 // No AsIssuer(): only identity-service holds the private half of the key.
 // This service verifies tokens and mints none.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 builder.Services.AddConsentInfrastructure(
     builder.Configuration,

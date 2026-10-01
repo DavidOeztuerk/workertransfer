@@ -16,7 +16,8 @@ const string serviceName = "profile-service";
 // be a second place that can produce a principal — afterwards nobody could tell
 // the two apart.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.Used);
 
 builder.Services.AddProfileInfrastructure(
     builder.Configuration,

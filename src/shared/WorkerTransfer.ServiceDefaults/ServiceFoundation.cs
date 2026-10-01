@@ -17,6 +17,24 @@ using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.ServiceDefaults;
 
+/// <summary>What a service states about its use of a model.</summary>
+/// <remarks>
+/// <para>A declaration, not an observation, and it is made per service in its
+/// <c>Program.cs</c>. Neither value is 0, so a forgotten argument is refused
+/// at startup rather than read as "no".</para>
+/// </remarks>
+public enum ArtificialIntelligence
+{
+    /// <summary>The service calls no model and reads no person's AI access.</summary>
+    NotUsed = 1,
+
+    /// <summary>
+    /// The service calls a model or holds a person's AI access. Which endpoint
+    /// is decided per person at run time, so none is named.
+    /// </summary>
+    Used = 2,
+}
+
 /// <summary>
 /// The one call every service makes, and the one that decides nothing a service
 /// has to decide for itself.
@@ -68,14 +86,27 @@ public static class ServiceFoundation
     /// <param name="configuration">The service's configuration.</param>
     /// <param name="environment">Where it runs.</param>
     /// <param name="serviceName">What it calls itself in logs and telemetry.</param>
+    /// <param name="artificialIntelligence">What this service states about its
+    /// use of a model. Required: see <see cref="ArtificialIntelligence"/>.</param>
     /// <param name="additional">Modules only this service needs.</param>
     public static IServiceCollection AddWorkerTransferDefaults(
         this IServiceCollection services,
         IConfiguration configuration,
         IHostEnvironment environment,
         string serviceName,
+        ArtificialIntelligence artificialIntelligence,
         Action<NoeliaBuilder>? additional = null)
     {
+        // `default(ArtificialIntelligence)` is 0 and names neither value: a
+        // forgotten argument must not arrive as a silent "no".
+        if (!Enum.IsDefined(artificialIntelligence))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(artificialIntelligence),
+                "Every service states its model use: ArtificialIntelligence.Used "
+                + "or ArtificialIntelligence.NotUsed.");
+        }
+
         // The input sanitization does NOT look into JSON bodies. Measured, not
         // assumed.
         //
@@ -185,9 +216,20 @@ public static class ServiceFoundation
                 // What does NOT stand in the configuration must not go out
                 // either. That is exactly the purpose: a telemetry package with
                 // a built-in default address, an SDK that phones home.
+                //
+                // THE MODEL USE IS DECLARED, because it cannot be observed here.
+                // Noelia recognises a model endpoint by its host name, and the
+                // endpoints that matter here stand per person in `AiAccessV1` —
+                // `openai_compatible` on `localhost` included. Since 7.0.0 an
+                // undeclared service reports "not determined" instead of a green
+                // inventory; the declaration says yes or no, and "yes" carries
+                // no endpoint, because the endpoints are not known at startup.
+                // `wt.ki.anbieter` stays the complete list.
                 .AddSovereignPlatform(sovereign => Declare(
-                    sovereign.Allow([.. CalledHosts(configuration)]),
-                    configuration))
+                        sovereign.Allow([.. CalledHosts(configuration)]),
+                        configuration)
+                    .DeclareArtificialIntelligence(
+                        artificialIntelligence == ArtificialIntelligence.Used))
 
                 // THE OPERATIONS SURFACE, and it replaces seven addresses of
                 // our own (ADR-0045).

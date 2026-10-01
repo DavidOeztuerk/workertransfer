@@ -239,9 +239,12 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
         page.Should().Contain("noelia.ai.record-keeping");
 
         // And that is the difference that matters: Noelia's inventory
-        // recognises model endpoints by HOSTNAME and reports "no recognised
-        // endpoint" here; ours reads the configured accesses and names
-        // api.anthropic.com. A lower bound against completeness.
+        // recognises model endpoints by HOSTNAME — here the operator's
+        // api.anthropic.com — and never a person's own access out of
+        // `AiAccessV1`; ours reads those too. A lower bound against
+        // completeness. Since 7.0.0 a service whose host is not recognisable
+        // says "declared … not recognisable" instead of an empty green
+        // inventory (`ArtificialIntelligenceDeclarationTests`).
         page.Should().Contain("noelia.ai.inventory");
 
         page.Should().Contain("Headline").And.Contain("Wish");

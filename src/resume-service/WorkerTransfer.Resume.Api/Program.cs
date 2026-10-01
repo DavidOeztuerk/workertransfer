@@ -13,7 +13,8 @@ const string serviceName = "resume-service";
 
 // No AsIssuer(): only identity-service holds the private half of the key.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 builder.Services.AddResumeInfrastructure(
     builder.Configuration,
