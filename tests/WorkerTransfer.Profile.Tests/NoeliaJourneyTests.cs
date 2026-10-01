@@ -332,7 +332,22 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
         }
 
         report.GetProperty("service").GetString().Should().Be("profile-service");
-        report.GetProperty("schemaVersion").GetInt32().Should().Be(2);
+        report.GetProperty("schemaVersion").GetInt32().Should().Be(3);
+
+        // Schema 3 (Noelia 7.0.0) keeps the declaration, the HTTP guard and the
+        // observation apart. The guard is reported as configured and redirect-
+        // free, and traffic as NOT observed — never as a zero.
+        var sovereignty = report.GetProperty("sovereignty");
+        var guard = sovereignty.GetProperty("httpEgress");
+
+        guard.GetProperty("isEnforcing").GetBoolean().Should().BeTrue();
+        guard.GetProperty("redirects").GetString()
+            .Should().Be("DisabledForSupportedTransports");
+
+        var observed = sovereignty.GetProperty("observedCalls");
+
+        observed.GetProperty("state").ToString().Should().Be("Unavailable");
+        observed.GetProperty("count").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     /// <summary>Every reference in the report carries what stays open.</summary>

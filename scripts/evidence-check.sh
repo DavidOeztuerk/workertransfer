@@ -80,7 +80,7 @@ for entry in "${SERVICES[@]}"; do
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     report = json.load(f)
-# Noelia's operator report, schema 2: the checks live under
+# Noelia's operator report, schema 3 since 7.0.0: the checks still live under
 # securityChecks.results, and their status is Pass/Warning/Fail/NotApplicable.
 findings = report["securityChecks"]["results"]
 tally = {}
