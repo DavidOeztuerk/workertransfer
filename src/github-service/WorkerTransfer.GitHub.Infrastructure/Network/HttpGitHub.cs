@@ -209,39 +209,42 @@ public sealed class HttpGitHub(
 
     private async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
-        using var client = factory.CreateClient(ClientName);
-        client.Timeout = _settings.Timeout;
+        var address = new Uri(new Uri(_settings.BaseUrl), path);
+        var response = await SendAsync(address, cancellationToken);
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
-
-        request.Headers.Accept.Add(
-            new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-
-        // Without this header GitHub answers everything with 403. See
-        // `GitHubSettings.UserAgent`.
-        request.Headers.UserAgent.ParseAdd(_settings.UserAgent);
-
-        if (_settings.Token is { Length: > 0 } token)
+        // A RENAMED REPOSITORY ANSWERS 301, and since Noelia 7.0.0 the client
+        // no longer follows it: under the egress boundary a redirect comes back
+        // to the caller. Measured 01.10.2026: `/repos/{old}/languages` →
+        // `301` to `/repositories/{id}/languages`. Followed here deliberately,
+        // once, and only within the API's own origin — the token goes along,
+        // so a Location elsewhere is not a place it may be sent to.
+        if (IsRedirect(response.StatusCode))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
+            using (response)
+            {
+                var target = response.Headers.Location is { } location
+                    ? new Uri(address, location)
+                    : null;
 
-        HttpResponseMessage response;
+                if (target is null || !SameOrigin(target, address))
+                {
+                    log.LogWarning(
+                        "GitHub redirected with {Code} to another origin; not followed",
+                        (int)response.StatusCode);
+                    throw new GitHubSilent(
+                        $"github redirected ({(int)response.StatusCode}) to another origin");
+                }
 
-        try
-        {
-            response = await client.SendAsync(request, cancellationToken);
-        }
-        catch (HttpRequestException error)
-        {
-            log.LogWarning("GitHub unreachable ({Kind})", error.GetType().Name);
-            throw new GitHubSilent("github unreachable", error);
-        }
-        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
-        {
-            log.LogWarning("GitHub did not answer in time");
-            throw new GitHubSilent("github did not answer in time", error);
+                address = target;
+            }
+
+            response = await SendAsync(address, cancellationToken);
+
+            if (IsRedirect(response.StatusCode))
+            {
+                response.Dispose();
+                throw new GitHubSilent("github redirected more than once");
+            }
         }
 
         using (response)
@@ -268,4 +271,52 @@ public sealed class HttpGitHub(
             }
         }
     }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        Uri address, CancellationToken cancellationToken)
+    {
+        using var client = factory.CreateClient(ClientName);
+        client.Timeout = _settings.Timeout;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, address);
+
+        request.Headers.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+
+        // Without this header GitHub answers everything with 403. See
+        // `GitHubSettings.UserAgent`.
+        request.Headers.UserAgent.ParseAdd(_settings.UserAgent);
+
+        if (_settings.Token is { Length: > 0 } token)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        try
+        {
+            return await client.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException error)
+        {
+            log.LogWarning("GitHub unreachable ({Kind})", error.GetType().Name);
+            throw new GitHubSilent("github unreachable", error);
+        }
+        catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            log.LogWarning("GitHub did not answer in time");
+            throw new GitHubSilent("github did not answer in time", error);
+        }
+    }
+
+    private static bool IsRedirect(HttpStatusCode code) =>
+        code is HttpStatusCode.MovedPermanently
+            or HttpStatusCode.Found
+            or HttpStatusCode.SeeOther
+            or HttpStatusCode.TemporaryRedirect
+            or HttpStatusCode.PermanentRedirect;
+
+    private static bool SameOrigin(Uri target, Uri origin) =>
+        Uri.Compare(
+            target, origin, UriComponents.SchemeAndServer, UriFormat.Unescaped,
+            StringComparison.OrdinalIgnoreCase) == 0;
 }
