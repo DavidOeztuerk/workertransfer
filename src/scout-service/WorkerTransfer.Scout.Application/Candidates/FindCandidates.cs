@@ -130,11 +130,21 @@ public sealed class CandidatesHandler(
         //     its own. One after the other and not in parallel: towards a foreign
         //     service a page with fifty simultaneous requests is a small attack,
         //     and the cap above keeps the number small enough.
+        //
+        //     Silent once means silent for this page. Each fetch has its own time
+        //     limit, and asking a silent github-service again for every hit
+        //     stacked them: fourteen hits took 30.9 s, measured 02.10.2026, and
+        //     the company looked at an empty list all that time.
         var hits = new List<Hit>(visible.Length);
+        var silent = false;
 
         foreach (var profile in visible)
         {
-            var sheet = await evidenceSource.GetAsync(profile.Subject, cancellationToken);
+            var sheet = silent
+                ? new EvidenceSheet([], EvidenceState.Unavailable)
+                : await evidenceSource.GetAsync(profile.Subject, cancellationToken);
+
+            silent = sheet.State == EvidenceState.Unavailable;
 
             hits.Add(new Hit(
                 profile.Subject,
