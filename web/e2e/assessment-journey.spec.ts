@@ -100,7 +100,12 @@ test("effort up front, rejection with a reason, no decline button", async ({ bro
   await recruiter.getByLabel(/Bis wann/i).fill(inDays(7));
   await recruiter.getByRole("button", { name: "Aufgabe stellen", exact: true }).click();
 
-  await expect(recruiter.getByText(/between 1 and 8 hours/i)).toBeVisible();
+  // The server names the rule ("the stated effort is between 1 and 8 hours",
+  // English on the wire); the page says it in the person's language. Until
+  // 26.09.2026 this line expected the server's English sentence, i.e. it
+  // pinned that the page drew it raw.
+  await expect(recruiter.getByText(/Der Umfang liegt außerhalb des Erlaubten/)).toBeVisible();
+  await expect(recruiter.getByText(/between 1 and 8 hours/i)).toHaveCount(0);
 
   // And now properly.
   await recruiter.getByLabel(/Umfang in Stunden/i).fill("4");
