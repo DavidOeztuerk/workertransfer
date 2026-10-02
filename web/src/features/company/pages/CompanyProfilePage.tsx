@@ -154,8 +154,18 @@ export function CompanyProfilePage() {
     >
       <Card>
         <CardContent>
-          {profile.pending ? (
+          {!adopted && profile.pending ? (
             <LoadingBlock label={t("companyProfile.loading")} />
+          ) : null}
+
+          {/* The form shows the STORED profile or nothing: drawn empty while
+              the answer was out, what an admin typed was replaced when it came,
+              and with no answer at all "Speichern" wrote empty fields over the
+              profile every applicant sees. */}
+          {!adopted && profile.data !== null && !profile.data.ok ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {t(failureKey(profile.data.error, "errors.profileUnavailable"))}
+            </Alert>
           ) : null}
 
           {error !== null ? (
@@ -170,115 +180,117 @@ export function CompanyProfilePage() {
             </Alert>
           ) : null}
 
-          <Box
-            component="form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save();
-            }}
-            sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
-          >
-            <TextField
-              label={t("companyProfile.displayName")}
-              helperText={t("companyProfile.displayNameHint")}
-              value={draft.display_name}
-              onChange={(e) => {
-                setDraft({ ...draft, display_name: e.target.value });
-                setSaved(false);
+          {adopted ? (
+            <Box
+              component="form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save();
               }}
-              required
-            />
-            <TextField
-              label={t("companyProfile.aboutUs")}
-              helperText={t("companyProfile.aboutUsHint")}
-              value={draft.about}
-              onChange={(e) => {
-                setDraft({ ...draft, about: e.target.value });
-                setSaved(false);
-              }}
-              multiline
-              minRows={4}
-            />
-            <TextField
-              label={t("companyProfile.website")}
-              helperText={t("companyProfile.websiteHint")}
-              value={draft.website}
-              onChange={(e) => {
-                setDraft({ ...draft, website: e.target.value });
-                setSaved(false);
-              }}
-            />
-            <TextField
-              label={t("companyProfile.locations")}
-              helperText={t("companyProfile.locationsHint")}
-              value={draft.locations}
-              onChange={(e) => {
-                setDraft({ ...draft, locations: e.target.value });
-                setSaved(false);
-              }}
-            />
-            <TextField
-              label={t("companyProfile.street")}
-              helperText={t("companyProfile.streetHint")}
-              value={draft.line1}
-              onChange={(e) => {
-                setDraft({ ...draft, line1: e.target.value });
-                setSaved(false);
-              }}
-            />
-            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
+              sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
+            >
               <TextField
-                label={t("companyProfile.postalCode")}
-                value={draft.postal_code}
+                label={t("companyProfile.displayName")}
+                helperText={t("companyProfile.displayNameHint")}
+                value={draft.display_name}
                 onChange={(e) => {
-                  setDraft({ ...draft, postal_code: e.target.value });
+                  setDraft({ ...draft, display_name: e.target.value });
+                  setSaved(false);
+                }}
+                required
+              />
+              <TextField
+                label={t("companyProfile.aboutUs")}
+                helperText={t("companyProfile.aboutUsHint")}
+                value={draft.about}
+                onChange={(e) => {
+                  setDraft({ ...draft, about: e.target.value });
+                  setSaved(false);
+                }}
+                multiline
+                minRows={4}
+              />
+              <TextField
+                label={t("companyProfile.website")}
+                helperText={t("companyProfile.websiteHint")}
+                value={draft.website}
+                onChange={(e) => {
+                  setDraft({ ...draft, website: e.target.value });
                   setSaved(false);
                 }}
               />
               <TextField
-                label={t("companyProfile.city")}
-                value={draft.city}
+                label={t("companyProfile.locations")}
+                helperText={t("companyProfile.locationsHint")}
+                value={draft.locations}
                 onChange={(e) => {
-                  setDraft({ ...draft, city: e.target.value });
+                  setDraft({ ...draft, locations: e.target.value });
                   setSaved(false);
                 }}
               />
               <TextField
-                label={t("companyProfile.country")}
-                value={draft.country}
+                label={t("companyProfile.street")}
+                helperText={t("companyProfile.streetHint")}
+                value={draft.line1}
                 onChange={(e) => {
-                  setDraft({ ...draft, country: e.target.value });
+                  setDraft({ ...draft, line1: e.target.value });
                   setSaved(false);
                 }}
-                slotProps={{ htmlInput: { maxLength: 2 } }}
               />
-            </Box>
-            <TextField
-              label={t("companyProfile.phone")}
-              value={draft.phone}
-              onChange={(e) => {
-                setDraft({ ...draft, phone: e.target.value });
-                setSaved(false);
-              }}
-            />
-            <TextField
-              label={t("companyProfile.benefits")}
-              helperText={t("companyProfile.benefitsHint")}
-              value={draft.benefits}
-              onChange={(e) => {
-                setDraft({ ...draft, benefits: e.target.value });
-                setSaved(false);
-              }}
-            />
+              <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 2fr 1fr" } }}>
+                <TextField
+                  label={t("companyProfile.postalCode")}
+                  value={draft.postal_code}
+                  onChange={(e) => {
+                    setDraft({ ...draft, postal_code: e.target.value });
+                    setSaved(false);
+                  }}
+                />
+                <TextField
+                  label={t("companyProfile.city")}
+                  value={draft.city}
+                  onChange={(e) => {
+                    setDraft({ ...draft, city: e.target.value });
+                    setSaved(false);
+                  }}
+                />
+                <TextField
+                  label={t("companyProfile.country")}
+                  value={draft.country}
+                  onChange={(e) => {
+                    setDraft({ ...draft, country: e.target.value });
+                    setSaved(false);
+                  }}
+                  slotProps={{ htmlInput: { maxLength: 2 } }}
+                />
+              </Box>
+              <TextField
+                label={t("companyProfile.phone")}
+                value={draft.phone}
+                onChange={(e) => {
+                  setDraft({ ...draft, phone: e.target.value });
+                  setSaved(false);
+                }}
+              />
+              <TextField
+                label={t("companyProfile.benefits")}
+                helperText={t("companyProfile.benefitsHint")}
+                value={draft.benefits}
+                onChange={(e) => {
+                  setDraft({ ...draft, benefits: e.target.value });
+                  setSaved(false);
+                }}
+              />
 
-            <Box>
-              <Button type="submit" variant="contained" disabled={running}>
-                {running
-                  ? t("common.saving")
-                  : t("common.save")}
-              </Button>
+              <Box>
+                <Button type="submit" variant="contained" disabled={running}>
+                  {running
+                    ? t("common.saving")
+                    : t("common.save")}
+                </Button>
+              </Box>
             </Box>
-          </Box>
+          ) : null}
         </CardContent>
       </Card>
     </PageShell>
