@@ -8,59 +8,59 @@
         "Services": [
           {
             "Name": "identity-service",
-            "Address": "http://identity-service:8001/noelia"
+            "Address": "http://localhost:8001/noelia"
           },
           {
             "Name": "consent-service",
-            "Address": "http://consent-service:8002/noelia"
+            "Address": "http://localhost:8002/noelia"
           },
           {
             "Name": "profile-service",
-            "Address": "http://profile-service:8003/noelia"
+            "Address": "http://localhost:8003/noelia"
           },
           {
             "Name": "resume-service",
-            "Address": "http://resume-service:8004/noelia"
+            "Address": "http://localhost:8004/noelia"
           },
           {
             "Name": "portfolio-service",
-            "Address": "http://portfolio-service:8005/noelia"
+            "Address": "http://localhost:8005/noelia"
           },
           {
             "Name": "jobs-service",
-            "Address": "http://jobs-service:8006/noelia"
+            "Address": "http://localhost:8006/noelia"
           },
           {
             "Name": "applications-service",
-            "Address": "http://applications-service:8007/noelia"
+            "Address": "http://localhost:8007/noelia"
           },
           {
             "Name": "companies-service",
-            "Address": "http://companies-service:8008/noelia"
+            "Address": "http://localhost:8008/noelia"
           },
           {
             "Name": "transfer-service",
-            "Address": "http://transfer-service:8009/noelia"
+            "Address": "http://localhost:8009/noelia"
           },
           {
             "Name": "notification-service",
-            "Address": "http://notification-service:8010/noelia"
+            "Address": "http://localhost:8010/noelia"
           },
           {
             "Name": "github-service",
-            "Address": "http://github-service:8011/noelia"
+            "Address": "http://localhost:8011/noelia"
           },
           {
             "Name": "scout-service",
-            "Address": "http://scout-service:8012/noelia"
+            "Address": "http://localhost:8012/noelia"
           },
           {
             "Name": "advisor-service",
-            "Address": "http://advisor-service:8013/noelia"
+            "Address": "http://localhost:8013/noelia"
           },
           {
             "Name": "assessment-service",
-            "Address": "http://assessment-service:8014/noelia"
+            "Address": "http://localhost:8014/noelia"
           }
         ]
       }

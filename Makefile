@@ -9,7 +9,7 @@ DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
         fix dev env up down images route-map analyze evidence evidence-check \
-        control-plane k8s-up k8s-down k8s-lint k8s-seed clean
+        control-plane control-plane-down k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # This list.
 	@# `0-9` in the pattern, otherwise k8s-up/-down/-seed/-lint are missing —
@@ -125,10 +125,13 @@ k8s-seed:  # Test data into the running environment: company, three jobs, an app
 	./scripts/k8s-seed.sh
 
 control-plane:  # The Noelia Control Plane over the running stack: http://localhost:8091
-	@# An overlay and no part of `make up`: the product lives in a neighbouring
-	@# repository, and `make up` must fail for nobody because of it.
-	@# The path can be redirected with NOELIA_CONTROL_PLANE_PFAD.
-	docker compose -f docker-compose.yml -f docker-compose.noelia.yml up -d --build noelia-control-plane
+	@# On the host, not in a container: its local mode accepts only loopback
+	@# peers, and Docker's port forwarding never is one. The reason stands in
+	@# the script. The path can be redirected with NOELIA_CONTROL_PLANE_PFAD.
+	./scripts/control-plane.sh
+
+control-plane-down:  # Stop the control plane.
+	./scripts/control-plane.sh --down
 
 images:  # Build both shipped images. The local twin of the CI job.
 	@# A green check that builds no image says nothing about what is shipped:
