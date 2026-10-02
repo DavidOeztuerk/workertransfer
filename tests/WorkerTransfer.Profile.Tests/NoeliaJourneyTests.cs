@@ -598,4 +598,36 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
                 "wtProtectedKey", "the wrapper names itself");
         }
     }
+
+    /// <summary>What one process protected, the next one can still read.</summary>
+    /// <remarks>
+    /// The whole point of a ring in the database: a replaced container must
+    /// still verify what the old one issued. The framework rebuilds the
+    /// decryptor from the type name stored in the key, with a constructor that
+    /// takes an <c>IServiceProvider</c> or nothing — the container's
+    /// <c>IXmlDecryptor</c> registration is never asked. Until 02.10.2026 the
+    /// decryptor took a <c>SecretStore</c>, every start logged
+    /// <c>MissingMethodException</c>, discarded the stored keys and made new
+    /// ones, and the two tests above stayed green.
+    /// </remarks>
+    [Fact]
+    public void A_second_process_reads_what_the_first_protected()
+    {
+        var protectedText = _service.Services.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("journey").Protect("something");
+
+        using var second = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        {
+            host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
+            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-ring");
+        });
+
+        second.Services.GetRequiredService<IDataProtectionProvider>()
+            .CreateProtector("journey").Unprotect(protectedText)
+            .Should().Be("something");
+    }
 }
