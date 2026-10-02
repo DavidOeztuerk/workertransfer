@@ -450,6 +450,10 @@ services:
       # As with Draft__BaseUrl: the target belongs in the configuration, so the
       # report and the egress boundary see it.
       GitHub__BaseUrl: https://api.github.com
+      # The sign-in's code exchange goes to github.com, not to the API. As a
+      # default in the source only, the egress boundary refused it, and every
+      # OAuth sign-in ended in "github is unreachable".
+      GitHub__OAuth__AuthorizeUrl: https://github.com
     ports:
       - "8011:8011"
   scout-service:
