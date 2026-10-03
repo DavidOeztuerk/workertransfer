@@ -1,5 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
+using WorkerTransfer.Assessment.Domain.Audit;
 using WorkerTransfer.Assessment.Application.Messages;
 using WorkerTransfer.Assessment.Domain.Cases;
 
@@ -21,15 +22,26 @@ public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int
 /// right. Revoking them here as well would be a second place for the same
 /// erasure.</para>
 /// </remarks>
-public sealed class ErasePersonHandler(ICaseStore store)
+public sealed class ErasePersonHandler(
+    ICaseStore store,
+    IAuditTrail trail,
+    TimeProvider clock)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
     /// <returns>How much was deliberately kept. Always zero.</returns>
-    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
+    public async Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return store.DeleteAsync(request.Subject, cancellationToken);
+        var kept = await store.DeleteAsync(request.Subject, cancellationToken);
+
+        // In the same transaction as the erasure (the command runs in one):
+        // both commit, or neither. THAT it ran, never what it deleted.
+        await trail.AppendOnceAsync(
+            new AuditEntry(AuditAction.Erased, request.Subject, clock.GetUtcNow()),
+            cancellationToken);
+
+        return kept;
     }
 }

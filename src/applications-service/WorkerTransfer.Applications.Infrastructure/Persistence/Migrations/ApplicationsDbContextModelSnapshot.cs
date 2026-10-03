@@ -100,6 +100,34 @@ namespace WorkerTransfer.Applications.Infrastructure.Persistence.Migrations
                     b.ToTable("applications", (string)null);
                 });
 
+            modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.AuditRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetId", "Action")
+                        .HasDatabaseName("ix_audit_events_target_action");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Applications.Infrastructure.Persistence.CommentRow", b =>
                 {
                     b.Property<Guid>("Id")

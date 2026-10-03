@@ -4,12 +4,14 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using Npgsql;
 using Noelia.Core.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using WorkerTransfer.Portfolio.Application.Ports;
+using WorkerTransfer.Portfolio.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Portfolio.Tests;
@@ -420,6 +422,49 @@ public class PortfolioJourneyTests(Postgres postgres) : IAsyncLifetime
         afterwards.StatusCode.Should().Be(HttpStatusCode.OK);
         (await afterwards.Content.ReadAsStringAsync()).Trim().Should().Be("null");
         Directory.Exists(folder).Should().BeFalse("the work samples went with it");
+    }
+
+    /// <summary>The erasure leaves exactly one row behind: THAT it ran.</summary>
+    /// <remarks>
+    /// Measured in the database, not in the answer: a receipt can say "done"
+    /// over an empty trail. Erased twice, because the cascade delivers at least
+    /// once — a second delivery must not record a second erasure (ADR-0012,
+    /// ADR-0027).
+    /// </remarks>
+    [Fact]
+    public async Task The_erasure_leaves_exactly_one_audit_row()
+    {
+        var anna = Guid.CreateVersion7();
+        var hers = As(anna);
+        await Write(hers, await Upload(hers));
+
+        for (var delivery = 0; delivery < 2; delivery++)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+            {
+                Content = JsonContent.Create(new { user_id = anna })
+            };
+            request.Headers.Add("X-Erasure-Secret", ErasureSecret);
+
+            (await _service.CreateClient().SendAsync(request))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await using var source = PortfolioDbContextFactory.DataSource(postgres.ConnectionString);
+
+        await using (var portfolios = source.CreateCommand(
+            "SELECT count(*) FROM portfolios WHERE id = $1"))
+        {
+            portfolios.Parameters.Add(new NpgsqlParameter { Value = anna });
+            ((long)(await portfolios.ExecuteScalarAsync())!).Should().Be(0);
+        }
+
+        await using var trail = source.CreateCommand(
+            "SELECT count(*) FROM audit_events WHERE target_id = $1 AND action = 'erased'");
+        trail.Parameters.Add(new NpgsqlParameter { Value = anna });
+
+        ((long)(await trail.ExecuteScalarAsync())!)
+            .Should().Be(1, "the trail says once that the erasure ran, and nothing about what it deleted");
     }
 
     [Fact]

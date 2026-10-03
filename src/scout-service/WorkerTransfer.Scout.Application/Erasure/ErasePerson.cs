@@ -1,5 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
+using WorkerTransfer.Scout.Domain.Audit;
 using WorkerTransfer.Scout.Application.Messages;
 using WorkerTransfer.Scout.Domain.Searches;
 
@@ -19,15 +20,26 @@ public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int
 /// <para>This service knows no retention case: nothing stands here that belongs
 /// to somebody else. The answer is therefore always zero.</para>
 /// </remarks>
-public sealed class ErasePersonHandler(ISearchStore store)
+public sealed class ErasePersonHandler(
+    ISearchStore store,
+    IAuditTrail trail,
+    TimeProvider clock)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
     /// <returns>How much was deliberately kept. Always zero.</returns>
-    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
+    public async Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return store.DeleteAsync(request.Subject, cancellationToken);
+        var kept = await store.DeleteAsync(request.Subject, cancellationToken);
+
+        // In the same transaction as the erasure (the command runs in one):
+        // both commit, or neither. THAT it ran, never what it deleted.
+        await trail.AppendOnceAsync(
+            new AuditEntry(AuditAction.Erased, request.Subject, clock.GetUtcNow()),
+            cancellationToken);
+
+        return kept;
     }
 }

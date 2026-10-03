@@ -22,6 +22,34 @@ namespace WorkerTransfer.Assessment.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("WorkerTransfer.Assessment.Infrastructure.Persistence.AuditRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetId", "Action")
+                        .HasDatabaseName("ix_audit_events_target_action");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Assessment.Infrastructure.Persistence.CaseRow", b =>
                 {
                     b.Property<Guid>("Id")

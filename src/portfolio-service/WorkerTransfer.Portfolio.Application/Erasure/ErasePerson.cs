@@ -1,5 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
+using WorkerTransfer.Portfolio.Domain.Audit;
 using WorkerTransfer.Portfolio.Application.Messages;
 using WorkerTransfer.Portfolio.Domain.Documents;
 using WorkerTransfer.Portfolio.Domain.Portfolios;
@@ -16,7 +17,11 @@ public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int
 /// work sample is not — and nobody sees it, because the interface no longer
 /// links to it.
 /// </remarks>
-public sealed class ErasePersonHandler(IPortfolioStore store, IDocumentStore documents)
+public sealed class ErasePersonHandler(
+    IPortfolioStore store,
+    IDocumentStore documents,
+    IAuditTrail trail,
+    TimeProvider clock)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
@@ -32,6 +37,12 @@ public sealed class ErasePersonHandler(IPortfolioStore store, IDocumentStore doc
         var kept = await store.DeleteAsync(request.Subject, cancellationToken);
 
         await documents.DeleteAllAsync(request.Subject, cancellationToken);
+
+        // In the same transaction as the erasure (the command runs in one):
+        // both commit, or neither. THAT it ran, never what it deleted.
+        await trail.AppendOnceAsync(
+            new AuditEntry(AuditAction.Erased, request.Subject, clock.GetUtcNow()),
+            cancellationToken);
 
         return kept;
     }

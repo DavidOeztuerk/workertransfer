@@ -1,5 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
+using WorkerTransfer.Notification.Domain.Audit;
 using WorkerTransfer.Notification.Application.Messages;
 using WorkerTransfer.Notification.Application.Ports;
 
@@ -13,14 +14,25 @@ namespace WorkerTransfer.Notification.Application.Erasure;
 public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int>;
 
 /// <summary>Erases inbox and settings.</summary>
-public sealed class ErasePersonHandler(IErasureLedger ledger)
+public sealed class ErasePersonHandler(
+    IErasureLedger ledger,
+    IAuditTrail trail,
+    TimeProvider clock)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
-    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
+    public async Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return ledger.DeleteAsync(request.Subject, cancellationToken);
+        var kept = await ledger.DeleteAsync(request.Subject, cancellationToken);
+
+        // In the same transaction as the erasure (the command runs in one):
+        // both commit, or neither. THAT it ran, never what it deleted.
+        await trail.AppendOnceAsync(
+            new AuditEntry(AuditAction.Erased, request.Subject, clock.GetUtcNow()),
+            cancellationToken);
+
+        return kept;
     }
 }

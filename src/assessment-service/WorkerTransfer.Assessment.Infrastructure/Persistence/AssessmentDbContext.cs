@@ -81,6 +81,9 @@ public sealed class CaseRow
 public sealed class AssessmentDbContext(DbContextOptions<AssessmentDbContext> options)
     : DbContext(options)
 {
+    /// <summary>The audit trail. Survives the erasure it records.</summary>
+    public DbSet<AuditRow> AuditEntries => Set<AuditRow>();
+
     /// <summary>The cases.</summary>
     public DbSet<CaseRow> Cases => Set<CaseRow>();
 
@@ -123,6 +126,23 @@ public sealed class AssessmentDbContext(DbContextOptions<AssessmentDbContext> op
         });
 
         modelBuilder.ConfigureOutbox();
+
+        modelBuilder.Entity<AuditRow>(row =>
+        {
+            row.ToTable("audit_events");
+            row.HasKey(column => column.Id);
+            row.Property(column => column.Id).HasColumnName("id");
+            row.Property(column => column.Action).HasColumnName("action");
+            row.Property(column => column.TargetId).HasColumnName("target_id");
+            row.Property(column => column.OccurredAt).HasColumnName("occurred_at");
+            row.HasIndex(column => new { column.TargetId, column.Action })
+                .HasDatabaseName("ix_audit_events_target_action");
+
+            // Expressly NO foreign key to the erased rows: the erasure removes
+            // them and keeps the trail. A foreign key would mean either cascade
+            // — then the proof would disappear with them — or prohibition, and
+            // then the erasure would not go through.
+        });
 
         base.OnModelCreating(modelBuilder);
     }

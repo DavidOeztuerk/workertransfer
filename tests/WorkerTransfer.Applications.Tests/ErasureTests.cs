@@ -237,6 +237,29 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         return browser;
     }
 
+    /// <summary>The erasure leaves exactly one row behind: THAT it ran.</summary>
+    /// <remarks>
+    /// Measured in the database, not in the answer: a receipt can say "done"
+    /// over an empty trail. Erased twice, because the cascade delivers at least
+    /// once — a second delivery must not record a second erasure (ADR-0012,
+    /// ADR-0027).
+    /// </remarks>
+    [Fact]
+    public async Task The_erasure_leaves_exactly_one_audit_row()
+    {
+        var subject = Guid.CreateVersion7();
+        var application = await Application(subject, Guid.CreateVersion7(), "submitted");
+
+        (await Erase(subject)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Erase(subject)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var context = postgres.Context();
+        (await context.Applications.AnyAsync(row => row.Id == application)).Should().BeFalse();
+        (await context.AuditEntries.CountAsync(
+                row => row.TargetId == subject && row.Action == "erased"))
+            .Should().Be(1, "the trail says once that the erasure ran, and nothing about what it deleted");
+    }
+
     private Task<HttpResponseMessage> Erase(Guid subject)
     {
         var browser = _service.CreateClient();
