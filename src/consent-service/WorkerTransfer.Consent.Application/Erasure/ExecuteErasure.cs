@@ -65,6 +65,7 @@ public sealed class ExecuteErasureHandler(
         var subject = new SubjectId(request.Subject);
         var now = clock.GetUtcNow();
         var latest = await ledger.LatestPerSkillAsync(subject, cancellationToken);
+        var closed = 0;
 
         foreach (var consentEvent in latest)
         {
@@ -83,15 +84,23 @@ public sealed class ExecuteErasureHandler(
             await ledger.AttachAsync(
                 ConsentEvent.Delete(subject, consentEvent.Capability, now, subject),
                 cancellationToken);
+            closed++;
         }
 
         // Without the capability names. The trail records that the erasure ran;
         // listing what it covered would be the one statement about the person
         // that the very next step has to remove again.
-        await auditTrail.AttachAsync(
-            new AuditEvent(
-                AuditAction.ConsentDelete, now, subject, null, subject, correlation.Current),
-            cancellationToken);
+        //
+        // Only when this delivery closed something — the same idempotency as
+        // the ledger above. A second delivery wrote a second `consent_delete`
+        // until 03.10.2026: the trail then said the person was erased twice.
+        if (closed > 0)
+        {
+            await auditTrail.AttachAsync(
+                new AuditEvent(
+                    AuditAction.ConsentDelete, now, subject, null, subject, correlation.Current),
+                cancellationToken);
+        }
 
         // Afterwards, not before: this way it also catches the rows just
         // written, and there stays exactly one place where "no free text any

@@ -202,6 +202,34 @@ public class ErasureArrivalTests(Postgres postgres) : IAsyncLifetime
         (await Rows(anna)).Should().HaveCount(after.Count);
     }
 
+    /// <summary>The erasure leaves exactly one row behind: THAT it ran.</summary>
+    /// <remarks>
+    /// Measured in the database, not in the answer: a receipt can say "done"
+    /// over an empty trail. Erased twice, because the cascade delivers at least
+    /// once — a second delivery must not record a second erasure (ADR-0012,
+    /// ADR-0027).
+    /// </remarks>
+    [Fact]
+    public async Task The_erasure_leaves_exactly_one_audit_row()
+    {
+        var anna = await PersonWithReleases();
+
+        (await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _service.CreateClient().SendAsync(ErasureRequest(anna, Secret)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT count(*) FROM audit_events WHERE target_id = @subject AND action = 'consent_delete'";
+        command.Parameters.AddWithValue("subject", anna);
+
+        ((long)(await command.ExecuteScalarAsync())!)
+            .Should().Be(1, "the trail says once that the erasure ran, and nothing about what it covered");
+    }
+
     /// <summary>
     /// Nothing personal was retained, so the receipt says zero — even though
     /// the chain stays.
