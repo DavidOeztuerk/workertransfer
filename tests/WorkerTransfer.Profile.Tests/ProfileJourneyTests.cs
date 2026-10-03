@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using WorkerTransfer.Profile.Domain.Audit;
 using Noelia.Core.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -406,6 +407,40 @@ public class ProfileJourneyTests(Postgres postgres) : IAsyncLifetime
         var after = await AsPerson(anna).GetAsync("/profiles/me");
         after.StatusCode.Should().Be(HttpStatusCode.OK);
         (await after.Content.ReadAsStringAsync()).Trim().Should().Be("null");
+    }
+
+    /// <summary>The trail says once that a profile was deleted — and never when there was none.</summary>
+    /// <remarks>
+    /// The cascade delivers at least once. Until 03.10.2026 every delivery
+    /// appended "profile deleted", so a second one recorded a second erasure,
+    /// and a person without a profile got one recorded that never happened.
+    /// </remarks>
+    [Fact]
+    public async Task The_trail_records_a_deleted_profile_once_and_a_missing_one_never()
+    {
+        var anna = Guid.CreateVersion7();
+        var nobody = Guid.CreateVersion7();
+        await Write(AsPerson(anna));
+
+        foreach (var subject in new[] { anna, anna, nobody })
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/erasure")
+            {
+                Content = JsonContent.Create(new { user_id = subject })
+            };
+            request.Headers.Add("X-Erasure-Secret", ErasureSecret);
+
+            (await _service.CreateClient().SendAsync(request))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await using var context = Context();
+
+        context.AuditEntries.Count(row =>
+                row.TargetId == anna && row.Action == AuditAction.ProfileDeleted)
+            .Should().Be(1, "two deliveries are one erasure");
+        context.AuditEntries.Count(row => row.TargetId == nobody)
+            .Should().Be(0, "there was no profile to delete");
     }
 
     [Fact]
