@@ -203,6 +203,36 @@ public class CrossProofTests(Postgres postgres) : IAsyncLifetime
         attempt.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    /// <summary>After signing out, the access token itself is refused — not only the next refresh.</summary>
+    /// <remarks>
+    /// Ending the session only stopped the refresh: the access token stayed good
+    /// for up to fifteen minutes, in every service. A copy of the cookie taken
+    /// before the sign-out is the token a thief would hold.
+    /// </remarks>
+    [Fact]
+    public async Task After_signing_out_the_old_access_token_is_refused()
+    {
+        var browser = Browser();
+        var signedIn = await SignIn(browser, _email, Password);
+        var access = CookieFrom(signedIn, "access");
+
+        (await WithAccessCookie(access)).Should().Be(HttpStatusCode.OK, "the token is good before");
+
+        (await browser.PostAsync("/auth/logout", null))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await WithAccessCookie(access)).Should().Be(
+            HttpStatusCode.Unauthorized, "a signed-out token must not open anything any more");
+    }
+
+    private async Task<HttpStatusCode> WithAccessCookie(string access)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        request.Headers.Add("Cookie", $"access={access}");
+
+        return (await _service.CreateClient().SendAsync(request)).StatusCode;
+    }
+
     [Fact]
     public async Task Signing_out_without_a_session_is_no_error()
     {

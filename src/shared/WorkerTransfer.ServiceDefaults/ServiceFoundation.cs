@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Noelia.Infrastructure.Builder;
 using Noelia.Infrastructure.Builder.Modules;
 using Noelia.Infrastructure.Extensions;
+using Noelia.Infrastructure.Security;
 using Noelia.Infrastructure.Security.Identity;
 using Noelia.Infrastructure.Security.InputSanitization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -186,6 +187,11 @@ public static class ServiceFoundation
                 // being, and a copied configuration sheet would be every account
                 // on every service.
                 .UseJwt(jwt => ResolveSigningKeys(jwt, configuration))
+
+                // A SIGN-OUT HAS TO REACH ALL FOURTEEN, not only identity:
+                // the others verify by signature and would honour the old
+                // token until it expires. See `Revocation`.
+                .UseTokenRevocationStore(configuration, environment)
 
                 // THE EGRESS BOUNDARY, AND WHERE IT KNOWS ITS HOSTS FROM.
                 //
@@ -478,6 +484,11 @@ public static class ServiceFoundation
         // HttpResponseCaching and PermissionEnforcement fall away by themselves,
         // and their reason stands in exactly one place.
         app.UseNoelia(environment, serviceName);
+
+        // Noelia's default chain does NOT check revocations, even with a store
+        // registered — registered, present, without effect. Behind the
+        // authentication, because it reads the verified token's claims.
+        app.UseTokenRevocation();
 
         app.UseNoeliaPrincipal();
         app.UseMiddleware<ProblemDetailsMiddleware>();

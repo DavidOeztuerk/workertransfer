@@ -167,6 +167,14 @@ Adding a service is three steps and no new Dockerfile: its database in `scripts/
 
 **ASP.NET's own key ring lives in Postgres, encrypted under the operator's master key** (`KeyRing`, ADR-0046). Left alone the framework writes it into the container's filesystem and says so twice at every start — and anything protected with it stops verifying when the container is replaced. Nothing in this tree reads it *today*; it is configured anyway, because the framework registers it whether or not you want it, and a gate that stays red gets ignored. **Not `Noelia.InMemory`**: that would satisfy the check while two instances still read different rings. The table carries no `DbSet` — it belongs to no domain model, and in the EF model it would look like a `SubjectKeyedTable` to the erasure guard.
 
+**A sign-out reaches all fourteen services, through Valkey — since 07.10.2026.** identity-service ended a session, but the other thirteen verify the access token by signature alone and honoured it for up to fifteen minutes after a sign-out or an account erasure. Now identity writes the revocation into **Valkey** (`ConnectionStrings__valkey`; BSD-licensed, protocol-equal to Redis, which left open source in 2024): the token's `jti` on sign-out, everything before "now" on erasure. Three things are easy to undo:
+
+- **`app.UseTokenRevocation()` stands in `UseWorkerTransferDefaults` and has to.** Noelia's default chain does not check revocations even with a store registered, while `noelia.revocation.degradation` reports green on mere registration. Measured: without the line both revocation tests pass the write and the token still opens everything.
+- **Only the connection is registered, never `AddRedisConnection`**, which also installs a distributed cache as a side effect (`Revocation.cs`).
+- **Without the key, Staging and Production refuse to start**; elsewhere — the test hosts — revocations stay in the process. Test tokens therefore carry `jti` and `iat` like real ones: the check refuses a token without them.
+
+Revoking a single *session* does not work in Noelia 7.0.0 (`bugs/sitzungswiderruf-liest-sid.md`), and nothing here needs it.
+
 **`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-service` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
 ### The Noelia Control Plane — on the host, deliberately not part of `make up`
@@ -1121,6 +1129,6 @@ that script was built against.
 - `docs/SCOUT-UND-BERATER.md` — planned, not built. See above.
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
-- `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). One open since 12.09.2026: `verschluesselung-verschluesselt-nicht.md` — the only shipping `IDataEncryptionService` stores the plaintext and reports `AES256GCM`. It blocks nothing here, because `AddEncryption` is out.
+- `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). Open: `sitzungswiderruf-liest-sid.md` (07.10.2026, session revocation reads `sid`, the issuer writes `session_id`); and `verschluesselung-verschluesselt-nicht.md` (12.09.2026: the only shipping `IDataEncryptionService` stored the plaintext and reported `AES256GCM`) — by the source fixed since 4.4.2, to be re-measured before it is closed. It blocks nothing here, because `AddEncryption` is out.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.

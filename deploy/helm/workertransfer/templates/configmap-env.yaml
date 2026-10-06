@@ -12,6 +12,11 @@ data:
   {{- range $key, $value := .Values.env }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}
+  {{/*
+  The shared revocation store. Without it a service in Staging refuses to start
+  and names this key, rather than honouring signed-out tokens.
+  */}}
+  ConnectionStrings__valkey: {{ printf "%s:%v" .Values.valkey.host .Values.valkey.port | quote }}
   Mail__Host: {{ .Values.smtp.host | quote }}
   Mail__Port: {{ .Values.smtp.port | quote }}
   {{/*
