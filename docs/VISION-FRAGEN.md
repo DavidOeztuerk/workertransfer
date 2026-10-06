@@ -579,6 +579,24 @@ gebundene Lizenz.
 
 ---
 
+## K. Anmeldung und Sitzungen (technische Entscheidung, 06.10.2026)
+
+**Befund:** Das Zugangstoken gilt 15 Minuten (ohne Kulanz). Danach holt sich die
+Seite still ein neues über das Refresh-Token, das 14 Tage ab letzter Nutzung und
+höchstens 30 Tage gilt — faktisch zwei Wochen angemeldet. Beide liegen in
+httpOnly-Cookies, die sich alle Tabs eines Browsers teilen.
+
+**Entscheidung:**
+1. Abmeldung nach **8 Stunden ohne Nutzung**, spätestens nach **7 Tagen**.
+2. **Mehrere Tabs im selben Browser bleiben erlaubt.** „Nur ein Tab“ ginge nur
+   mit einem für JavaScript lesbaren Token (stehlbar per Skript-Angriff) und
+   würde jeden Link in einem neuen Tab abmelden. Andere Browser und Geräte
+   brauchen eine eigene Anmeldung.
+3. **Abmelden wirkt sofort in allen Tabs** (die Tabs benachrichtigen sich).
+4. **Abmelden wirkt sofort in allen Diensten** (Widerrufs-Speicher Valkey, I1).
+
+---
+
 ## J. Was ein Jurist vor dem Start prüfen muss
 
 Zusammengestellt am 06.10.2026 aus den Antworten oben. Jeder Punkt nennt die
