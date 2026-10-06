@@ -1,0 +1,100 @@
+# Bauliste: von heute zur Vision
+
+Stand 07.10.2026. Vergleicht [`VISION.md`](VISION.md) mit dem, was im Baum
+steht. Jede Zeile nennt die Katalogfrage, aus der sie kommt. Die Reihenfolge
+folgt den Abhängigkeiten: was weiter oben steht, brauchen die Zeilen darunter.
+
+Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
+
+## Schon erledigt
+
+| Was | Frage | Stand |
+|---|---|---|
+| Widerruf in allen Diensten (Valkey) | I1 | gebaut 07.10.2026 |
+| Sitzungen 8 Std. / 7 Tage, Abmelden in allen Tabs | K | gebaut 07.10.2026 |
+| Prüfspur für alle Löschempfänger | — | gebaut 03.10.2026 |
+| Anschreiben mit Freigabe vor dem Senden (das Vorbild für alle Agenten) | D2 | gebaut (ADR-0034) |
+| Scout mit Häkchen, ohne Rangfolge, nach festen Regeln | B1 | gebaut (ADR-0036) — fehlt: pro Inserat, siehe Phase 2 |
+| Lebenslauf-Vorlage, Bewerbung auf Inserat | B2 | gebaut |
+
+## Phase 1 — Grundlagen, ohne die kein Agent arbeiten kann
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **Nachrichten pro Vorgang** (Person ↔ Firma) | E1 | L | neuer Baustein; dort schreiben Menschen und Agenten |
+| **Freigabe-Mechanismus für Agenten-Entwürfe** im Gespräch | D2 | M | ein Entwurf ist sichtbar als Entwurf, geht erst nach „Freigeben“ raus — wie beim Anschreiben, aber allgemein |
+| **Platzhalter-Schicht** für Name, Arbeitgeber, Gehalt, Vertragsdaten | E2 | M | vor dem Senden ersetzen, nach der Antwort einsetzen; einmal gebaut, von allen Agenten genutzt |
+| **Anschreiben auf Platzhalter umstellen** | E2 | S | heute gehen Klarname und Werdegang im Klartext raus |
+| **Mistral als Standard-Anbieter**, Ollama bleibt | E2 | S | Egress-Ziel in der Konfiguration, `Draft__BaseUrl` |
+| Hinweis „keine Gesundheitsdaten“, wenn ein Berater mitliest | E2 | S | |
+
+## Phase 2 — Firmenseite
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **Rolle „Recruiter“** | B7 | S | neben `admin` und `member`; Rechte festlegen |
+| **Gehaltsspanne im Inserat** | B5 | S | Feld in jobs-service, Pflicht oder freiwillig klären (EU-Entgelttransparenz) |
+| **KI-Scout pro Inserat**: Liste passender Personen am Inserat | B1 | M | baut auf dem bestehenden Scout auf; Sichtbarkeit bei jeder Anzeige neu |
+| **KI-Recruiter**: entwirft Nachrichten, Mensch gibt frei | B2, D2 | M | braucht Phase 1 |
+
+## Phase 3 — Personenseite
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **KI-Berater** (Gehalt, Vertrag erklären, Wechsel begleiten) | B4, B5 | L | ersetzt das heutige „Berater = Mandat + Freigabestufen“; braucht Phase 1 |
+| Gehaltsvergleich: Inserate + **Destatis GENESIS** | B5 | M | Quelle wird immer genannt |
+| **Initiativbewerbung** | B2 | M | auch ohne Inserat; Berater bereitet vor |
+| **Eigenes Zeitfenster** im Marktstatus | H1 | S | außerhalb nicht ansprechbar |
+| **Kündigungsfrist** → frühester Wechsel, Angebote markieren | H2 | M | sichtbar nur für Person und Berater |
+| **Checklisten** (Kündigung, Aufhebung, Sperrzeit, Zeugnis, Resturlaub) | B6, F2 | S | feste Texte, mit Links zu neutralen Stellen |
+
+## Phase 4 — Der alte Arbeitgeber und die Ablöse
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **Alter Arbeitgeber als Nutzer**: Einstellung „Anfragen zu unserem Personal zulassen“ | C1, D1 | M | unauffällig, ohne „Insolvenz“ |
+| **Zustimmung der Person** zum Weg über den Arbeitgeber | C1 | M | ohne sie entsteht „arbeitet bei X“ nie |
+| **Ablöse-Verhandlung** Firma ↔ Firma, Person stimmt dem Ergebnis zu | C3, D1 | L | beide sehen die Restzeit, keinen Preisvorschlag |
+| Feld „Ablöse“ aus dem Angebot an die Person **entfernen** | C3 | S | heute sinnlos, weil der alte Arbeitgeber nie Teil ist |
+| **Zeugnis anfordern** über den Berater | C2 | M | Endzeugnis nach Kündigung, Zwischenzeugnis bewusst |
+
+## Phase 5 — Verträge
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **Vertragsvorlagen**, automatisch gefüllt | F1 | L | **blockiert**: die Vorlagen schreibt oder gibt ein Jurist frei (J7) |
+
+## Neue ADRs, die mit dem Bau nötig werden
+
+- **Der Berater ist ein Agent der Person** — ersetzt die Rolle aus ADR-0037
+  (heute „Mandat als Sicht“).
+- **Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen** — widerspricht
+  bewusst dem Transfer-Entwurf vom 02.08.2026 („die Plattform kontaktiert den
+  Arbeitgeber nicht“).
+- **Nachrichten und Agenten-Entwürfe werden gespeichert** — wie ADR-0034 für das
+  Anschreiben, jetzt allgemein.
+
+## Vor dem Start (siehe `VISION-FRAGEN.md`)
+
+- Geschäftsmodell (G1, G2)
+- Control Plane im Betrieb: Keycloak, echte Lizenz (I2)
+- Arbeitgeber gibt Personal aktiv ab (C1)
+- Juristen-Liste J1–J12, dazu Impressum, Datenschutzerklärung, Nutzungsbedingungen
+
+## Später
+
+- Termine im Gespräch (E1-C): eigene kleine Lösung mit `.ics`
+- Treuhand für die Ablöse (C4-B), über einen lizenzierten Zahlungsanbieter
+- kununu als Gehaltsquelle, nur per Partnervertrag
+- Seite „Meine Sitzungen → diese abmelden“ — braucht Noelia 7.0.1 (Sitzungswiderruf)
+
+## Nicht im Katalog behandelt — nächste Fragerunde
+
+Aus dem ursprünglichen Auftrag (kon.txt, Z. 896), weder gebaut noch geklärt:
+
+- **Karriereseiten-Anbindung:** Inserate automatisch von der Firmenwebsite holen
+  (nur über offizielle Schnittstellen, ADR-0004).
+- **Subdomain der Firma** mit einer persönlichen Seite für jeden Bewerber.
+- **LinkedIn / Xing** und weitere Verbindungen.
+- **Weitere Agenten** aus dem Vorschlag damals (Interview-Trainer,
+  Lebenslauf-Optimierer, Lern-Coach …) — welche davon gewollt sind.
