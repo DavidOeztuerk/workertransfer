@@ -34,10 +34,12 @@ public static class ErasureEndpoints
             await mediator.Send(
                 new RequestErasureCommand(actor.Subject), cancellationToken);
 
-            // 202 either way, including when it was already running: pressing
-            // twice is not an error, and the second press must not start a
-            // second cascade nor look like a failure.
-            //
+            // The request revoked every access token of the person, this one
+            // included — so the browser drops the cookies with it. A second
+            // press therefore never gets this far (401), and none starts a
+            // second cascade.
+            AuthEndpoints.ClearSignInCookies(context);
+
             // "Running", never "done". The cascade is not instant, and
             // saying otherwise would be the first thing this promise breaks.
             context.Response.StatusCode = StatusCodes.Status202Accepted;

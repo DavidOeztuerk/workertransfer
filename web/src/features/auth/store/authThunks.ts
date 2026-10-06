@@ -3,6 +3,7 @@ import { request } from "../../../core/api/client";
 import { createAppThunk } from "../../../core/store/thunkHelpers";
 import { readOccupationalField } from "../../../shared/lib/occupationalFields";
 import type { Membership, Session, SessionWireState } from "../types/session";
+import { announceSignedOut } from "../lib/sessionBroadcast";
 
 interface SessionBody {
   user_id: string;
@@ -122,6 +123,7 @@ export const logout = createAppThunk<void>("auth/logout", async (_arg, { rejectW
     "errors.signOutFailed"
   );
   if (!answer.ok) return rejectWithValue(answer.error);
+  announceSignedOut();
 });
 
 export const loadMemberships = createAppThunk<Membership[]>(

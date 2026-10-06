@@ -15,6 +15,7 @@ import { sessionEnded } from "../../auth/store/authSlice";
 import { SignInRequired } from "../components/SignInRequired";
 import { requestErasure } from "../api/erasure";
 import { failureKey } from "../../../shared/api/errors";
+import { announceSignedOut } from "../../auth/lib/sessionBroadcast";
 
 /** Only the numbers — the wording lives in the catalogues. */
 const WHAT_DISAPPEARS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
@@ -125,6 +126,7 @@ export function DeleteAccountPage() {
       // NOT `logout()`: that asks the server, and it answers a revoked session
       // with 401 — the store would stay as it is.
       dispatch(sessionEnded());
+      announceSignedOut();
     } else {
       setError(t(failureKey(result.error, "errors.deletionNotAccepted")));
     }
