@@ -18,9 +18,22 @@ describe("the session broadcast", () => {
     const other = vi.fn();
     stops.push(listenForSignOut(other));
 
-    announceSignedOut();
+    // What another tab's announcement looks like on the wire.
+    const otherTab = new BroadcastChannel("workertransfer-session");
+    otherTab.postMessage({ type: "signed-out", from: "another-tab" });
+    otherTab.close();
 
     await vi.waitFor(() => expect(other).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not hear its own announcement", async () => {
+    const self = vi.fn();
+    stops.push(listenForSignOut(self));
+
+    announceSignedOut();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(self).not.toHaveBeenCalled();
   });
 
   it("ignores messages that are not a sign-out", async () => {
@@ -28,9 +41,9 @@ describe("the session broadcast", () => {
     stops.push(listenForSignOut(other));
 
     const stranger = new BroadcastChannel("workertransfer-session");
-    stranger.postMessage({ type: "something-else" });
+    stranger.postMessage({ type: "something-else", from: "another-tab" });
+    stranger.postMessage({ type: "signed-out", from: "another-tab" });
     stranger.close();
-    announceSignedOut();
 
     await vi.waitFor(() => expect(other).toHaveBeenCalledTimes(1));
   });

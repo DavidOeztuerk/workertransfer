@@ -11,7 +11,15 @@
 
 const CHANNEL = "workertransfer-session";
 
-type Message = { type: "signed-out" };
+/**
+ * Who sent it. A `BroadcastChannel` delivers to every OTHER channel object —
+ * including the listener in this very tab. Without the id the tab that signed
+ * out heard itself and navigated away: the erasure page lost its "läuft"
+ * before anyone could read it (measured 07.10.2026).
+ */
+const THIS_TAB = crypto.randomUUID();
+
+type Message = { type: "signed-out"; from: string };
 
 function open(): BroadcastChannel | null {
   return typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CHANNEL);
@@ -21,7 +29,7 @@ function open(): BroadcastChannel | null {
 export function announceSignedOut(): void {
   const channel = open();
   if (channel === null) return;
-  channel.postMessage({ type: "signed-out" } satisfies Message);
+  channel.postMessage({ type: "signed-out", from: THIS_TAB } satisfies Message);
   channel.close();
 }
 
@@ -31,7 +39,7 @@ export function listenForSignOut(onSignedOut: () => void): () => void {
   if (channel === null) return () => undefined;
 
   channel.onmessage = (event: MessageEvent<Message>) => {
-    if (event.data?.type === "signed-out") onSignedOut();
+    if (event.data?.type === "signed-out" && event.data.from !== THIS_TAB) onSignedOut();
   };
 
   return () => channel.close();
