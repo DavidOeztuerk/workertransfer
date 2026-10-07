@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Applications.Infrastructure.CoverLetter;
 
@@ -126,7 +127,7 @@ public sealed class HttpCoverLetterWriter(
         ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(context);
 
-        return AskAsync(access, Instruction(context), progress, cancellationToken);
+        return AskMaskedAsync(access, context, Instruction(context), progress, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -159,7 +160,51 @@ public sealed class HttpCoverLetterWriter(
             builder.AppendLine($"{number + 1}. {comments[number]}");
         }
 
-        return AskAsync(access, builder.ToString(), progress, cancellationToken);
+        return AskMaskedAsync(access, context, builder.ToString(), progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// What the platform knows as a field goes out as a placeholder (E2): the
+    /// person's name, the addressee, every former employer.
+    /// </summary>
+    /// <remarks>
+    /// Masked HERE, at the last step before the wire, so no caller can forget
+    /// it. The whole instruction is masked — the name also stands in the
+    /// person's own text, the employer in the job description.
+    /// </remarks>
+    public static Placeholders PlaceholdersFor(CoverLetterContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var placeholders = new Placeholders();
+        placeholders.AddPersonName(context.OwnName);
+        placeholders.Add("COMPANY", context.Company);
+
+        foreach (var station in context.OwnCareer)
+        {
+            placeholders.Add("EMPLOYER", station.Employer, numbered: true);
+        }
+
+        return placeholders;
+    }
+
+    private async Task<string> AskMaskedAsync(
+        AiAccess access,
+        CoverLetterContext context,
+        string instruction,
+        Func<string, Task>? progress,
+        CancellationToken cancellationToken)
+    {
+        var placeholders = PlaceholdersFor(context);
+
+        Func<string, Task>? restoring = progress is null
+            ? null
+            : fragment => progress(placeholders.RestoreFragment(fragment));
+
+        var answer = await AskAsync(
+            access, placeholders.Mask(instruction), restoring, cancellationToken);
+
+        return placeholders.Restore(answer);
     }
 
     /// <summary>The instruction, from the context and nothing else.</summary>

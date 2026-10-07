@@ -649,6 +649,8 @@ There are **two** consumers and they are mirror images. `POST /profiles/me/draft
 
 Each service owns its own `IDrafter` port and its own context type rather than sharing one prompt with branches — the profile context carries no name, no email, no subject id, no employer, no CV; the job context carries no tenant and no company name. Tests pin both field sets. A shared prompt with an `if` is exactly where "invent nothing about the person" would one day apply to an advert, or worse, the reverse.
 
+**Known values leave as placeholders** (`ServiceDefaults/Ai/Placeholders.cs`, VISION-FRAGEN E2): the cover-letter writer masks the person's name (and its parts), the addressee and every former employer in the *whole* instruction — they also stand in free text — and restores them in the answer and in every streamed fragment. It masks at the last step before the wire so no caller can forget it. It cannot find what a person typed about somebody else in free text; there the choice of provider protects.
+
 With no API key configured, nothing external is ever called and the UI says so. Nothing is stored — not the prompt, not the answer; the draft lives in the form until it is saved, and then it is the author's text. Errors report the failure kind, never the content. Do not add memory, a vector store, or a background suggestion — all three either store or act unasked. **There is deliberately no plan-act-reflect loop and no ledger entry**: a reflect stage means two calls to rewrite the user's own words unasked, and a ledger entry would assert a standing permission nobody gave — the button is the consent, informed and per use.
 
 ### What ADR-0022 actually forbids

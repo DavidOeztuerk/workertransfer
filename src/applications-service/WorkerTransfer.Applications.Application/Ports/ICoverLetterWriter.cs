@@ -99,6 +99,10 @@ public sealed record CoverLetterContext(
         6. Haupttext 180 bis 250 Woerter — eine Seite, nicht ein duenner Absatz.
         7. Die Signatur ist GENAU der volle Name aus den Angaben, kein Spitzname
            und kein anderer Name.
+        8. Angaben in eckigen Klammern wie [PERSON_NAME], [COMPANY] oder
+           [EMPLOYER_1] sind Platzhalter fuer echte Angaben. Uebernimm sie
+           zeichengenau dort, wo die Angabe hingehoert. Ersetze sie nie durch
+           einen erfundenen Namen und erfinde keine neuen.
 
         Ausgabeformat, genau so, vollstaendige Woerter, kein fehlender Buchstabe:
         BETREFF: <Betreffzeile>
