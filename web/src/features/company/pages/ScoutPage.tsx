@@ -10,6 +10,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 
 import {
   EmptyBlock,
@@ -24,6 +25,7 @@ import {
   NO_FILTER,
   type SearchFilter,
   type Hit,
+  advertCandidates,
   searchCandidates,
 } from "../api/scout";
 import {
@@ -71,6 +73,12 @@ export function ScoutPage() {
   // not wait for "search" — it does not change the set after all.
   const [jobId, setJobId] = useState("");
 
+  // `?advert=<id>`: the scout per advert (VISION-FRAGEN B1). The advert's own
+  // skills are the words, its place the commute tick — the free filters do
+  // not apply, so the form gives way to a line saying what is searched.
+  const [params] = useSearchParams();
+  const advert = params.get("advert") ?? "";
+
   const hasFilter =
     filter.skills.length > 0 || filter.location !== "" || filter.remoteOnly;
 
@@ -85,7 +93,10 @@ export function ScoutPage() {
 
   const pages = usePages<Hit, MessageKey>(
     (cursor, signal) =>
-      searchCandidates(cursor, filter, signal, jobId).then((result) =>
+      (advert !== ""
+        ? advertCandidates(advert, cursor, signal)
+        : searchCandidates(cursor, filter, signal, jobId)
+      ).then((result) =>
         result.ok
           ? {
               ok: true as const,
@@ -95,7 +106,7 @@ export function ScoutPage() {
           : // A key, never scout-service's sentence (English on the wire).
             { ok: false as const, error: failureKey(result.error, "errors.searchFailed") },
       ),
-    JSON.stringify({ filter, jobId }),
+    JSON.stringify({ filter, jobId, advert }),
     forCompany,
   );
 
@@ -142,7 +153,25 @@ export function ScoutPage() {
         </Alert>
       ) : null}
 
-      <Card sx={{ mb: 3 }}>
+      {advert !== "" ? (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h4" sx={{ mb: 0.5 }}>
+              {t("scout.advertTitle", {
+                title: jobs.find((job) => job.id === advert)?.title ?? "",
+              })}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              {t("scout.advertLead")}
+            </Typography>
+            <Button component={RouterLink} to="/scout" variant="text" size="small">
+              {t("scout.advertToFreeSearch")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card sx={{ mb: 3, display: advert !== "" ? "none" : undefined }}>
         <CardContent>
           <Box
             component="form"

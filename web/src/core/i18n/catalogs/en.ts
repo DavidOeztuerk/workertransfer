@@ -580,6 +580,8 @@ const en: Catalog = {
   },
 
   errors: {
+    advertGone: "This advert is not (or no longer) published.",
+    advertNoSkills: "The advert names no skill — there is nothing to match. Add to the advert what the job asks for.",
     recruiterOnly: "In your company, a recruiter makes the first contact with a person. An administrator can give you that role.",
     conversationNotLoaded: "The conversation could not be loaded.",
     messageNotSent: "The message could not be sent.",
@@ -1008,6 +1010,7 @@ const en: Catalog = {
   },
 
   companyJobs: {
+    matchingPeople: "Matching people",
     salaryMin: "Salary from (€, gross)",
     salaryMax: "Salary to (€, gross)",
     salaryPeriod: "Period",
@@ -1146,6 +1149,9 @@ const en: Catalog = {
   },
 
   scout: {
+    advertTitle: "Who fits “{{title}}”",
+    advertLead: "Searched with the advert's skills; the ticks show who named which. No ranking — sorted by “last updated”. Only people who released their profile to you appear.",
+    advertToFreeSearch: "To the free search",
     againstJob: "Against which vacancy?",
     againstJobHint: "Shows a reachability tick per hit. It filters nothing out — the list does not get shorter.",
     noJob: "No vacancy chosen",

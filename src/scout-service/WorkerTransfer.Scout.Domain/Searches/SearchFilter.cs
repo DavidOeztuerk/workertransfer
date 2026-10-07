@@ -42,6 +42,16 @@ public sealed class SearchFilter
     /// </remarks>
     public const int MaxWords = 10;
 
+    /// <summary>How many skills an ADVERT may hand to the search.</summary>
+    /// <remarks>
+    /// An advert may name twenty (<c>SkillList.MaxEntries</c> in jobs-service).
+    /// Cutting it to ten would search for half of what the company asked for
+    /// and show ticks for the other half that nobody searched — silent
+    /// incompleteness, which ADR-0022 §3 forbids. Kept equal to the advert's
+    /// limit, and profile-service's search door takes as many.
+    /// </remarks>
+    public const int MaxAdvertWords = 20;
+
     /// <summary>How long a single word may be.</summary>
     public const int MaxWordLength = SkillLimits.MaxLength;
 
@@ -76,6 +86,33 @@ public sealed class SearchFilter
     /// a filter on the opposite would exclude whoever simply ticked nothing.
     /// </remarks>
     public bool RemoteOnly { get; }
+
+    /// <summary>The filter for "who fits this advert" — its skills and nothing else.</summary>
+    /// <remarks>
+    /// <para>No location and no "remote only": the advert's place becomes the
+    /// commute TICK on every hit (ADR-0041) and never a filter that removes
+    /// somebody.</para>
+    /// </remarks>
+    /// <exception cref="InputError">The advert names no skill, or more than the limit.</exception>
+    public static SearchFilter ForAdvert(IReadOnlyList<string> skills)
+    {
+        ArgumentNullException.ThrowIfNull(skills);
+
+        var canonical = Vocabulary.CanonicaliseAll(
+                skills.Select(skill => skill.Trim()).Where(skill => skill.Length > 0))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        // web/src/features/company/pages/ScoutPage.tsx matches "names no skill".
+        if (canonical.Length == 0)
+        {
+            throw new InputError("the advert names no skill — there is nothing to match");
+        }
+
+        return canonical.Length > MaxAdvertWords
+            ? throw new InputError($"an advert may hand at most {MaxAdvertWords} skills to the search")
+            : new SearchFilter(canonical, string.Empty, false);
+    }
 
     /// <summary>Builds the filter from what somebody typed.</summary>
     /// <exception cref="InputError">Too many words, one too long, a location too long.</exception>

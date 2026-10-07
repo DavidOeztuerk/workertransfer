@@ -580,6 +580,8 @@ const fr: Catalog = {
   },
 
   errors: {
+    advertGone: "Cette annonce n’est pas (ou plus) publiée.",
+    advertNoSkills: "L’annonce ne nomme aucune compétence — il n’y a rien à comparer. Complétez l’annonce avec ce que le poste exige.",
     recruiterOnly: "Dans votre entreprise, le premier contact avec une personne est pris par un recruteur. Un administrateur peut vous attribuer ce rôle.",
     conversationNotLoaded: "La conversation n’a pas pu être chargée.",
     messageNotSent: "Le message n’a pas pu être envoyé.",
@@ -1008,6 +1010,7 @@ const fr: Catalog = {
   },
 
   companyJobs: {
+    matchingPeople: "Personnes correspondantes",
     salaryMin: "Salaire de (€, brut)",
     salaryMax: "Salaire à (€, brut)",
     salaryPeriod: "Période",
@@ -1146,6 +1149,9 @@ const fr: Catalog = {
   },
 
   scout: {
+    advertTitle: "Qui correspond à « {{title}} »",
+    advertLead: "Recherche avec les compétences de l’annonce ; les coches montrent qui a nommé lesquelles. Aucun classement — trié par « dernière mise à jour ». N’apparaissent que les personnes qui vous ont ouvert leur profil.",
+    advertToFreeSearch: "Vers la recherche libre",
     againstJob: "Pour quel poste ?",
     againstJobHint: "Affiche une coche d’accessibilité par résultat. Cela ne filtre rien — la liste n’en devient pas plus courte.",
     noJob: "Aucun poste choisi",

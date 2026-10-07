@@ -12,7 +12,13 @@ namespace WorkerTransfer.Scout.Application.Ports;
 /// form a tick is where it lies and whether somebody has to come. Anything more
 /// would be a copy of foreign data (ADR-0004).
 /// </remarks>
-public sealed record JobStatement(string Location, string PostalCode, Attendance? Attendance);
+public sealed record JobStatement(
+    string Location,
+    string PostalCode,
+    Attendance? Attendance,
+    Guid Company = default,
+    IReadOnlyList<string>? Skills = null,
+    bool Published = false);
 
 /// <summary>jobs-service did not answer.</summary>
 /// <remarks>

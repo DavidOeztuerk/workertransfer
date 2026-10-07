@@ -158,3 +158,23 @@ Das ist [ADR-0041](0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md).
 Ab der ersten Tabelle ist scout-service Löschempfänger. `"scout"` gehört in
 `Loeschempfaenger.Fremde` **und** in `LoeschempfaengerTests.Dienste` — sonst
 sieht die Prüfung den zwölften Dienst nicht.
+
+## Ergänzung 07.10.2026 — der Scout pro Inserat (VISION-FRAGEN B1)
+
+Die Firma öffnet an einem **eigenen, veröffentlichten** Inserat „Passende
+Personen“ (`GET /scout/jobs/{id}/candidates`). Das ist **diese** Suche mit den
+Fähigkeiten des Inserats als Wörtern und seinem Ort als Pendel-Häkchen
+(ADR-0041) — kein zweiter Mechanismus, alle vier Bedingungen gelten
+unverändert: Häkchen, keine Ordnung nach Passung, der Ledger je Seite, keine
+Gesamtzahl. Feste Regeln, kein Modell — damit bleibt es außerhalb von Art. 3
+Nr. 1 KI-VO (VISION-FRAGEN D3).
+
+- **Aktiviert wird durch Öffnen**, nicht durch eine Einstellung: kein
+  nächtlicher Lauf, keine gespeicherte Liste von Menschen pro Inserat.
+- **Entwurf, geschlossenes oder fremdes Inserat: dieselbe 404.**
+- **Ein Inserat ohne Fähigkeit ist 422**, nicht die leere Suche — die würde
+  jeden zeigen, der freigegeben hat.
+- **Alle bis zu zwanzig Fähigkeiten** gehen in die Suche (`MaxAdvertWords`);
+  die Tür in profile-service schnitt bis dahin still bei zehn ab.
+- Wer gefunden wird, erfährt es wie bei jeder Suche (`profile_discovered`,
+  ohne Firma, ohne Inserat).

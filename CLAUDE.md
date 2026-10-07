@@ -750,6 +750,8 @@ harmless.
 
 There is no `/me/scouting` and no table of who looked at whom.
 
+**The scout per advert** (07.10.2026, ADR-0036 Ergänzung, VISION-FRAGEN B1): `GET /scout/jobs/{id}/candidates` is *this* search with the company's own published advert's skills as the words — all four conditions unchanged, opened on a click from `/company/jobs`, never run in the background. A draft, closed or foreign advert is one 404; an advert without skills is 422, never the empty search (which would list everybody who released). Up to twenty skills go in; profile-service's door used to cut silently at ten.
+
 **Three filters PBI-3 names are decided against, not pending** (ADR-0036 §6–8):
 the **occupational field** never becomes a filter — it contradicts ADR-0039
 ("no visibility follows from it") and would find *less*, since the vocabulary

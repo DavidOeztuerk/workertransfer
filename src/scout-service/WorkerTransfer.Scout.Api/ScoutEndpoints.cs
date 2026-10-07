@@ -108,6 +108,60 @@ public static class ScoutEndpoints
                 cancellationToken);
         });
 
+        // The scout per advert (VISION-FRAGEN B1): the same search, with the
+        // advert's words, and the advert's place as the commute tick. It runs
+        // when somebody of the company opens it — never on its own.
+        scout.MapGet("/jobs/{jobId:guid}/candidates", async (
+            Guid jobId,
+            IMediator mediator,
+            ICurrentPrincipal actor,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (Company(actor) is not { } company)
+            {
+                await WithoutCompany(actor, context);
+                return;
+            }
+
+            SearchFilter filter;
+
+            try
+            {
+                filter = await mediator.Send(new AdvertFilterQuery(company, jobId), cancellationToken);
+            }
+            catch (NoAdvert error)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status404NotFound, "Request failed", error.Message);
+                return;
+            }
+            catch (InputError error)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", error.Message);
+                return;
+            }
+
+            var query = context.Request.Query;
+            var page = await mediator.Send(
+                new CandidatesQuery(company, filter, PageLength(query["limit"]), query["cursor"], jobId),
+                cancellationToken);
+
+            // Found is found, whichever door the company came through (ADR-0033):
+            // the same message, naming no company and no advert.
+            if (page.Items.Count > 0)
+            {
+                await mediator.Send(
+                    new ReportDiscoveryCommand([.. page.Items.Select(hit => hit.Subject)]),
+                    cancellationToken);
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                new HitPageV1([.. page.Items.Select(ToContract)], page.Next),
+                cancellationToken);
+        });
+
         scout.MapPost("/candidates/{subjectId:guid}/draft", async (
             Guid subjectId,
             ApproachRequestV1? body,
@@ -297,6 +351,16 @@ public static class ScoutEndpoints
             await ProblemDetailsMiddleware.Write(
                 call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                 "Request failed", "the consent ledger did not answer");
+
+            return Written;
+        }
+        catch (JobLookupSilent)
+        {
+            // Swallowed in the ordinary search (a dash instead of a cross), but
+            // not here: without the advert there is no question to ask.
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                "Request failed", "the job service did not answer");
 
             return Written;
         }

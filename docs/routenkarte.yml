@@ -728,6 +728,7 @@ gruppen:
       (ADR-0036 Auflage 4).
     eintraege:
       - { methode: GET, pfad: '/scout/candidates', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/scout/jobs/00000000-0000-0000-0000-000000000001/candidates', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/scout/candidates/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: GET, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/scout/searches', ohne: 401, person: 403, mitglied: 422, firma: 422 }

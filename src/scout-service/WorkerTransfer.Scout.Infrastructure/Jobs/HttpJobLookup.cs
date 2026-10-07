@@ -121,7 +121,10 @@ public sealed class HttpJobLookup(
                     : new JobStatement(
                         advert.Location ?? string.Empty,
                         advert.PostalCode ?? string.Empty,
-                        AvailabilityTerms.ReadAttendance(advert.RemoteMode));
+                        AvailabilityTerms.ReadAttendance(advert.RemoteMode),
+                        advert.TenantId,
+                        advert.Skills ?? [],
+                        advert.Status == "published");
             }
             catch (Exception error) when (error is JsonException or NotSupportedException)
             {

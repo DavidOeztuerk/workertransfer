@@ -88,7 +88,14 @@ export interface SearchFilter {
 
 export const NO_FILTER: SearchFilter = { skills: [], location: "", remoteOnly: false };
 
-export type ScoutError = "no-company" | "unauthenticated" | "consent-unavailable" | "offline";
+export type ScoutError =
+  | "no-company"
+  | "unauthenticated"
+  | "consent-unavailable"
+  | "offline"
+  | "advert-gone"
+  | "advert-without-skills"
+  | "failed";
 
 export type HitPage =
   | { ok: true; items: Hit[]; nextCursor: string | null }
@@ -179,5 +186,51 @@ export async function searchCandidates(
       },
     },
     "offline"
+  );
+}
+
+/**
+ * "Who fits this advert?" — the scout per advert (VISION-FRAGEN B1).
+ *
+ * The same tick list as the free search, with the advert's skills as the
+ * words and its place as the commute tick. No ranking, no total; the ledger
+ * is asked on every load. It runs when somebody opens it — nothing is stored.
+ */
+export async function advertCandidates(
+  jobId: string,
+  cursor?: string,
+  signal?: AbortSignal
+): Promise<HitPage> {
+  const params = new URLSearchParams();
+  if (cursor !== undefined && cursor !== "") params.set("cursor", cursor);
+  const query = params.toString();
+  const answer = await request<{ items?: Hit[]; next?: string | null }>(
+    SCOUT_BASE_URL,
+    `/scout/jobs/${jobId}/candidates${query === "" ? "" : `?${query}`}`,
+    { signal },
+    "errors.listNotLoaded2"
+  );
+  if (answer.ok) {
+    return { ok: true, items: answer.value?.items ?? [], nextCursor: answer.value?.next ?? null };
+  }
+  return interpretError<ScoutError>(
+    answer.error,
+    {
+      0: { reason: "offline", titleKey: "errors.noConnection" },
+      403: {
+        reason: "no-company",
+        titleKey: "errors.onlyCompaniesSeeProfiles",
+        detailKey: "errors.chooseCompany",
+      },
+      // detailKey too: the page draws `failureKey`, which reads the detail key.
+      404: { reason: "advert-gone", titleKey: "errors.advertGone", detailKey: "errors.advertGone" },
+      422: {
+        reason: "advert-without-skills",
+        titleKey: "errors.advertNoSkills",
+        detailKey: "errors.advertNoSkills",
+      },
+      503: { reason: "consent-unavailable", titleKey: "errors.serviceSilent", detailKey: "errors.serviceSilent" },
+    },
+    "failed"
   );
 }

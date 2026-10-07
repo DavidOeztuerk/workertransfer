@@ -583,6 +583,8 @@ const de = {
   },
 
   errors: {
+    advertGone: "Dieses Inserat ist nicht (mehr) veröffentlicht.",
+    advertNoSkills: "Das Inserat nennt keine Fähigkeit — es gibt nichts abzugleichen. Ergänze im Inserat, was die Stelle verlangt.",
     recruiterOnly: "Den ersten Kontakt zu einer Person nimmt bei euch ein Recruiter auf. Ein Administrator kann dir diese Rolle geben.",
     conversationNotLoaded: "Das Gespräch ließ sich nicht laden.",
     messageNotSent: "Die Nachricht ließ sich nicht senden.",
@@ -1012,6 +1014,7 @@ const de = {
   },
 
   companyJobs: {
+    matchingPeople: "Passende Personen",
     salaryMin: "Gehalt von (€, brutto)",
     salaryMax: "Gehalt bis (€, brutto)",
     salaryPeriod: "Zeitraum",
@@ -1150,6 +1153,9 @@ const de = {
   },
 
   scout: {
+    advertTitle: "Wer zu „{{title}}“ passt",
+    advertLead: "Gesucht wird mit den Fähigkeiten aus dem Inserat, die Häkchen zeigen, wer welche genannt hat. Keine Rangfolge — sortiert nach „zuletzt aktualisiert“. Zu sehen ist nur, wer euch sein Profil freigegeben hat.",
+    advertToFreeSearch: "Zur freien Suche",
     againstJob: "Gegen welche Stelle?",
     againstJobHint: "Zeigt je Treffer ein Häkchen zur Erreichbarkeit. Es filtert nichts weg — die Liste wird dadurch nicht kürzer.",
     noJob: "Keine Stelle gewählt",

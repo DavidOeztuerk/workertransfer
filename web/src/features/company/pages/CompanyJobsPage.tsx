@@ -178,6 +178,18 @@ export function CompanyJobsPage() {
 
                     {job.status !== "closed" ? (
                       <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                        {job.status === "published" ? (
+                          // The scout per advert (B1): opened on a click,
+                          // never run in the background.
+                          <Button
+                            component={RouterLink}
+                            to={`/scout?advert=${job.id}`}
+                            variant="outlined"
+                            size="small"
+                          >
+                            {t("companyJobs.matchingPeople")}
+                          </Button>
+                        ) : null}
                         {job.status === "draft" ? (
                           <Button
                             variant="contained"

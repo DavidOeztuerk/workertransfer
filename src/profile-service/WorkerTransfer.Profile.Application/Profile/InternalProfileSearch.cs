@@ -69,8 +69,14 @@ public sealed class InternalProfileSearchHandler(IProfileStore store)
     /// <remarks>
     /// The same consideration as with the page cap: without a limit a caller
     /// builds an arbitrarily expensive query with a single address line.
+    /// <para>
+    /// Twenty, the most an advert may name (<c>SkillList.MaxEntries</c> in
+    /// jobs-service): the scout per advert hands all of them. At ten the
+    /// door CUT them silently, and the search found people for half an advert
+    /// while the ticks pretended to cover all of it (VISION-FRAGEN B1).
+    /// </para>
     /// </remarks>
-    public const int MaxSkillFilters = 10;
+    public const int MaxSkillFilters = 20;
 
     /// <inheritdoc />
     public Task<ProfilePage> Handle(
