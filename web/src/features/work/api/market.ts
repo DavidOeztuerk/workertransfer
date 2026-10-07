@@ -22,12 +22,18 @@ export interface MarketStatus {
   note: string;
   is_approachable: boolean;
   updated_at: string;
+  /** The person's own window (H1) — present only in her own view. ISO date. */
+  open_from?: string | null;
+  open_until?: string | null;
 }
 
 export interface MarketStatusInput {
   availability: Availability;
   employed: boolean;
   note: string;
+  /** ISO date or empty — an empty end is an open end. */
+  openFrom?: string;
+  openUntil?: string;
 }
 
 export type MarketRequestStatus = "PENDING" | "GRANTED" | "DECLINED";
@@ -114,8 +120,15 @@ export async function saveMyMarketStatus(
     "/market/me",
     {
       method: "PUT",
-      // Exactly the three fields of the contract.
-      body: { availability: input.availability, employed: input.employed, note: input.note },
+      // Exactly the fields of the contract — an empty date goes out as null,
+      // never as "", which the service could not read as a date.
+      body: {
+        availability: input.availability,
+        employed: input.employed,
+        note: input.note,
+        open_from: input.openFrom ? input.openFrom : null,
+        open_until: input.openUntil ? input.openUntil : null,
+      },
     },
     "errors.marketStatusNotSaved"
   );

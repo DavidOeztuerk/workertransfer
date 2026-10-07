@@ -172,6 +172,11 @@ const fr: Catalog = {
   },
 
   market: {
+    window: "Ma période",
+    windowHint: "Facultatif. Les entreprises ne peuvent vous contacter que pendant cette période — en dehors, vous n’êtes pas joignable, même si « Je cherche activement » est choisi plus haut. Aucune entreprise ne voit les dates, seulement si vous êtes joignable aujourd’hui. Un champ vide signifie : ouvert.",
+    openFrom: "Ouvert à partir du",
+    openUntil: "Ouvert jusqu’au",
+    windowUpsideDown: "La période se termine avant de commencer.",
     employed: "Je travaille actuellement quelque part",
     saved: "Statut sur le marché enregistré.",
     save: "Enregistrer",

@@ -126,7 +126,7 @@ public sealed class CaseCommands(
             return new CaseResult.NotApproachable();
         }
 
-        if (!status.IsApproachable)
+        if (!status.IsApproachableOn(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)))
         {
             // The release permits SEEING, not DISTURBING.
             return new CaseResult.NotApproachable();

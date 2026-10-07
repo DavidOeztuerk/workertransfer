@@ -14,7 +14,14 @@ public sealed record MarketStatusV1(
     /// works it out wrongly: "released" does not mean "approachable".
     /// </remarks>
     [property: JsonPropertyName("is_approachable")] bool IsApproachable,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    /// <summary>The person's own window — only in their OWN view, never a company's (H1).</summary>
+    [property: JsonPropertyName("open_from")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    DateOnly? OpenFrom = null,
+    [property: JsonPropertyName("open_until")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    DateOnly? OpenUntil = null);
 
 /// <summary>A market status as it is written.</summary>
 /// <remarks>
@@ -25,7 +32,9 @@ public sealed record MarketStatusV1(
 public sealed record WriteMarketStatusV1(
     [property: JsonPropertyName("availability")] string Availability,
     [property: JsonPropertyName("employed")] bool Employed = false,
-    [property: JsonPropertyName("note")] string Note = "");
+    [property: JsonPropertyName("note")] string Note = "",
+    [property: JsonPropertyName("open_from")] DateOnly? OpenFrom = null,
+    [property: JsonPropertyName("open_until")] DateOnly? OpenUntil = null);
 
 /// <summary>A company's request for a market status.</summary>
 public sealed record MarketRequestV1(

@@ -11,7 +11,9 @@ public sealed record SaveMarketStatusCommand(
     SubjectId Subject,
     Availability Availability,
     bool IsEmployed,
-    string Remark) : ICommandMessage<MarketStatus>;
+    string Remark,
+    DateOnly? OpenFrom = null,
+    DateOnly? OpenUntil = null) : ICommandMessage<MarketStatus>;
 
 /// <summary>One's own market status.</summary>
 /// <remarks>
@@ -49,12 +51,13 @@ public sealed class MarketCommands(
         {
             status = MarketStatus.Create(
                 request.Subject, request.Availability, request.IsEmployed,
-                request.Remark, now);
+                request.Remark, now, request.OpenFrom, request.OpenUntil);
         }
         else
         {
             existing.Change(
-                request.Availability, request.IsEmployed, request.Remark, now);
+                request.Availability, request.IsEmployed, request.Remark, now,
+                request.OpenFrom, request.OpenUntil);
 
             status = existing;
         }

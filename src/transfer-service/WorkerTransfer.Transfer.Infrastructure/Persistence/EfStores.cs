@@ -38,7 +38,9 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
                 Employed = status.IsEmployed,
                 Note = status.Remark,
                 CreatedAt = status.CreatedAt.UtcDateTime,
-                UpdatedAt = status.ChangedAt.UtcDateTime
+                UpdatedAt = status.ChangedAt.UtcDateTime,
+                OpenFrom = status.OpenFrom,
+                OpenUntil = status.OpenUntil
             });
 
             return;
@@ -48,6 +50,8 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
         existing.Employed = status.IsEmployed;
         existing.Note = status.Remark;
         existing.UpdatedAt = status.ChangedAt.UtcDateTime;
+        existing.OpenFrom = status.OpenFrom;
+        existing.OpenUntil = status.OpenUntil;
     }
 
     private static MarketStatus ToAggregate(MarketRow row) =>
@@ -59,7 +63,9 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
             row.Employed,
             row.Note,
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
-            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
+            row.OpenFrom,
+            row.OpenUntil);
 }
 
 /// <summary>Reads and writes <c>market_requests</c>.</summary>

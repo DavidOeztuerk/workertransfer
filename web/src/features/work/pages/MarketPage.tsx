@@ -62,6 +62,7 @@ const CHOICES: { value: Availability; label: string; hint: string }[] = [
  */
 const SAVE_CASES: readonly ServerCase[] = [
   { status: 422, pattern: /note exceeds/i, key: "market.remarkTooLong" },
+  { status: 422, pattern: /window ends before/i, key: "market.windowUpsideDown" },
 ];
 
 /** A 409 on a request means it was answered meanwhile — elsewhere, or in another tab. */
@@ -87,6 +88,8 @@ export function MarketPage() {
   const [availability, setAvailability] = useState<Availability>("unavailable");
   const [employed, setEmployed] = useState(false);
   const [note, setNote] = useState("");
+  const [openFrom, setOpenFrom] = useState("");
+  const [openUntil, setOpenUntil] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -100,6 +103,8 @@ export function MarketPage() {
     setAvailability(current.data.status.availability);
     setEmployed(current.data.status.employed);
     setNote(current.data.status.note);
+    setOpenFrom(current.data.status.open_from ?? "");
+    setOpenUntil(current.data.status.open_until ?? "");
     setAdopted(true);
   }, [adopted, current.data]);
 
@@ -124,7 +129,7 @@ export function MarketPage() {
 
   async function save() {
     setRunning(true);
-    const result = await saveMyMarketStatus({ availability, employed, note });
+    const result = await saveMyMarketStatus({ availability, employed, note, openFrom, openUntil });
     setRunning(false);
 
     if (result.ok) {
@@ -299,6 +304,35 @@ export function MarketPage() {
                 label={t("market.employed")}
                 sx={{ mb: 2, display: "block" }}
               />
+
+              <Typography variant="h4" sx={{ mb: 0.5 }}>
+                {t("market.window")}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {t("market.windowHint")}
+              </Typography>
+              <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, mb: 2 }}>
+                <TextField
+                  type="date"
+                  label={t("market.openFrom")}
+                  value={openFrom}
+                  onChange={(event) => {
+                    setSaved(false);
+                    setOpenFrom(event.target.value);
+                  }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <TextField
+                  type="date"
+                  label={t("market.openUntil")}
+                  value={openUntil}
+                  onChange={(event) => {
+                    setSaved(false);
+                    setOpenUntil(event.target.value);
+                  }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </Box>
 
               <TextField
                 label={t("market.note")}

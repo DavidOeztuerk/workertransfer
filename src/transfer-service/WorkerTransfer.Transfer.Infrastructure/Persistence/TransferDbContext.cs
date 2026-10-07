@@ -20,6 +20,12 @@ public sealed class MarketRow
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>The first day of the person's own window, or <c>null</c>.</summary>
+    public DateOnly? OpenFrom { get; set; }
+
+    /// <summary>The last day of the window, or <c>null</c>.</summary>
+    public DateOnly? OpenUntil { get; set; }
 }
 
 /// <summary>One row of <c>market_requests</c>.</summary>
@@ -124,6 +130,8 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
                 .HasColumnName("note").HasColumnType("text").IsRequired();
             entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.OpenFrom).HasColumnName("open_from");
+            entity.Property(row => row.OpenUntil).HasColumnName("open_until");
         });
 
         modelBuilder.Entity<RequestRow>(entity =>

@@ -172,6 +172,11 @@ const en: Catalog = {
   },
 
   market: {
+    window: "My time window",
+    windowHint: "Optional. Companies may approach you only within this period — outside it you are not approachable, even if “I am actively looking” is chosen above. No company sees the dates, only whether you are approachable today. An empty field means: open.",
+    openFrom: "Open from",
+    openUntil: "Open until",
+    windowUpsideDown: "The window ends before it begins.",
     employed: "I am currently working somewhere",
     saved: "Market status saved.",
     save: "Save",

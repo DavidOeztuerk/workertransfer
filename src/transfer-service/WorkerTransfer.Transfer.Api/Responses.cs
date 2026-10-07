@@ -195,7 +195,13 @@ public static class Responses
     }
 
     /// <summary>A market status on the wire.</summary>
-    public static MarketStatusV1 ToWire(MarketStatus status)
+    /// <param name="status">The status.</param>
+    /// <param name="today">The day "approachable" is answered for.</param>
+    /// <param name="own">
+    /// Whether the person reads their own status. Only then does the window
+    /// travel along; a company learns only "today, yes or no" (H1).
+    /// </param>
+    public static MarketStatusV1 ToWire(MarketStatus status, DateOnly today, bool own)
     {
         ArgumentNullException.ThrowIfNull(status);
 
@@ -206,8 +212,19 @@ public static class Responses
             status.Remark,
             // Derived and sent along: otherwise every client works the rule out
             // for itself, and one of them works it out wrongly.
-            status.IsApproachable,
-            status.ChangedAt);
+            status.IsApproachableOn(today),
+            status.ChangedAt,
+            own ? status.OpenFrom : null,
+            own ? status.OpenUntil : null);
+    }
+
+    /// <summary>Today, from the container's clock — so a test can move it.</summary>
+    public static DateOnly Today(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return DateOnly.FromDateTime(
+            context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime);
     }
 
     /// <summary>A market request on the wire.</summary>

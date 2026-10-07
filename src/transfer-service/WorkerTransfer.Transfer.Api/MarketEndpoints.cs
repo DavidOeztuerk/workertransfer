@@ -58,11 +58,12 @@ public static class MarketEndpoints
                 // somebody else's market status.
                 var status = await mediator.Send(
                     new SaveMarketStatusCommand(
-                        actor.Subject, availability, body.Employed, body.Note),
+                        actor.Subject, availability, body.Employed, body.Note,
+                        body.OpenFrom, body.OpenUntil),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(
-                    Responses.ToWire(status), cancellationToken);
+                    Responses.ToWire(status, Responses.Today(context), own: true), cancellationToken);
             }
             catch (MarketError error)
             {
@@ -90,7 +91,7 @@ public static class MarketEndpoints
             var status = await mediator.Send(
                 new MyMarketStatusQuery(actor.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status, Responses.Today(context), own: true), cancellationToken);
         });
 
         // Who asked — and what holds right now. `active` comes fresh from the
@@ -232,7 +233,7 @@ public static class MarketEndpoints
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status, Responses.Today(context), own: false), cancellationToken);
         });
 
         return app;

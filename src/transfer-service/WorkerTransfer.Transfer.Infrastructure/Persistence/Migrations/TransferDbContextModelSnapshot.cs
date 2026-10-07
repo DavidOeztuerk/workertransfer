@@ -188,6 +188,14 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<DateOnly?>("OpenFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("open_from");
+
+                    b.Property<DateOnly?>("OpenUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("open_until");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

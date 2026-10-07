@@ -13,6 +13,11 @@ public abstract class MarketError(string notification) : Exception(notification)
 /// called <c>note</c> and carries one of the thirteen exemptions; a type name
 /// does not have to, so it does not get a fourteenth.
 /// </remarks>
+/// <summary>The window ends before it begins.</summary>
+public sealed class WindowUpsideDown()
+    // web/src/features/work/pages/MarketPage.tsx (SAVE_CASES) matches "window ends before".
+    : MarketError("The window ends before it begins");
+
 public sealed class RemarkTooLong(int limit)
     // web/src/features/work/pages/MarketPage.tsx (SAVE_CASES) matches "note exceeds".
     : MarketError($"The note exceeds {limit} characters");
@@ -82,7 +87,9 @@ public sealed class MarketStatus
         bool isEmployed,
         string remark,
         DateTimeOffset createdAt,
-        DateTimeOffset changedAt)
+        DateTimeOffset changedAt,
+        DateOnly? openFrom,
+        DateOnly? openUntil)
     {
         Subject = subject;
         Availability = availability;
@@ -90,6 +97,8 @@ public sealed class MarketStatus
         Remark = remark;
         CreatedAt = createdAt;
         ChangedAt = changedAt;
+        OpenFrom = openFrom;
+        OpenUntil = openUntil;
     }
 
     /// <summary>Whose status. It <em>is</em> the key.</summary>
@@ -115,30 +124,59 @@ public sealed class MarketStatus
     /// <summary>When it last changed.</summary>
     public DateTimeOffset ChangedAt { get; private set; }
 
-    /// <summary>May this person be approached?</summary>
+    /// <summary>The first day of the person's own window, or <c>null</c>: open from now on.</summary>
+    /// <remarks>
+    /// <para><strong>A window of the person's own, never a fixed one for
+    /// everybody</strong> (VISION-FRAGEN H1). Fixed transfer windows would
+    /// restrict the freedom of occupation (Art. 12 GG); this one is a promise
+    /// the person makes and changes whenever they like.</para>
+    ///
+    /// <para><strong>The dates stay with the person.</strong> A company learns
+    /// only whether it may approach TODAY — "open from January" would tell
+    /// whoever reads it when somebody plans to leave.</para>
+    /// </remarks>
+    public DateOnly? OpenFrom { get; private set; }
+
+    /// <summary>The last day of the window, or <c>null</c>: open without end.</summary>
+    public DateOnly? OpenUntil { get; private set; }
+
+    /// <summary>May this person be approached on <paramref name="today"/>?</summary>
     /// <remarks>
     /// <c>Unavailable</c> means no — for a company with a release too.
-    /// <strong>The release permits seeing, not disturbing.</strong>
+    /// <strong>The release permits seeing, not disturbing.</strong> And outside
+    /// the person's own window: no as well.
+    /// <para>
+    /// A method with a date and no property: "approachable" depends on the
+    /// day, and a property would let a caller ask without one.
+    /// </para>
     /// </remarks>
-    public bool IsApproachable =>
-        Availability is Availability.Open or Availability.Listening;
+    public bool IsApproachableOn(DateOnly today) =>
+        Availability is Availability.Open or Availability.Listening
+        && (OpenFrom is not { } from || today >= from)
+        && (OpenUntil is not { } until || today <= until);
 
     /// <summary>Whoever has said nothing has not said "I am listening".</summary>
     /// <remarks>
     /// The default must never fall in the market's favour.
     /// </remarks>
     public static MarketStatus Default(SubjectId subject, DateTimeOffset now) =>
-        new(subject, Availability.Unavailable, isEmployed: false, string.Empty, now, now);
+        new(subject, Availability.Unavailable, isEmployed: false, string.Empty, now, now, null, null);
 
     /// <summary>Creates a status.</summary>
     /// <exception cref="RemarkTooLong">The note is too long.</exception>
+    /// <exception cref="WindowUpsideDown">The window ends before it begins.</exception>
     public static MarketStatus Create(
         SubjectId subject,
         Availability availability,
         bool isEmployed,
         string remark,
-        DateTimeOffset now) =>
-        new(subject, availability, isEmployed, Text(remark), now, now);
+        DateTimeOffset now,
+        DateOnly? openFrom = null,
+        DateOnly? openUntil = null)
+    {
+        var (from, until) = Window(openFrom, openUntil);
+        return new(subject, availability, isEmployed, Text(remark), now, now, from, until);
+    }
 
     /// <summary>The status as a row holds it.</summary>
     public static MarketStatus Restore(
@@ -147,26 +185,39 @@ public sealed class MarketStatus
         bool isEmployed,
         string remark,
         DateTimeOffset createdAt,
-        DateTimeOffset changedAt) =>
-        new(subject, availability, isEmployed, remark, createdAt, changedAt);
+        DateTimeOffset changedAt,
+        DateOnly? openFrom = null,
+        DateOnly? openUntil = null) =>
+        new(subject, availability, isEmployed, remark, createdAt, changedAt, openFrom, openUntil);
 
     /// <summary>Writes the status anew.</summary>
     /// <exception cref="RemarkTooLong">The note is too long.</exception>
+    /// <exception cref="WindowUpsideDown">The window ends before it begins.</exception>
     public void Change(
         Availability availability,
         bool isEmployed,
         string remark,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        DateOnly? openFrom = null,
+        DateOnly? openUntil = null)
     {
         // Check first, then write: a refused form must not leave a half-changed
         // aggregate behind.
         var checkedValue = Text(remark);
+        var (from, until) = Window(openFrom, openUntil);
 
         Availability = availability;
         IsEmployed = isEmployed;
         Remark = checkedValue;
+        OpenFrom = from;
+        OpenUntil = until;
         ChangedAt = now;
     }
+
+    private static (DateOnly? From, DateOnly? Until) Window(DateOnly? from, DateOnly? until) =>
+        from is { } start && until is { } end && end < start
+            ? throw new WindowUpsideDown()
+            : (from, until);
 
     private static string Text(string? remark)
     {

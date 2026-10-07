@@ -175,6 +175,11 @@ const de = {
   },
 
   market: {
+    window: "Mein Zeitfenster",
+    windowHint: "Freiwillig. Nur in diesem Zeitraum dürfen Firmen dich ansprechen — außerhalb bist du nicht ansprechbar, auch wenn oben „Ich suche aktiv“ gewählt ist. Die Daten sieht keine Firma, nur ob du heute ansprechbar bist. Ein leeres Feld heißt: offen.",
+    openFrom: "Offen ab",
+    openUntil: "Offen bis",
+    windowUpsideDown: "Das Ende des Zeitfensters liegt vor seinem Anfang.",
     employed: "Ich arbeite gerade irgendwo",
     saved: "Marktstatus gespeichert.",
     save: "Speichern",
