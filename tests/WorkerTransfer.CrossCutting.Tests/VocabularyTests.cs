@@ -62,7 +62,9 @@ public class VocabularyTests
         ("advisor", typeof(Advisor.Domain.Conversations.TransitionNotAllowed),
          typeof(Advisor.Contracts.MandateV1)),
         ("assessment", typeof(Assessment.Domain.Cases.InputError),
-         typeof(Assessment.Contracts.SetTaskV1))
+         typeof(Assessment.Contracts.SetTaskV1)),
+        ("messages", typeof(Messages.Domain.Conversations.InputError),
+         typeof(Messages.Contracts.MessageV1))
     ];
 
     /// <summary>The same fourteen, as xUnit enumerates them.</summary>

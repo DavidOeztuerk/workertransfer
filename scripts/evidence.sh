@@ -56,7 +56,7 @@ SERVICES=(
   "identity:8001" "consent:8002" "profile:8003" "resume:8004"
   "portfolio:8005" "jobs:8006" "applications:8007" "companies:8008"
   "transfer:8009" "notification:8010" "github:8011" "scout:8012"
-  "advisor:8013" "assessment:8014"
+  "advisor:8013" "assessment:8014" "messages:8015"
 )
 
 WORK=$(mktemp -d)

@@ -62,6 +62,7 @@ public class WireContractTests
         { "scout", typeof(Scout.Api.ErasureEndpoints) },
         { "advisor", typeof(Advisor.Api.ErasureEndpoints) },
         { "assessment", typeof(Assessment.Api.AssessmentEndpoints) },
+        { "messages", typeof(Messages.Api.MessageEndpoints) },
 
         // The shared contracts belong here, and urgently so: this is where the
         // defect hid last. `ConsentQuestionV1` travels between two services, so
@@ -93,7 +94,8 @@ public class WireContractTests
         { "profile.contracts", typeof(Profile.Contracts.ProfileHitV1) },
         { "scout.contracts", typeof(Scout.Contracts.HitV1) },
         { "advisor.contracts", typeof(Advisor.Contracts.ConversationV1) },
-        { "assessment.contracts", typeof(Assessment.Contracts.CaseV1) }
+        { "assessment.contracts", typeof(Assessment.Contracts.CaseV1) },
+        { "messages.contracts", typeof(Messages.Contracts.MessageV1) }
     };
 
     /// <summary>Whether camelCase and snake_case come apart for this name.</summary>

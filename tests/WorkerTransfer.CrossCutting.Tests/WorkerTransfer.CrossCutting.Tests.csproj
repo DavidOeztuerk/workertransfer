@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\src\scout-service\WorkerTransfer.Scout.Infrastructure\WorkerTransfer.Scout.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\advisor-service\WorkerTransfer.Advisor.Infrastructure\WorkerTransfer.Advisor.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\assessment-service\WorkerTransfer.Assessment.Infrastructure\WorkerTransfer.Assessment.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\messages-service\WorkerTransfer.Messages.Infrastructure\WorkerTransfer.Messages.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
     <ProjectReference Include="..\..\src\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
@@ -53,5 +54,6 @@
     <ProjectReference Include="..\..\src\scout-service\WorkerTransfer.Scout.Api\WorkerTransfer.Scout.Api.csproj" />
     <ProjectReference Include="..\..\src\advisor-service\WorkerTransfer.Advisor.Api\WorkerTransfer.Advisor.Api.csproj" />
     <ProjectReference Include="..\..\src\assessment-service\WorkerTransfer.Assessment.Api\WorkerTransfer.Assessment.Api.csproj" />
+    <ProjectReference Include="..\..\src\messages-service\WorkerTransfer.Messages.Api\WorkerTransfer.Messages.Api.csproj" />
   </ItemGroup>
 </Project>

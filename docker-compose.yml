@@ -210,6 +210,7 @@ services:
       Erasure__BaseUrls__scout: http://scout-service:8012
       Erasure__BaseUrls__advisor: http://advisor-service:8013
       Erasure__BaseUrls__assessment: http://assessment-service:8014
+      Erasure__BaseUrls__messages: http://messages-service:8015
     depends_on:
       postgres:
         condition: service_healthy
@@ -591,6 +592,38 @@ services:
       # chosen by a stranger into a server request.
     ports:
       - "8014:8014"
+
+  messages-service:
+    <<: *service
+    container_name: workertransfer-messages
+    environment:
+      <<: *environment
+      SERVICE_DIR: messages
+      ASPNETCORE_URLS: "http://0.0.0.0:8015"
+      ConnectionStrings__messages: Host=postgres;Port=5432;Database=messages;Username=worker;Password=worker
+      # One conversation per process (ADR-0047). WHO BELONGS TO IT is asked of
+      # the process's own service, with the caller's token, at every request —
+      # without this line every conversation answers 503.
+      Applications__BaseUrl: http://applications-service:8007
+      # A company's members — the recipients when the person writes — and a
+      # person's own AI access for their drafts. The same door and secret as
+      # everywhere.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # "A message arrived" — via the outbox, free of content (ADR-0025).
+      Notifications__BaseUrl: http://notification-service:8010
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The reply drafts. Empty key means: no draft, and the UI says so.
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
+      # Where a person may point their OWN access — the same declaration as for
+      # the cover letter; without it a local model is refused at the boundary.
+      Draft__AllowedTargets__0: ${WORKERTRANSFER_AI_TARGET_1:-http://host.docker.internal}
+      Draft__AllowedTargets__1: ${WORKERTRANSFER_AI_TARGET_2:-http://localhost}
+    ports:
+      - "8015:8015"
 
   gateway:
     <<: *service

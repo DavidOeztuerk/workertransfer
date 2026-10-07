@@ -45,7 +45,7 @@ public class Landscape : IAsyncLifetime
     [
         "identity", "consent", "profile", "resume", "portfolio", "jobs",
         "applications", "companies", "transfer", "notification", "github",
-        "scout", "advisor", "assessment", "web"
+        "scout", "advisor", "assessment", "messages", "web"
     ];
 
     private readonly List<WebApplication> _fakes = [];

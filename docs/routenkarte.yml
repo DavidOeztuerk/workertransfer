@@ -820,3 +820,28 @@ gruppen:
       - { methode: GET, pfad: '/assessments/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/assessments/00000000-0000-0000-0000-000000000001/submission', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
       - { methode: POST, pfad: '/assessments/00000000-0000-0000-0000-000000000001/evaluation', ohne: 401, person: 403, mitglied: 404, firma: 404, rumpf: '{"outcome":"rejected","text":"x"}' }
+
+  - name: 'Nachrichten — ein Gespraech pro Vorgang'
+    warum: |
+      `messages-service` (ADR-0047). Person und Firma schreiben einander zu
+      EINEM Vorgang — in Phase 1 nur zu einer Bewerbung. WER dazugehoert,
+      entscheidet nicht dieser Dienst: er fragt applications-service mit dem
+      Token des Aufrufers, bei jeder Anfrage, ohne Zwischenspeicher.
+
+      ALLE VORGANGSROUTEN GEBEN 404 in den drei angemeldeten Spalten, weil die
+      Bewerbung hier nicht existiert — und weil „gibt es nicht", „gehoert dir
+      nicht" und „ein Entwurf der anderen Seite" EINE Antwort bleiben muessen.
+      Eine zweite wuerde verraten, welche Bewerbungskennungen es gibt, und der
+      Person, dass die Firma gerade etwas entwirft.
+
+      `member` genuegt: einer Bewerberin zu antworten ist taegliche Arbeit im
+      Namen der Firma. Einen Entwurf FREIGEBEN kann jedes Mitglied seiner
+      Seite; abschicken ohne Freigabe kann niemand — dafuer gibt es keine
+      Route (VISION-FRAGEN D2).
+    eintraege:
+      - { methode: GET, pfad: '/messages/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
+      - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/messages/drafts/00000000-0000-0000-0000-000000000001/release', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{}' }
+      - { methode: DELETE, pfad: '/messages/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }

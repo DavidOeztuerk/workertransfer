@@ -72,7 +72,12 @@ public class QueryCacheTests
         // assessment-service asks the ledger on every company read of a case
         // (ADR-0042 §2): a cached answer would keep a revoked person's work
         // visible to the company.
-        { "assessment", typeof(Assessment.Application.Cases.CompanyCasesQuery) }
+        { "assessment", typeof(Assessment.Application.Cases.CompanyCasesQuery) },
+
+        // messages-service asks applications-service who belongs to a
+        // conversation at every read (ADR-0047): a cached answer would let a
+        // member removed from the company read on until it expired.
+        { "messages", typeof(Messages.Application.Conversations.ConversationQuery) }
     };
 
     /// <summary>No type of a service implements <c>ICacheableQuery</c>.</summary>

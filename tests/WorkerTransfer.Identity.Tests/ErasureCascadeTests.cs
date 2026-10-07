@@ -182,7 +182,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_request_locks_immediately_and_writes_thirteen_intents()
+    public async Task The_request_locks_immediately_and_writes_fourteen_intents()
     {
         var (browser, subject, _) = await Person();
 
@@ -192,7 +192,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         (await AccountStatusValue(subject)).Should().Be("disabled", "from now on nothing happens under this name");
 
         var rows = await Rows(subject);
-        rows.Should().HaveCount(13, "eleven recipients, the closing notice and identity itself");
+        rows.Should().HaveCount(14, "twelve recipients, the closing notice and identity itself");
         rows.Select(row => row.Kind).Should().Contain(RequestErasureHandler.Intents);
     }
 
@@ -241,7 +241,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         [
             "consent", "profile", "resume", "portfolio",
             "applications", "transfer", "github", "notification", "scout", "advisor",
-            "assessment"
+            "assessment", "messages"
         ]);
 
         // `github` belongs on it: the service holds one row per human being —
@@ -274,6 +274,11 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         // out.
         ErasureRecipient.Services.Should().Contain("assessment");
 
+        // `messages` joined with its first table (ADR-0047). A conversation is
+        // keyed by the person, and the company's messages in it are about the
+        // person too — the whole conversation falls, no retention case.
+        ErasureRecipient.Services.Should().Contain("messages");
+
         ErasureRecipient.Services.Should().NotContain("jobs", "it holds nothing about a person");
         ErasureRecipient.Services.Should().NotContain("companies");
     }
@@ -292,8 +297,8 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// The second press must not start a second cascade: thirteen more rows
-    /// would be thirteen more deliveries for a thing that happens once.
+    /// The second press must not start a second cascade: fourteen more rows
+    /// would be fourteen more deliveries for a thing that happens once.
     /// </summary>
     /// <remarks>
     /// Since 06.10.2026 the second press does not even get in: the first one
@@ -310,7 +315,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         var second = await browser.PostAsync("/account/erasure", null);
 
         second.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "the first press revoked this token");
-        (await Rows(subject)).Should().HaveCount(13);
+        (await Rows(subject)).Should().HaveCount(14);
     }
 
     /// <summary>
@@ -376,7 +381,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         await Pass(3);
 
         var rows = await Rows(subject);
-        rows.Should().OnlyContain(row => row.Delivered != null, "all thirteen are through");
+        rows.Should().OnlyContain(row => row.Delivered != null, "all fourteen are through");
 
         (await AccountStatusValue(subject)).Should().BeNull("the row is gone");
 
@@ -399,7 +404,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         using var scope = _service.Services.CreateScope();
         var erasureLedger = scope.ServiceProvider.GetRequiredService<IErasureLedger>();
 
-        (await erasureLedger.OpenIntentsAsync(new SubjectId(subject))).Should().HaveCount(13);
+        (await erasureLedger.OpenIntentsAsync(new SubjectId(subject))).Should().HaveCount(14);
 
         await Pass(3);
 

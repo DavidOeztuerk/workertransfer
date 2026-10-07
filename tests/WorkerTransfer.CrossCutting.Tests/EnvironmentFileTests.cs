@@ -172,7 +172,7 @@ public sealed class EnvironmentFileTests
                         && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .ToList();
 
-        entryPoints.Should().HaveCount(15, "fourteen services and the gateway");
+        entryPoints.Should().HaveCount(16, "fifteen services and the gateway");
 
         foreach (var path in entryPoints)
         {

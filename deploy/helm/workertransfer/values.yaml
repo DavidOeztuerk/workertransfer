@@ -243,6 +243,7 @@ services:
       Erasure__BaseUrls__scout: http://scout-service:8012
       Erasure__BaseUrls__advisor: http://advisor-service:8013
       Erasure__BaseUrls__assessment: http://assessment-service:8014
+      Erasure__BaseUrls__messages: http://messages-service:8015
 
   - name: consent-service
     dir: consent
@@ -306,6 +307,14 @@ services:
       Jobs__BaseUrl: http://jobs-service:8006
       Notifications__BaseUrl: http://notification-service:8010
       Identity__BaseUrl: http://identity-service:8001
+      # The cover letter's own details, fetched on the server. Missing here
+      # until 07.10.2026 — in the cluster the cover letter never had its
+      # context, and without `drafting` no platform model either.
+      Lookup__Identity: http://identity-service:8001
+      Lookup__Profile: http://profile-service:8003
+      Lookup__Resume: http://resume-service:8004
+      Lookup__Companies: http://companies-service:8008
+    drafting: true
 
   - name: companies-service
     dir: companies
@@ -408,6 +417,20 @@ services:
       # "Something has moved on your work sample", via the outbox, free of
       # content (ADR-0025).
       Notifications__BaseUrl: http://notification-service:8010
+
+  - name: messages-service
+    dir: messages
+    port: 8015
+    database: messages
+    env:
+      # One conversation per process (ADR-0047): who belongs to it is asked of
+      # applications-service with the caller's token, at every request.
+      Applications__BaseUrl: http://applications-service:8007
+      # Members and a person's own AI access. `Identity__Secret` hangs on this
+      # line in _helpers.tpl.
+      Identity__BaseUrl: http://identity-service:8001
+      Notifications__BaseUrl: http://notification-service:8010
+    drafting: true
       # NOT entered: the address a person submits. It is stored and shown,
       # never fetched.
 

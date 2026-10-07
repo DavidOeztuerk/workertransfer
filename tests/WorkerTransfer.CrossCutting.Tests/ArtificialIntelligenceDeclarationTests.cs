@@ -31,7 +31,7 @@ public sealed class ArtificialIntelligenceDeclarationTests
     /// resume's recogniser is a library in-process, not a model (ADR-0043).
     /// </remarks>
     private static readonly string[] Using =
-        ["applications", "identity", "jobs", "profile", "scout"];
+        ["applications", "identity", "jobs", "messages", "profile", "scout"];
 
     private static IReadOnlyDictionary<string, string> Declarations()
     {
@@ -67,7 +67,7 @@ public sealed class ArtificialIntelligenceDeclarationTests
     {
         var declarations = Declarations();
 
-        declarations.Should().HaveCount(14, "fourteen services, the gateway calls no defaults");
+        declarations.Should().HaveCount(15, "fifteen services, the gateway calls no defaults");
         declarations.Where(pair => pair.Value == "Used").Select(pair => pair.Key)
             .Should().BeEquivalentTo(Using);
     }
