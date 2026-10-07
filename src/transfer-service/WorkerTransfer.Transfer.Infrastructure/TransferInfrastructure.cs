@@ -65,6 +65,7 @@ public static class TransferInfrastructure
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IMarketStore, EfMarketStore>();
+        services.AddScoped<INoticeStore, EfNoticeStore>();
         services.AddScoped<IRequestStore, EfRequestStore>();
         services.AddScoped<ITransferStore, EfTransferStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();

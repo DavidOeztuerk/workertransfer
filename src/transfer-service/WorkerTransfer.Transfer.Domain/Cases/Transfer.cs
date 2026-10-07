@@ -289,9 +289,31 @@ public sealed class Transfer
         }
 
         OfferText = Text("Offer", text);
-        OfferStart = start;
+        OfferStart = Month(start);
         OfferFeeCents = feeCents;
         MoveTo(TransferState.Offered, now);
+    }
+
+    /// <summary>The start as a month — <c>yyyy-MM</c> — or <c>null</c>.</summary>
+    /// <remarks>
+    /// Free text went straight into a seven-character column until 07.10.2026,
+    /// and "Oktober 2026" ended in a 500. A month is also what the notice
+    /// mark reads (H2): a start it could not read would never be marked.
+    /// </remarks>
+    private static string? Month(string? start)
+    {
+        var trimmed = (start ?? string.Empty).Trim();
+
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        // web/src/features/work/api/transfers.ts (COMPANY_TRANSFER_CASES) matches this sentence.
+        return DateOnly.TryParseExact(trimmed, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _)
+            ? trimmed
+            : throw new OfferError("The start must be a month (yyyy-MM)");
     }
 
     /// <summary>The company completes.</summary>

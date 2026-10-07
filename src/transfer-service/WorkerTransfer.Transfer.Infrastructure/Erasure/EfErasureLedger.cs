@@ -33,6 +33,11 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
             .Where(row => row.Id == subject.Value)
             .ExecuteDeleteAsync(cancellationToken);
 
+        // The notice period — when somebody could be gone (H2).
+        await context.NoticePeriods
+            .Where(row => row.Id == subject.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+
         // What was said ABOUT the person falls: the row IS the statement
         // "company X asked about this human being".
         await context.Requests

@@ -1,3 +1,5 @@
+using WorkerTransfer.Transfer.Application.Market;
+using WorkerTransfer.Transfer.Domain.Market;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Transfer.Api.Authorization;
@@ -74,8 +76,13 @@ public static class CaseEndpoints
             var mine = await mediator.Send(
                 new MyCasesQuery(actor.Subject), cancellationToken);
 
+            // Her own view, and only hers: an offer starting before she could
+            // leave is marked (H2). The company's list carries no mark.
+            var notice = await mediator.Send(new MyNoticeQuery(actor.Subject), cancellationToken);
+            var earliest = notice?.EarliestStart(Responses.Today(context));
+
             await context.Response.WriteAsJsonAsync(
-                mine.Select(Responses.ToWire), cancellationToken);
+                mine.Select(caseItem => Responses.ToWire(caseItem, earliest)), cancellationToken);
         });
 
         cases.MapGet("/", async (
@@ -92,7 +99,7 @@ public static class CaseEndpoints
             var theirs = await mediator.Send(new CompanyCasesQuery(company), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                theirs.Select(Responses.ToWire), cancellationToken);
+                theirs.Select(caseItem => Responses.ToWire(caseItem)), cancellationToken);
         });
 
         cases.MapPost("/{id:guid}/accept-talk", (

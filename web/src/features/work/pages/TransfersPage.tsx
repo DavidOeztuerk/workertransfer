@@ -202,6 +202,11 @@ function TransferCard({
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
               {transfer.offer_start_on ?? "—"}
+              {transfer.starts_before_earliest === true ? (
+                <Typography component="span" variant="body2" color="warning.main" sx={{ display: "block" }}>
+                  {t("transfers.startsBeforeEarliest")}
+                </Typography>
+              ) : null}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
               {t("transfers.fee")}

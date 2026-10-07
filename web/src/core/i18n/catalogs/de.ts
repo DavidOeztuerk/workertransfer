@@ -175,6 +175,22 @@ const de = {
   },
 
   market: {
+    noticeSave: "Frist speichern",
+    notice: "Meine Kündigungsfrist",
+    noticeLead: "Freiwillig, und nur du siehst sie — keine Firma, auch nicht mit Freigabe. Daraus berechnet die Plattform deinen frühesten Wechsel und markiert Angebote, die früher beginnen.",
+    noticeLength: "Dauer",
+    noticeUnit: "Einheit",
+    noticeWeeks: "Wochen",
+    noticeMonths: "Monate",
+    noticeEnd: "Zum",
+    noticeEnd_any_day: "beliebigen Tag",
+    noticeEnd_fifteenth_or_month_end: "15. oder Monatsende (§ 622 BGB)",
+    noticeEnd_month_end: "Monatsende",
+    noticeEnd_quarter_end: "Quartalsende",
+    noticeWithdraw: "Angabe entfernen",
+    noticeInvalid: "Die Dauer liegt zwischen 1 und 24 Monaten oder 1 und 104 Wochen.",
+    noticeResult: "Bei Kündigung heute: letzter Arbeitstag {{last}}, frühester Beginn woanders {{earliest}}.",
+    noticeOrientation: "Eine Orientierung, keine Rechtsauskunft: Probezeit, Tarifvertrag und der Tag, an dem die Kündigung zugeht, verschieben das echte Datum. Lass deinen Vertrag im Zweifel prüfen.",
     window: "Mein Zeitfenster",
     windowHint: "Freiwillig. Nur in diesem Zeitraum dürfen Firmen dich ansprechen — außerhalb bist du nicht ansprechbar, auch wenn oben „Ich suche aktiv“ gewählt ist. Die Daten sieht keine Firma, nur ob du heute ansprechbar bist. Ein leeres Feld heißt: offen.",
     openFrom: "Offen ab",
@@ -976,6 +992,7 @@ const de = {
   },
 
   transfers: {
+    startsBeforeEarliest: "Beginnt vor deinem frühesten Wechsel — nötig wären eine Ablöse oder ein Aufhebungsvertrag.",
     title: "Meine Gespräche",
     signInRequired: "Bitte <1>anmelden</1>, um deine Gespräche zu sehen.",
     intro: "Ein Unternehmen kann nur zugehen, wenn du ihm deinen <1>Marktstatus freigegeben</1> hast und gerade ansprechbar bist. Ablehnen kannst du jederzeit, in jedem Schritt.",
@@ -1000,6 +1017,7 @@ const de = {
   },
 
   companyTransfers: {
+    startNotAMonth: "Der Beginn ist ein Monat, zum Beispiel 2026-11.",
     title: "Transfers",
     companyOnly: "Transfers sieht nur, wer für ein Unternehmen handelt. Wechsle oben auf ein Unternehmen.",
     lead: "Die Ablöse wird hier festgehalten, nicht bewegt: diese Plattform führt kein Geld. Sie steht da, damit beide Seiten dieselbe Zahl im Blick haben.",

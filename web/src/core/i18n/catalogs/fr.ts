@@ -172,6 +172,22 @@ const fr: Catalog = {
   },
 
   market: {
+    noticeSave: "Enregistrer le préavis",
+    notice: "Mon préavis",
+    noticeLead: "Facultatif, et vous seul le voyez — aucune entreprise, même avec une autorisation. La plateforme en déduit votre départ le plus tôt possible et signale les offres qui commencent avant.",
+    noticeLength: "Durée",
+    noticeUnit: "Unité",
+    noticeWeeks: "Semaines",
+    noticeMonths: "Mois",
+    noticeEnd: "Au",
+    noticeEnd_any_day: "jour quelconque",
+    noticeEnd_fifteenth_or_month_end: "15 ou à la fin du mois (§ 622 BGB)",
+    noticeEnd_month_end: "fin du mois",
+    noticeEnd_quarter_end: "fin du trimestre",
+    noticeWithdraw: "Supprimer",
+    noticeInvalid: "La durée est comprise entre 1 et 24 mois ou 1 et 104 semaines.",
+    noticeResult: "En démissionnant aujourd’hui : dernier jour de travail {{last}}, début ailleurs au plus tôt {{earliest}}.",
+    noticeOrientation: "Une orientation, pas un conseil juridique : période d’essai, convention collective et date de réception de la démission décalent la date réelle. En cas de doute, faites vérifier votre contrat.",
     window: "Ma période",
     windowHint: "Facultatif. Les entreprises ne peuvent vous contacter que pendant cette période — en dehors, vous n’êtes pas joignable, même si « Je cherche activement » est choisi plus haut. Aucune entreprise ne voit les dates, seulement si vous êtes joignable aujourd’hui. Un champ vide signifie : ouvert.",
     openFrom: "Ouvert à partir du",
@@ -972,6 +988,7 @@ const fr: Catalog = {
   },
 
   transfers: {
+    startsBeforeEarliest: "Commence avant votre départ le plus tôt possible — il faudrait une indemnité de transfert ou une rupture conventionnelle.",
     title: "Mes échanges",
     signInRequired: "Veuillez vous <1>connecter</1> pour voir vos échanges.",
     intro: "Une entreprise ne peut vous aborder que si vous lui avez <1>autorisé votre statut sur le marché</1> et que vous êtes actuellement ouvert aux propositions. Vous pouvez refuser à tout moment, à chaque étape.",
@@ -996,6 +1013,7 @@ const fr: Catalog = {
   },
 
   companyTransfers: {
+    startNotAMonth: "Le début est un mois, par exemple 2026-11.",
     title: "Transferts",
     companyOnly: "Seul quelqu’un agissant pour une entreprise voit les transferts. Basculez sur une entreprise en haut.",
     lead: "L’indemnité est consignée ici, pas versée : cette plateforme ne gère pas d’argent. Elle figure ici pour que les deux parties aient le même chiffre sous les yeux.",

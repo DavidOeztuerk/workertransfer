@@ -23,6 +23,7 @@ import {
 } from "../../../shared/components/ui";
 import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
+import { NoticeCard } from "../components/NoticeCard";
 import { useAsync } from "../lib/useAsync";
 import {
   type Availability,
@@ -354,6 +355,7 @@ export function MarketPage() {
           ) : null}
         </CardContent>
       </Card>
+      <NoticeCard />
     </PageShell>
   );
 }

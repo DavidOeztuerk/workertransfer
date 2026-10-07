@@ -28,6 +28,21 @@ public sealed class MarketRow
     public DateOnly? OpenUntil { get; set; }
 }
 
+/// <summary>One row of <c>notice_periods</c> — the person's notice period.</summary>
+public sealed class NoticeRow
+{
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
+    public Guid Id { get; set; }
+
+    public int Length { get; set; }
+
+    public string Unit { get; set; } = string.Empty;
+
+    public string End { get; set; } = string.Empty;
+
+    public DateTime UpdatedAt { get; set; }
+}
+
 /// <summary>One row of <c>market_requests</c>.</summary>
 /// <remarks>
 /// No <c>revoked_at</c>: the revocation lives in the ledger. Mirroring it here
@@ -98,6 +113,9 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
     /// <summary>The market statuses.</summary>
     public DbSet<MarketRow> MarketStatus => Set<MarketRow>();
 
+    /// <summary>The notice periods — keyed by the person, seen by the person only.</summary>
+    public DbSet<NoticeRow> NoticePeriods => Set<NoticeRow>();
+
     /// <summary>The market requests.</summary>
     public DbSet<RequestRow> Requests => Set<RequestRow>();
 
@@ -132,6 +150,20 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
             entity.Property(row => row.OpenFrom).HasColumnName("open_from");
             entity.Property(row => row.OpenUntil).HasColumnName("open_until");
+        });
+
+        modelBuilder.Entity<NoticeRow>(entity =>
+        {
+            entity.ToTable("notice_periods");
+            // The key IS the person — the erasure guard recognises the table by
+            // this annotation, not by a column name.
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.Length).HasColumnName("length").IsRequired();
+            entity.Property(row => row.Unit).HasColumnName("unit").HasMaxLength(8).IsRequired();
+            entity.Property(row => row.End).HasColumnName("end_rule").HasMaxLength(32).IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
         modelBuilder.Entity<RequestRow>(entity =>

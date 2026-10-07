@@ -465,6 +465,8 @@ gruppen:
       traegt.
     eintraege:
       - { methode: PUT, pfad: '/market/me', ohne: 401, person: 422, mitglied: 422, firma: 422 }
+      - { methode: GET, pfad: '/market/me/notice', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/market/me/notice', ohne: 401, person: 422, mitglied: 422, firma: 422, rumpf: '{}' }
       - { methode: GET, pfad: '/market/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/market/me/requests', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/market/requests', ohne: 401, person: 403, mitglied: 200, firma: 200 }

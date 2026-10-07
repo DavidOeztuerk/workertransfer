@@ -68,6 +68,51 @@ public sealed class EfMarketStore(TransferDbContext context) : IMarketStore
             row.OpenUntil);
 }
 
+/// <summary>Reads and writes <c>notice_periods</c>.</summary>
+public sealed class EfNoticeStore(TransferDbContext context) : INoticeStore
+{
+    /// <inheritdoc />
+    public async Task<NoticePeriod?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default)
+    {
+        var row = await context.NoticePeriods.FirstOrDefaultAsync(entry => entry.Id == subject.Value, cancellationToken);
+
+        return row is null
+            ? null
+            : NoticePeriod.Restore(
+                subject,
+                row.Length,
+                NoticeWords.ReadUnit(row.Unit) ?? throw new InvalidOperationException($"Unknown unit: {row.Unit}"),
+                NoticeWords.ReadEnd(row.End) ?? throw new InvalidOperationException($"Unknown end: {row.End}"),
+                new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync(NoticePeriod notice, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+
+        // AsTracking, because this changes the row (CLAUDE.md, Persistence).
+        var row = await context.NoticePeriods
+            .AsTracking()
+            .FirstOrDefaultAsync(entry => entry.Id == notice.Subject.Value, cancellationToken);
+
+        if (row is null)
+        {
+            row = new NoticeRow { Id = notice.Subject.Value };
+            context.NoticePeriods.Add(row);
+        }
+
+        row.Length = notice.Length;
+        row.Unit = NoticeWords.Word(notice.Unit);
+        row.End = NoticeWords.Word(notice.End);
+        row.UpdatedAt = notice.ChangedAt.UtcDateTime;
+    }
+
+    /// <inheritdoc />
+    public Task DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default) =>
+        context.NoticePeriods.Where(entry => entry.Id == subject.Value).ExecuteDeleteAsync(cancellationToken);
+}
+
 /// <summary>Reads and writes <c>market_requests</c>.</summary>
 public sealed class EfRequestStore(TransferDbContext context) : IRequestStore
 {

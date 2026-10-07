@@ -65,7 +65,15 @@ public sealed record TransferV1(
     [property: JsonPropertyName("offer_start_on")] string? OfferStartOn,
     [property: JsonPropertyName("offer_fee_cents")] long? OfferFeeCents,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    /// <summary>
+    /// Only in the PERSON's view, and only with a stated notice period and a
+    /// readable start: whether the offer begins before she could leave — then
+    /// a buyout or a termination agreement would be needed (H2). Never a price.
+    /// </summary>
+    [property: JsonPropertyName("starts_before_earliest")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    bool? StartsBeforeEarliest = null);
 
 /// <summary>What a company sends to show interest.</summary>
 public sealed record ShowInterestV1(
@@ -77,3 +85,18 @@ public sealed record OfferV1(
     [property: JsonPropertyName("note")] string Note = "",
     [property: JsonPropertyName("start_on")] string? StartOn = null,
     [property: JsonPropertyName("fee_cents")] long? FeeCents = null);
+
+/// <summary>The person's notice period and what follows from it — her own view only.</summary>
+/// <remarks>All <c>null</c>: not stated. <c>earliest_start</c> assumes notice given today.</remarks>
+public sealed record NoticeV1(
+    [property: JsonPropertyName("length")] int? Length,
+    [property: JsonPropertyName("unit")] string? Unit,
+    [property: JsonPropertyName("end")] string? End,
+    [property: JsonPropertyName("last_day")] DateOnly? LastDay,
+    [property: JsonPropertyName("earliest_start")] DateOnly? EarliestStart);
+
+/// <summary>Stating the notice period.</summary>
+public sealed record WriteNoticeV1(
+    [property: JsonPropertyName("length")] int Length,
+    [property: JsonPropertyName("unit")] string? Unit,
+    [property: JsonPropertyName("end")] string? End);

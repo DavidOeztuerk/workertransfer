@@ -172,6 +172,22 @@ const en: Catalog = {
   },
 
   market: {
+    noticeSave: "Save notice period",
+    notice: "My notice period",
+    noticeLead: "Optional, and only you see it — no company, not even with a release. From it the platform computes your earliest change and marks offers that start earlier.",
+    noticeLength: "Length",
+    noticeUnit: "Unit",
+    noticeWeeks: "Weeks",
+    noticeMonths: "Months",
+    noticeEnd: "To",
+    noticeEnd_any_day: "any day",
+    noticeEnd_fifteenth_or_month_end: "the 15th or month end (§ 622 BGB)",
+    noticeEnd_month_end: "month end",
+    noticeEnd_quarter_end: "quarter end",
+    noticeWithdraw: "Remove",
+    noticeInvalid: "The length lies between 1 and 24 months or 1 and 104 weeks.",
+    noticeResult: "Giving notice today: last working day {{last}}, earliest start elsewhere {{earliest}}.",
+    noticeOrientation: "An orientation, not legal advice: probation, collective agreements and the day the notice is received shift the real date. If in doubt, have your contract checked.",
     window: "My time window",
     windowHint: "Optional. Companies may approach you only within this period — outside it you are not approachable, even if “I am actively looking” is chosen above. No company sees the dates, only whether you are approachable today. An empty field means: open.",
     openFrom: "Open from",
@@ -972,6 +988,7 @@ const en: Catalog = {
   },
 
   transfers: {
+    startsBeforeEarliest: "Starts before your earliest change — a buyout or a termination agreement would be needed.",
     title: "My conversations",
     signInRequired: "Please <1>sign in</1> to see your conversations.",
     intro: "A company can only approach you if you have <1>released your market status</1> to it and are currently open to offers. You can decline at any time, at every step.",
@@ -996,6 +1013,7 @@ const en: Catalog = {
   },
 
   companyTransfers: {
+    startNotAMonth: "The start is a month, for example 2026-11.",
     title: "Transfers",
     companyOnly: "Only someone acting for a company sees transfers. Switch to a company at the top.",
     lead: "The transfer fee is recorded here, not moved: this platform handles no money. It is here so both sides have the same figure in view.",

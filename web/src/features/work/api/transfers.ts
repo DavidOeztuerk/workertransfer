@@ -37,6 +37,12 @@ export interface Transfer {
   message: string;
   offer_note: string;
   offer_start_on: string | null;
+  /**
+   * Only in the person's own view (H2): whether the offer starts before she
+   * could leave. Absent when no notice period is stated or the start is not a
+   * month — absent is "we do not know", never "fine".
+   */
+  starts_before_earliest?: boolean;
   offer_fee_cents: number | null;
   created_at: string;
   updated_at: string;
@@ -122,6 +128,7 @@ export const COMPANY_TRANSFER_CASES: readonly ServerCase[] = [
   { status: 409, key: "companyTransfers.stepNotNow" },
   { status: 422, pattern: /exceeds \d+ characters/i, key: "companyTransfers.textTooLong" },
   { status: 422, pattern: /fee cannot be negative/i, key: "companyTransfers.feeNegative" },
+  { status: 422, pattern: /start must be a month/i, key: "companyTransfers.startNotAMonth" },
 ];
 
 export function expressInterest(subjectId: string, message: string): Promise<TransferResult> {

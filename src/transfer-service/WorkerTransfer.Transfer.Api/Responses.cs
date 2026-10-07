@@ -1,3 +1,4 @@
+using WorkerTransfer.Transfer.Application.Market;
 using Noelia.Core.Identity;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Transfer.Application.Requests;
@@ -218,6 +219,17 @@ public static class Responses
             own ? status.OpenUntil : null);
     }
 
+    /// <summary>The notice period on the wire — all <c>null</c> when none is stated.</summary>
+    public static NoticeV1 ToWire(NoticePeriod? notice, DateOnly today) =>
+        notice is null
+            ? new NoticeV1(null, null, null, null, null)
+            : new NoticeV1(
+                notice.Length,
+                NoticeWords.Word(notice.Unit),
+                NoticeWords.Word(notice.End),
+                notice.LastDay(today),
+                notice.EarliestStart(today));
+
     /// <summary>Today, from the container's clock — so a test can move it.</summary>
     public static DateOnly Today(HttpContext context)
     {
@@ -243,7 +255,12 @@ public static class Responses
     }
 
     /// <summary>A case on the wire.</summary>
-    public static TransferV1 ToWire(Domain.Cases.Transfer caseItem)
+    /// <param name="caseItem">The case.</param>
+    /// <param name="earliestStart">
+    /// The person's earliest start — passed ONLY in her own view. A company's
+    /// view gets <c>null</c> and with it no mark (H2).
+    /// </param>
+    public static TransferV1 ToWire(Domain.Cases.Transfer caseItem, DateOnly? earliestStart = null)
     {
         ArgumentNullException.ThrowIfNull(caseItem);
 
@@ -259,6 +276,9 @@ public static class Responses
             caseItem.OfferStart,
             caseItem.OfferFeeCents,
             caseItem.CreatedAt,
-            caseItem.ChangedAt);
+            caseItem.ChangedAt,
+            earliestStart is { } earliest && NoticeWords.ReadStart(caseItem.OfferStart) is { } start
+                ? start < earliest
+                : null);
     }
 }

@@ -207,6 +207,39 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                     b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.NoticeRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("End")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("end_rule");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("integer")
+                        .HasColumnName("length");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("unit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("notice_periods", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.RequestRow", b =>
                 {
                     b.Property<Guid>("Id")

@@ -90,6 +90,14 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         var paid = await Case(anna, company, "completed", fee: 500_000);
         var running = await Case(anna, Guid.CreateVersion7(), "talking");
         await Status(anna);
+        await using (var arrange = postgres.Context())
+        {
+            arrange.NoticePeriods.Add(new NoticeRow
+            {
+                Id = anna, Length = 3, Unit = "month", End = "month_end", UpdatedAt = DateTime.UtcNow
+            });
+            await arrange.SaveChangesAsync();
+        }
 
         var response = await Erase(anna);
 
@@ -102,6 +110,7 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         (await context.Cases.AnyAsync(row => row.Id == paid)).Should().BeFalse();
         (await context.Cases.AnyAsync(row => row.Id == running)).Should().BeFalse();
         (await context.MarketStatus.AnyAsync(row => row.Id == anna)).Should().BeFalse();
+        (await context.NoticePeriods.AnyAsync(row => row.Id == anna)).Should().BeFalse("when she could be gone falls too");
     }
 
     /// <summary>

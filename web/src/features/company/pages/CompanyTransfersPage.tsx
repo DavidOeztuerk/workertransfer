@@ -264,7 +264,9 @@ function TransferCard({
             <TextField
               label={t("companyTransfers.start")}
               helperText={t("companyTransfers.startHint")}
+              type="month"
               placeholder="2026-11"
+              slotProps={{ inputLabel: { shrink: true } }}
               value={start}
               onChange={(e) => setStart(e.target.value)}
             />
