@@ -337,6 +337,9 @@ function AccountMenu() {
         <MenuEntry to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onDone={close}>
           {t("header.drafts")}
         </MenuEntry>
+        <MenuEntry to="/messages" icon={<SendOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.messages")}
+        </MenuEntry>
 
         <Divider />
         <MenuEntry to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onDone={close}>
@@ -484,6 +487,7 @@ function CompanyMenu() {
         <MenuEntry to="/scout">{t("header.candidates")}</MenuEntry>
         <MenuEntry to="/company/jobs">{t("header.ourJobs")}</MenuEntry>
         <MenuEntry to="/company/applications">{t("header.receivedApplications")}</MenuEntry>
+        <MenuEntry to="/messages">{t("header.messages")}</MenuEntry>
         <MenuEntry to="/company/transfers">{t("header.ourConversations")}</MenuEntry>
         <MenuEntry to="/company/advisor">{t("header.ourAdvisor")}</MenuEntry>
         <MenuEntry to="/company/assessments">{t("header.ourAssessments")}</MenuEntry>

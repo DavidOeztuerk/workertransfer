@@ -14,6 +14,7 @@ using WorkerTransfer.Messages.Application.Ports;
 using WorkerTransfer.Messages.Infrastructure.Persistence;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Roles;
 
 namespace WorkerTransfer.Messages.Tests;
 
@@ -41,6 +42,8 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
     private readonly ProbeProcess _process = new();
     private readonly ProbeMembers _members = new();
     private readonly ProbeDrafter _drafter = new();
+    private readonly ProbeLedger _ledger = new();
+    private readonly RoleProbe _roles = new();
 
     /// <inheritdoc />
     public async Task InitializeAsync()
@@ -72,6 +75,8 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                 services.Replace(ServiceDescriptor.Scoped<IProcessLookup>(_ => _process));
                 services.Replace(ServiceDescriptor.Scoped<ICompanyMemberLookup>(_ => _members));
                 services.Replace(ServiceDescriptor.Scoped<IReplyDrafter>(_ => _drafter));
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
             });
         });
     }
@@ -94,6 +99,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                           || row.Contains("erasure", StringComparison.Ordinal))
             .Should().BeEquivalentTo(
                 "GET /messages/me",
+                "POST /messages/approaches",
                 "GET /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}/draft",
@@ -332,9 +338,134 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
             var row = list.EnumerateArray().Single();
             row.GetProperty("kind").GetString().Should().Be("application");
             row.GetProperty("reference").GetGuid().Should().Be(Application);
-            row.EnumerateObject().Select(property => property.Name)
-                .Should().BeEquivalentTo("kind", "reference", "last_message_at");
         }
+
+        // The counterpart, and only the counterpart.
+        mine.EnumerateArray().Single().EnumerateObject().Select(property => property.Name)
+            .Should().BeEquivalentTo("kind", "reference", "last_message_at", "company_id");
+        mine.EnumerateArray().Single().GetProperty("company_id").GetGuid().Should().Be(Company);
+        ours.EnumerateArray().Single().EnumerateObject().Select(property => property.Name)
+            .Should().BeEquivalentTo("kind", "reference", "last_message_at", "person_id");
+        ours.EnumerateArray().Single().GetProperty("person_id").GetGuid().Should().Be(Anna);
+    }
+
+    // -----------------------------------------------------------------
+    // Approaches — a company's first message (ADR-0048, B2)
+    // -----------------------------------------------------------------
+
+    private Task<HttpResponseMessage> Approach(Guid member, Guid person, string text = "Hallo, wir suchen eine Schweißerin.", bool drafted = false) =>
+        AsCompany(member).PostAsJsonAsync(
+            new Uri("/messages/approaches", UriKind.Relative),
+            new Dictionary<string, object?> { ["subject_id"] = person, ["text"] = text, ["drafted"] = drafted });
+
+    [Fact]
+    public async Task A_recruiter_approaches_a_person_who_released_and_she_reads_and_answers()
+    {
+        _ledger.Set(Anna, Company, true);
+
+        var opened = await Approach(Recruiter, Anna, drafted: true);
+
+        opened.StatusCode.Should().Be(HttpStatusCode.Created);
+        var conversation = await Json(opened);
+        conversation.GetProperty("kind").GetString().Should().Be("approach");
+        var reference = conversation.GetProperty("reference").GetGuid();
+        conversation.GetProperty("messages")[0].GetProperty("origin").GetString().Should().Be("agent");
+
+        (await Notes()).Should().BeEquivalentTo([(Anna, "message_received")]);
+
+        var hers = await Json(await AsPerson(Anna).GetAsync(new Uri($"/messages/approach/{reference}", UriKind.Relative)));
+        var first = hers.GetProperty("messages").EnumerateArray().Single();
+        first.GetProperty("text").GetString().Should().Be("Hallo, wir suchen eine Schweißerin.");
+        first.TryGetProperty("origin", out _).Should().BeFalse("the person does not see where the company's words came from");
+
+        (await AsPerson(Anna).PostAsJsonAsync(new Uri($"/messages/approach/{reference}", UriKind.Relative), Text("Gern, erzählen Sie mehr.")))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Nobody_who_released_nothing_is_approached()
+    {
+        var unreleased = await Approach(Recruiter, Anna);
+        var invented = await Approach(Recruiter, Guid.NewGuid());
+
+        unreleased.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Strip(await Raw(unreleased)).Should().Be(Strip(await Raw(invented)));
+
+        await using var context = Context();
+        (await context.Conversations.CountAsync()).Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(CompanyRole.Member, HttpStatusCode.Forbidden)]
+    [InlineData(CompanyRole.Recruiter, HttpStatusCode.Created)]
+    [InlineData(CompanyRole.Admin, HttpStatusCode.Created)]
+    public async Task Only_a_recruiter_or_an_admin_makes_the_first_contact(CompanyRole role, HttpStatusCode expected)
+    {
+        _ledger.Set(Anna, Company, true);
+        _roles.Answer = role;
+
+        (await Approach(Recruiter, Anna)).StatusCode.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task A_member_answers_in_a_running_approach()
+    {
+        _ledger.Set(Anna, Company, true);
+        var reference = (await Json(await Approach(Recruiter, Anna))).GetProperty("reference").GetGuid();
+
+        _roles.Answer = CompanyRole.Member;
+
+        (await AsCompany(Colleague).PostAsJsonAsync(new Uri($"/messages/approach/{reference}", UriKind.Relative), Text("Ich übernehme.")))
+            .StatusCode.Should().Be(HttpStatusCode.Created, "answering is daily work, not a first contact (ADR-0048)");
+    }
+
+    [Fact]
+    public async Task A_second_approach_lands_in_the_same_conversation()
+    {
+        _ledger.Set(Anna, Company, true);
+
+        var first = (await Json(await Approach(Recruiter, Anna, "Erste"))).GetProperty("reference").GetGuid();
+        var second = (await Json(await Approach(Colleague, Anna, "Zweite"))).GetProperty("reference").GetGuid();
+
+        second.Should().Be(first);
+        await using var context = Context();
+        (await context.Conversations.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task After_a_revocation_the_company_is_out_and_the_person_still_reads()
+    {
+        _ledger.Set(Anna, Company, true);
+        var reference = (await Json(await Approach(Recruiter, Anna))).GetProperty("reference").GetGuid();
+        var address = new Uri($"/messages/approach/{reference}", UriKind.Relative);
+
+        _ledger.Set(Anna, Company, false);
+
+        (await AsCompany(Recruiter).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await AsCompany(Recruiter).PostAsJsonAsync(address, Text("Noch da?"))).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await AsPerson(Anna).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Another_company_does_not_see_the_approach()
+    {
+        _ledger.Set(Anna, Company, true);
+        _ledger.Set(Anna, OtherCompany, true);
+        var reference = (await Json(await Approach(Recruiter, Anna))).GetProperty("reference").GetGuid();
+
+        (await With(TokenShape.Company(Recruiter, OtherCompany)).GetAsync(new Uri($"/messages/approach/{reference}", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await AsPerson(Stranger).GetAsync(new Uri($"/messages/approach/{reference}", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_person_cannot_open_an_approach()
+    {
+        (await With(TokenShape.Person(Anna)).PostAsJsonAsync(
+                new Uri("/messages/approaches", UriKind.Relative),
+                new Dictionary<string, object?> { ["subject_id"] = Stranger, ["text"] = "Hallo" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     // -----------------------------------------------------------------

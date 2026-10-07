@@ -42,14 +42,18 @@ export type DraftResult = { ok: true; message: Message } | Failure<DraftError>;
 const GONE = { reason: "gone" as const, titleKey: "errors.conversationGone" as const };
 const SILENT = { reason: "unavailable" as const, titleKey: "errors.serviceSilent" as const };
 
-/** The conversation of an application, as the caller's side sees it. */
+/** The kinds of process a conversation hangs on. */
+export type ProcessKind = "application" | "approach";
+
+/** The conversation of a process, as the caller's side sees it. */
 export async function getConversation(
-  application: string,
-  signal?: AbortSignal
+  reference: string,
+  signal?: AbortSignal,
+  kind: ProcessKind = "application"
 ): Promise<ConversationResult> {
   const answer = await request<Conversation>(
     MESSAGES_BASE_URL,
-    `/messages/application/${application}`,
+    `/messages/${kind}/${reference}`,
     { signal },
     "errors.conversationNotLoaded"
   );
@@ -64,10 +68,14 @@ export async function getConversation(
 }
 
 /** A human being writes and sends. */
-export async function sendMessage(application: string, text: string): Promise<MessageResult> {
+export async function sendMessage(
+  reference: string,
+  text: string,
+  kind: ProcessKind = "application"
+): Promise<MessageResult> {
   const answer = await request<Message>(
     MESSAGES_BASE_URL,
-    `/messages/application/${application}`,
+    `/messages/${kind}/${reference}`,
     { method: "POST", body: { text } },
     "errors.messageNotSent"
   );
@@ -89,10 +97,13 @@ export async function sendMessage(application: string, text: string): Promise<Me
  * Asks for a reply draft. It comes back as a draft of the own side and goes
  * nowhere until a human being releases it (VISION-FRAGEN D2).
  */
-export async function requestDraft(application: string): Promise<DraftResult> {
+export async function requestDraft(
+  reference: string,
+  kind: ProcessKind = "application"
+): Promise<DraftResult> {
   const answer = await request<Message>(
     MESSAGES_BASE_URL,
-    `/messages/application/${application}/draft`,
+    `/messages/${kind}/${reference}/draft`,
     { method: "POST" },
     "errors.draftNotCreated"
   );
@@ -147,4 +158,63 @@ export async function discardDraft(id: string): Promise<boolean> {
     "errors.requestFailed"
   );
   return answer.ok;
+}
+
+/** One line of "my conversations" — the counterpart and nothing else. */
+export interface ConversationSummary {
+  kind: ProcessKind;
+  reference: string;
+  last_message_at: string;
+  /** For the person: which company wrote. */
+  company_id?: string;
+  /** For the company: which person. */
+  person_id?: string;
+}
+
+export type ConversationListResult = { ok: true; items: ConversationSummary[] } | Failure<"failed">;
+
+/** The caller's conversations, newest first. No unread count (ADR-0047). */
+export async function listConversations(signal?: AbortSignal): Promise<ConversationListResult> {
+  const answer = await request<ConversationSummary[]>(
+    MESSAGES_BASE_URL,
+    "/messages/me",
+    { signal },
+    "errors.listNotLoaded"
+  );
+  if (answer.ok) return { ok: true, items: answer.value ?? [] };
+  return { ok: false, reason: "failed", error: answer.error };
+}
+
+export type ApproachResult =
+  | { ok: true; reference: string }
+  | Failure<ConversationError | "invalid">;
+
+/**
+ * A company's first message to a person (ADR-0048) — released by a recruiter.
+ *
+ * `drafted` records only where the words came from (the scout's draft); the
+ * person never sees it. Nothing is sent without this call, and this call is a
+ * click.
+ */
+export async function openApproach(
+  subjectId: string,
+  text: string,
+  drafted: boolean
+): Promise<ApproachResult> {
+  const answer = await request<Conversation>(
+    MESSAGES_BASE_URL,
+    "/messages/approaches",
+    { method: "POST", body: { subject_id: subjectId, text, drafted } },
+    "errors.messageNotSent"
+  );
+  if (answer.ok && answer.value != null) return { ok: true, reference: answer.value.reference };
+  return interpretError<ConversationError | "invalid">(
+    answer.ok ? { status: 503, title: "", detail: "" } : answer.error,
+    {
+      404: { reason: "gone", titleKey: "errors.personNotApproachable", detailKey: "errors.personNotApproachable" },
+      422: { reason: "invalid", titleKey: "errors.messageInvalid", detailKey: "errors.messageInvalid" },
+      503: SILENT,
+    },
+    "failed"
+  );
 }

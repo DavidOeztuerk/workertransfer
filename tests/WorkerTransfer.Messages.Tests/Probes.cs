@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using WorkerTransfer.Messages.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Messages.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Messages.Tests;
@@ -190,3 +191,67 @@ public sealed class ProbeDrafter : IReplyDrafter
     }
 }
 
+/// <summary>A ledger the test controls.</summary>
+/// <remarks>
+/// It counts the questions, and that is the interesting number: the company side
+/// has to ask at <em>every</em> read (ADR-0013), the person side at
+/// <em>none</em> (ADR-0047).
+/// </remarks>
+public sealed class ProbeLedger : IConsentGate
+{
+    /// <summary>Who has released something to whom — key "subject|company".</summary>
+    public HashSet<string> Releases { get; } = [];
+
+    /// <summary>How often it was asked.</summary>
+    public int Questions { get; private set; }
+
+    /// <summary>When true, the ledger says nothing at all.</summary>
+    public bool Silent { get; set; }
+
+    /// <summary>Releases or takes back.</summary>
+    public void Set(Guid subject, Guid company, bool released)
+    {
+        var key = $"{subject}|{company}";
+
+        if (released)
+        {
+            Releases.Add(key);
+        }
+        else
+        {
+            Releases.Remove(key);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> MaySeeAsync(
+        SubjectId subject, TenantId company, CancellationToken cancellationToken = default) =>
+        (await MayEachSeeAsync([(subject, company)], cancellationToken))[0];
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<bool>> MayEachSeeAsync(
+        IReadOnlyList<(SubjectId Subject, TenantId Company)> pairs,
+        CancellationToken cancellationToken = default)
+    {
+        Questions++;
+
+        if (Silent)
+        {
+            throw new ConsentGateSilent("the ledger does not answer in the test");
+        }
+
+        return Task.FromResult<IReadOnlyList<bool>>(
+            [.. pairs.Select(pair => Releases.Contains($"{pair.Subject.Value}|{pair.Company.Value}"))]);
+    }
+}
+
+/// <summary>identity-service's role lookup, answered by the test — recruiter by default.</summary>
+public sealed class RoleProbe : ICompanyRoles
+{
+    /// <summary>What it answers.</summary>
+    public CompanyRole Answer { get; set; } = CompanyRole.Recruiter;
+
+    /// <inheritdoc />
+    public Task<CompanyRole> RoleAsync(Guid subject, Guid company, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Answer);
+}

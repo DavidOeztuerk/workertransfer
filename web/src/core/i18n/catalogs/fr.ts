@@ -35,6 +35,7 @@ const fr: Catalog = {
   },
 
   header: {
+    messages: "Messages",
     visitorMenu: "Réglages et connexion",
     register: "S'inscrire",
     signIn: "Se connecter",
@@ -580,6 +581,7 @@ const fr: Catalog = {
   },
 
   errors: {
+    personNotApproachable: "Cette personne n’est pas (ou plus) visible pour vous.",
     advertGone: "Cette annonce n’est pas (ou plus) publiée.",
     advertNoSkills: "L’annonce ne nomme aucune compétence — il n’y a rien à comparer. Complétez l’annonce avec ce que le poste exige.",
     recruiterOnly: "Dans votre entreprise, le premier contact avec une personne est pris par un recruteur. Un administrateur peut vous attribuer ce rôle.",
@@ -912,6 +914,14 @@ const fr: Catalog = {
 
 
   messages: {
+    title: "Messages",
+    lead: "Chaque conversation se rattache à une démarche — une candidature ou une prise de contact. Pas d’accusé de lecture ni de compteur : qui répond a lu.",
+    signInRequired: "Veuillez vous connecter pour voir vos messages.",
+    noConversations: "Aucune conversation pour l’instant.",
+    kindApplication: "Candidature",
+    kindApproach: "Prise de contact",
+    aCompany: "Une entreprise",
+    aPerson: "Une personne",
     loading: "Chargement des messages…",
     empty: "Aucun message pour l’instant. Écrivez le premier — l’autre partie reçoit une notification sans contenu.",
     listLabel: "Messages",
@@ -1149,6 +1159,12 @@ const fr: Catalog = {
   },
 
   scout: {
+    approach: "Contacter",
+    approachHint: "Le premier message à cette personne. Sur demande, le recruteur IA rédige un texte à partir de son titre et des compétences nommées — sans nom. Ne part que ce que vous validez. Dans votre entreprise, le premier contact est pris par un recruteur.",
+    approachText: "Message",
+    approachDraft: "Brouillon du recruteur IA",
+    approachSent: "Envoyé.",
+    approachOpenConversation: "Vers la conversation",
     advertTitle: "Qui correspond à « {{title}} »",
     advertLead: "Recherche avec les compétences de l’annonce ; les coches montrent qui a nommé lesquelles. Aucun classement — trié par « dernière mise à jour ». N’apparaissent que les personnes qui vous ont ouvert leur profil.",
     advertToFreeSearch: "Vers la recherche libre",

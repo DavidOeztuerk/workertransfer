@@ -12,6 +12,7 @@ import { failureKey, type MessageKey } from "../../../shared/api/errors";
 import {
   type Conversation,
   type Message,
+  type ProcessKind,
   DRAFT_CASES,
   discardDraft,
   getConversation,
@@ -31,7 +32,13 @@ import {
  * (E2, Art. 9 DSGVO) — not only when a model is involved: a message is stored,
  * and a model may read it later when somebody asks for a draft.
  */
-export function ConversationPanel({ application }: { application: string }) {
+export function ConversationPanel({
+  reference,
+  kind = "application",
+}: {
+  reference: string;
+  kind?: ProcessKind;
+}) {
   const { t } = useTranslation();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +48,7 @@ export function ConversationPanel({ application }: { application: string }) {
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      const result = await getConversation(application, signal);
+      const result = await getConversation(reference, signal, kind);
       if (signal?.aborted) return;
       setLoading(false);
       if (result.ok) {
@@ -50,7 +57,7 @@ export function ConversationPanel({ application }: { application: string }) {
         setError(failureKey(result.error, "errors.conversationNotLoaded"));
       }
     },
-    [application]
+    [reference, kind]
   );
 
   useEffect(() => {
@@ -61,7 +68,7 @@ export function ConversationPanel({ application }: { application: string }) {
 
   async function send() {
     setBusy(true);
-    const result = await sendMessage(application, text);
+    const result = await sendMessage(reference, text, kind);
     setBusy(false);
     if (result.ok) {
       setText("");
@@ -74,7 +81,7 @@ export function ConversationPanel({ application }: { application: string }) {
 
   async function draft() {
     setBusy(true);
-    const result = await requestDraft(application);
+    const result = await requestDraft(reference, kind);
     setBusy(false);
     if (result.ok) {
       setError(null);

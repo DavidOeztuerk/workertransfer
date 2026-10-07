@@ -12,6 +12,7 @@ using WorkerTransfer.Messages.Contracts;
 using WorkerTransfer.Messages.Domain.Audit;
 using WorkerTransfer.Messages.Domain.Conversations;
 using WorkerTransfer.Messages.Infrastructure.Companies;
+using WorkerTransfer.Messages.Infrastructure.Consent;
 using WorkerTransfer.Messages.Infrastructure.Draft;
 using WorkerTransfer.Messages.Infrastructure.Erasure;
 using WorkerTransfer.Messages.Infrastructure.Notification;
@@ -56,6 +57,7 @@ public static class MessagesInfrastructure
         services.Configure<NotificationSettings>(configuration.GetSection(NotificationSettings.Section));
         services.Configure<ErasureSettings>(configuration.GetSection(ErasureSettings.Section));
         services.Configure<DraftSettings>(configuration.GetSection(DraftSettings.Section));
+        services.Configure<ConsentSettings>(configuration.GetSection(ConsentSettings.Section));
 
         services.AddSingleton(_ => MessagesDbContextFactory.DataSource(connectionString));
         services.AddDbContext<MessagesDbContext>((provider, options) =>
@@ -73,6 +75,8 @@ public static class MessagesInfrastructure
         services.AddScoped<IProcessLookup, HttpProcessLookup>();
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
         services.AddScoped<IReplyDrafter, HttpReplyDrafter>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<ConversationAccess>();
 
         services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<MessagesDbContext>(configuration);
@@ -105,6 +109,12 @@ public static class MessagesInfrastructure
 
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
+
+        // No further type stands between the question and the ledger
+        // (ADR-0013): a cache in front of it strikes nobody, because everything
+        // keeps working, only with the state from before.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(provider, typeof(HttpConsentGate)));
 
         services.AddScoped<IAuditTrail, EfAuditTrail>();
 

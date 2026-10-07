@@ -1,3 +1,4 @@
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Messages.Api;
 using WorkerTransfer.Messages.Infrastructure;
 using WorkerTransfer.Messages.Infrastructure.Persistence;
@@ -15,6 +16,11 @@ const string serviceName = "messages-service";
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
     ArtificialIntelligence.Used);
+
+// The first contact to a person is a recruiter's (ADR-0048); answering in a
+// running conversation is every member's.
+builder.Services.AddCompanyPermissions(
+    builder.Configuration, [], [MessagePermissions.Approach]);
 
 builder.Services.AddMessagesInfrastructure(
     builder.Configuration,

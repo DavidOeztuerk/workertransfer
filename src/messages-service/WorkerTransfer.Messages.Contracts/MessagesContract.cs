@@ -32,11 +32,31 @@ public sealed record ConversationV1(
     [property: JsonPropertyName("messages")] IReadOnlyList<MessageV1> Messages);
 
 /// <summary>One line of "my conversations".</summary>
-/// <remarks>No unread count and no preview: see ADR-0047, "Kein Gelesen-Zähler".</remarks>
+/// <remarks>
+/// <para>No unread count and no preview: see ADR-0047, "Kein Gelesen-Zähler".</para>
+///
+/// <para><strong>The counterpart, and only the counterpart.</strong> The
+/// person sees which company (<c>company_id</c>) — it wrote to them; the
+/// company sees which person (<c>person_id</c>) — it applied to or was
+/// approached by it, and the profile behind that id answers only while the
+/// person releases it.</para>
+/// </remarks>
 public sealed record ConversationSummaryV1(
     [property: JsonPropertyName("kind")] string Kind,
     [property: JsonPropertyName("reference")] Guid Reference,
-    [property: JsonPropertyName("last_message_at")] DateTimeOffset LastMessageAt);
+    [property: JsonPropertyName("last_message_at")] DateTimeOffset LastMessageAt,
+    [property: JsonPropertyName("company_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    Guid? CompanyId = null,
+    [property: JsonPropertyName("person_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    Guid? PersonId = null);
+
+/// <summary>A company's first message to a person — released by a recruiter.</summary>
+public sealed record OpenApproachV1(
+    [property: JsonPropertyName("subject_id")] Guid SubjectId,
+    [property: JsonPropertyName("text")] string? Text,
+    [property: JsonPropertyName("drafted")] bool Drafted = false);
 
 /// <summary>What a human being sends.</summary>
 public sealed record WriteMessageV1(

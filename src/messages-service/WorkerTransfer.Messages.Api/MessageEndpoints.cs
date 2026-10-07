@@ -1,3 +1,4 @@
+using WorkerTransfer.ServiceDefaults.Roles;
 using MediatR;
 using Noelia.Core.Identity;
 using WorkerTransfer.Messages.Application.Conversations;
@@ -42,9 +43,43 @@ public static class MessageEndpoints
             var mine = await mediator.Send(new MyConversationsQuery(caller), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
-                mine.Select(entry => new ConversationSummaryV1(entry.Kind, entry.Reference, entry.LastMessageAt)),
+                mine.Select(entry => new ConversationSummaryV1(
+                    entry.Kind, entry.Reference, entry.LastMessageAt,
+                    CompanyId: caller.Company is null ? entry.Company.Value : null,
+                    PersonId: caller.Company is null ? null : entry.Person.Value)),
                 cancellationToken);
         });
+
+        // A first contact (ADR-0048): at least a recruiter, checked BEFORE the
+        // body and the person are looked at.
+        messages.MapPost("/approaches", async (
+            OpenApproachV1? body, IMediator mediator, ICurrentPrincipal principal,
+            HttpContext context, CancellationToken cancellationToken) =>
+        {
+            if (CallerOf(principal) is not { Company: { } company } caller)
+            {
+                await NotAuthenticated(context);
+                return;
+            }
+
+            if (body is null || body.SubjectId == Guid.Empty)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", "subject_id is required");
+                return;
+            }
+
+            var (conversation, message) = await mediator.Send(
+                new OpenApproachCommand(company, caller.Subject, new SubjectId(body.SubjectId), body.Text, body.Drafted),
+                cancellationToken);
+
+            context.Response.StatusCode = StatusCodes.Status201Created;
+            await context.Response.WriteAsJsonAsync(
+                new ConversationV1(
+                    conversation.Kind, conversation.Reference, "company", [View(message, Side.Company)]),
+                cancellationToken);
+        })
+        .RequireAuthorization(AdminPermissionExtensions.Policy(MessagePermissions.Approach));
 
         messages.MapGet("/{kind}/{reference:guid}", async (
             string kind, Guid reference, IMediator mediator, ICurrentPrincipal principal,
@@ -196,4 +231,11 @@ public static class MessageEndpoints
 
     private static Task Write(EndpointFilterInvocationContext call, int status, string detail) =>
         ProblemDetailsMiddleware.Write(call.HttpContext, status, "Request failed", detail);
+}
+
+/// <summary>What a first contact needs here (ADR-0048).</summary>
+public static class MessagePermissions
+{
+    /// <summary>Approaching a person — at least a <c>recruiter</c>.</summary>
+    public const string Approach = "messages.approach";
 }

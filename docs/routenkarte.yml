@@ -846,11 +846,16 @@ gruppen:
       Person, dass die Firma gerade etwas entwirft.
 
       `member` genuegt: einer Bewerberin zu antworten ist taegliche Arbeit im
-      Namen der Firma. Einen Entwurf FREIGEBEN kann jedes Mitglied seiner
+      Namen der Firma. NUR `POST /messages/approaches` — der erste Kontakt zu
+      jemandem, der sich nicht gemeldet hat — verlangt mindestens einen
+      `recruiter` (ADR-0048); `firma` ist Admin und kommt deshalb bis zum 422
+      des leeren Rumpfs, `mitglied` nicht. Einen Entwurf FREIGEBEN kann jedes Mitglied seiner
       Seite; abschicken ohne Freigabe kann niemand — dafuer gibt es keine
       Route (VISION-FRAGEN D2).
     eintraege:
       - { methode: GET, pfad: '/messages/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/messages/approaches', ohne: 401, person: 403, mitglied: 403, firma: 422, rumpf: '{}' }
+      - { methode: GET, pfad: '/messages/approach/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: GET, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 404, mitglied: 404, firma: 404 }

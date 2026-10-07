@@ -38,6 +38,7 @@ const de = {
   },
 
   header: {
+    messages: "Nachrichten",
     visitorMenu: "Einstellungen und Anmeldung",
     register: "Registrieren",
     signIn: "Anmelden",
@@ -583,6 +584,7 @@ const de = {
   },
 
   errors: {
+    personNotApproachable: "Diese Person ist für euch nicht (mehr) sichtbar.",
     advertGone: "Dieses Inserat ist nicht (mehr) veröffentlicht.",
     advertNoSkills: "Das Inserat nennt keine Fähigkeit — es gibt nichts abzugleichen. Ergänze im Inserat, was die Stelle verlangt.",
     recruiterOnly: "Den ersten Kontakt zu einer Person nimmt bei euch ein Recruiter auf. Ein Administrator kann dir diese Rolle geben.",
@@ -916,6 +918,14 @@ const de = {
 
 
   messages: {
+    title: "Nachrichten",
+    lead: "Jedes Gespräch hängt an einem Vorgang — einer Bewerbung oder einer Ansprache. Es gibt keine Lesebestätigung und keinen Zähler: wer antwortet, hat gelesen.",
+    signInRequired: "Bitte melde dich an, um deine Nachrichten zu sehen.",
+    noConversations: "Noch kein Gespräch.",
+    kindApplication: "Bewerbung",
+    kindApproach: "Ansprache",
+    aCompany: "Ein Unternehmen",
+    aPerson: "Eine Person",
     loading: "Nachrichten werden geladen…",
     empty: "Noch keine Nachricht. Schreib die erste — die andere Seite bekommt eine Benachrichtigung ohne Inhalt.",
     listLabel: "Nachrichten",
@@ -1153,6 +1163,12 @@ const de = {
   },
 
   scout: {
+    approach: "Ansprechen",
+    approachHint: "Die erste Nachricht an diese Person. Der KI-Recruiter entwirft auf Wunsch einen Text aus ihrer Überschrift und den genannten Fähigkeiten — ohne Namen. Hinaus geht nur, was du freigibst. Den ersten Kontakt nimmt bei euch ein Recruiter auf.",
+    approachText: "Nachricht",
+    approachDraft: "Entwurf vom KI-Recruiter",
+    approachSent: "Gesendet.",
+    approachOpenConversation: "Zum Gespräch",
     advertTitle: "Wer zu „{{title}}“ passt",
     advertLead: "Gesucht wird mit den Fähigkeiten aus dem Inserat, die Häkchen zeigen, wer welche genannt hat. Keine Rangfolge — sortiert nach „zuletzt aktualisiert“. Zu sehen ist nur, wer euch sein Profil freigegeben hat.",
     advertToFreeSearch: "Zur freien Suche",

@@ -610,6 +610,10 @@ services:
       # the process's own service, with the caller's token, at every request —
       # without this line every conversation answers 503.
       Applications__BaseUrl: http://applications-service:8007
+      # An APPROACH stands on the ledger (`profile.visibility:*`): the company
+      # side asks it at every request. Without this line every approach
+      # answers 503 — rightly, and visibly.
+      Consent__BaseUrl: http://consent-service:8002
       # A company's members — the recipients when the person writes — and a
       # person's own AI access for their drafts. The same door and secret as
       # everywhere.

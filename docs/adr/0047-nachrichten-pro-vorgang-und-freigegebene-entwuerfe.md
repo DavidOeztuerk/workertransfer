@@ -95,3 +95,23 @@ Person. Keine Aufbewahrungsausnahme.
 - **Ein Lesestatus.** Siehe oben.
 - **Entwürfe nur im Browser halten.** Dann gäbe es keinen Ort, an dem ein
   Agent später etwas zur Freigabe ablegt, ohne dass die Seite gerade offen ist.
+
+## Ergänzung 07.10.2026 — die Ansprache (Phase 2, ADR-0048)
+
+Zweite Vorgangsart: **`approach`**, der erste Kontakt einer Firma zu einer
+Person, die ihr das Profil freigegeben hat.
+
+- **Geöffnet wird sie nur über `POST /messages/approaches`**, mit mindestens
+  der Rolle `recruiter`, und nur, wenn der Ledger `profile.visibility:*`
+  bestätigt. Sonst 404 — gleich, ob es die Person gibt.
+- **Eine Ansprache pro Paar Firma/Person.** Die Referenz wird aus beiden
+  abgeleitet; eine zweite Ansprache landet im selben Gespräch.
+- **Wer dazugehört, steht im Gespräch selbst.** Die Firmenseite fragt den
+  Ledger bei jeder Anfrage erneut: wer sein Profil zurücknimmt, wird ab der
+  nächsten Anfrage nicht mehr angeschrieben. Die Person liest weiter.
+- **Den Text entwirft der KI-Recruiter im Scout** (`/scout/candidates/{id}/draft`,
+  ohne Namen) und legt ihn ins Formular; abgeschickt wird er erst mit
+  „Freigeben und senden“. `drafted` hält fest, woher die Worte kamen, und nur
+  die eigene Seite sieht es.
+- **Antworten in einer laufenden Ansprache darf jedes Mitglied** — das ist
+  Tagesarbeit, kein erster Kontakt.

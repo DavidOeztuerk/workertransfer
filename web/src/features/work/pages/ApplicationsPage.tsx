@@ -222,7 +222,7 @@ export function ApplicationsPage() {
                   </CardContent>
                   {open === application.id ? (
                     <CardContent sx={{ borderTop: 1, borderColor: "divider" }}>
-                      <ConversationPanel application={application.id} />
+                      <ConversationPanel reference={application.id} />
                     </CardContent>
                   ) : null}
                 </Card>

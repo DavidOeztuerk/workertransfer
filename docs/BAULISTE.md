@@ -31,12 +31,18 @@ Vorgangs.
 
 ## Phase 2 — Firmenseite
 
-| Was | Frage | Größe | Bemerkung |
-|---|---|---|---|
-| **Rolle „Recruiter“** | B7 | S | neben `admin` und `member`; Rechte festlegen |
-| **Gehaltsspanne im Inserat** | B5 | S | Feld in jobs-service, Pflicht oder freiwillig klären (EU-Entgelttransparenz) |
-| **KI-Scout pro Inserat**: Liste passender Personen am Inserat | B1 | M | baut auf dem bestehenden Scout auf; Sichtbarkeit bei jeder Anzeige neu |
-| **KI-Recruiter**: entwirft Nachrichten, Mensch gibt frei | B2, D2 | M | braucht Phase 1 |
+**Erledigt am 07.10.2026.**
+
+| Was | Frage | Stand |
+|---|---|---|
+| **Rolle „Recruiter“** | B7 | gebaut (ADR-0048): geordnet member < recruiter < admin; der erste Kontakt braucht mindestens recruiter |
+| **Gehaltsspanne im Inserat** | B5 | gebaut: freiwillig, ohne Angabe „Gehalt nicht angegeben“; Pflicht oder nicht ist J13 |
+| **KI-Scout pro Inserat** | B1 | gebaut: „Passende Personen“ am veröffentlichten Inserat, dieselbe Häkchen-Suche, feste Regeln |
+| **KI-Recruiter** | B2, D2 | gebaut: Entwurf der Ansprache im Scout, Freigabe öffnet die Ansprache in messages-service; `/messages` für beide Seiten |
+
+Nebenbei gefunden und behoben: Inserate kamen ohne Arbeitsort-Modus und
+Anstellungsart an (falsche Feldnamen), das Anschreiben hatte im Cluster keinen
+Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 
 ## Phase 3 — Personenseite
 

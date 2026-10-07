@@ -171,7 +171,7 @@ export function CompanyApplicationPage() {
             />
           ) : null}
 
-          {current.key === "messages" ? <ConversationPanel application={e.id} /> : null}
+          {current.key === "messages" ? <ConversationPanel reference={e.id} /> : null}
 
           {current.key.startsWith("doc-") ? (
             <DocumentView

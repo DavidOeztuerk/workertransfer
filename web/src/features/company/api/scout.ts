@@ -234,3 +234,32 @@ export async function advertCandidates(
     "failed"
   );
 }
+
+export type ApproachDraftResult = { ok: true; draft: string } | Failure<"gone" | "no-provider" | "failed">;
+
+/**
+ * The AI recruiter's draft of a first message (VISION-FRAGEN B2, D2).
+ *
+ * The model reads the person's headline and named skills and the searched
+ * words — never a name, never evidence. The text comes back to THIS browser
+ * and lies in a field; scout-service sends nothing. Sending is a separate,
+ * deliberate step in messages-service.
+ */
+export async function draftApproach(
+  subjectId: string,
+  searched: string[],
+  wish = ""
+): Promise<ApproachDraftResult> {
+  const answer = await request<{ draft: string }>(
+    SCOUT_BASE_URL,
+    `/scout/candidates/${subjectId}/draft`,
+    { method: "POST", body: { skills: searched, wish } },
+    "errors.draftNotCreated"
+  );
+  if (answer.ok && answer.value != null) return { ok: true, draft: answer.value.draft };
+  return interpretError<"gone" | "no-provider" | "failed">(
+    answer.ok ? { status: 503, title: "", detail: "" } : answer.error,
+    { 404: { reason: "gone", titleKey: "errors.personNotApproachable", detailKey: "errors.personNotApproachable" } },
+    "failed"
+  );
+}

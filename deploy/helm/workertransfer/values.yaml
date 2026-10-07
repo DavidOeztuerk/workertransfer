@@ -429,6 +429,8 @@ services:
       # One conversation per process (ADR-0047): who belongs to it is asked of
       # applications-service with the caller's token, at every request.
       Applications__BaseUrl: http://applications-service:8007
+      # An approach stands on the ledger, asked at every request (ADR-0013).
+      Consent__BaseUrl: http://consent-service:8002
       # Members and a person's own AI access. `Identity__Secret` hangs on this
       # line in _helpers.tpl.
       Identity__BaseUrl: http://identity-service:8001

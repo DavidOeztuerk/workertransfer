@@ -41,8 +41,31 @@ public static class ProcessKinds
     /// <summary>An application to a job advert.</summary>
     public const string Application = "application";
 
+    /// <summary>
+    /// A company's first contact to a person who released their profile to it
+    /// (ADR-0048, VISION-FRAGEN B2). Who belongs to it stands in the
+    /// conversation itself; the ledger decides, at every request, whether the
+    /// company may still write.
+    /// </summary>
+    public const string Approach = "approach";
+
     /// <summary>Whether this service knows the kind.</summary>
-    public static bool IsKnown(string kind) => kind == Application;
+    public static bool IsKnown(string kind) => kind is Application or Approach;
+
+    /// <summary>The reference of the one approach between this company and this person.</summary>
+    /// <remarks>
+    /// Derived, not random: a second approach by the same company lands in the
+    /// SAME conversation instead of opening a parallel one — two threads with
+    /// the same counterpart would be a way to write past an unanswered first
+    /// message. And it is not the person's id: the reference stands in URLs,
+    /// and a subject id there would be a handle on the person.
+    /// </remarks>
+    public static Guid ApproachReference(TenantId company, SubjectId person)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"approach:{company.Value:N}:{person.Value:N}"));
+        return new Guid(bytes.AsSpan(0, 16));
+    }
 }
 
 /// <summary>Something about the input is wrong.</summary>
@@ -183,11 +206,17 @@ public sealed class Message
     /// <summary>When it was sent — <c>null</c> for a draft.</summary>
     public DateTimeOffset? SentAt { get; private set; }
 
-    /// <summary>A message a human being wrote and sends.</summary>
+    /// <summary>A message a human being sends — written themselves, or a model's draft they released.</summary>
+    /// <param name="origin">
+    /// <see cref="Origin.Agent"/> when the text came from a draft the sender
+    /// released (the first approach is drafted in the scout, before a
+    /// conversation exists). Released is always by a human being.
+    /// </param>
     public static Message Write(
-        Guid conversation, Side side, SubjectId author, string text, DateTimeOffset now) =>
+        Guid conversation, Side side, SubjectId author, string text, DateTimeOffset now,
+        Origin origin = Origin.Human) =>
         new(Guid.CreateVersion7(), conversation, side, author, Checked(text),
-            Origin.Human, isDraft: false, now, now);
+            origin, isDraft: false, now, now);
 
     /// <summary>A draft a model wrote on request of <paramref name="requestedBy"/>.</summary>
     public static Message Draft(

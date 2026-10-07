@@ -41,7 +41,7 @@ function draw() {
   return render(
     <I18nextProvider i18n={i18n}>
       <ThemeProvider theme={buildTheme("light")}>
-        <ConversationPanel application={APPLICATION} />
+        <ConversationPanel reference={APPLICATION} />
       </ThemeProvider>
     </I18nextProvider>,
   );

@@ -372,10 +372,11 @@ public sealed class RouteMapTests
                 // admin column is an admin — so these three differ too.
                 "POST /resumes/00000000-0000-0000-0000-000000000001/requests",
                 "POST /market/00000000-0000-0000-0000-000000000001/requests",
-                "POST /advisor/conversations"
+                "POST /advisor/conversations",
+                "POST /messages/approaches"
             ],
-            "exactly these eight show the difference in the map; whoever protects "
-            + "a ninth this way or opens one changes this list deliberately");
+            "exactly these nine show the difference in the map; whoever protects "
+            + "a tenth this way or opens one changes this list deliberately");
 
         differing.Should().OnlyContain(
             row => row.Member == 403,

@@ -31,31 +31,69 @@ public sealed class NoConversation() : Exception("No such conversation");
 public sealed record ConversationView(
     string Kind, Guid Reference, Side Side, IReadOnlyList<Message> Messages);
 
-/// <summary>Resolves the caller's side — by asking the process's own service.</summary>
-internal static class Sides
+/// <summary>Who may open a conversation, and on which side.</summary>
+/// <remarks>
+/// <para><strong>An application:</strong> its own service is asked, with the
+/// caller's token, at every request (ADR-0047).</para>
+///
+/// <para><strong>An approach:</strong> the parties stand in the conversation —
+/// the company opened it, after the ledger said yes. The COMPANY side asks the
+/// ledger again at every request: a person who takes their profile back is no
+/// longer written to, from the next request on (ADR-0013). The PERSON side does
+/// not: what was written to somebody stays readable to them after they
+/// revoked.</para>
+///
+/// <para>Every refusal is the same 404.</para>
+/// </remarks>
+public sealed class ConversationAccess(
+    IProcessLookup lookup, IConversationStore store, IConsentGate gate)
 {
-    public static async Task<(ProcessParties Parties, Side Side)> ResolveAsync(
-        IProcessLookup lookup, string kind, Guid reference, Caller caller,
-        CancellationToken cancellationToken)
+    /// <summary>The parties and the caller's side.</summary>
+    /// <exception cref="NoConversation">The caller is not a party, or the process does not exist.</exception>
+    public async Task<(ProcessParties Parties, Side Side)> ResolveAsync(
+        string kind, Guid reference, Caller caller, CancellationToken cancellationToken)
     {
         if (!ProcessKinds.IsKnown(kind))
         {
             throw new NoConversation();
         }
 
-        var parties = await lookup.PartiesAsync(kind, reference, cancellationToken)
+        if (kind == ProcessKinds.Approach)
+        {
+            var conversation = await store.FindAsync(kind, reference, cancellationToken)
+                ?? throw new NoConversation();
+            var parties = new ProcessParties(conversation.Person, conversation.Company, string.Empty);
+
+            if (caller.Company is { } acting)
+            {
+                return acting == conversation.Company
+                       && await gate.MaySeeAsync(conversation.Person, acting, cancellationToken)
+                    ? (parties, Side.Company)
+                    : throw new NoConversation();
+            }
+
+            return caller.Subject == conversation.Person
+                ? (parties, Side.Person)
+                : throw new NoConversation();
+        }
+
+        var found = await lookup.PartiesAsync(kind, reference, cancellationToken)
             ?? throw new NoConversation();
 
         // The capacity decides the side, not who the human being is: acting for
         // the company, even the applicant's own colleague writes as the company.
         if (caller.Company is { } company)
         {
-            return parties.Company == company ? (parties, Side.Company) : throw new NoConversation();
+            return found.Company == company ? (found, Side.Company) : throw new NoConversation();
         }
 
-        return parties.Person == caller.Subject ? (parties, Side.Person) : throw new NoConversation();
+        return found.Person == caller.Subject ? (found, Side.Person) : throw new NoConversation();
     }
+}
 
+/// <summary>Who hears of a message.</summary>
+internal static class Sides
+{
     /// <summary>Who hears of a message <paramref name="from"/> sent.</summary>
     public static async Task<IReadOnlyList<SubjectId>> RecipientsAsync(
         ICompanyMemberLookup members, ProcessParties parties, Side from, SubjectId writer,
@@ -84,7 +122,7 @@ public sealed record ConversationQuery(string Kind, Guid Reference, Caller Calle
 /// A conversation that does not exist yet is an empty one, not a 404: whoever
 /// may see the process may start it.
 /// </remarks>
-public sealed class ConversationHandler(IProcessLookup lookup, IConversationStore store)
+public sealed class ConversationHandler(ConversationAccess access, IConversationStore store)
     : IRequestHandler<ConversationQuery, ConversationView>
 {
     /// <inheritdoc />
@@ -92,8 +130,8 @@ public sealed class ConversationHandler(IProcessLookup lookup, IConversationStor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var (_, side) = await Sides.ResolveAsync(
-            lookup, request.Kind, request.Reference, request.Caller, cancellationToken);
+        var (_, side) = await access.ResolveAsync(
+            request.Kind, request.Reference, request.Caller, cancellationToken);
 
         var conversation = await store.FindAsync(request.Kind, request.Reference, cancellationToken);
 
@@ -132,7 +170,7 @@ public sealed record WriteCommand(string Kind, Guid Reference, Caller Caller, st
 
 /// <summary>Sends, and tells the other side in the same transaction.</summary>
 public sealed class WriteHandler(
-    IProcessLookup lookup,
+    ConversationAccess access,
     ICompanyMemberLookup members,
     IConversationStore store,
     IOutbox outbox,
@@ -143,8 +181,8 @@ public sealed class WriteHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var (parties, side) = await Sides.ResolveAsync(
-            lookup, request.Kind, request.Reference, request.Caller, cancellationToken);
+        var (parties, side) = await access.ResolveAsync(
+            request.Kind, request.Reference, request.Caller, cancellationToken);
 
         var now = clock.GetUtcNow();
         var conversation = await Conversations.OpenAsync(
@@ -200,7 +238,7 @@ public sealed record ComposeReplyQuery(string Kind, Guid Reference, Caller Calle
 
 /// <summary>Builds the context from this conversation's sent messages and nothing else.</summary>
 public sealed class ComposeReplyHandler(
-    IProcessLookup lookup, IConversationStore store, IReplyDrafter drafter)
+    ConversationAccess access, IConversationStore store, IReplyDrafter drafter)
     : IRequestHandler<ComposeReplyQuery, string>
 {
     /// <summary>How many sent messages the model reads.</summary>
@@ -211,8 +249,8 @@ public sealed class ComposeReplyHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var (parties, side) = await Sides.ResolveAsync(
-            lookup, request.Kind, request.Reference, request.Caller, cancellationToken);
+        var (parties, side) = await access.ResolveAsync(
+            request.Kind, request.Reference, request.Caller, cancellationToken);
 
         var conversation = await store.FindAsync(request.Kind, request.Reference, cancellationToken);
 
@@ -236,7 +274,7 @@ public sealed record SaveDraftCommand(string Kind, Guid Reference, Caller Caller
 
 /// <summary>A draft tells nobody: the other side learns of it never.</summary>
 public sealed class SaveDraftHandler(
-    IProcessLookup lookup, IConversationStore store, TimeProvider clock)
+    ConversationAccess access, IConversationStore store, TimeProvider clock)
     : IRequestHandler<SaveDraftCommand, Message>
 {
     /// <inheritdoc />
@@ -244,8 +282,8 @@ public sealed class SaveDraftHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var (parties, side) = await Sides.ResolveAsync(
-            lookup, request.Kind, request.Reference, request.Caller, cancellationToken);
+        var (parties, side) = await access.ResolveAsync(
+            request.Kind, request.Reference, request.Caller, cancellationToken);
 
         var now = clock.GetUtcNow();
         var conversation = await Conversations.OpenAsync(
@@ -264,7 +302,7 @@ public sealed record ReleaseDraftCommand(Guid Message, Caller Caller, string? Te
 
 /// <summary>From here on it is a sent message, and the other side hears of it.</summary>
 public sealed class ReleaseDraftHandler(
-    IProcessLookup lookup,
+    ConversationAccess access,
     ICompanyMemberLookup members,
     IConversationStore store,
     IOutbox outbox,
@@ -276,7 +314,7 @@ public sealed class ReleaseDraftHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var (draft, conversation, parties) = await Drafts.OwnAsync(
-            lookup, store, request.Message, request.Caller, cancellationToken);
+            access, store, request.Message, request.Caller, cancellationToken);
 
         var now = clock.GetUtcNow();
         draft.Release(request.Caller.Subject, request.Text, now);
@@ -299,7 +337,7 @@ public sealed class ReleaseDraftHandler(
 public sealed record DiscardDraftCommand(Guid Message, Caller Caller) : ICommandMessage<bool>;
 
 /// <summary>Deletes the row — no "discarded" state, no count of discarded drafts.</summary>
-public sealed class DiscardDraftHandler(IProcessLookup lookup, IConversationStore store)
+public sealed class DiscardDraftHandler(ConversationAccess access, IConversationStore store)
     : IRequestHandler<DiscardDraftCommand, bool>
 {
     /// <inheritdoc />
@@ -308,7 +346,7 @@ public sealed class DiscardDraftHandler(IProcessLookup lookup, IConversationStor
         ArgumentNullException.ThrowIfNull(request);
 
         var (draft, _, _) = await Drafts.OwnAsync(
-            lookup, store, request.Message, request.Caller, cancellationToken);
+            access, store, request.Message, request.Caller, cancellationToken);
 
         await store.DeleteAsync(draft, cancellationToken);
         return true;
@@ -322,15 +360,15 @@ internal static class Drafts
     /// a draft that does not exist.
     /// </summary>
     public static async Task<(Message Draft, Conversation Conversation, ProcessParties Parties)> OwnAsync(
-        IProcessLookup lookup, IConversationStore store, Guid id, Caller caller,
+        ConversationAccess access, IConversationStore store, Guid id, Caller caller,
         CancellationToken cancellationToken)
     {
         var message = await store.MessageAsync(id, cancellationToken) ?? throw new NoConversation();
         var conversation = await store.GetAsync(message.Conversation, cancellationToken)
             ?? throw new NoConversation();
 
-        var (parties, side) = await Sides.ResolveAsync(
-            lookup, conversation.Kind, conversation.Reference, caller, cancellationToken);
+        var (parties, side) = await access.ResolveAsync(
+            conversation.Kind, conversation.Reference, caller, cancellationToken);
 
         if (side != message.Side || !message.IsDraft)
         {

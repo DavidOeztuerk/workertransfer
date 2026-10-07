@@ -35,6 +35,7 @@ const en: Catalog = {
   },
 
   header: {
+    messages: "Messages",
     visitorMenu: "Settings and sign-in",
     register: "Sign up",
     signIn: "Sign in",
@@ -580,6 +581,7 @@ const en: Catalog = {
   },
 
   errors: {
+    personNotApproachable: "This person is not (or no longer) visible to you.",
     advertGone: "This advert is not (or no longer) published.",
     advertNoSkills: "The advert names no skill — there is nothing to match. Add to the advert what the job asks for.",
     recruiterOnly: "In your company, a recruiter makes the first contact with a person. An administrator can give you that role.",
@@ -912,6 +914,14 @@ const en: Catalog = {
 
 
   messages: {
+    title: "Messages",
+    lead: "Every conversation hangs on a process — an application or an approach. There is no read receipt and no counter: whoever answers has read.",
+    signInRequired: "Please sign in to see your messages.",
+    noConversations: "No conversation yet.",
+    kindApplication: "Application",
+    kindApproach: "Approach",
+    aCompany: "A company",
+    aPerson: "A person",
     loading: "Loading messages…",
     empty: "No message yet. Write the first — the other side gets a notification without its content.",
     listLabel: "Messages",
@@ -1149,6 +1159,12 @@ const en: Catalog = {
   },
 
   scout: {
+    approach: "Approach",
+    approachHint: "The first message to this person. On request the AI recruiter drafts a text from their headline and named skills — without a name. Only what you release goes out. In your company, a recruiter makes the first contact.",
+    approachText: "Message",
+    approachDraft: "Draft from the AI recruiter",
+    approachSent: "Sent.",
+    approachOpenConversation: "To the conversation",
     advertTitle: "Who fits “{{title}}”",
     advertLead: "Searched with the advert's skills; the ticks show who named which. No ranking — sorted by “last updated”. Only people who released their profile to you appear.",
     advertToFreeSearch: "To the free search",

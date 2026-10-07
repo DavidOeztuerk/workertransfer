@@ -8,6 +8,7 @@
     <ProjectReference Include="..\WorkerTransfer.Messages.Application\WorkerTransfer.Messages.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Messages.Contracts\WorkerTransfer.Messages.Contracts.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Messages.Domain\WorkerTransfer.Messages.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
