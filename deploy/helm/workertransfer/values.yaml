@@ -121,9 +121,11 @@ secrets:
 
 # The key for the drafting help (ADR-0024). EMPTY means: it is off, and the UI
 # says so. It never stands in the repository — for a local run
-# ANTHROPIC_API_KEY=... make k8s-up is enough.
-anthropicApiKey: ""
-draftingModel: claude-sonnet-5
+# WORKERTRANSFER_AI_KEY=... make k8s-up is enough. Mistral (EU) is the
+# default provider (VISION-FRAGEN E2); its API is OpenAI-compatible.
+aiKey: ""
+draftingProvider: openai_compatible
+draftingModel: mistral-medium-latest
 # WHERE the drafting help calls, and why that stands here and not only as a
 # default in the source: the egress boundary derives its allowed hosts from the
 # CONFIGURATION (`ServiceFoundation`). A built-in target abroad is exactly what
@@ -131,7 +133,7 @@ draftingModel: claude-sonnet-5
 # boundary refuses the call in the cluster without logging it.
 # docker-compose.yml has said the same since the move to `SovereignPlatform`;
 # the chart was missing it.
-draftingUrl: https://api.anthropic.com/v1/messages
+draftingUrl: https://api.mistral.ai/v1/chat/completions
 
 # --- Postgres ---------------------------------------------------------------
 # enabled: false in staging/production, then `host` points at the managed

@@ -137,7 +137,7 @@ public static class ProfileInfrastructure
         // environment file, one for everybody. Access per person stands in
         // identity-service, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.BaseUrl, seam));
+            draft.Provider, draft.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));

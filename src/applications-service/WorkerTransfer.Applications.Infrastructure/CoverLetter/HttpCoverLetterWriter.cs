@@ -15,7 +15,7 @@ namespace WorkerTransfer.Applications.Infrastructure.CoverLetter;
 /// <para>
 /// The property names ARE the environment keys (<c>Draft__ApiKey</c>,
 /// <c>Draft__BaseUrl</c>, <c>Draft__Timeout</c>,
-/// <c>Draft__Model</c>); renaming one alone leaves its value on the default,
+/// <c>Draft__Model</c>, <c>Draft__Provider</c>); renaming one alone leaves its value on the default,
 /// silently.
 /// </para>
 /// </remarks>
@@ -28,7 +28,7 @@ public sealed class CoverLetterSettings
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The provider's address.</summary>
-    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
+    public string BaseUrl { get; set; } = ModelWire.DefaultAddress;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -39,7 +39,13 @@ public sealed class CoverLetterSettings
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
 
     /// <summary>Which model.</summary>
-    public string Model { get; set; } = "claude-sonnet-5";
+    public string Model { get; set; } = ModelWire.DefaultModel;
+
+    /// <summary>
+    /// Which wire format the operator's address speaks: <c>openai_compatible</c>
+    /// (Mistral, the default) or <c>anthropic</c>.
+    /// </summary>
+    public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
 /// <summary>The cover-letter writer when none is set up.</summary>

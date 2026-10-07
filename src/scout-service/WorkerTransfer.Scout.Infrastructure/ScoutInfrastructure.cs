@@ -148,7 +148,7 @@ public static class ScoutInfrastructure
         // environment file, one for everybody. identity-service holds the access
         // per person, and there it is counted instead of named.
         services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
-            "anthropic", draft.BaseUrl, seam));
+            draft.Provider, draft.BaseUrl, seam));
 
         services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
             provider.GetServices<IProviderSource>()));

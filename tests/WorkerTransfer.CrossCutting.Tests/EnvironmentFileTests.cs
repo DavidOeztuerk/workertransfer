@@ -33,7 +33,7 @@ public sealed class EnvironmentFileTests
 
         return [.. Regex.Matches(
                 withoutComments,
-                @"\$\{(?<name>WORKERTRANSFER_[A-Z_]+|ANTHROPIC_API_KEY)[:}]",
+                @"\$\{(?<name>WORKERTRANSFER_[A-Z_]+)[:}]",
                 RegexOptions.None,
                 TimeSpan.FromSeconds(5))
             .Select(hit => hit.Groups["name"].Value)

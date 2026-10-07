@@ -251,12 +251,14 @@ services:
       # service is called, and the UI says so (ADR-0024). That is why `:-` and
       # not `:?` — a missing key must not stop the stack, unlike the three real
       # secrets.
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8003:8003"
 
@@ -324,12 +326,14 @@ services:
       # service is called, and the UI says so (ADR-0024). That is why `:-` and
       # not `:?` — a missing key must not stop the stack, unlike the three real
       # secrets.
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8006:8006"
 
@@ -352,12 +356,14 @@ services:
       # The cover-letter agent. Empty means: NOTHING is called, and the UI says
       # so — instead of showing an empty draft somebody releases by accident
       # (ADR-0034).
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
       # THE TARGETS A PERSON MAY CHOOSE FOR THEIR OWN AI ACCESS.
       #
       # `Draft__BaseUrl` above is the operator's default. A person can,
@@ -514,8 +520,10 @@ services:
       # The draft of an approach. Empty means: NOTHING is called, and the UI
       # says so — instead of showing an empty draft somebody sends to a person
       # by accident (ADR-0024).
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8012:8012"
 
