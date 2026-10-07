@@ -81,6 +81,44 @@ public static class MessageEndpoints
         })
         .RequireAuthorization(AdminPermissionExtensions.Policy(MessagePermissions.Approach));
 
+        // An unsolicited application (B2) — a person, acting as herself, writes
+        // to a company. Sending releases her profile to it.
+        messages.MapPost("/initiatives", async (
+            OpenInitiativeV1? body, IMediator mediator, ICurrentPrincipal principal,
+            HttpContext context, CancellationToken cancellationToken) =>
+        {
+            if (CallerOf(principal) is not { } caller)
+            {
+                await NotAuthenticated(context);
+                return;
+            }
+
+            if (caller.Company is not null)
+            {
+                // A company does not apply. 403 says something about the
+                // caller and nothing about the company asked for.
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status403Forbidden, "Request failed", "acting for a company");
+                return;
+            }
+
+            if (body is null || body.CompanyId == Guid.Empty)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", "company_id is required");
+                return;
+            }
+
+            var (conversation, message) = await mediator.Send(
+                new OpenInitiativeCommand(caller.Subject, new TenantId(body.CompanyId), body.Text),
+                cancellationToken);
+
+            context.Response.StatusCode = StatusCodes.Status201Created;
+            await context.Response.WriteAsJsonAsync(
+                new ConversationV1(conversation.Kind, conversation.Reference, "person", [View(message, Side.Person)]),
+                cancellationToken);
+        });
+
         messages.MapGet("/{kind}/{reference:guid}", async (
             string kind, Guid reference, IMediator mediator, ICurrentPrincipal principal,
             HttpContext context, CancellationToken cancellationToken) =>
@@ -218,6 +256,12 @@ public static class MessageEndpoints
         catch (ProcessLookupSilent error)
         {
             // "We do not know" is not "not yours": 503, never 404.
+            await Write(call, StatusCodes.Status503ServiceUnavailable, error.Message);
+            return AlreadyWritten;
+        }
+        catch (ConsentGateSilent error)
+        {
+            // The ledger did not answer: neither "released" nor "not".
             await Write(call, StatusCodes.Status503ServiceUnavailable, error.Message);
             return AlreadyWritten;
         }

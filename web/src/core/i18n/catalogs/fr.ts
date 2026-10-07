@@ -602,6 +602,7 @@ const fr: Catalog = {
   },
 
   errors: {
+    companyNotReachable: "Cette entreprise n’est pas joignable ici.",
     personNotApproachable: "Cette personne n’est pas (ou plus) visible pour vous.",
     advertGone: "Cette annonce n’est pas (ou plus) publiée.",
     advertNoSkills: "L’annonce ne nomme aucune compétence — il n’y a rien à comparer. Complétez l’annonce avec ce que le poste exige.",
@@ -935,6 +936,7 @@ const fr: Catalog = {
 
 
   messages: {
+    kindInitiative: "Candidature spontanée",
     title: "Messages",
     lead: "Chaque conversation se rattache à une démarche — une candidature ou une prise de contact. Pas d’accusé de lecture ni de compteur : qui répond a lu.",
     signInRequired: "Veuillez vous connecter pour voir vos messages.",
@@ -1543,6 +1545,16 @@ const fr: Catalog = {
     placeUnion: "Protection juridique du DGB — pour les membres d’un syndicat",
     placeMinistry: "Ministère fédéral du Travail et des Affaires sociales — droit du travail",
     placesNote: "WorkerTransfer ne recommande aucun cabinet en particulier et n’est rémunéré par personne pour une recommandation.",
+  },
+
+  initiative: {
+    title: "Candidature spontanée",
+    lead: "Aucune offre ne correspond ? Écrivez directement à l’entreprise — vous retrouverez ensuite la conversation dans Messages.",
+    start: "Écrire un message",
+    text: "Votre message",
+    release: "En envoyant, vous ouvrez votre profil à cette entreprise — à elle seule. Vous pouvez le retirer à tout moment dans Autorisations ; l’entreprise ne pourra alors plus vous écrire, et vous continuez à lire.",
+    send: "Envoyer et ouvrir le profil",
+    sent: "Envoyé.",
   },
 
   footer: {

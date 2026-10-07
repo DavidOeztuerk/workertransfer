@@ -602,6 +602,7 @@ const en: Catalog = {
   },
 
   errors: {
+    companyNotReachable: "This company cannot be reached here.",
     personNotApproachable: "This person is not (or no longer) visible to you.",
     advertGone: "This advert is not (or no longer) published.",
     advertNoSkills: "The advert names no skill — there is nothing to match. Add to the advert what the job asks for.",
@@ -935,6 +936,7 @@ const en: Catalog = {
 
 
   messages: {
+    kindInitiative: "Unsolicited application",
     title: "Messages",
     lead: "Every conversation hangs on a process — an application or an approach. There is no read receipt and no counter: whoever answers has read.",
     signInRequired: "Please sign in to see your messages.",
@@ -1543,6 +1545,16 @@ const en: Catalog = {
     placeUnion: "DGB legal protection — for trade union members",
     placeMinistry: "Federal Ministry of Labour and Social Affairs — labour law",
     placesNote: "WorkerTransfer recommends no individual law firm and is paid by nobody for a referral.",
+  },
+
+  initiative: {
+    title: "Apply without an advert",
+    lead: "No matching job advertised? Write to the company directly — you will then find the conversation under Messages.",
+    start: "Write a message",
+    text: "Your message",
+    release: "Sending releases your profile to this company — only to it. You can take that back at any time under Releases; the company can then no longer write to you, and you keep reading.",
+    send: "Send and release profile",
+    sent: "Sent.",
   },
 
   footer: {

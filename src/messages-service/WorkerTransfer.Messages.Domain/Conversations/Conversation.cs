@@ -49,8 +49,18 @@ public static class ProcessKinds
     /// </summary>
     public const string Approach = "approach";
 
+    /// <summary>
+    /// A person's unsolicited application to a company, without an advert
+    /// (VISION-FRAGEN B2). The mirror of <see cref="Approach"/>: the person
+    /// opens it, and opening it releases her profile to that one company.
+    /// </summary>
+    public const string Initiative = "initiative";
+
     /// <summary>Whether this service knows the kind.</summary>
-    public static bool IsKnown(string kind) => kind is Application or Approach;
+    public static bool IsKnown(string kind) => kind is Application or Approach or Initiative;
+
+    /// <summary>Whether the parties stand in the conversation itself, checked against the ledger.</summary>
+    public static bool StandsOnTheLedger(string kind) => kind is Approach or Initiative;
 
     /// <summary>The reference of the one approach between this company and this person.</summary>
     /// <remarks>
@@ -60,10 +70,18 @@ public static class ProcessKinds
     /// message. And it is not the person's id: the reference stands in URLs,
     /// and a subject id there would be a handle on the person.
     /// </remarks>
-    public static Guid ApproachReference(TenantId company, SubjectId person)
+    public static Guid ApproachReference(TenantId company, SubjectId person) =>
+        Derived(Approach, company, person);
+
+    /// <summary>The reference of the one unsolicited application from this person to this company.</summary>
+    /// <remarks>Its own prefix: an approach and an initiative between the same two are two conversations.</remarks>
+    public static Guid InitiativeReference(TenantId company, SubjectId person) =>
+        Derived(Initiative, company, person);
+
+    private static Guid Derived(string kind, TenantId company, SubjectId person)
     {
         var bytes = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes($"approach:{company.Value:N}:{person.Value:N}"));
+            System.Text.Encoding.UTF8.GetBytes($"{kind}:{company.Value:N}:{person.Value:N}"));
         return new Guid(bytes.AsSpan(0, 16));
     }
 }
@@ -250,6 +268,10 @@ public sealed class Message
         IsDraft = false;
         SentAt = now;
     }
+
+    /// <summary>Checks a text before anything else happens — e.g. before a release is written.</summary>
+    /// <exception cref="InputError">Empty or too long.</exception>
+    public static void Check(string? text) => Checked(text ?? string.Empty);
 
     private static string Checked(string text)
     {

@@ -941,6 +941,8 @@ Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-frei
 
 **The approach** (second kind, `approach`, Phase 2): a company's first message to a person who released their profile to it, opened only by `POST /messages/approaches` with at least a `recruiter` (ADR-0048) and a yes from the ledger. One conversation per company/person pair — the reference is derived from both, never the subject id itself (it stands in URLs). Its parties stand in the conversation; the **company side asks the ledger at every request**, the person side never — a revocation stops the company and leaves the person reading. The first text is the scout's approach draft (the AI recruiter), released in the hit card; `/messages` lists every conversation with its counterpart only (`company_id` for the person, `person_id` for the company).
 
+**The unsolicited application** (third kind, `initiative`, 08.10.2026, VISION-FRAGEN B2) is the approach's mirror: a person writes to a company from its careers page, and **sending releases her profile to that company** — written with *her* token through `IReleaseWriter`, the one place messages-service writes to the ledger. Text is checked before the release, the company's members before either (none → 404, no release).
+
 **Erasure:** the person's conversations fall whole, the company's messages in them too. An erased *member*'s released messages stay in the other person's conversation with `author_id = null`; their unreleased drafts go.
 
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure

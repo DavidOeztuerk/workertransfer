@@ -16,6 +16,13 @@ import { getCandidateProfile } from "../../company/api/candidateProfile";
 import { type ConversationSummary, type ProcessKind, listConversations } from "../api/messages";
 import { ConversationPanel } from "../components/ConversationPanel";
 
+/** The kind as a catalogue key. */
+const KIND_KEY = {
+  application: "messages.kindApplication",
+  approach: "messages.kindApproach",
+  initiative: "messages.kindInitiative",
+} as const satisfies Record<ProcessKind, string>;
+
 /**
  * <c>/messages</c> — every conversation of the caller, person or company
  * (ADR-0047).
@@ -63,7 +70,7 @@ export function MessagesPage() {
                 <CardContent>
                   <Counterpart item={item} />
                   <Typography variant="body2" color="text.secondary">
-                    {t(item.kind === "approach" ? "messages.kindApproach" : "messages.kindApplication")}
+                    {t(KIND_KEY[item.kind])}
                     {" · "}
                     {new Date(item.last_message_at).toLocaleString()}
                   </Typography>

@@ -58,7 +58,9 @@ public sealed class ConversationAccess(
             throw new NoConversation();
         }
 
-        if (kind == ProcessKinds.Approach)
+        // An approach and an unsolicited application: the parties stand in the
+        // conversation, and the company side asks the ledger every time.
+        if (ProcessKinds.StandsOnTheLedger(kind))
         {
             var conversation = await store.FindAsync(kind, reference, cancellationToken)
                 ?? throw new NoConversation();

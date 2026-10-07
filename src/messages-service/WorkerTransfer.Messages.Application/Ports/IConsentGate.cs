@@ -68,3 +68,21 @@ public static class Visibilities
     /// <summary>The profile, for this one company.</summary>
     public static string Profile(TenantId company) => $"profile.visibility:tenant:{company.Value}";
 }
+
+/// <summary>Writes a release — with the PERSON's own token, never a service's.</summary>
+/// <remarks>
+/// <para>Exactly one producer: the unsolicited application. Sending it is the
+/// person's act, and it releases her profile to that one company — the same
+/// as applying to an advert does in applications-service. Nothing else here
+/// writes to the ledger.</para>
+///
+/// <para>The token is hers, so the ledger records the grant as hers. A service
+/// secret could not: it would be the platform consenting on somebody's
+/// behalf.</para>
+/// </remarks>
+public interface IReleaseWriter
+{
+    /// <summary>Releases the person's profile to the company.</summary>
+    /// <exception cref="ConsentGateSilent">The ledger does not answer or refuses the call.</exception>
+    Task GrantProfileAsync(SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
+}

@@ -44,6 +44,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
     private readonly ProbeDrafter _drafter = new();
     private readonly ProbeLedger _ledger = new();
     private readonly RoleProbe _roles = new();
+    private ProbeReleases _releases = null!;
 
     /// <inheritdoc />
     public async Task InitializeAsync()
@@ -59,6 +60,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
         _process.Applications[Application] = new ProcessParties(
             new SubjectId(Anna), new TenantId(Company), "Anna Muster");
         _members.Members[Company] = [Recruiter, Colleague];
+        _releases = new ProbeReleases(_ledger);
 
         _service = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
@@ -77,6 +79,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                 services.Replace(ServiceDescriptor.Scoped<IReplyDrafter>(_ => _drafter));
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
                 services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
+                services.Replace(ServiceDescriptor.Scoped<IReleaseWriter>(_ => _releases));
             });
         });
     }
@@ -100,6 +103,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
             .Should().BeEquivalentTo(
                 "GET /messages/me",
                 "POST /messages/approaches",
+                "POST /messages/initiatives",
                 "GET /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}/draft",
@@ -466,6 +470,79 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                 new Uri("/messages/approaches", UriKind.Relative),
                 new Dictionary<string, object?> { ["subject_id"] = Stranger, ["text"] = "Hallo" }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    // -----------------------------------------------------------------
+    // Unsolicited applications (VISION-FRAGEN B2)
+    // -----------------------------------------------------------------
+
+    private Task<HttpResponseMessage> Initiative(Guid person, Guid company, string text = "Ich möchte mich initiativ bewerben.") =>
+        AsPerson(person).PostAsJsonAsync(
+            new Uri("/messages/initiatives", UriKind.Relative),
+            new Dictionary<string, object?> { ["company_id"] = company, ["text"] = text });
+
+    [Fact]
+    public async Task Sending_an_initiative_releases_her_profile_and_tells_every_member()
+    {
+        var opened = await Initiative(Anna, Company);
+
+        opened.StatusCode.Should().Be(HttpStatusCode.Created);
+        var reference = (await Json(opened)).GetProperty("reference").GetGuid();
+
+        _releases.Granted.Should().Equal([(Anna, Company)]);
+        (await Notes()).Should().BeEquivalentTo([(Recruiter, "message_received"), (Colleague, "message_received")]);
+
+        var theirs = await Json(await AsCompany(Colleague).GetAsync(new Uri($"/messages/initiative/{reference}", UriKind.Relative)));
+        theirs.GetProperty("messages").EnumerateArray().Single().GetProperty("text").GetString()
+            .Should().Be("Ich möchte mich initiativ bewerben.");
+    }
+
+    [Fact]
+    public async Task An_empty_initiative_releases_nothing()
+    {
+        (await Initiative(Anna, Company, "   ")).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        _releases.Granted.Should().BeEmpty("a refused message must leave no release behind");
+    }
+
+    [Fact]
+    public async Task A_company_without_members_is_404_and_gets_no_release()
+    {
+        (await Initiative(Anna, Guid.NewGuid())).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        _releases.Granted.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_company_does_not_send_an_initiative()
+    {
+        (await AsCompany(Recruiter).PostAsJsonAsync(
+                new Uri("/messages/initiatives", UriKind.Relative),
+                new Dictionary<string, object?> { ["company_id"] = OtherCompany, ["text"] = "Hallo" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_silent_ledger_leaves_no_conversation()
+    {
+        _releases.Silent = true;
+
+        (await Initiative(Anna, Company)).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        await using var context = Context();
+        (await context.Conversations.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task After_she_revokes_the_company_is_out_and_she_still_reads()
+    {
+        var reference = (await Json(await Initiative(Anna, Company))).GetProperty("reference").GetGuid();
+        var address = new Uri($"/messages/initiative/{reference}", UriKind.Relative);
+
+        _ledger.Set(Anna, Company, false);
+
+        (await AsCompany(Recruiter).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await AsPerson(Anna).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     // -----------------------------------------------------------------

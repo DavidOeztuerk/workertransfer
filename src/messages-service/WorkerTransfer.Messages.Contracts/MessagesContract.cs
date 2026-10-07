@@ -58,6 +58,11 @@ public sealed record OpenApproachV1(
     [property: JsonPropertyName("text")] string? Text,
     [property: JsonPropertyName("drafted")] bool Drafted = false);
 
+/// <summary>A person's unsolicited application — sending it releases her profile to the company.</summary>
+public sealed record OpenInitiativeV1(
+    [property: JsonPropertyName("company_id")] Guid CompanyId,
+    [property: JsonPropertyName("text")] string? Text);
+
 /// <summary>What a human being sends.</summary>
 public sealed record WriteMessageV1(
     [property: JsonPropertyName("text")] string? Text);

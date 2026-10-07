@@ -43,7 +43,7 @@ const GONE = { reason: "gone" as const, titleKey: "errors.conversationGone" as c
 const SILENT = { reason: "unavailable" as const, titleKey: "errors.serviceSilent" as const };
 
 /** The kinds of process a conversation hangs on. */
-export type ProcessKind = "application" | "approach";
+export type ProcessKind = "application" | "approach" | "initiative";
 
 /** The conversation of a process, as the caller's side sees it. */
 export async function getConversation(
@@ -212,6 +212,31 @@ export async function openApproach(
     answer.ok ? { status: 503, title: "", detail: "" } : answer.error,
     {
       404: { reason: "gone", titleKey: "errors.personNotApproachable", detailKey: "errors.personNotApproachable" },
+      422: { reason: "invalid", titleKey: "errors.messageInvalid", detailKey: "errors.messageInvalid" },
+      503: SILENT,
+    },
+    "failed"
+  );
+}
+
+/**
+ * A person's unsolicited application to a company (VISION-FRAGEN B2).
+ *
+ * <strong>Sending it releases her profile to that company</strong> — the same
+ * as applying to an advert. The page says so before the button.
+ */
+export async function openInitiative(companyId: string, text: string): Promise<ApproachResult> {
+  const answer = await request<Conversation>(
+    MESSAGES_BASE_URL,
+    "/messages/initiatives",
+    { method: "POST", body: { company_id: companyId, text } },
+    "errors.messageNotSent"
+  );
+  if (answer.ok && answer.value != null) return { ok: true, reference: answer.value.reference };
+  return interpretError<ConversationError | "invalid">(
+    answer.ok ? { status: 503, title: "", detail: "" } : answer.error,
+    {
+      404: { reason: "gone", titleKey: "errors.companyNotReachable", detailKey: "errors.companyNotReachable" },
       422: { reason: "invalid", titleKey: "errors.messageInvalid", detailKey: "errors.messageInvalid" },
       503: SILENT,
     },

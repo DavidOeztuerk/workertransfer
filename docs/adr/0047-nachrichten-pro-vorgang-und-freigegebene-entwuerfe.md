@@ -115,3 +115,20 @@ Person, die ihr das Profil freigegeben hat.
   die eigene Seite sieht es.
 - **Antworten in einer laufenden Ansprache darf jedes Mitglied** — das ist
   Tagesarbeit, kein erster Kontakt.
+
+## Ergänzung 08.10.2026 — die Initiativbewerbung (Phase 3, VISION-FRAGEN B2)
+
+Dritte Vorgangsart **`initiative`**: das Spiegelbild der Ansprache. Die
+Person schreibt einer Firma von deren Karriereseite aus, ohne Inserat.
+
+- **Senden ist Freigeben.** `POST /messages/initiatives` schreibt mit dem
+  Token der Person `profile.visibility:tenant:<id>` in den Ledger — wie eine
+  Bewerbung auf ein Inserat. Die Seite sagt es vor dem Knopf.
+- **Reihenfolge:** erst den Text prüfen, dann die Mitglieder der Firma holen
+  (keine Mitglieder → 404, keine Freigabe), dann freigeben, dann das Gespräch
+  öffnen. Ein abgewiesener Text hinterlässt keine Freigabe, ein stummer
+  Ledger kein Gespräch.
+- **Zugriff wie bei der Ansprache:** die Firmenseite fragt den Ledger bei
+  jeder Anfrage, die Person liest nach einem Widerruf weiter.
+- Es ist der **einzige** Ort, an dem messages-service in den Ledger schreibt
+  (`IReleaseWriter`).

@@ -18,6 +18,7 @@ import {
 import { failureKey } from "../../../shared/api/errors";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
+import { InitiativeBlock } from "../../messages/components/InitiativeBlock";
 import { remoteLabel, searchJobs,
   salaryText,
   PERIOD_KEY,
@@ -51,7 +52,7 @@ export function CareerPage() {
 
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { signedIn } = useActor();
+  const { signedIn, forCompany } = useActor();
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
 
@@ -141,6 +142,7 @@ export function CareerPage() {
 
   return (
     <PageShell title={profile.display_name} narrow>
+      {signedIn && !forCompany && tenantId ? <InitiativeBlock companyId={tenantId} /> : null}
       {profile.website !== null ? (
         <Box sx={{ mb: 3 }}>
           <Link href={profile.website} target="_blank" rel="noreferrer noopener">

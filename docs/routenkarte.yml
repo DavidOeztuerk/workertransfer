@@ -858,6 +858,8 @@ gruppen:
       - { methode: GET, pfad: '/messages/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/messages/approaches', ohne: 401, person: 403, mitglied: 403, firma: 422, rumpf: '{}' }
       - { methode: GET, pfad: '/messages/approach/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/messages/initiatives', ohne: 401, person: 422, mitglied: 403, firma: 403, rumpf: '{}' }
+      - { methode: GET, pfad: '/messages/initiative/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: GET, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 404, mitglied: 404, firma: 404 }

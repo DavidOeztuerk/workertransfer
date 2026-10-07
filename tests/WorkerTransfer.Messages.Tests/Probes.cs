@@ -255,3 +255,30 @@ public sealed class RoleProbe : ICompanyRoles
     public Task<CompanyRole> RoleAsync(Guid subject, Guid company, CancellationToken cancellationToken = default) =>
         Task.FromResult(Answer);
 }
+
+/// <summary>The ledger's write side — records every release and feeds the read side.</summary>
+/// <remarks>
+/// A release written here is seen by <see cref="ProbeLedger"/> at once, the
+/// way the real ledger answers the next read.
+/// </remarks>
+public sealed class ProbeReleases(ProbeLedger ledger) : IReleaseWriter
+{
+    /// <summary>What was released, in order.</summary>
+    public List<(Guid Subject, Guid Company)> Granted { get; } = [];
+
+    /// <summary>When true, the ledger does not answer.</summary>
+    public bool Silent { get; set; }
+
+    /// <inheritdoc />
+    public Task GrantProfileAsync(SubjectId subject, TenantId company, CancellationToken cancellationToken = default)
+    {
+        if (Silent)
+        {
+            throw new ConsentGateSilent("the ledger does not answer in the test");
+        }
+
+        Granted.Add((subject.Value, company.Value));
+        ledger.Set(subject.Value, company.Value, true);
+        return Task.CompletedTask;
+    }
+}

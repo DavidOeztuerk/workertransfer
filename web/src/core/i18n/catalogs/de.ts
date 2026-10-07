@@ -605,6 +605,7 @@ const de = {
   },
 
   errors: {
+    companyNotReachable: "Dieses Unternehmen ist hier nicht erreichbar.",
     personNotApproachable: "Diese Person ist für euch nicht (mehr) sichtbar.",
     advertGone: "Dieses Inserat ist nicht (mehr) veröffentlicht.",
     advertNoSkills: "Das Inserat nennt keine Fähigkeit — es gibt nichts abzugleichen. Ergänze im Inserat, was die Stelle verlangt.",
@@ -939,6 +940,7 @@ const de = {
 
 
   messages: {
+    kindInitiative: "Initiativbewerbung",
     title: "Nachrichten",
     lead: "Jedes Gespräch hängt an einem Vorgang — einer Bewerbung oder einer Ansprache. Es gibt keine Lesebestätigung und keinen Zähler: wer antwortet, hat gelesen.",
     signInRequired: "Bitte melde dich an, um deine Nachrichten zu sehen.",
@@ -1555,6 +1557,16 @@ const de = {
     placeUnion: "DGB Rechtsschutz — für Gewerkschaftsmitglieder",
     placeMinistry: "Bundesministerium für Arbeit und Soziales — Arbeitsrecht",
     placesNote: "WorkerTransfer empfiehlt keine einzelnen Kanzleien und bekommt von niemandem Geld für einen Hinweis.",
+  },
+
+  initiative: {
+    title: "Initiativ bewerben",
+    lead: "Keine passende Stelle ausgeschrieben? Schreib dem Unternehmen direkt — das Gespräch findest du danach unter Nachrichten.",
+    start: "Nachricht schreiben",
+    text: "Deine Nachricht",
+    release: "Mit dem Senden gibst du diesem Unternehmen dein Profil frei — nur diesem. Unter Freigaben kannst du das jederzeit zurücknehmen; das Unternehmen kann dir dann nicht mehr schreiben, du liest weiter.",
+    send: "Senden und Profil freigeben",
+    sent: "Gesendet.",
   },
 
   footer: {

@@ -76,6 +76,7 @@ public static class MessagesInfrastructure
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
         services.AddScoped<IReplyDrafter, HttpReplyDrafter>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<IReleaseWriter, HttpReleaseWriter>();
         services.AddScoped<ConversationAccess>();
 
         services.AddScoped<IDelivery, HttpNotifier>();
