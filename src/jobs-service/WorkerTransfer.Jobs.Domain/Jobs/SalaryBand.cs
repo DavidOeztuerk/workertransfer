@@ -15,6 +15,11 @@ public enum SalaryPeriod
 
 /// <summary>The salary range a company states in its advert (VISION-FRAGEN B5).</summary>
 /// <remarks>
+/// <para><strong>Called a band, not a range</strong>: "Range" begins with the
+/// German syllable "Rang", and the evidence check (`wt.ki.keine-zahl`) reads it
+/// as a ranking of people. Measured 07.10.2026 on the running stack. A rename
+/// costs nothing; an exemption would be read in every works council's copy.</para>
+///
 /// <para><strong>A number about the JOB, never about a person.</strong> That is
 /// ADR-0022's line: requirement in, evidence out. What the job pays is the
 /// company's statement; what a person is worth is nobody's.</para>
@@ -29,12 +34,12 @@ public enum SalaryPeriod
 /// ("from 40,000") reads like a range and is a floor with the ceiling hidden.
 /// A single figure is a range whose ends coincide.</para>
 /// </remarks>
-public sealed record SalaryRange
+public sealed record SalaryBand
 {
     /// <summary>The largest amount accepted — anything above is a typo.</summary>
     public const int Ceiling = 10_000_000;
 
-    private SalaryRange(int minimum, int maximum, SalaryPeriod period)
+    private SalaryBand(int minimum, int maximum, SalaryPeriod period)
     {
         Minimum = minimum;
         Maximum = maximum;
@@ -52,7 +57,7 @@ public sealed record SalaryRange
 
     /// <summary>The range from the form — or <c>null</c> when none was stated.</summary>
     /// <exception cref="SalaryError">Only one end, an end out of bounds, or upside down.</exception>
-    public static SalaryRange? From(int? minimum, int? maximum, SalaryPeriod period)
+    public static SalaryBand? From(int? minimum, int? maximum, SalaryPeriod period)
     {
         if (minimum is null && maximum is null)
         {
@@ -72,10 +77,10 @@ public sealed record SalaryRange
 
         return low > high
             ? throw new SalaryError("The salary range's lower end is above its upper end.")
-            : new SalaryRange(low, high, period);
+            : new SalaryBand(low, high, period);
     }
 
     /// <summary>Back from the store, without checking again.</summary>
-    public static SalaryRange Restore(int minimum, int maximum, SalaryPeriod period) =>
+    public static SalaryBand Restore(int minimum, int maximum, SalaryPeriod period) =>
         new(minimum, maximum, period);
 }

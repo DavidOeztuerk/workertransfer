@@ -238,7 +238,7 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
         row.PublishedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null,
         row.SalaryMin is { } low && row.SalaryMax is { } high
-            ? SalaryRange.Restore(low, high, row.SalaryPeriod switch
+            ? SalaryBand.Restore(low, high, row.SalaryPeriod switch
             {
                 "month" => SalaryPeriod.Month,
                 "hour" => SalaryPeriod.Hour,

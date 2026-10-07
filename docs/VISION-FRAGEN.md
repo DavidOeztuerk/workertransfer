@@ -713,7 +713,7 @@ Rechtsberatung.
   Inserat ohne Angabe zeigt „Gehalt nicht angegeben“. Muss die Plattform es zur
   Pflicht machen, sobald das deutsche Umsetzungsgesetz gilt? Reicht brutto in
   ganzen Euro mit Zeitraum (Jahr, Monat, Stunde)?
-- **Dateien:** `src/jobs-service/WorkerTransfer.Jobs.Domain/Jobs/SalaryRange.cs`,
+- **Dateien:** `src/jobs-service/WorkerTransfer.Jobs.Domain/Jobs/SalaryBand.cs`,
   `web/src/features/company/pages/CompanyJobNewPage.tsx`,
   `web/src/core/i18n/catalogs/de.ts` (`companyJobs.salaryHint`).
 

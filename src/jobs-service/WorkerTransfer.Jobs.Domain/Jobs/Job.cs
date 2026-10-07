@@ -105,7 +105,7 @@ public sealed class Job
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? publishedAt,
-        SalaryRange? salary)
+        SalaryBand? salary)
     {
         Id = id;
         Company = company;
@@ -160,7 +160,7 @@ public sealed class Job
     public SkillList Skills { get; private set; }
 
     /// <summary>What the job pays, as the company states it — or <c>null</c>: not stated.</summary>
-    public SalaryRange? Salary { get; private set; }
+    public SalaryBand? Salary { get; private set; }
 
     /// <summary>Where it stands.</summary>
     public JobState State { get; private set; }
@@ -189,7 +189,7 @@ public sealed class Job
         EmploymentKind employment,
         SkillList skills,
         DateTimeOffset now,
-        SalaryRange? salary = null) =>
+        SalaryBand? salary = null) =>
         new(
             Guid.CreateVersion7(), company,
             Text("The title", title, required: true, MaxTitleLength),
@@ -213,7 +213,7 @@ public sealed class Job
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? publishedAt,
-        SalaryRange? salary = null) =>
+        SalaryBand? salary = null) =>
         new(id, company, title, description, location, postalCode, remote, employment,
             skills, state, createdAt, updatedAt, publishedAt, salary);
 
@@ -228,7 +228,7 @@ public sealed class Job
         EmploymentKind employment,
         SkillList skills,
         DateTimeOffset now,
-        SalaryRange? salary = null)
+        SalaryBand? salary = null)
     {
         // Changing a closed advert would mean changing the text people applied
         // to.

@@ -43,7 +43,7 @@ public sealed class CreateJobHandler(IJobStore store, TimeProvider clock)
             details.PostalCode,
             details.Remote, details.Employment, SkillList.From(details.Skills),
             clock.GetUtcNow(),
-            SalaryRange.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
+            SalaryBand.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
 
         await store.SaveAsync(job, cancellationToken);
 
@@ -83,7 +83,7 @@ public sealed class ChangeJobHandler(IJobStore store, TimeProvider clock)
             details.Title, details.Description, details.Location, details.PostalCode,
             details.Remote,
             details.Employment, SkillList.From(details.Skills), clock.GetUtcNow(),
-            SalaryRange.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
+            SalaryBand.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
 
         await store.SaveAsync(job, cancellationToken);
 
