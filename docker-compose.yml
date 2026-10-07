@@ -271,6 +271,11 @@ services:
       SERVICE_DIR: resume
       ASPNETCORE_URLS: "http://0.0.0.0:8004"
       ConnectionStrings__resume: Host=postgres;Port=5432;Database=resume;Username=worker;Password=worker
+      # Who may ask a person for their CV: at least a `recruiter` (ADR-0048),
+      # read from identity-service's membership table per request. Without
+      # these two lines the request route answers 503 — rightly, and visibly.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
       Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}

@@ -110,7 +110,7 @@ public static class CompanyEndpoints
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status400BadRequest,
-                    "Request failed", "role must be 'admin' or 'member'");
+                    "Request failed", "role must be 'admin', 'recruiter' or 'member'");
                 return;
             }
 
@@ -307,6 +307,9 @@ public static class CompanyEndpoints
                 return true;
             case "member":
                 role = MembershipRole.Member;
+                return true;
+            case "recruiter":
+                role = MembershipRole.Recruiter;
                 return true;
             default:
                 role = MembershipRole.Member;

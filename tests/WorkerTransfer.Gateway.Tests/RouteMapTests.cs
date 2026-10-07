@@ -366,10 +366,16 @@ public sealed class RouteMapTests
                 "POST /jobs/00000000-0000-0000-0000-000000000001/close",
                 "PUT /companies/me/profile",
                 "POST /transfers/00000000-0000-0000-0000-000000000001/offer",
-                "POST /transfers/00000000-0000-0000-0000-000000000001/complete"
+                "POST /transfers/00000000-0000-0000-0000-000000000001/complete",
+
+                // ADR-0048: a first contact needs at least a recruiter, and the
+                // admin column is an admin — so these three differ too.
+                "POST /resumes/00000000-0000-0000-0000-000000000001/requests",
+                "POST /market/00000000-0000-0000-0000-000000000001/requests",
+                "POST /advisor/conversations"
             ],
-            "exactly these five show the difference in the map; whoever protects "
-            + "a sixth this way or opens one changes this list deliberately");
+            "exactly these eight show the difference in the map; whoever protects "
+            + "a ninth this way or opens one changes this list deliberately");
 
         differing.Should().OnlyContain(
             row => row.Member == 403,

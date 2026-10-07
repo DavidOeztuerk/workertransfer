@@ -111,6 +111,22 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
             note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
         });
 
+    /// <summary>Asking for the market status is a first contact: at least a recruiter (ADR-0048).</summary>
+    [Theory]
+    [InlineData(CompanyRole.Member, HttpStatusCode.Forbidden)]
+    [InlineData(CompanyRole.Recruiter, HttpStatusCode.NotFound)]
+    [InlineData(CompanyRole.Admin, HttpStatusCode.NotFound)]
+    public async Task Only_a_recruiter_or_an_admin_asks_for_the_market_status(
+        CompanyRole role, HttpStatusCode expected)
+    {
+        _roles.Answer = role;
+
+        var asked = await AsCompany(Guid.CreateVersion7())
+            .PostAsync($"/market/{Guid.CreateVersion7()}/requests", null);
+
+        asked.StatusCode.Should().Be(expected);
+    }
+
     /// <summary>A <c>member</c> makes no offer.</summary>
     [Fact]
     public async Task Only_an_admin_makes_an_offer()

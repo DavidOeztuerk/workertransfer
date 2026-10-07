@@ -1,3 +1,4 @@
+using WorkerTransfer.ServiceDefaults.Roles;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -33,6 +34,7 @@ public class AdvisorJourneyTests(Postgres postgres) : IAsyncLifetime
     private static readonly Guid Recruiter = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid Anna = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
+    private readonly RoleProbe _roles = new();
     private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeLedger _ledger = new();
     private readonly ProbeCompanies _companies = new();
@@ -69,6 +71,7 @@ public class AdvisorJourneyTests(Postgres postgres) : IAsyncLifetime
                 services.Replace(ServiceDescriptor.Scoped<ICompanyLookup>(_ => _companies));
                 services.Replace(ServiceDescriptor.Scoped<IPersonLookup>(_ => _people));
                 services.Replace(ServiceDescriptor.Scoped<ICaseHandover>(_ => _handover));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
             });
         });
     }
@@ -180,6 +183,33 @@ public class AdvisorJourneyTests(Postgres postgres) : IAsyncLifetime
         var withRelease = await AsCompany().PostAsJsonAsync(
             Target("/advisor/conversations"), Opening());
         withRelease.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    /// <summary>Opening a conversation is a first contact: at least a recruiter (ADR-0048).</summary>
+    [Theory]
+    [InlineData(CompanyRole.Member, HttpStatusCode.Forbidden)]
+    [InlineData(CompanyRole.Recruiter, HttpStatusCode.Created)]
+    [InlineData(CompanyRole.Admin, HttpStatusCode.Created)]
+    public async Task Only_a_recruiter_or_an_admin_opens_a_conversation(CompanyRole role, HttpStatusCode expected)
+    {
+        _ledger.SetStage(Anna, Company, Stage.Profile);
+        _roles.Answer = role;
+
+        var opened = await AsCompany().PostAsJsonAsync(Target("/advisor/conversations"), Opening());
+
+        opened.StatusCode.Should().Be(expected);
+        _roles.Last!.Value.Company.Should().Be(Company, "the company comes from the token");
+    }
+
+    /// <summary>A silent role lookup is "we do not know", never "you may not".</summary>
+    [Fact]
+    public async Task A_silent_role_lookup_is_503()
+    {
+        _ledger.SetStage(Anna, Company, Stage.Profile);
+        _roles.Silent = true;
+
+        (await AsCompany().PostAsJsonAsync(Target("/advisor/conversations"), Opening()))
+            .StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>The person learns of it — content-free, through the outbox.</summary>

@@ -15,7 +15,15 @@ public enum MembershipRole
     Admin,
 
     /// <summary>May act for the company.</summary>
-    Member
+    Member,
+
+    /// <summary>May also make the first contact to a person (ADR-0048).</summary>
+    /// <remarks>
+    /// Last in this enumeration because it came last; the ORDER of rights is
+    /// kept in <c>ServiceDefaults.Roles.CompanyRole</c>, which the other
+    /// services read, and never derived from these values.
+    /// </remarks>
+    Recruiter
 }
 
 /// <summary>Maps <see cref="MembershipRole"/> to the stored value.</summary>
@@ -26,6 +34,7 @@ public static class MembershipRoleNames
     {
         MembershipRole.Admin => "admin",
         MembershipRole.Member => "member",
+        MembershipRole.Recruiter => "recruiter",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown role.")
     };
 
@@ -34,6 +43,7 @@ public static class MembershipRoleNames
     {
         "admin" => MembershipRole.Admin,
         "member" => MembershipRole.Member,
+        "recruiter" => MembershipRole.Recruiter,
         _ => throw new ArgumentOutOfRangeException(nameof(stored), stored, "Unknown role.")
     };
 }

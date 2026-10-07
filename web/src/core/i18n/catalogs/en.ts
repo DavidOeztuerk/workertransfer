@@ -580,6 +580,7 @@ const en: Catalog = {
   },
 
   errors: {
+    recruiterOnly: "In your company, a recruiter makes the first contact with a person. An administrator can give you that role.",
     conversationNotLoaded: "The conversation could not be loaded.",
     messageNotSent: "The message could not be sent.",
     messageInvalid: "The message is empty or longer than 4000 characters.",
@@ -1054,6 +1055,7 @@ const en: Catalog = {
     invitationsEmpty: "No open invitations.",
     roleAdmin: "Administrator",
     roleMember: "Member",
+    roleRecruiter: "Recruiter",
     leave: "Leave",
     remove: "Remove",
     back: "Back to the team",

@@ -25,10 +25,13 @@ builder.Services.AddWorkerTransferDefaults(
 //
 // `withdraw` is deliberately not among them: whoever may start must be allowed
 // to stop.
-builder.Services.AddAdminPermissions(
+//
+// Asking a person for their market status is a first contact: at least a
+// `recruiter` (ADR-0048).
+builder.Services.AddCompanyPermissions(
     builder.Configuration,
-    CasePermissions.Offer,
-    CasePermissions.Complete);
+    [CasePermissions.Offer, CasePermissions.Complete],
+    [MarketPermissions.Request]);
 
 builder.Services.AddTransferInfrastructure(
     builder.Configuration,

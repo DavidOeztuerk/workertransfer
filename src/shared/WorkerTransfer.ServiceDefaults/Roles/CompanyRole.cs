@@ -2,10 +2,11 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 
 /// <summary>What somebody is in a company.</summary>
 /// <remarks>
-/// Two roles and a "nothing" — the membership table knows no more. There is
-/// deliberately no third role and no inheritance: every further one would be a
-/// decision about who can lock out whom, and that does not belong in an
-/// enumeration but in an ADR.
+/// Three roles and a "nothing", ORDERED: each may what the one below may
+/// (ADR-0048). The order of the values IS the rule — a check reads
+/// <c>role &gt;= minimum</c>, so a fourth role is inserted where it belongs or
+/// it silently gains or loses rights. Every further one is a decision about who
+/// can lock out whom, and that belongs in an ADR, not in this enumeration.
 /// </remarks>
 public enum CompanyRole
 {
@@ -19,13 +20,16 @@ public enum CompanyRole
     /// <summary>May act for the company.</summary>
     Member,
 
+    /// <summary>May also make the first contact to a person (ADR-0048).</summary>
+    Recruiter,
+
     /// <summary>May also bind: invite, remove, publish, offer.</summary>
     Admin
 }
 
 /// <summary>The spelling in which the role travels over the wire.</summary>
 /// <remarks>
-/// The same words as in the membership table (<c>admin</c>, <c>member</c>). A
+/// The same words as in the membership table (<c>admin</c>, <c>recruiter</c>, <c>member</c>). A
 /// second spelling on the way would be the place where a typo silently becomes
 /// "not an admin" — and a silent loss of permission looks like a correct
 /// refusal.
@@ -38,6 +42,7 @@ public static class RoleNames
     {
         "admin" => CompanyRole.Admin,
         "member" => CompanyRole.Member,
+        "recruiter" => CompanyRole.Recruiter,
         _ => CompanyRole.None
     };
 }

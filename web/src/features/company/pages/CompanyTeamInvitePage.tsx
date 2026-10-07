@@ -147,6 +147,7 @@ export function CompanyTeamInvitePage() {
         fullWidth
       >
         <MenuItem value="member">{t("team.roleMember")}</MenuItem>
+        <MenuItem value="recruiter">{t("team.roleRecruiter")}</MenuItem>
         <MenuItem value="admin">{t("team.roleAdmin")}</MenuItem>
       </TextField>
 

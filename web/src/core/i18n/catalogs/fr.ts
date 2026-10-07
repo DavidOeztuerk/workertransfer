@@ -580,6 +580,7 @@ const fr: Catalog = {
   },
 
   errors: {
+    recruiterOnly: "Dans votre entreprise, le premier contact avec une personne est pris par un recruteur. Un administrateur peut vous attribuer ce rôle.",
     conversationNotLoaded: "La conversation n’a pas pu être chargée.",
     messageNotSent: "Le message n’a pas pu être envoyé.",
     messageInvalid: "Le message est vide ou dépasse 4000 caractères.",
@@ -1054,6 +1055,7 @@ const fr: Catalog = {
     invitationsEmpty: "Aucune invitation en attente.",
     roleAdmin: "Administrateur",
     roleMember: "Membre",
+    roleRecruiter: "Recruteur·se",
     leave: "Quitter",
     remove: "Retirer",
     back: "Retour à l’équipe",

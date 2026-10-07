@@ -583,6 +583,7 @@ const de = {
   },
 
   errors: {
+    recruiterOnly: "Den ersten Kontakt zu einer Person nimmt bei euch ein Recruiter auf. Ein Administrator kann dir diese Rolle geben.",
     conversationNotLoaded: "Das Gespräch ließ sich nicht laden.",
     messageNotSent: "Die Nachricht ließ sich nicht senden.",
     messageInvalid: "Die Nachricht ist leer oder länger als 4000 Zeichen.",
@@ -1058,6 +1059,7 @@ const de = {
     invitationsEmpty: "Keine offenen Einladungen.",
     roleAdmin: "Administrator",
     roleMember: "Mitglied",
+    roleRecruiter: "Recruiter",
     leave: "Verlassen",
     remove: "Entfernen",
     back: "Zurück zur Mannschaft",

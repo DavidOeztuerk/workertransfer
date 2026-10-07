@@ -44,6 +44,16 @@
 #   POST   /transfers/{id}/offer              Termin und Gebuehr
 #   POST   /transfers/{id}/complete           den Abschluss feststellen
 #
+# Und DREI verlangen seit ADR-0048 mindestens einen `recruiter` — den ersten
+# Kontakt zu einem Menschen, der sich nicht selbst gemeldet hat:
+#
+#   POST   /resumes/{subject}/requests        den Lebenslauf anfragen
+#   POST   /market/{subject}/requests         den Marktstatus anfragen
+#   POST   /advisor/conversations             ein Gespraech eroeffnen
+#
+# `firma` ist Admin und darf das auch (die Rollen sind geordnet); `mitglied`
+# bekommt 403, VOR dem Blick auf Rumpf und Person.
+#
 # SICHTBAR wird der Unterschied hier nur in FUENF Zeilen, und der Grund ist
 # lehrreich genug, um ihn aufzuschreiben: die drei Verwaltungsrouten nennen die
 # Firma im PFAD, und die Kennung dort EXISTIERT NICHT (wie ueberall in dieser
@@ -284,7 +294,7 @@ gruppen:
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, mitglied: 404, firma: 404 }
-      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/resumes/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 403, firma: 404 }
       - { methode: GET, pfad: '/resumes/requests', ohne: 401, person: 403, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/resumes/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/resumes/me/documents', ohne: 401, person: 415, mitglied: 415, firma: 415 }
@@ -461,7 +471,7 @@ gruppen:
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/grant', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/market/requests/00000000-0000-0000-0000-000000000001/revoke', ohne: 401, person: 404, mitglied: 404, firma: 404 }
-      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/market/00000000-0000-0000-0000-000000000001/requests', ohne: 401, person: 403, mitglied: 403, firma: 404 }
       - { methode: GET, pfad: '/market/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/transfers', ohne: 401, person: 403, mitglied: 422, firma: 422 }
       - { methode: GET, pfad: '/transfers/me', ohne: 401, person: 200, mitglied: 200, firma: 200 }
@@ -768,7 +778,7 @@ gruppen:
       - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"stage":1}' }
       - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/agree', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/advisor/me/conversations/00000000-0000-0000-0000-000000000001/end', ohne: 401, person: 404, mitglied: 404, firma: 404 }
-      - { methode: POST, pfad: '/advisor/conversations', ohne: 401, person: 403, mitglied: 422, firma: 422, rumpf: '{}' }
+      - { methode: POST, pfad: '/advisor/conversations', ohne: 401, person: 403, mitglied: 403, firma: 422, rumpf: '{}' }
       - { methode: GET, pfad: '/advisor/conversations', ohne: 401, person: 403, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/advisor/conversations/00000000-0000-0000-0000-000000000001/hand-over', ohne: 401, person: 403, mitglied: 404, firma: 404 }

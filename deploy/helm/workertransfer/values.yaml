@@ -265,6 +265,9 @@ services:
     port: 8004
     database: resume
     env:
+      # The CV request is a first contact: at least a `recruiter` (ADR-0048).
+      # `Identity__Secret` hangs on this line in _helpers.tpl.
+      Identity__BaseUrl: http://identity-service:8001
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
       DocumentStore__Folder: /data/document-store

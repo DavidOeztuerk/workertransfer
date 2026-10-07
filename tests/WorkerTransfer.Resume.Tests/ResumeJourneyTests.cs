@@ -1,3 +1,4 @@
+using WorkerTransfer.ServiceDefaults.Roles;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -37,6 +38,7 @@ public class ResumeJourneyTests(Postgres postgres) : IAsyncLifetime
             {
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _gate));
                 services.Replace(ServiceDescriptor.Scoped<IDelivery>(_ => _delivery));
+                services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
             });
         });
 
@@ -48,6 +50,8 @@ public class ResumeJourneyTests(Postgres postgres) : IAsyncLifetime
         _service.Dispose();
         return Task.CompletedTask;
     }
+
+    private readonly RoleProbe _roles = new();
 
     private HttpClient AsPerson(Guid subject) => With(TokenShape.Person(subject));
 
@@ -281,6 +285,36 @@ public class ResumeJourneyTests(Postgres postgres) : IAsyncLifetime
 
         forReal.StatusCode.Should().Be(HttpStatusCode.NotFound);
         forInvented.StatusCode.Should().Be(forReal.StatusCode);
+    }
+
+    /// <summary>Asking for a CV is a first contact: at least a recruiter (ADR-0048).</summary>
+    /// <remarks>
+    /// Refused BEFORE the person is looked at: a member gets 403 whether or not
+    /// she exists, so the refusal says nothing about her.
+    /// </remarks>
+    [Theory]
+    [InlineData(CompanyRole.Member, HttpStatusCode.Forbidden)]
+    [InlineData(CompanyRole.Recruiter, HttpStatusCode.NotFound)]
+    [InlineData(CompanyRole.Admin, HttpStatusCode.NotFound)]
+    public async Task Only_a_recruiter_or_an_admin_asks_for_a_cv(CompanyRole role, HttpStatusCode expected)
+    {
+        _roles.Answer = role;
+
+        var asked = await AsCompany(Guid.CreateVersion7(), Guid.CreateVersion7())
+            .PostAsync($"/resumes/{Guid.CreateVersion7()}/requests", null);
+
+        asked.StatusCode.Should().Be(expected);
+    }
+
+    /// <summary>A silent role lookup is 503, never 403.</summary>
+    [Fact]
+    public async Task A_silent_role_lookup_is_503()
+    {
+        _roles.Silent = true;
+
+        (await AsCompany(Guid.CreateVersion7(), Guid.CreateVersion7())
+                .PostAsync($"/resumes/{Guid.CreateVersion7()}/requests", null))
+            .StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     /// <summary>There is no public switch, so a private person reads nothing.</summary>

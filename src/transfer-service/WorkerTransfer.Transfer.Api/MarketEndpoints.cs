@@ -1,3 +1,5 @@
+using WorkerTransfer.Transfer.Api.Authorization;
+using WorkerTransfer.ServiceDefaults.Roles;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.ServiceDefaults;
@@ -196,7 +198,12 @@ public static class MarketEndpoints
             await Responses.Write(
                 context, result, cancellationToken,
                 active: null, successStatus: StatusCodes.Status201Created);
-        });
+        })
+        // A first contact to a person who did not come forward: at least a
+        // `recruiter` (ADR-0048), resolved from identity-service's membership
+        // table per request. The check stands BEFORE the body and the person
+        // are looked at.
+        .RequireAuthorization(AdminPermissionExtensions.Policy(MarketPermissions.Request));
 
         market.MapGet("/{subjectId:guid}", async (
             Guid subjectId,

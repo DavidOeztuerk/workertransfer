@@ -76,6 +76,8 @@ describe("the catalogues", () => {
       "en:companyTransfers.title",
       "en:myData.sectionTransfers",
       "en:team.roleAdmin",
+      // The English loan word is the German job title (ADR-0048).
+      "en:team.roleRecruiter",
       // "System" is the same word in English. French does not stand beside
       // it — there it is "Systeme", and an exemption per key would let exactly
       // that line slip through silently.
