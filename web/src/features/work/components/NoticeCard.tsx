@@ -7,7 +7,9 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
+import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
+import { Link as RouterLink } from "react-router-dom";
 
 import {
   type Notice,
@@ -148,7 +150,10 @@ export function NoticeCard() {
           <Alert severity="info">
             {t("market.noticeResult", { last: day(notice.last_day), earliest: day(notice.earliest_start) })}
             <Typography variant="body2" sx={{ mt: 1 }}>
-              {t("market.noticeOrientation")}
+              {t("market.noticeOrientation")}{" "}
+              <Link component={RouterLink} to="/checklists">
+                {t("footer.checklists")}
+              </Link>
             </Typography>
           </Alert>
         ) : null}

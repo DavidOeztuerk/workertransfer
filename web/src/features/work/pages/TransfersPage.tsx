@@ -204,7 +204,10 @@ function TransferCard({
               {transfer.offer_start_on ?? "—"}
               {transfer.starts_before_earliest === true ? (
                 <Typography component="span" variant="body2" color="warning.main" sx={{ display: "block" }}>
-                  {t("transfers.startsBeforeEarliest")}
+                  {t("transfers.startsBeforeEarliest")}{" "}
+                  <Link component={RouterLink} to="/checklists">
+                    {t("footer.checklists")}
+                  </Link>
                 </Typography>
               ) : null}
             </Typography>

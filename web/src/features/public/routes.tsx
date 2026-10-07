@@ -19,6 +19,7 @@ import { HomePage } from "./pages/HomePage";
 export const publicRoutes: RouteObject[] = [
   { index: true, element: <HomePage /> },
   { path: "/overview", element: lazyRoute(() => import("./pages/OverviewPage"), "OverviewPage") },
+  { path: "/checklists", element: lazyRoute(() => import("./pages/ChecklistsPage"), "ChecklistsPage") },
 
   // The four legal pages. They lie in ONE module and are therefore loaded as
   // one — four separate bundles for four text pages would be four requests for

@@ -664,6 +664,9 @@ Rechtsberatung.
   Checklisten (B6, F2); automatisch gefüllte Vertragsvorlagen (F1, vgl. BGH
   „Smartlaw“).
 - **Dateien:** `docs/superpowers/specs/2026-08-02-contract-templates-design.md`; `docs/VISION-FRAGEN.md` B5, B6, F1, F2.
+  Seit 08.10.2026 dazu: die Checklisten `web/src/features/public/pages/ChecklistsPage.tsx`
+  mit ihren Texten (`checklists.*` in `web/src/core/i18n/catalogs/de.ts`) und der
+  Fristrechner `src/transfer-service/WorkerTransfer.Transfer.Domain/Market/NoticePeriod.cs`.
 
 ### J7. Die Vertragsvorlagen selbst
 
