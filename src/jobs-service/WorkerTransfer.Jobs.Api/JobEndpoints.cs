@@ -199,7 +199,8 @@ public static class JobEndpoints
                     query["q"].ToString(),
                     Guid.TryParse(query["company"], out var company) ? company : null,
                     query["employment"].ToString(),
-                    radius),
+                    radius,
+                    query["with_salary"] == "true"),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(

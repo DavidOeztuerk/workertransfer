@@ -1569,7 +1569,24 @@ const de = {
     sent: "Gesendet.",
   },
 
+  salaries: {
+    title: "Gehaltsvergleich",
+    lead: "Was Inserate auf dieser Plattform für eine Tätigkeit nennen — jede Spanne einzeln, mit ihrer Quelle. Kein Durchschnitt und keine Zahl über dich.",
+    term: "Tätigkeit oder Titel",
+    termHint: "Zum Beispiel „Schweißer“ oder „Pflegefachkraft“.",
+    search: "Vergleichen",
+    loading: "Inserate werden gelesen…",
+    none: "Kein Inserat mit Gehaltsangabe gefunden.",
+    noneHint: "Das sagt nichts über den Markt — nur, dass hier niemand für diese Tätigkeit eine Spanne genannt hat.",
+    platformTitle: "Inserate auf WorkerTransfer",
+    platformSource: "Quelle: {{count}} veröffentlichte Inserate mit Gehaltsspanne, Stand {{date}}. Brutto, wie die Firmen sie angeben.",
+    officialTitle: "Amtliche Statistik (Destatis)",
+    officialNotConnected: "Noch nicht angebunden. Die Verdienste nach Berufen veröffentlicht das Statistische Bundesamt — dort steht die Quelle mit Stand und Methode.",
+    officialLink: "Verdienste nach Branchen und Berufen beim Statistischen Bundesamt",
+  },
+
   footer: {
+    salaries: "Gehaltsvergleich",
     checklists: "Checklisten zum Wechsel",
     platform: "Plattform",
     jobs: "Offene Stellen",

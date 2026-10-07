@@ -168,6 +168,8 @@ export interface SearchFilters {
   lat?: number;
   lon?: number;
   radiusKm?: number;
+  /** Only adverts that state a salary range — for the salary comparison (B5). */
+  withSalary?: boolean;
 }
 
 export type SearchError = "offline" | "failed";
@@ -234,6 +236,7 @@ export function searchQuery(filters: SearchFilters, page = 1, pageSize?: number)
   // Do not send empty filters at all: the server would read `remote=` as a
   // filter on an empty value and find nothing.
   if (filters.q !== undefined && filters.q !== "") params.set("q", filters.q);
+  if (filters.withSalary === true) params.set("with_salary", "true");
   if (filters.location !== undefined && filters.location !== "")
     params.set("location", filters.location);
   if (filters.remote !== undefined && filters.remote !== "") params.set("remote", filters.remote);

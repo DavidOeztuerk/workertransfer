@@ -135,6 +135,35 @@ public class JobJourneyTests(Postgres postgres) : IAsyncLifetime
         salary.GetProperty("currency").GetString().Should().Be("EUR");
     }
 
+    /// <summary>The salary comparison reads only adverts that state a range (B5).</summary>
+    [Fact]
+    public async Task With_salary_returns_only_adverts_that_state_a_range()
+    {
+        var company = Guid.CreateVersion7();
+        var browser = AsCompany(company);
+        var stamp = Guid.NewGuid().ToString("N")[..8];
+
+        var stated = await browser.PostAsJsonAsync("/jobs", new
+        {
+            title = $"Welder {stamp}", description = "TIG.",
+            salary = new { min = 3_000, max = 3_600, period = "month" }
+        });
+        var silent = await browser.PostAsJsonAsync("/jobs", new { title = $"Welder {stamp} B", description = "MIG." });
+
+        foreach (var created in new[] { stated, silent })
+        {
+            var id = (await Json(created)).GetProperty("id").GetGuid();
+            await browser.PostAsync($"/jobs/{id}/publish", null);
+        }
+
+        var all = await Json(await Anonymous().GetAsync($"/jobs?q=Welder%20{stamp}"));
+        var withSalary = await Json(await Anonymous().GetAsync($"/jobs?q=Welder%20{stamp}&with_salary=true"));
+
+        all.GetProperty("items").GetArrayLength().Should().Be(2);
+        withSalary.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("title").GetString())
+            .Should().Equal($"Welder {stamp}");
+    }
+
     /// <summary>Not stated is a statement too — <c>null</c>, never a made-up figure.</summary>
     [Fact]
     public async Task Without_a_range_the_advert_says_null()

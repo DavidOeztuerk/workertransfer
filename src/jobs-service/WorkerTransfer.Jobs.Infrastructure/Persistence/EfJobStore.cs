@@ -59,11 +59,20 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         Guid? company = null,
         string employment = "",
         SearchRadius? radius = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool withSalaryOnly = false)
     {
         // The state is filtered HERE and never by the caller: a `status=draft`
         // on the wire would be a way to read other companies' drafts.
         var query = context.Jobs.Where(candidate => candidate.Status == "published");
+
+        // The salary comparison (B5) reads adverts that STATE a range. Filtered
+        // here, not in the browser: otherwise one page of twenty could hold
+        // none, and "nothing found" would be a claim about the market.
+        if (withSalaryOnly)
+        {
+            query = query.Where(candidate => candidate.SalaryMin != null && candidate.SalaryMax != null);
+        }
 
         if (!string.IsNullOrWhiteSpace(location))
         {

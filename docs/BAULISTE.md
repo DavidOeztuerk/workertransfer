@@ -46,14 +46,15 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 
 ## Phase 3 — Personenseite
 
-| Was | Frage | Größe | Bemerkung |
-|---|---|---|---|
-| **KI-Berater** (Gehalt, Vertrag erklären, Wechsel begleiten) | B4, B5 | L | ersetzt das heutige „Berater = Mandat + Freigabestufen“; braucht Phase 1 |
-| Gehaltsvergleich: Inserate + **Destatis GENESIS** | B5 | M | Quelle wird immer genannt |
-| **Initiativbewerbung** | B2 | M | auch ohne Inserat; Berater bereitet vor |
-| **Eigenes Zeitfenster** im Marktstatus | H1 | S | außerhalb nicht ansprechbar |
-| **Kündigungsfrist** → frühester Wechsel, Angebote markieren | H2 | M | sichtbar nur für Person und Berater |
-| **Checklisten** (Kündigung, Aufhebung, Sperrzeit, Zeugnis, Resturlaub) | B6, F2 | S | feste Texte, mit Links zu neutralen Stellen |
+| Was | Frage | Stand |
+|---|---|---|
+| **Eigenes Zeitfenster** im Marktstatus | H1 | gebaut 07.10.2026: außerhalb nicht ansprechbar, Daten sieht nur die Person |
+| **Kündigungsfrist** → frühester Wechsel, Angebote markieren | H2 | gebaut 07.10.2026: nur für die Person; nebenbei Angebotsbeginn als Monat (war ein 500) |
+| **Checklisten** (Kündigung, Aufhebung, Sperrzeit, Zeugnis, Resturlaub) | B6, F2 | gebaut 08.10.2026: `/checklists`, öffentlich, neutrale Stellen |
+| **Initiativbewerbung** | B2 | gebaut 08.10.2026: dritte Gesprächsart, Senden gibt das Profil der Firma frei |
+| Gehaltsvergleich: Inserate | B5 | gebaut 08.10.2026: `/salaries`, jede Spanne einzeln mit Quelle, kein Durchschnitt |
+| Gehaltsvergleich: **Destatis GENESIS** | B5 | **offen** — die Schnittstelle braucht ein Konto, und die zwei Dokumentationen widersprechen sich (Gast per GET / Token per POST). Erst gegen einen echten Zugang messen, dann bauen. Bis dahin verlinkt die Seite die Veröffentlichung. |
+| **KI-Berater** (Gehalt, Vertrag erklären, Wechsel begleiten) | B4, B5 | offen |
 
 ## Phase 4 — Der alte Arbeitgeber und die Ablöse
 

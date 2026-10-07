@@ -1557,7 +1557,24 @@ const fr: Catalog = {
     sent: "Envoyé.",
   },
 
+  salaries: {
+    title: "Comparaison des salaires",
+    lead: "Ce que les annonces de cette plateforme indiquent pour un métier — chaque fourchette séparément, avec sa source. Pas de moyenne ni de chiffre sur vous.",
+    term: "Métier ou intitulé",
+    termHint: "Par exemple « soudeur » ou « infirmier ».",
+    search: "Comparer",
+    loading: "Lecture des annonces…",
+    none: "Aucune annonce avec fourchette de salaire trouvée.",
+    noneHint: "Cela ne dit rien du marché — seulement que personne ici n’a indiqué de fourchette pour ce métier.",
+    platformTitle: "Annonces sur WorkerTransfer",
+    platformSource: "Source : {{count}} annonces publiées avec fourchette de salaire, état au {{date}}. Brut, tel qu’indiqué par les entreprises.",
+    officialTitle: "Statistique officielle (Destatis)",
+    officialNotConnected: "Pas encore raccordée. L’Office fédéral de la statistique publie les salaires par profession — la source, sa date et sa méthode y figurent.",
+    officialLink: "Salaires par secteur et profession à l’Office fédéral de la statistique",
+  },
+
   footer: {
+    salaries: "Comparaison des salaires",
     checklists: "Listes de contrôle pour un changement",
     platform: "Plateforme",
     jobs: "Postes ouverts",

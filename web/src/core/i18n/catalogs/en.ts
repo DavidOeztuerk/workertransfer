@@ -1557,7 +1557,24 @@ const en: Catalog = {
     sent: "Sent.",
   },
 
+  salaries: {
+    title: "Salary comparison",
+    lead: "What adverts on this platform state for a job — each range on its own, with its source. No average and no number about you.",
+    term: "Job or title",
+    termHint: "For example “welder” or “nurse”.",
+    search: "Compare",
+    loading: "Reading adverts…",
+    none: "No advert with a salary range found.",
+    noneHint: "That says nothing about the market — only that nobody here stated a range for this job.",
+    platformTitle: "Adverts on WorkerTransfer",
+    platformSource: "Source: {{count}} published adverts with a salary range, as of {{date}}. Gross, as the companies state it.",
+    officialTitle: "Official statistics (Destatis)",
+    officialNotConnected: "Not connected yet. The Federal Statistical Office publishes earnings by occupation — the source, its date and method stand there.",
+    officialLink: "Earnings by sector and occupation at the Federal Statistical Office",
+  },
+
   footer: {
+    salaries: "Salary comparison",
     checklists: "Checklists for a change",
     platform: "Platform",
     jobs: "Open positions",
