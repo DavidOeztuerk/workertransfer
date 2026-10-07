@@ -16,17 +16,18 @@ Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
 | Anschreiben mit Freigabe vor dem Senden (das Vorbild für alle Agenten) | D2 | gebaut (ADR-0034) |
 | Scout mit Häkchen, ohne Rangfolge, nach festen Regeln | B1 | gebaut (ADR-0036) — fehlt: pro Inserat, siehe Phase 2 |
 | Lebenslauf-Vorlage, Bewerbung auf Inserat | B2 | gebaut |
+| **Nachrichten pro Vorgang** (Bewerbung) mit Entwurf und Freigabe | E1, D2 | gebaut 07.10.2026 (ADR-0047, `messages-service`) |
+| **Platzhalter-Schicht**, Anschreiben darauf umgestellt | E2 | gebaut 07.10.2026 (`ServiceDefaults/Ai/Placeholders.cs`) |
+| **Mistral als Standard-Anbieter**, Ollama bleibt | E2 | gebaut 07.10.2026 (`Draft__Provider`, `ModelWire`) |
+| Hinweis „keine Gesundheitsdaten" über jedem Nachrichtenfeld | E2 | gebaut 07.10.2026 — immer, nicht erst wenn ein Berater mitliest |
 
 ## Phase 1 — Grundlagen, ohne die kein Agent arbeiten kann
 
-| Was | Frage | Größe | Bemerkung |
-|---|---|---|---|
-| **Nachrichten pro Vorgang** (Person ↔ Firma) | E1 | L | neuer Baustein; dort schreiben Menschen und Agenten |
-| **Freigabe-Mechanismus für Agenten-Entwürfe** im Gespräch | D2 | M | ein Entwurf ist sichtbar als Entwurf, geht erst nach „Freigeben“ raus — wie beim Anschreiben, aber allgemein |
-| **Platzhalter-Schicht** für Name, Arbeitgeber, Gehalt, Vertragsdaten | E2 | M | vor dem Senden ersetzen, nach der Antwort einsetzen; einmal gebaut, von allen Agenten genutzt |
-| **Anschreiben auf Platzhalter umstellen** | E2 | S | heute gehen Klarname und Werdegang im Klartext raus |
-| **Mistral als Standard-Anbieter**, Ollama bleibt | E2 | S | Egress-Ziel in der Konfiguration, `Draft__BaseUrl` |
-| Hinweis „keine Gesundheitsdaten“, wenn ein Berater mitliest | E2 | S | |
+**Erledigt am 07.10.2026**, siehe oben. Offen aus Phase 1 bleibt nur, was erst
+mit seiner Phase kommt: weitere Vorgangsarten für Nachrichten (Ansprache durch
+den Recruiter in Phase 2, Gespräch mit dem Berater in Phase 3, Transfer in
+Phase 4) — jede mit ihrer eigenen Antwort auf „wer gehört dazu“, im Dienst des
+Vorgangs.
 
 ## Phase 2 — Firmenseite
 
@@ -71,8 +72,7 @@ Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
 - **Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen** — widerspricht
   bewusst dem Transfer-Entwurf vom 02.08.2026 („die Plattform kontaktiert den
   Arbeitgeber nicht“).
-- **Nachrichten und Agenten-Entwürfe werden gespeichert** — wie ADR-0034 für das
-  Anschreiben, jetzt allgemein.
+- ~~Nachrichten und Agenten-Entwürfe werden gespeichert~~ — ADR-0047, 07.10.2026.
 
 ## Vor dem Start (siehe `VISION-FRAGEN.md`)
 

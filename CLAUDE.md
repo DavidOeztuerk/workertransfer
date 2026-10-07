@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.1** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
-Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
+Fifteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
 The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
 
 ### The layout, so nobody guesses
 
 ```
-src/            fourteen services, gateway/, shared/
+src/            fifteen services, gateway/, shared/
 tests/          nineteen test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
@@ -41,6 +41,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `scout-service` | 8012 | the search for people — ticks and evidence, never a number |
 | `advisor-service` | 8013 | the mandate — four values; the stages live in the ledger |
 | `assessment-service` | 8014 | the work sample — the effort in hours, and one evaluation the person always reads |
+| `messages-service` | 8015 | one conversation per process — and drafts only a human being releases |
 
 The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `DocumentStore` (bytes for certificates, never a PDF the server rendered — `Ablage` until 24.09.2026), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model. The eighth, `Nachweis`, collapsed into Noelia with ADR-0045; the checks WorkerTransfer answers itself live in `ServiceDefaults/Checks`.
 
@@ -619,7 +620,7 @@ Certificates ride a capability of their own: `documents.visibility:tenant:<id>` 
 
 ### Erasure: the default deletes completely (ADR-0027)
 
-`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to eleven recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`, `advisor`, `assessment` — `ErasureRecipient.Services`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `ErasureRecipientTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `SubjectKeyedTable` annotation.
+`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to twelve recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`, `advisor`, `assessment`, `messages` — `ErasureRecipient.Services`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `ErasureRecipientTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `SubjectKeyedTable` annotation.
 
 Three things are load-bearing:
 
@@ -920,6 +921,22 @@ The eighth notification kind came with it: `assessment_update`, for both
 movements ("a task was set for you", "your evaluation is in"). The second is why
 the kind exists — without it a person learns of a reply at their next visit.
 
+### messages-service: one conversation per process, and a draft goes out only released
+
+Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md) — Phase 1 of `docs/BAULISTE.md`, the ground every later agent stands on (VISION-FRAGEN D2, E1, E2). Phase 1 knows one kind of process: **`application`**.
+
+**Who belongs to a conversation is decided by the process's own service, not here.** Before every read and write, `HttpProcessLookup` asks `GET /applications/{id}` **with the caller's token**, synchronously, no cache; 404 there is 404 here, byte-identical whether or not the conversation exists. The capacity in the token decides the side: acting for the company → `company`, acting as oneself → `person`. A silent applications-service is **503**, never 404.
+
+**A draft is a message in state `draft`, and only its own side sees it** — filtered in the SQL (`VisibleToAsync`), not further up. It comes into being on a click (`POST …/draft`), a human being edits and **releases** it; discarding deletes the row. The model call is a *query* (`ComposeReplyQuery`) and the draft is saved by a separate command, so no transaction stays open for the seconds a model takes. There is **no route** that sends a draft without a release; `MessageJourneyTests` pins the closed set of six.
+
+**What reaches the model:** `ReplyContext` — the writing side, the last twenty *sent* messages of this one conversation, the person's name (only to be masked) and a language. Never a draft, a profile, a CV or another conversation; the rules forbid judging the other side (D2/D3). The person's side uses their own AI access if they set one up — a silent identity-service is refused, not quietly replaced by the platform's provider — the company's side the platform's (Mistral).
+
+**`origin` (`human`/`agent`) is shown to the own side only**, and no author id ever goes out; whether a recipient must learn that a model drafted a released message is lawyer question J2.
+
+**No read state, no unread count** — "has the company read it?" is pressure and a statement about a person's behaviour. The ninth notification kind, `message_received`, names nobody; a person writing notifies every member but the writer.
+
+**Erasure:** the person's conversations fall whole, the company's messages in them too. An erased *member*'s released messages stay in the other person's conversation with `author_id = null`; their unreleased drafts go.
+
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 
 Built 12.09.2026 under ADR-0043. It is PBI-7, and it closes the last place where
@@ -1134,5 +1151,6 @@ that script was built against.
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
 - `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). `sitzungswiderruf-liest-sid.md` is closed (fixed in Noelia 7.0.1, 07.10.2026); its two side findings — no `UseTokenRevocation` in the default chain, a `text/plain` refusal — stay open there. `verschluesselung-verschluesselt-nicht.md` is **closed**: fixed in 4.4.2, re-measured against 7.0.0 on 07.10.2026 (no plaintext in the envelope, a foreign key fails on the GCM tag). `AddEncryption` stays out anyway — `SecretStore` covers what we encrypt.
+- `docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md` — messages per process, and drafts only a human being releases. 07.10.2026.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.
