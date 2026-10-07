@@ -59,6 +59,7 @@ describe("letterHead", () => {
         status: "published",
         published_at: null,
         updated_at: "",
+        salary: null,
       },
     );
 
@@ -80,6 +81,7 @@ describe("letterHead", () => {
       status: "published",
       published_at: null,
       updated_at: "",
+        salary: null,
     });
 
     expect(recipient.name).toBe("");

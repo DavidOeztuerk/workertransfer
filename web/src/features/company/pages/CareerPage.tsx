@@ -18,7 +18,10 @@ import {
 import { failureKey } from "../../../shared/api/errors";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
-import { remoteLabel, searchJobs } from "../../work/api/jobs";
+import { remoteLabel, searchJobs,
+  salaryText,
+  PERIOD_KEY,
+} from "../../work/api/jobs";
 import { startDrafts } from "../../work/lib/startDrafts";
 import { useActor } from "../lib/session";
 import { Trans, useTranslation } from "react-i18next";
@@ -46,7 +49,7 @@ export function CareerPage() {
   const { slug } = useParams();
   const requestedSlug = slug ?? "";
 
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { signedIn } = useActor();
   const [runningJobId, setRunningJobId] = useState<string | null>(null);
@@ -236,6 +239,9 @@ export function CareerPage() {
                           ? job.location
                           : t("careers.locationMissing")}{" "}
                         · {remoteLabel(job.remote)}
+                        · {job.salary !== null
+                          ? salaryText(job.salary, i18n.language, (period) => t(PERIOD_KEY[period]))
+                          : t("jobs.salaryMissing")}
                       </Typography>
                     </Box>
                     <Button

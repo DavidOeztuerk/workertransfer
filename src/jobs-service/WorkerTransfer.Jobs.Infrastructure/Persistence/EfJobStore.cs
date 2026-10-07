@@ -236,7 +236,15 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         ToState(row.Status),
         new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
         new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
-        row.PublishedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null);
+        row.PublishedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null,
+        row.SalaryMin is { } low && row.SalaryMax is { } high
+            ? SalaryRange.Restore(low, high, row.SalaryPeriod switch
+            {
+                "month" => SalaryPeriod.Month,
+                "hour" => SalaryPeriod.Hour,
+                _ => SalaryPeriod.Year
+            })
+            : null);
 
     private static JobRow ToRow(Job job)
     {
@@ -264,6 +272,9 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         row.Status = Word(job.State);
         row.UpdatedAt = job.UpdatedAt.UtcDateTime;
         row.PublishedAt = job.PublishedAt?.UtcDateTime;
+        row.SalaryMin = job.Salary?.Minimum;
+        row.SalaryMax = job.Salary?.Maximum;
+        row.SalaryPeriod = job.Salary?.Period.ToString().ToLowerInvariant();
     }
 
     // The stored words below are the column values of every existing row and

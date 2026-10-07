@@ -849,6 +849,13 @@ const de = {
   },
 
   jobs: {
+    salaryMissing: "Gehalt nicht angegeben",
+    perYear: "brutto/Jahr",
+    perMonth: "brutto/Monat",
+    perHour: "brutto/Stunde",
+    periodYear: "pro Jahr",
+    periodMonth: "pro Monat",
+    periodHour: "pro Stunde",
     title: "Offene Stellen",
     searchTerm: "Suchbegriff",
     searchTermExample: "Python, Pflege, Vertrieb …",
@@ -1005,6 +1012,11 @@ const de = {
   },
 
   companyJobs: {
+    salaryMin: "Gehalt von (€, brutto)",
+    salaryMax: "Gehalt bis (€, brutto)",
+    salaryPeriod: "Zeitraum",
+    salaryHint: "Freiwillig, aber sichtbar: ohne Angabe steht am Inserat „Gehalt nicht angegeben“. Nach der EU-Entgelttransparenz-Richtlinie muss die Spanne Bewerbenden spätestens vor dem Gespräch genannt werden. Eine einzelne Zahl: beide Felder gleich.",
+    salaryInvalid: "Die Gehaltsspanne braucht beide Enden, das untere nicht über dem oberen.",
     title: "Unsere Stellen",
     companyOnly: "Stellen verwaltet nur, wer für ein Unternehmen handelt. Wechsle oben auf ein Unternehmen.",
     lead: "Ein Entwurf sieht niemand außer euch. Veröffentlicht ist er für alle sichtbar, auch ohne Konto — und geschlossen bleibt geschlossen.",

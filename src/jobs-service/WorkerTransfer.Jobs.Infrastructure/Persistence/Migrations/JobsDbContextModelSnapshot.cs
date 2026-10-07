@@ -64,6 +64,19 @@ namespace WorkerTransfer.Jobs.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("remote_mode");
 
+                    b.Property<int?>("SalaryMax")
+                        .HasColumnType("integer")
+                        .HasColumnName("salary_max");
+
+                    b.Property<int?>("SalaryMin")
+                        .HasColumnType("integer")
+                        .HasColumnName("salary_min");
+
+                    b.Property<string>("SalaryPeriod")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("salary_period");
+
                     b.Property<string>("Skills")
                         .IsRequired()
                         .HasColumnType("jsonb")

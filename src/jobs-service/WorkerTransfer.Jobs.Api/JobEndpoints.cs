@@ -368,7 +368,17 @@ public static class JobEndpoints
         body.Title, body.Description, body.Location, body.PostalCode,
         ToRemoteMode(body.RemoteMode) ?? RemoteMode.None,
         ToEmployment(body.EmploymentType),
-        body.Skills ?? []);
+        body.Skills ?? [],
+        body.Salary?.Min,
+        body.Salary?.Max,
+        ToPeriod(body.Salary?.Period));
+
+    private static SalaryPeriod ToPeriod(string? raw) => raw?.Trim().ToLowerInvariant() switch
+    {
+        "month" => SalaryPeriod.Month,
+        "hour" => SalaryPeriod.Hour,
+        _ => SalaryPeriod.Year
+    };
 
     // The words below are the wire contract with web/ and stay byte-identical.
 
@@ -421,7 +431,10 @@ public static class JobEndpoints
         job.Skills.Values,
         job.State.ToString().ToLowerInvariant(),
         job.PublishedAt,
-        job.UpdatedAt);
+        job.UpdatedAt,
+        job.Salary is { } salary
+            ? new SalaryV1(salary.Minimum, salary.Maximum, salary.Period.ToString().ToLowerInvariant())
+            : null);
 
     private static Task NotSignedIn(HttpContext context) =>
         ProblemDetailsMiddleware.Write(

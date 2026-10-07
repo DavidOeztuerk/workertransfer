@@ -705,6 +705,18 @@ Rechtsberatung.
   Nutzungsbedingungen sind heute nur Gerüst ohne Inhalt.
 - **Dateien:** `scripts/evidence_documents.py`, `docs/adr/0044-nachweis-belege-statt-konformitaet.md`, `web/src/core/i18n/catalogs/de.ts` (Abschnitte Impressum, Datenschutz, Nutzungsbedingungen).
 
+### J13. Gehaltsspanne im Inserat: Pflicht oder freiwillig?
+
+- **Frage:** Die Entgelttransparenz-Richtlinie (EU 2023/970, Art. 5) verlangt
+  das Einstiegsentgelt oder seine Spanne **vor dem Vorstellungsgespräch** — im
+  Inserat oder auf anderem Weg. Heute ist das Feld freiwillig, und ein
+  Inserat ohne Angabe zeigt „Gehalt nicht angegeben“. Muss die Plattform es zur
+  Pflicht machen, sobald das deutsche Umsetzungsgesetz gilt? Reicht brutto in
+  ganzen Euro mit Zeitraum (Jahr, Monat, Stunde)?
+- **Dateien:** `src/jobs-service/WorkerTransfer.Jobs.Domain/Jobs/SalaryRange.cs`,
+  `web/src/features/company/pages/CompanyJobNewPage.tsx`,
+  `web/src/core/i18n/catalogs/de.ts` (`companyJobs.salaryHint`).
+
 ---
 
 ## Quellen

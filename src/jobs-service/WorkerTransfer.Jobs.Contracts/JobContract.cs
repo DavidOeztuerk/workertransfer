@@ -25,7 +25,26 @@ public sealed record JobV1(
     [property: JsonPropertyName("skills")] IReadOnlyList<string> Skills,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("published_at")] DateTimeOffset? PublishedAt,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    /// <summary>
+    /// What the job pays — <c>null</c> means "not stated", and the UI says so
+    /// (VISION-FRAGEN B5). A number about the job, never about a person.
+    /// </summary>
+    [property: JsonPropertyName("salary")] SalaryV1? Salary = null);
+
+/// <summary>A salary range: gross, whole euros, both ends.</summary>
+public sealed record SalaryV1(
+    [property: JsonPropertyName("min")] int Min,
+    [property: JsonPropertyName("max")] int Max,
+    /// <summary><c>year</c>, <c>month</c> or <c>hour</c>.</summary>
+    [property: JsonPropertyName("period")] string Period,
+    [property: JsonPropertyName("currency")] string Currency = "EUR");
+
+/// <summary>The salary range as the form sends it — both ends or neither.</summary>
+public sealed record WriteSalaryV1(
+    [property: JsonPropertyName("min")] int? Min,
+    [property: JsonPropertyName("max")] int? Max,
+    [property: JsonPropertyName("period")] string? Period = "year");
 
 /// <summary>An advert, as it is written.</summary>
 /// <remarks>
@@ -40,7 +59,8 @@ public sealed record WriteJobV1(
     [property: JsonPropertyName("postal_code")] string PostalCode = "",
     [property: JsonPropertyName("remote_mode")] string RemoteMode = "none",
     [property: JsonPropertyName("employment_type")] string EmploymentType = "full_time",
-    [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null);
+    [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null,
+    [property: JsonPropertyName("salary")] WriteSalaryV1? Salary = null);
 
 // A PAGE OF ADVERTS NO LONGER EXISTS HERE — it is now `PageResponse<JobV1>`
 // from `ServiceDefaults`, so that every pageable list has the same envelope.

@@ -845,6 +845,13 @@ const en: Catalog = {
   },
 
   jobs: {
+    salaryMissing: "Salary not stated",
+    perYear: "gross/year",
+    perMonth: "gross/month",
+    perHour: "gross/hour",
+    periodYear: "per year",
+    periodMonth: "per month",
+    periodHour: "per hour",
     title: "Open positions",
     searchTerm: "Search term",
     searchTermExample: "Python, nursing, sales …",
@@ -1001,6 +1008,11 @@ const en: Catalog = {
   },
 
   companyJobs: {
+    salaryMin: "Salary from (€, gross)",
+    salaryMax: "Salary to (€, gross)",
+    salaryPeriod: "Period",
+    salaryHint: "Optional, but visible: without it the advert says “Salary not stated”. Under the EU Pay Transparency Directive the range must be given to applicants before the interview at the latest. A single figure: both fields the same.",
+    salaryInvalid: "The salary range needs both ends, the lower one not above the upper one.",
     title: "Our positions",
     companyOnly: "Only someone acting for a company manages positions. Switch to a company at the top.",
     lead: "Nobody but you sees a draft. Published, it is visible to everyone, even without an account — and closed stays closed.",

@@ -21,3 +21,6 @@ public sealed class TransitionNotAllowed(JobState now, JobState wanted)
 /// </remarks>
 public sealed class WishError()
     : InputError($"The wish may have at most {Job.MaxWishLength} characters.");
+
+/// <summary>The salary range does not keep its rule.</summary>
+public sealed class SalaryError(string reason) : InputError(reason);

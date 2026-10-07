@@ -845,6 +845,13 @@ const fr: Catalog = {
   },
 
   jobs: {
+    salaryMissing: "Salaire non indiqué",
+    perYear: "brut/an",
+    perMonth: "brut/mois",
+    perHour: "brut/heure",
+    periodYear: "par an",
+    periodMonth: "par mois",
+    periodHour: "par heure",
     title: "Postes ouverts",
     searchTerm: "Terme de recherche",
     searchTermExample: "Python, soins, vente …",
@@ -1001,6 +1008,11 @@ const fr: Catalog = {
   },
 
   companyJobs: {
+    salaryMin: "Salaire de (€, brut)",
+    salaryMax: "Salaire à (€, brut)",
+    salaryPeriod: "Période",
+    salaryHint: "Facultatif, mais visible : sans indication, l’annonce affiche « Salaire non indiqué ». Selon la directive européenne sur la transparence des rémunérations, la fourchette doit être communiquée aux candidats au plus tard avant l’entretien. Un montant unique : les deux champs identiques.",
+    salaryInvalid: "La fourchette de salaire nécessite deux bornes, la basse ne dépassant pas la haute.",
     title: "Nos postes",
     companyOnly: "Seul quelqu’un agissant pour une entreprise gère les postes. Basculez sur une entreprise en haut.",
     lead: "Personne d’autre que vous ne voit un brouillon. Publié, il est visible de tous, même sans compte — et fermé reste fermé.",

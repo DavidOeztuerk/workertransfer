@@ -34,6 +34,15 @@ public sealed class JobRow
     public DateTime UpdatedAt { get; set; }
 
     public DateTime? PublishedAt { get; set; }
+
+    /// <summary>The lower end of the salary range, or <c>null</c>: not stated.</summary>
+    public int? SalaryMin { get; set; }
+
+    /// <summary>The upper end — set exactly when the lower one is.</summary>
+    public int? SalaryMax { get; set; }
+
+    /// <summary><c>year</c>, <c>month</c> or <c>hour</c>; <c>null</c> without a range.</summary>
+    public string? SalaryPeriod { get; set; }
 }
 
 /// <summary>The one table of this service.</summary>
@@ -66,6 +75,9 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
             row.Property(entry => entry.CreatedAt).HasColumnName("created_at");
             row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at");
             row.Property(entry => entry.PublishedAt).HasColumnName("published_at");
+            row.Property(entry => entry.SalaryMin).HasColumnName("salary_min");
+            row.Property(entry => entry.SalaryMax).HasColumnName("salary_max");
+            row.Property(entry => entry.SalaryPeriod).HasColumnName("salary_period").HasMaxLength(8);
 
             // Both are paths that are searched along: a company's list and the
             // public page.
