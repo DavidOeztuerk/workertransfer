@@ -614,6 +614,11 @@ services:
       # side asks it at every request. Without this line every approach
       # answers 503 — rightly, and visibly.
       Consent__BaseUrl: http://consent-service:8002
+      # The AI advisor reads the person's OWN facts with her token (ADR-0049):
+      # her mandate and her earliest start. Without these lines it advises
+      # without them — and says so.
+      OwnFacts__AdvisorUrl: http://advisor-service:8013
+      OwnFacts__TransferUrl: http://transfer-service:8009
       # A company's members — the recipients when the person writes — and a
       # person's own AI access for their drafts. The same door and secret as
       # everywhere.

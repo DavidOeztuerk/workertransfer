@@ -45,6 +45,8 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
     private readonly ProbeLedger _ledger = new();
     private readonly RoleProbe _roles = new();
     private ProbeReleases _releases = null!;
+    private readonly ProbeOwnFacts _facts = new();
+    private readonly ProbeAdvisor _advisor = new();
 
     /// <inheritdoc />
     public async Task InitializeAsync()
@@ -80,6 +82,8 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _ledger));
                 services.Replace(ServiceDescriptor.Scoped<ICompanyRoles>(_ => _roles));
                 services.Replace(ServiceDescriptor.Scoped<IReleaseWriter>(_ => _releases));
+                services.Replace(ServiceDescriptor.Scoped<IOwnFactsLookup>(_ => _facts));
+                services.Replace(ServiceDescriptor.Scoped<IAdvisor>(_ => _advisor));
             });
         });
     }
@@ -107,6 +111,7 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
                 "GET /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}",
                 "POST /messages/{kind}/{reference:guid}/draft",
+                "POST /messages/{kind}/{reference:guid}/advice",
                 "POST /messages/drafts/{id:guid}/release",
                 "DELETE /messages/drafts/{id:guid}",
                 "POST /erasure");
@@ -543,6 +548,55 @@ public class MessageJourneyTests(Postgres postgres) : IAsyncLifetime
 
         (await AsCompany(Recruiter).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await AsPerson(Anna).GetAsync(address)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // -----------------------------------------------------------------
+    // The AI advisor (ADR-0049)
+    // -----------------------------------------------------------------
+
+    private Uri Advice() => new($"/messages/application/{Application}/advice", UriKind.Relative);
+
+    [Fact]
+    public async Task The_advisor_reads_sent_messages_and_her_own_facts_and_answers_her()
+    {
+        await AsCompany(Recruiter).PostAsJsonAsync(Conversation(), Text("Start am 1. November?"));
+        _drafter.Answer = "Ein Entwurf, den niemand gesendet hat";
+        await AsPerson(Anna).PostAsync(Draft(), null);
+        _facts.Facts = new OwnFacts(new OwnWishes("2027-01", 50_000, 60_000, 100), false, new DateOnly(2027, 1, 1), false);
+
+        var answer = await AsPerson(Anna).PostAsync(Advice(), null);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(answer)).GetProperty("advice").GetString().Should().Contain("frühesten Wechsel");
+
+        var read = _advisor.Read.Single();
+        read.History.Select(entry => entry.Text).Should().Equal("Start am 1. November?");
+        read.Facts.EarliestStart.Should().Be(new DateOnly(2027, 1, 1));
+        read.PersonName.Should().Be("Anna Muster", "it travels only to be masked");
+    }
+
+    [Fact]
+    public async Task A_company_has_no_advisor()
+    {
+        (await AsCompany(Recruiter).PostAsync(Advice(), null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        _advisor.Read.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_stranger_gets_404_from_the_advisor_too()
+    {
+        (await AsPerson(Stranger).PostAsync(Advice(), null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Advice_is_stored_nowhere()
+    {
+        await AsPerson(Anna).PostAsync(Advice(), null);
+
+        await using var context = Context();
+        (await context.Messages.CountAsync()).Should().Be(0);
+        (await context.Conversations.CountAsync()).Should().Be(0);
+        (await Notes()).Should().BeEmpty();
     }
 
     // -----------------------------------------------------------------

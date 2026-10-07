@@ -602,6 +602,7 @@ const fr: Catalog = {
   },
 
   errors: {
+    adviceNotGiven: "Le conseiller n’a pas pu donner d’avis pour le moment.",
     companyNotReachable: "Cette entreprise n’est pas joignable ici.",
     personNotApproachable: "Cette personne n’est pas (ou plus) visible pour vous.",
     advertGone: "Cette annonce n’est pas (ou plus) publiée.",
@@ -936,6 +937,9 @@ const fr: Catalog = {
 
 
   messages: {
+    askAdvisor: "Demander au conseiller",
+    adviceLabel: "L’avis de votre conseiller IA",
+    adviceNote: "Votre conseiller IA ne travaille que pour vous. Son avis n’est pas conservé et n’est transmis à personne ; ce n’est pas un conseil juridique.",
     kindInitiative: "Candidature spontanée",
     title: "Messages",
     lead: "Chaque conversation se rattache à une démarche — une candidature ou une prise de contact. Pas d’accusé de lecture ni de compteur : qui répond a lu.",

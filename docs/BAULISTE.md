@@ -54,7 +54,7 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 | **Initiativbewerbung** | B2 | gebaut 08.10.2026: dritte Gesprächsart, Senden gibt das Profil der Firma frei |
 | Gehaltsvergleich: Inserate | B5 | gebaut 08.10.2026: `/salaries`, jede Spanne einzeln mit Quelle, kein Durchschnitt |
 | Gehaltsvergleich: **Destatis GENESIS** | B5 | **offen** — die Schnittstelle braucht ein Konto, und die zwei Dokumentationen widersprechen sich (Gast per GET / Token per POST). Erst gegen einen echten Zugang messen, dann bauen. Bis dahin verlinkt die Seite die Veröffentlichung. |
-| **KI-Berater** (Gehalt, Vertrag erklären, Wechsel begleiten) | B4, B5 | offen |
+| **KI-Berater** (Gehalt, Vertrag erklären, Wechsel begleiten) | B4, B5 | erste Fassung gebaut 08.10.2026 (ADR-0049): spricht zur Person über ein Gespräch, liest ihr Mandat und ihren frühesten Wechsel; nach außen über Entwurf und Freigabe. Offen: im Namen der Person verhandeln. |
 
 ## Phase 4 — Der alte Arbeitgeber und die Ablöse
 
@@ -74,8 +74,7 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 
 ## Neue ADRs, die mit dem Bau nötig werden
 
-- **Der Berater ist ein Agent der Person** — ersetzt die Rolle aus ADR-0037
-  (heute „Mandat als Sicht“).
+- ~~Der Berater ist ein Agent der Person~~ — ADR-0049, 08.10.2026.
 - **Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen** — widerspricht
   bewusst dem Transfer-Entwurf vom 02.08.2026 („die Plattform kontaktiert den
   Arbeitgeber nicht“).

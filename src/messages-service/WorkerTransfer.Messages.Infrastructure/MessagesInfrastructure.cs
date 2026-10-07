@@ -58,6 +58,7 @@ public static class MessagesInfrastructure
         services.Configure<ErasureSettings>(configuration.GetSection(ErasureSettings.Section));
         services.Configure<DraftSettings>(configuration.GetSection(DraftSettings.Section));
         services.Configure<ConsentSettings>(configuration.GetSection(ConsentSettings.Section));
+        services.Configure<OwnFactsSettings>(configuration.GetSection(OwnFactsSettings.Section));
 
         services.AddSingleton(_ => MessagesDbContextFactory.DataSource(connectionString));
         services.AddDbContext<MessagesDbContext>((provider, options) =>
@@ -74,7 +75,10 @@ public static class MessagesInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IProcessLookup, HttpProcessLookup>();
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
-        services.AddScoped<IReplyDrafter, HttpReplyDrafter>();
+        services.AddScoped<HttpReplyDrafter>();
+        services.AddScoped<IReplyDrafter>(provider => provider.GetRequiredService<HttpReplyDrafter>());
+        services.AddScoped<IAdvisor>(provider => provider.GetRequiredService<HttpReplyDrafter>());
+        services.AddScoped<IOwnFactsLookup, HttpOwnFactsLookup>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
         services.AddScoped<IReleaseWriter, HttpReleaseWriter>();
         services.AddScoped<ConversationAccess>();

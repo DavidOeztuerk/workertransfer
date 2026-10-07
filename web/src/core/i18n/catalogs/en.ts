@@ -602,6 +602,7 @@ const en: Catalog = {
   },
 
   errors: {
+    adviceNotGiven: "The advisor could not give a view just now.",
     companyNotReachable: "This company cannot be reached here.",
     personNotApproachable: "This person is not (or no longer) visible to you.",
     advertGone: "This advert is not (or no longer) published.",
@@ -936,6 +937,9 @@ const en: Catalog = {
 
 
   messages: {
+    askAdvisor: "Ask the advisor",
+    adviceLabel: "Your AI advisor's view",
+    adviceNote: "Your AI advisor works for you only. Its view is not stored and goes to nobody; it is not legal advice.",
     kindInitiative: "Unsolicited application",
     title: "Messages",
     lead: "Every conversation hangs on a process — an application or an approach. There is no read receipt and no counter: whoever answers has read.",

@@ -112,3 +112,74 @@ public interface IReplyDrafter
     Task<string> DraftAsync(
         ReplyContext context, SubjectId requestedBy, CancellationToken cancellationToken = default);
 }
+
+/// <summary>The person's own wishes from her mandate (advisor-service).</summary>
+public sealed record OwnWishes(string? EntryMonth, int? SalaryMin, int? SalaryMax, int? WorkloadPercent);
+
+/// <summary>What the person herself stated — fetched with HER token (ADR-0049).</summary>
+/// <param name="Wishes">Her mandate, or <c>null</c> when she wrote none.</param>
+/// <param name="WishesUnknown">advisor-service did not answer — the advisor says so.</param>
+/// <param name="EarliestStart">From her notice period (H2), or <c>null</c> when not stated.</param>
+/// <param name="NoticeUnknown">transfer-service did not answer — the advisor says so.</param>
+public sealed record OwnFacts(OwnWishes? Wishes, bool WishesUnknown, DateOnly? EarliestStart, bool NoticeUnknown);
+
+/// <summary>Fetches the person's own facts for the advisor.</summary>
+/// <remarks>Never throws for a silent service: the advice goes on without the fact and says it is missing.</remarks>
+public interface IOwnFactsLookup
+{
+    /// <summary>Her own stated wishes and earliest start.</summary>
+    Task<OwnFacts> GetAsync(CancellationToken cancellationToken = default);
+}
+
+/// <summary>What the AI advisor may read — and therefore what it may not (ADR-0049).</summary>
+/// <remarks>
+/// <para><strong>This type IS the boundary:</strong> the sent messages of
+/// one conversation, her own facts, the language. No profile, no CV, nothing
+/// about the company from elsewhere. A test pins the field list.</para>
+/// </remarks>
+public sealed record AdviceContext(
+    IReadOnlyList<HistoryEntry> History,
+    string PersonName,
+    OwnFacts Facts,
+    string Language)
+{
+    /// <summary>The rules above every piece of advice.</summary>
+    /// <remarks>
+    /// <para>German, like the other prompts; it tells the model the language.</para>
+    /// <para><strong>Rule 3 is § 2 RDG, rule 4 ADR-0022, rule 5 the source
+    /// rule of B5.</strong> Each is the sentence somebody would otherwise
+    /// remove to make the advice "more helpful".</para>
+    /// </remarks>
+    public const string Rules = """
+        Du bist der KI-Berater der Person, und nur ihrer. Du sprichst zu ihr,
+        nicht zur Firma. Sie entscheidet; du hilfst ihr, klar zu sehen.
+
+        1. Sag kurz, wo das Gespraech steht und was offen ist.
+        2. Vergleiche das Gespraech mit IHREN eigenen Angaben (Wunsch-Eintritt,
+           Gehaltswunsch, Pensum, fruehester Wechsel). Widerspricht etwas, sag
+           es deutlich.
+        3. Kein Rechtsrat: erklaere, was eine Klausel allgemein bedeutet, und
+           schreib dazu "Lass das vor dem Unterschreiben pruefen". Beurteile
+           nie, ob eine Klausel wirksam oder gut ist.
+        4. Keine Zahl ueber die Person, kein "du bist X wert", keine
+           Gehaltszahl, die nicht in den Angaben oder im Gespraech steht. Fuer
+           Vergleiche verweise auf den Gehaltsvergleich der Plattform.
+        5. Nenne zu jeder Angabe ihre Quelle: (Gespraech), (dein Mandat),
+           (deine Kuendigungsfrist).
+        6. Fehlt eine Angabe oder war sie nicht abrufbar, sag das, statt zu
+           raten.
+        7. Schlag hoechstens zwei naechste Schritte vor. Keine Gesundheit,
+           keine Religion, keine Herkunft.
+        8. Angaben in eckigen Klammern wie [PERSON_NAME] sind Platzhalter;
+           uebernimm sie unveraendert.
+        9. Hoechstens 200 Woerter, in der angegebenen Sprache.
+        """;
+}
+
+/// <summary>The AI advisor (ADR-0049) — on request, once, and keeps nothing.</summary>
+public interface IAdvisor
+{
+    /// <summary>Advice for the person about one conversation.</summary>
+    /// <exception cref="DraftUnavailable">No provider, or it is silent.</exception>
+    Task<string> AdviseAsync(AdviceContext context, SubjectId requestedBy, CancellationToken cancellationToken = default);
+}

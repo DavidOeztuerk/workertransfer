@@ -282,3 +282,27 @@ public sealed class ProbeReleases(ProbeLedger ledger) : IReleaseWriter
         return Task.CompletedTask;
     }
 }
+
+/// <summary>The person's own facts, as the test sets them.</summary>
+public sealed class ProbeOwnFacts : IOwnFactsLookup
+{
+    /// <summary>What it answers.</summary>
+    public OwnFacts Facts { get; set; } = new(null, false, null, false);
+
+    /// <inheritdoc />
+    public Task<OwnFacts> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult(Facts);
+}
+
+/// <summary>An advisor that remembers what it read.</summary>
+public sealed class ProbeAdvisor : IAdvisor
+{
+    /// <summary>What it was given.</summary>
+    public List<AdviceContext> Read { get; } = [];
+
+    /// <inheritdoc />
+    public Task<string> AdviseAsync(AdviceContext context, SubjectId requestedBy, CancellationToken cancellationToken = default)
+    {
+        Read.Add(context);
+        return Task.FromResult("Das Angebot beginnt vor deinem frühesten Wechsel (deine Kündigungsfrist).");
+    }
+}

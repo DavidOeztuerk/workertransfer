@@ -174,6 +174,22 @@ public static class MessageEndpoints
             await context.Response.WriteAsJsonAsync(View(draft, draft.Side), cancellationToken);
         });
 
+        // The AI advisor (ADR-0049): advice for the PERSON about one of her
+        // conversations. Not stored, not sent — it comes back to her browser.
+        messages.MapPost("/{kind}/{reference:guid}/advice", async (
+            string kind, Guid reference, IMediator mediator, ICurrentPrincipal principal,
+            HttpContext context, CancellationToken cancellationToken) =>
+        {
+            if (CallerOf(principal) is not { } caller)
+            {
+                await NotAuthenticated(context);
+                return;
+            }
+
+            var advice = await mediator.Send(new AdviseQuery(kind, reference, caller), cancellationToken);
+            await context.Response.WriteAsJsonAsync(new AdviceV1(advice), cancellationToken);
+        });
+
         messages.MapPost("/drafts/{id:guid}/release", async (
             Guid id, ReleaseDraftV1? body, IMediator mediator, ICurrentPrincipal principal,
             HttpContext context, CancellationToken cancellationToken) =>
@@ -257,6 +273,11 @@ public static class MessageEndpoints
         {
             // "We do not know" is not "not yours": 503, never 404.
             await Write(call, StatusCodes.Status503ServiceUnavailable, error.Message);
+            return AlreadyWritten;
+        }
+        catch (AdvisorIsThePersons error)
+        {
+            await Write(call, StatusCodes.Status403Forbidden, error.Message);
             return AlreadyWritten;
         }
         catch (ConsentGateSilent error)

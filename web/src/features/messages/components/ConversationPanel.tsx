@@ -4,8 +4,10 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { Link as RouterLink } from "react-router-dom";
 
 import { LoadingBlock } from "../../../shared/components/ui";
 import { failureKey, type MessageKey } from "../../../shared/api/errors";
@@ -14,6 +16,7 @@ import {
   type Message,
   type ProcessKind,
   DRAFT_CASES,
+  askAdvisor,
   discardDraft,
   getConversation,
   releaseDraft,
@@ -45,6 +48,7 @@ export function ConversationPanel({
   const [error, setError] = useState<MessageKey | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [advice, setAdvice] = useState<string | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -88,6 +92,18 @@ export function ConversationPanel({
       await load();
     } else {
       setError(failureKey(result.error, "errors.draftNotCreated", DRAFT_CASES));
+    }
+  }
+
+  async function advise() {
+    setBusy(true);
+    const result = await askAdvisor(reference, kind);
+    setBusy(false);
+    if (result.ok) {
+      setAdvice(result.advice);
+      setError(null);
+    } else {
+      setError(failureKey(result.error, "errors.adviceNotGiven", DRAFT_CASES));
     }
   }
 
@@ -148,7 +164,27 @@ export function ConversationPanel({
         <Button variant="outlined" onClick={() => void draft()} disabled={busy}>
           {t("messages.requestDraft")}
         </Button>
+        {conversation.side === "person" ? (
+          // The advisor works for the person only (ADR-0049, D4) — the company
+          // side has no such button and the server refuses it.
+          <Button variant="text" onClick={() => void advise()} disabled={busy}>
+            {t("messages.askAdvisor")}
+          </Button>
+        ) : null}
       </Box>
+      {advice !== null ? (
+        <Alert severity="info" role="note" aria-label={t("messages.adviceLabel")}>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mb: 1 }}>
+            {advice}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t("messages.adviceNote")}{" "}
+            <Link component={RouterLink} to="/checklists">
+              {t("footer.checklists")}
+            </Link>
+          </Typography>
+        </Alert>
+      ) : null}
       <Typography variant="body2" color="text.secondary">
         {t("messages.draftHint")}
       </Typography>

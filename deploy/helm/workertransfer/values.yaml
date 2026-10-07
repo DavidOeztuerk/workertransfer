@@ -431,6 +431,9 @@ services:
       Applications__BaseUrl: http://applications-service:8007
       # An approach stands on the ledger, asked at every request (ADR-0013).
       Consent__BaseUrl: http://consent-service:8002
+      # The AI advisor's sources: her mandate and her notice period (ADR-0049).
+      OwnFacts__AdvisorUrl: http://advisor-service:8013
+      OwnFacts__TransferUrl: http://transfer-service:8009
       # Members and a person's own AI access. `Identity__Secret` hangs on this
       # line in _helpers.tpl.
       Identity__BaseUrl: http://identity-service:8001

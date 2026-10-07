@@ -63,6 +63,10 @@ public sealed record OpenInitiativeV1(
     [property: JsonPropertyName("company_id")] Guid CompanyId,
     [property: JsonPropertyName("text")] string? Text);
 
+/// <summary>The AI advisor's words to the person — never stored (ADR-0049).</summary>
+public sealed record AdviceV1(
+    [property: JsonPropertyName("advice")] string Advice);
+
 /// <summary>What a human being sends.</summary>
 public sealed record WriteMessageV1(
     [property: JsonPropertyName("text")] string? Text);

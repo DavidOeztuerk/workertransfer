@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "../../../core/i18n/i18n";
 import { buildTheme } from "../../../styles/theme";
+import { MemoryRouter } from "react-router-dom";
+
 import { ConversationPanel } from "./ConversationPanel";
 
 const APPLICATION = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -41,7 +43,9 @@ function draw() {
   return render(
     <I18nextProvider i18n={i18n}>
       <ThemeProvider theme={buildTheme("light")}>
-        <ConversationPanel reference={APPLICATION} />
+        <MemoryRouter>
+          <ConversationPanel reference={APPLICATION} />
+        </MemoryRouter>
       </ThemeProvider>
     </I18nextProvider>,
   );
@@ -132,5 +136,28 @@ describe("ConversationPanel", () => {
 
     await screen.findByText(/keine Gesundheitsdaten/i);
     expect(screen.queryByRole("group", { name: "Entwurf" })).not.toBeInTheDocument();
+  });
+
+  it("offers the advisor to the person and shows what it says", async () => {
+    const calls = stubFetch((url, method) =>
+      method === "POST" && url.endsWith("/advice")
+        ? { body: { advice: "Der Start liegt vor deinem frühesten Wechsel (deine Kündigungsfrist)." } }
+        : { body: { kind: "application", reference: APPLICATION, side: "person", messages: [SENT] } },
+    );
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Berater fragen" }));
+
+    expect(await screen.findByText(/vor deinem frühesten Wechsel/)).toBeInTheDocument();
+    expect(screen.getByText(/wird nicht gespeichert/)).toBeInTheDocument();
+    expect(calls.some((call) => call.url.endsWith("/messages/application/" + APPLICATION + "/advice"))).toBe(true);
+  });
+
+  it("offers no advisor to a company", async () => {
+    stubFetch(() => ({ body: { kind: "application", reference: APPLICATION, side: "company", messages: [SENT] } }));
+    draw();
+
+    await screen.findByText(/keine Gesundheitsdaten/i);
+    expect(screen.queryByRole("button", { name: "Berater fragen" })).not.toBeInTheDocument();
   });
 });

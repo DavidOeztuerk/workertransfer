@@ -57,7 +57,7 @@ public sealed class HttpReplyDrafter(
     IHttpClientFactory factory,
     IOptions<DraftSettings> settings,
     IOptions<IdentitySettings> identity,
-    ILogger<HttpReplyDrafter> log) : IReplyDrafter
+    ILogger<HttpReplyDrafter> log) : IReplyDrafter, IAdvisor
 {
     /// <summary>The client's name.</summary>
     public const string ClientName = "reply-draft";
@@ -78,20 +78,46 @@ public sealed class HttpReplyDrafter(
             ? await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform()
             : Platform();
 
+        return await AskAsync(access, ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The person's side, always: the advisor works for her, so it speaks with
+    /// her own access if she set one up (ADR-0049).
+    /// </remarks>
+    public async Task<string> AdviseAsync(
+        AdviceContext context, SubjectId requestedBy, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var access = await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform();
+
+        return await AskAsync(access, AdviceContext.Rules, AdvicePrompt(context), context.PersonName, AdviceTokens, cancellationToken);
+    }
+
+    /// <summary>Upper bound of the advice — 200 words fit.</summary>
+    public const int AdviceTokens = 700;
+
+    /// <summary>One call, masked on the way out, restored on the way back.</summary>
+    private async Task<string> AskAsync(
+        AiAccessV1? access, string rules, string prompt, string personName, int maxTokens,
+        CancellationToken cancellationToken)
+    {
         if (access is null)
         {
             throw new DraftUnavailable(DraftUnavailable.NoProvider);
         }
 
         var placeholders = new Placeholders();
-        placeholders.AddPersonName(context.PersonName);
+        placeholders.AddPersonName(personName);
 
         using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Timeout;
 
         using var request = ModelWire.Request(
             access.Provider, access.BaseUrl, access.Model, access.Key,
-            ReplyContext.Rules, placeholders.Mask(Prompt(context)), MaxTokens);
+            rules, placeholders.Mask(prompt), maxTokens);
 
         HttpResponseMessage response;
 
@@ -144,6 +170,62 @@ public sealed class HttpReplyDrafter(
             return restored.Length > Message.MaxLength ? restored[..Message.MaxLength] : restored;
         }
     }
+
+    /// <summary>The advisor's prompt — the conversation and her own facts, each with its source.</summary>
+    /// <remarks>
+    /// A missing or unreadable fact is written out as such: the rules tell the
+    /// model to say so instead of guessing (ADR-0022 §3).
+    /// </remarks>
+    public static string AdvicePrompt(AdviceContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"Sprache: {context.Language}");
+        builder.AppendLine();
+        builder.AppendLine("## Ihre eigenen Angaben");
+
+        var wishes = context.Facts.Wishes;
+
+        builder.AppendLine(context.Facts.WishesUnknown
+            ? "- Mandat: nicht abrufbar"
+            : wishes is null
+                ? "- Mandat: keines angelegt"
+                : $"- Mandat: Eintritt {wishes.EntryMonth ?? "nicht angegeben"}, "
+                  + $"Gehaltswunsch {Range(wishes.SalaryMin, wishes.SalaryMax)}, "
+                  + $"Pensum {(wishes.WorkloadPercent is { } workload ? $"{workload} %" : "nicht angegeben")} (dein Mandat)");
+
+        builder.AppendLine(context.Facts.NoticeUnknown
+            ? "- Fruehester Wechsel: nicht abrufbar"
+            : context.Facts.EarliestStart is { } earliest
+                ? $"- Fruehester Wechsel bei Kuendigung heute: {earliest:yyyy-MM-dd} (deine Kuendigungsfrist)"
+                : "- Fruehester Wechsel: keine Kuendigungsfrist angegeben");
+
+        builder.AppendLine();
+        builder.AppendLine("## Das Gespraech (aelteste zuerst)");
+
+        if (context.History.Count == 0)
+        {
+            builder.AppendLine("(noch keine Nachricht)");
+        }
+
+        foreach (var entry in context.History)
+        {
+            builder.AppendLine(entry.Side == Side.Person ? "### Person ([PERSON_NAME])" : "### Unternehmen");
+            builder.AppendLine(entry.Text);
+        }
+
+        return builder.ToString();
+    }
+
+    private static string Range(int? minimum, int? maximum) =>
+        (minimum, maximum) switch
+        {
+            (null, null) => "nicht angegeben",
+            ({ } low, null) => $"ab {low}",
+            (null, { } high) => $"bis {high}",
+            ({ } low, { } high) => $"{low} bis {high}"
+        };
 
     /// <summary>The prompt, from the context and nothing else.</summary>
     /// <remarks>German, like <see cref="ReplyContext.Rules"/>.</remarks>

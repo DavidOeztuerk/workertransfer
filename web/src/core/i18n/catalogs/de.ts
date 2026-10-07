@@ -605,6 +605,7 @@ const de = {
   },
 
   errors: {
+    adviceNotGiven: "Der Berater konnte gerade keine Einschätzung geben.",
     companyNotReachable: "Dieses Unternehmen ist hier nicht erreichbar.",
     personNotApproachable: "Diese Person ist für euch nicht (mehr) sichtbar.",
     advertGone: "Dieses Inserat ist nicht (mehr) veröffentlicht.",
@@ -940,6 +941,9 @@ const de = {
 
 
   messages: {
+    askAdvisor: "Berater fragen",
+    adviceLabel: "Einschätzung deines KI-Beraters",
+    adviceNote: "Dein KI-Berater arbeitet nur für dich. Seine Einschätzung wird nicht gespeichert und geht an niemanden; sie ist keine Rechtsauskunft.",
     kindInitiative: "Initiativbewerbung",
     title: "Nachrichten",
     lead: "Jedes Gespräch hängt an einem Vorgang — einer Bewerbung oder einer Ansprache. Es gibt keine Lesebestätigung und keinen Zähler: wer antwortet, hat gelesen.",

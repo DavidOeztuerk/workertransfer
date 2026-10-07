@@ -74,6 +74,55 @@ public sealed class ReplyDrafterWireTests
                 nameof(ReplyContext.Language));
 
     [Fact]
+    public void The_advice_context_carries_nothing_beyond_the_conversation_and_her_own_facts() =>
+        typeof(AdviceContext).GetProperties().Select(property => property.Name)
+            .Should().BeEquivalentTo(
+                nameof(AdviceContext.History),
+                nameof(AdviceContext.PersonName),
+                nameof(AdviceContext.Facts),
+                nameof(AdviceContext.Language));
+
+    [Fact]
+    public void The_advice_rules_keep_the_three_lines() =>
+        AdviceContext.Rules.Should().Contain("Kein Rechtsrat")
+            .And.Contain("Keine Zahl ueber die Person")
+            .And.Contain("Quelle");
+
+    [Fact]
+    public void A_silent_source_is_said_not_left_out()
+    {
+        var prompt = HttpReplyDrafter.AdvicePrompt(
+            new AdviceContext([], "Anna", new OwnFacts(null, WishesUnknown: true, null, NoticeUnknown: true), "de"));
+
+        prompt.Should().Contain("Mandat: nicht abrufbar").And.Contain("Fruehester Wechsel: nicht abrufbar");
+    }
+
+    [Fact]
+    public void Not_stated_is_said_differently_from_not_reachable()
+    {
+        var prompt = HttpReplyDrafter.AdvicePrompt(
+            new AdviceContext([], "Anna", new OwnFacts(null, false, null, false), "de"));
+
+        prompt.Should().Contain("Mandat: keines angelegt").And.Contain("keine Kuendigungsfrist angegeben");
+    }
+
+    [Fact]
+    public async Task The_advice_masks_her_name_too()
+    {
+        var received = string.Empty;
+        using var provider = Listen(body => received = body, "Lies es genau, [PERSON_NAME].");
+
+        var advice = await Drafter(provider.Port).AdviseAsync(
+            new AdviceContext(
+                [new HistoryEntry(Side.Company, "Hallo Anna Muster")],
+                "Anna Muster", new OwnFacts(null, false, null, false), "de"),
+            new SubjectId(Guid.NewGuid()));
+
+        received.Should().NotContain("Anna").And.NotContain("Muster");
+        advice.Should().Be("Lies es genau, Anna Muster.");
+    }
+
+    [Fact]
     public void The_rules_forbid_judging_the_other_side() =>
         ReplyContext.Rules.Should().Contain("Bewerte die andere Seite nicht")
             .And.Contain("Gesundheitsdaten")

@@ -863,5 +863,6 @@ gruppen:
       - { methode: GET, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{"text":"x"}' }
       - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001/draft', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/messages/application/00000000-0000-0000-0000-000000000001/advice', ohne: 401, person: 404, mitglied: 403, firma: 403 }
       - { methode: POST, pfad: '/messages/drafts/00000000-0000-0000-0000-000000000001/release', ohne: 401, person: 404, mitglied: 404, firma: 404, rumpf: '{}' }
       - { methode: DELETE, pfad: '/messages/drafts/00000000-0000-0000-0000-000000000001', ohne: 401, person: 404, mitglied: 404, firma: 404 }

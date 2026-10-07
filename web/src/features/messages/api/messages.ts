@@ -243,3 +243,24 @@ export async function openInitiative(companyId: string, text: string): Promise<A
     "failed"
   );
 }
+
+export type AdviceResult = { ok: true; advice: string } | Failure<"gone" | "failed">;
+
+/**
+ * The AI advisor (ADR-0049): advice for the person about one of her
+ * conversations. Nothing is stored and nothing is sent — it comes back here.
+ */
+export async function askAdvisor(reference: string, kind: ProcessKind = "application"): Promise<AdviceResult> {
+  const answer = await request<{ advice: string }>(
+    MESSAGES_BASE_URL,
+    `/messages/${kind}/${reference}/advice`,
+    { method: "POST" },
+    "errors.adviceNotGiven"
+  );
+  if (answer.ok && answer.value != null) return { ok: true, advice: answer.value.advice };
+  return interpretError<"gone" | "failed">(
+    answer.ok ? { status: 503, title: "", detail: "" } : answer.error,
+    { 404: GONE },
+    "failed"
+  );
+}

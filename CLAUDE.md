@@ -943,6 +943,8 @@ Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-frei
 
 **The unsolicited application** (third kind, `initiative`, 08.10.2026, VISION-FRAGEN B2) is the approach's mirror: a person writes to a company from its careers page, and **sending releases her profile to that company** — written with *her* token through `IReleaseWriter`, the one place messages-service writes to the ledger. Text is checked before the release, the company's members before either (none → 404, no release).
 
+**The AI advisor** ([ADR-0049](docs/adr/0049-der-ki-berater-ist-ein-agent-der-person.md), 08.10.2026, VISION-FRAGEN B4/B5/D4): `POST /messages/{kind}/{ref}/advice` — on a click, for the person only (a company gets 403; an agent for both sides is the conflict D4 forbids). It reads the sent messages of that one conversation and **her own facts with her token** — mandate (advisor-service) and earliest start (transfer-service, H2) — and nothing else (`AdviceContext` is pinned). A silent source is written into the prompt as *not reachable*, never left out. No legal verdict (§ 2 RDG), no number about her, every statement with its source; the advice is stored nowhere and sent to nobody. Speaking *for* her goes through the existing draft-and-release path.
+
 **Erasure:** the person's conversations fall whole, the company's messages in them too. An erased *member*'s released messages stay in the other person's conversation with `author_id = null`; their unreleased drafts go.
 
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
