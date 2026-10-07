@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.0** — a shared foundation library of this author's, from nuget.org — plus a React app.
+WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.1** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
 Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
@@ -173,7 +173,7 @@ Adding a service is three steps and no new Dockerfile: its database in `scripts/
 - **Only the connection is registered, never `AddRedisConnection`**, which also installs a distributed cache as a side effect (`Revocation.cs`).
 - **Without the key, Staging and Production refuse to start**; elsewhere — the test hosts — revocations stay in the process. Test tokens therefore carry `jti` and `iat` like real ones: the check refuses a token without them.
 
-Revoking a single *session* does not work in Noelia 7.0.0 (`bugs/sitzungswiderruf-liest-sid.md`), and nothing here needs it.
+Revoking a single *session* did not work in Noelia 7.0.0 (`bugs/sitzungswiderruf-liest-sid.md`); fixed in 7.0.1, which this tree uses. Nothing here revokes single sessions yet.
 
 **`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-service` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
@@ -1129,6 +1129,6 @@ that script was built against.
 - `docs/SCOUT-UND-BERATER.md` — planned, not built. See above.
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
-- `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). Open: `sitzungswiderruf-liest-sid.md` (07.10.2026, session revocation reads `sid`, the issuer writes `session_id`). `verschluesselung-verschluesselt-nicht.md` is **closed**: fixed in 4.4.2, re-measured against 7.0.0 on 07.10.2026 (no plaintext in the envelope, a foreign key fails on the GCM tag). `AddEncryption` stays out anyway — `SecretStore` covers what we encrypt.
+- `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). `sitzungswiderruf-liest-sid.md` is closed (fixed in Noelia 7.0.1, 07.10.2026); its two side findings — no `UseTokenRevocation` in the default chain, a `text/plain` refusal — stay open there. `verschluesselung-verschluesselt-nicht.md` is **closed**: fixed in 4.4.2, re-measured against 7.0.0 on 07.10.2026 (no plaintext in the envelope, a foreign key fails on the GCM tag). `AddEncryption` stays out anyway — `SecretStore` covers what we encrypt.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.

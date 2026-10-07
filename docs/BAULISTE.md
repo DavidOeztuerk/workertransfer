@@ -86,7 +86,7 @@ Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
 - Termine im Gespräch (E1-C): eigene kleine Lösung mit `.ics`
 - Treuhand für die Ablöse (C4-B), über einen lizenzierten Zahlungsanbieter
 - kununu als Gehaltsquelle, nur per Partnervertrag
-- Seite „Meine Sitzungen → diese abmelden“ — braucht Noelia 7.0.1 (Sitzungswiderruf)
+- Seite „Meine Sitzungen → diese abmelden“ — Noelia 7.0.1 trägt den Sitzungswiderruf, die Seite fehlt
 
 ## Nicht im Katalog behandelt — nächste Fragerunde
 

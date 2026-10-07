@@ -9,7 +9,7 @@
     -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 
-    <NoeliaVersion>7.0.0</NoeliaVersion>
+    <NoeliaVersion>7.0.1</NoeliaVersion>
   </PropertyGroup>
 
   <ItemGroup Label="Noelia">

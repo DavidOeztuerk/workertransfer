@@ -1,4 +1,4 @@
-# Ein Sitzungswiderruf greift nie: der Aussteller schreibt `session_id`, die Prüfung liest `sid`
+# GESCHLOSSEN (Noelia 7.0.1) — Ein Sitzungswiderruf griff nie: der Aussteller schreibt `session_id`, die Prüfung liest `sid`
 
 - **Noelia-Fassung:** 7.0.0
 - **Gefunden beim:** Widerruf in allen Diensten über Valkey (`docs/VISION-FRAGEN.md`, I1), 06.10.2026
@@ -95,5 +95,10 @@ Heute nichts, weil wir keine einzelne Sitzung widerrufen. Sobald es eine Seite
 ## Stand
 
 - [x] gemeldet (dieses Ticket, 06.10.2026)
-- [ ] in Noelia behoben, Fassung: <…>
-- [ ] Umweg hier entfernt — keiner gebaut
+- [x] in Noelia behoben, Fassung: **7.0.1** (07.10.2026, PR DavidOeztuerk/noelia#33).
+  Die Claim-Namen stehen jetzt an einer Stelle (`SessionClaims`): gelesen wird
+  `session_id`, mit `sid` als Rückfall. Noelias eigener Test dafür war vor der
+  Behebung rot (2 von 5) und danach grün. WorkerTransfer steht auf 7.0.1.
+- [x] Umweg hier entfernt — keiner gebaut
+- Die zwei Nebenbefunde (Standardkette ohne `UseTokenRevocation`, Abweisung als
+  `text/plain`) sind **nicht** Teil von 7.0.1 und bleiben offen.
