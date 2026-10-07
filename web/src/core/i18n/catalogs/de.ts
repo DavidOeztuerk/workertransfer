@@ -373,6 +373,8 @@ const de = {
     advisorHint: "Welches, steht nicht darin — das siehst du hinter der Anmeldung in deiner Liste.",
     assessmentLabel: "Wenn sich bei einer Arbeitsprobe etwas tut",
     assessmentHint: "Eine gestellte Aufgabe und eine Rückmeldung darauf. Abbestellen nimmt dir die Mail, nicht den Eintrag — die Rückmeldung steht immer in deiner Liste.",
+    messageLabel: "Wenn eine Nachricht kommt",
+    messageHint: "Von wem und was, steht nicht in der Mail — das liest du hinter der Anmeldung.",
     privacy: "Datenschutz",
     expiry: "Konto verfällt nach",
     expiryNever: "Nie von selbst",
@@ -581,6 +583,11 @@ const de = {
   },
 
   errors: {
+    conversationNotLoaded: "Das Gespräch ließ sich nicht laden.",
+    messageNotSent: "Die Nachricht ließ sich nicht senden.",
+    messageInvalid: "Die Nachricht ist leer oder länger als 4000 Zeichen.",
+    draftNotCreated: "Der Entwurf ließ sich nicht erstellen.",
+    noDraftProvider: "Für Entwürfe ist kein Sprachmodell eingerichtet.",
     noConnection: "Keine Verbindung zum Server.",
     assessmentNotLoaded: "Die Arbeitsprobe ließ sich nicht laden.",
     assessmentGone: "Diese Arbeitsprobe gibt es hier nicht.",
@@ -898,6 +905,28 @@ const de = {
   },
 
 
+  messages: {
+    loading: "Nachrichten werden geladen…",
+    empty: "Noch keine Nachricht. Schreib die erste — die andere Seite bekommt eine Benachrichtigung ohne Inhalt.",
+    listLabel: "Nachrichten",
+    you: "Du",
+    company: "Unternehmen",
+    person: "Bewerbende Person",
+    compose: "Nachricht",
+    send: "Senden",
+    requestDraft: "Antwort entwerfen",
+    draftHint: "Ein Entwurf geht nirgendwohin, bis du ihn freigibst. Die andere Seite erfährt nichts von ihm.",
+    noHealthData: "Schreib hier keine Gesundheitsdaten, keine Religion und nichts über Dritte — Nachrichten werden gespeichert und können beim Entwerfen einem Sprachmodell vorgelegt werden.",
+    draftLabel: "Entwurf",
+    draftChip: "Entwurf",
+    draftNotSent: "Noch nicht gesendet — nur deine Seite sieht ihn.",
+    draftText: "Entwurf bearbeiten",
+    release: "Freigeben und senden",
+    discard: "Verwerfen",
+    toggle: "Nachrichten",
+    toggleHide: "Nachrichten ausblenden",
+  },
+
   applications: {
     title: "Meine Bewerbungen",
     signInRequired: "Bitte <1>anmelden</1>, um deine Bewerbungen zu sehen.",
@@ -1078,6 +1107,7 @@ const de = {
     notFound: "Diese Bewerbung gibt es nicht.",
     notFoundHint: "Vielleicht wurde sie zurückgezogen oder du hast keine Berechtigung.",
     tabCoverLetter: "Anschreiben",
+    tabMessages: "Nachrichten",
     tabResume: "Lebenslauf",
     tabPortfolio: "Portfolio",
     tabDocuments: "Unterlagen",

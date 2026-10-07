@@ -56,6 +56,7 @@ const SWITCHES: {
   { key: "profile_discovered", label: "settings.discoveredLabel", hint: "settings.discoveredHint" },
   { key: "advisor_conversation", label: "settings.advisorLabel", hint: "settings.advisorHint" },
   { key: "assessment_update", label: "settings.assessmentLabel", hint: "settings.assessmentHint" },
+  { key: "message_received", label: "settings.messageLabel", hint: "settings.messageHint" },
 ];
 
 /**

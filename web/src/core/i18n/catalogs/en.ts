@@ -370,6 +370,8 @@ const en: Catalog = {
     advisorHint: "Which one is not in the message — you see that behind the sign-in, in your own list.",
     assessmentLabel: "When something moves on a work sample",
     assessmentHint: "A task set for you, and a reply to it. Unsubscribing takes away the mail, not the entry — the reply is always in your list.",
+    messageLabel: "When a message arrives",
+    messageHint: "Who sent it and what it says is not in the mail — you read that after signing in.",
     privacy: "Privacy",
     expiry: "Account expires after",
     expiryNever: "Never by itself",
@@ -578,6 +580,11 @@ const en: Catalog = {
   },
 
   errors: {
+    conversationNotLoaded: "The conversation could not be loaded.",
+    messageNotSent: "The message could not be sent.",
+    messageInvalid: "The message is empty or longer than 4000 characters.",
+    draftNotCreated: "The draft could not be created.",
+    noDraftProvider: "No language model is set up for drafts.",
     noConnection: "No connection to the server.",
     assessmentNotLoaded: "The work sample could not be loaded.",
     assessmentGone: "There is no such work sample here.",
@@ -894,6 +901,28 @@ const en: Catalog = {
   },
 
 
+  messages: {
+    loading: "Loading messages…",
+    empty: "No message yet. Write the first — the other side gets a notification without its content.",
+    listLabel: "Messages",
+    you: "You",
+    company: "Company",
+    person: "Applicant",
+    compose: "Message",
+    send: "Send",
+    requestDraft: "Draft a reply",
+    draftHint: "A draft goes nowhere until you release it. The other side never learns of it.",
+    noHealthData: "Do not write health data, religion or anything about third parties here — messages are stored and may be shown to a language model when a draft is requested.",
+    draftLabel: "Draft",
+    draftChip: "Draft",
+    draftNotSent: "Not sent yet — only your side sees it.",
+    draftText: "Edit draft",
+    release: "Release and send",
+    discard: "Discard",
+    toggle: "Messages",
+    toggleHide: "Hide messages",
+  },
+
   applications: {
     title: "My applications",
     signInRequired: "Please <1>sign in</1> to see your applications.",
@@ -1074,6 +1103,7 @@ const en: Catalog = {
     notFound: "This application does not exist.",
     notFoundHint: "Maybe it was withdrawn or you don't have permission.",
     tabCoverLetter: "Cover letter",
+    tabMessages: "Messages",
     tabResume: "CV",
     tabPortfolio: "Work portfolio",
     tabDocuments: "Documents",

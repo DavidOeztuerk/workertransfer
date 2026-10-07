@@ -38,6 +38,8 @@ export interface NotificationPreferences {
   advisor_conversation: boolean;
   /** "Something moved on your work sample" (ADR-0042). */
   assessment_update: boolean;
+  /** "A message arrived" (ADR-0047). */
+  message_received: boolean;
 }
 
 /** What holds as long as nobody has set anything. */
@@ -50,6 +52,7 @@ export const ALL_ON: NotificationPreferences = {
   profile_discovered: true,
   advisor_conversation: true,
   assessment_update: true,
+  message_received: true,
 };
 
 const PATH = "/me/notification-preferences";

@@ -21,6 +21,7 @@ import { getCompanyApplication } from "../api/applications";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { getJob } from "../../work/api/jobs";
+import { ConversationPanel } from "../../messages/components/ConversationPanel";
 
 export function CompanyApplicationPage() {
   const { t } = useTranslation();
@@ -116,6 +117,7 @@ export function CompanyApplicationPage() {
   for (const docId of e.documents) {
     tabs.push({ key: `doc-${docId}`, label: t("companyApplications.tabDocument") });
   }
+  tabs.push({ key: "messages", label: t("companyApplications.tabMessages") });
 
   const current = tabs[tab] ?? tabs[0] ?? { key: "letter", label: t("companyApplications.tabCoverLetter") };
 
@@ -168,6 +170,8 @@ export function CompanyApplicationPage() {
               }}
             />
           ) : null}
+
+          {current.key === "messages" ? <ConversationPanel application={e.id} /> : null}
 
           {current.key.startsWith("doc-") ? (
             <DocumentView

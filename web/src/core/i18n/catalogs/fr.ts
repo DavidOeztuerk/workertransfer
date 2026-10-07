@@ -370,6 +370,8 @@ const fr: Catalog = {
     advisorHint: "Laquelle n’y figure pas — vous le voyez une fois connecté, dans votre propre liste.",
     assessmentLabel: "Quand un travail d’essai évolue",
     assessmentHint: "Une tâche proposée, et le retour qui s’ensuit. Se désabonner vous prive du courriel, pas de l’entrée — le retour figure toujours dans votre liste.",
+    messageLabel: "Quand un message arrive",
+    messageHint: "L’expéditeur et le contenu ne figurent pas dans le courriel — vous les lisez une fois connecté.",
     privacy: "Confidentialité",
     expiry: "Le compte expire après",
     expiryNever: "Jamais de lui-même",
@@ -578,6 +580,11 @@ const fr: Catalog = {
   },
 
   errors: {
+    conversationNotLoaded: "La conversation n’a pas pu être chargée.",
+    messageNotSent: "Le message n’a pas pu être envoyé.",
+    messageInvalid: "Le message est vide ou dépasse 4000 caractères.",
+    draftNotCreated: "Le brouillon n’a pas pu être créé.",
+    noDraftProvider: "Aucun modèle de langage n’est configuré pour les brouillons.",
     noConnection: "Pas de connexion au serveur.",
     assessmentNotLoaded: "Le travail d’essai n’a pas pu être chargé.",
     assessmentGone: "Ce travail d’essai n’existe pas ici.",
@@ -894,6 +901,28 @@ const fr: Catalog = {
   },
 
 
+  messages: {
+    loading: "Chargement des messages…",
+    empty: "Aucun message pour l’instant. Écrivez le premier — l’autre partie reçoit une notification sans contenu.",
+    listLabel: "Messages",
+    you: "Vous",
+    company: "Entreprise",
+    person: "Candidat·e",
+    compose: "Message",
+    send: "Envoyer",
+    requestDraft: "Rédiger une réponse",
+    draftHint: "Un brouillon ne part nulle part tant que vous ne l’avez pas validé. L’autre partie n’en apprend rien.",
+    noHealthData: "N’écrivez ici ni données de santé, ni religion, ni rien sur des tiers — les messages sont conservés et peuvent être soumis à un modèle de langage lors d’une demande de brouillon.",
+    draftLabel: "Brouillon",
+    draftChip: "Brouillon",
+    draftNotSent: "Pas encore envoyé — seule votre partie le voit.",
+    draftText: "Modifier le brouillon",
+    release: "Valider et envoyer",
+    discard: "Supprimer",
+    toggle: "Messages",
+    toggleHide: "Masquer les messages",
+  },
+
   applications: {
     title: "Mes candidatures",
     signInRequired: "Veuillez vous <1>connecter</1> pour voir vos candidatures.",
@@ -1074,6 +1103,7 @@ const fr: Catalog = {
     notFound: "Cette candidature n’existe pas.",
     notFoundHint: "Peut-être a-t-elle été retirée ou vous n’avez pas la permission.",
     tabCoverLetter: "Lettre de motivation",
+    tabMessages: "Messages",
     tabResume: "CV",
     tabPortfolio: "Réalisations",
     tabDocuments: "Pièces jointes",
