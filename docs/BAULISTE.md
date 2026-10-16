@@ -58,13 +58,16 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 
 ## Phase 4 — Der alte Arbeitgeber und die Ablöse
 
+**Erledigt am 16.10.2026** (ADR-0050). Offen bleibt, was D1 als dritten Weg
+nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
+
 | Was | Frage | Stand |
 |---|---|---|
 | **Alter Arbeitgeber als Nutzer**: Einstellung „Anfragen anderer Firmen zu unserem Personal zulassen“ | C1, D1 | gebaut 16.10.2026 (ADR-0050): `admin`, nirgends öffentlich, kein „Insolvenz“; eine Liste „Anfragen zu eurem Personal“ zeigt eine Person erst, wenn eine Firma fragt |
 | **Zustimmung der Person** zum Weg über den Arbeitgeber | C1 | gebaut 16.10.2026: auf der Karriereseite des Arbeitgebers, **nennen = zustimmen** (`employer.route:tenant:<X>` im Register); schließen löscht „arbeitet bei X“ |
 | **Ablöse-Verhandlung** Firma ↔ Firma, Person stimmt dem Ergebnis zu | C3, D1 | gebaut 16.10.2026: Monat + Ablöse, abwechselnd, angenommen wird von der anderen Seite; beide sehen den frühesten regulären Wechsel der Person; kein Preisvorschlag |
 | Feld „Ablöse“ aus dem Angebot an die Person **entfernen** | C3 | gebaut 16.10.2026; „bezahlt“ (ADR-0027 §3) heißt jetzt „vereinbarte Ablöse“ |
-| **Zeugnis anfordern** über den Berater | C2 | offen |
+| **Zeugnis anfordern** über den Berater | C2 | gebaut 16.10.2026: Musterschreiben auf `/checklists`, im Browser gefüllt, nichts gespeichert oder gesendet; Zwischenzeugnis erst nach dem Haken zum Risiko |
 
 ## Phase 5 — Verträge
 

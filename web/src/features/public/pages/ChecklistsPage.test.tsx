@@ -35,9 +35,12 @@ describe("ChecklistsPage", () => {
 
   it("links neutral places only, and says nobody pays for a referral", () => {
     draw();
+    // Every link LEAVING the platform — the one to her own documents stays inside.
     const hosts = screen
       .getAllByRole("link")
-      .map((link) => new URL(link.getAttribute("href") ?? "").host);
+      .map((link) => link.getAttribute("href") ?? "")
+      .filter((href) => !href.startsWith("/"))
+      .map((href) => new URL(href).host);
     expect(hosts).toEqual(["www.arbeitsagentur.de", "anwaltauskunft.de", "www.dgb-rechtsschutz.de", "www.bmas.de"]);
     expect(screen.getByText(/bekommt von niemandem Geld/i)).toBeInTheDocument();
   });

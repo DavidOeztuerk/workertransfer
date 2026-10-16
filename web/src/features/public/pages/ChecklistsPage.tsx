@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -7,6 +8,7 @@ import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 
 import { PageShell } from "../../../shared/components/ui";
+import { ReferenceLetter } from "../components/ReferenceLetter";
 
 /**
  * The lists, with their points written out as keys — never built from a
@@ -69,7 +71,8 @@ export function ChecklistsPage() {
       </Alert>
 
       {LISTS.map((list) => (
-        <Card key={list.title} sx={{ mb: 2.5 }}>
+        <Fragment key={list.title}>
+        <Card sx={{ mb: 2.5 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1.5 }}>
               {t(list.title)}
@@ -83,6 +86,9 @@ export function ChecklistsPage() {
             </Box>
           </CardContent>
         </Card>
+        {/* The sample letter stands under the list it belongs to (C2). */}
+        {list.title === "checklists.referenceTitle" ? <ReferenceLetter /> : null}
+        </Fragment>
       ))}
 
       <Card>
