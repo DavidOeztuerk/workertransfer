@@ -98,6 +98,9 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 
 ## Nicht im Katalog behandelt — nächste Fragerunde
 
+**Gestellt am 16.10.2026 in `docs/VISION-FRAGEN-2.md`** (L–Q, J14–J17),
+zusammen mit den Punkten „vor dem Start“.
+
 Aus dem ursprünglichen Auftrag (kon.txt, Z. 896), weder gebaut noch geklärt:
 
 - **Karriereseiten-Anbindung:** Inserate automatisch von der Firmenwebsite holen
