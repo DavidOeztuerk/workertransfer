@@ -58,13 +58,13 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 
 ## Phase 4 — Der alte Arbeitgeber und die Ablöse
 
-| Was | Frage | Größe | Bemerkung |
-|---|---|---|---|
-| **Alter Arbeitgeber als Nutzer**: Einstellung „Anfragen zu unserem Personal zulassen“ | C1, D1 | M | unauffällig, ohne „Insolvenz“ |
-| **Zustimmung der Person** zum Weg über den Arbeitgeber | C1 | M | ohne sie entsteht „arbeitet bei X“ nie |
-| **Ablöse-Verhandlung** Firma ↔ Firma, Person stimmt dem Ergebnis zu | C3, D1 | L | beide sehen die Restzeit, keinen Preisvorschlag |
-| Feld „Ablöse“ aus dem Angebot an die Person **entfernen** | C3 | S | heute sinnlos, weil der alte Arbeitgeber nie Teil ist |
-| **Zeugnis anfordern** über den Berater | C2 | M | Endzeugnis nach Kündigung, Zwischenzeugnis bewusst |
+| Was | Frage | Stand |
+|---|---|---|
+| **Alter Arbeitgeber als Nutzer**: Einstellung „Anfragen anderer Firmen zu unserem Personal zulassen“ | C1, D1 | gebaut 16.10.2026 (ADR-0050): `admin`, nirgends öffentlich, kein „Insolvenz“; eine Liste „Anfragen zu eurem Personal“ zeigt eine Person erst, wenn eine Firma fragt |
+| **Zustimmung der Person** zum Weg über den Arbeitgeber | C1 | gebaut 16.10.2026: auf der Karriereseite des Arbeitgebers, **nennen = zustimmen** (`employer.route:tenant:<X>` im Register); schließen löscht „arbeitet bei X“ |
+| **Ablöse-Verhandlung** Firma ↔ Firma, Person stimmt dem Ergebnis zu | C3, D1 | gebaut 16.10.2026: Monat + Ablöse, abwechselnd, angenommen wird von der anderen Seite; beide sehen den frühesten regulären Wechsel der Person; kein Preisvorschlag |
+| Feld „Ablöse“ aus dem Angebot an die Person **entfernen** | C3 | gebaut 16.10.2026; „bezahlt“ (ADR-0027 §3) heißt jetzt „vereinbarte Ablöse“ |
+| **Zeugnis anfordern** über den Berater | C2 | offen |
 
 ## Phase 5 — Verträge
 
@@ -75,9 +75,8 @@ Kontext, die Suchtür schnitt still bei zehn Fähigkeiten ab.
 ## Neue ADRs, die mit dem Bau nötig werden
 
 - ~~Der Berater ist ein Agent der Person~~ — ADR-0049, 08.10.2026.
-- **Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen** — widerspricht
-  bewusst dem Transfer-Entwurf vom 02.08.2026 („die Plattform kontaktiert den
-  Arbeitgeber nicht“).
+- ~~Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen~~ — ADR-0050,
+  16.10.2026.
 - ~~Nachrichten und Agenten-Entwürfe werden gespeichert~~ — ADR-0047, 07.10.2026.
 
 ## Vor dem Start (siehe `VISION-FRAGEN.md`)

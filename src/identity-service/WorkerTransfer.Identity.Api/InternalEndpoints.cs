@@ -131,8 +131,10 @@ public static class InternalEndpoints
         // THE SECRET IS NOT THE WHOLE PERMISSION HERE. It proves that a service
         // is asking, not that it may ask. The permission stands in the ledger,
         // and advisor-service fetches it BEFORE this call: stage 3 is
-        // `advisor.identity:tenant:<id>` (ADR-0037). Whoever uses this door for
-        // something else fetches the check along with it.
+        // `advisor.identity:tenant:<id>` (ADR-0037). transfer-service asks
+        // `employer.route:tenant:<id>` first and hands the name only to the
+        // employer she named (ADR-0050). Whoever uses this door for something
+        // else fetches the check along with it.
         //
         // Two fields, no postal address, no telephone (ADR-0038) — and no list:
         // it answers on exactly one id.

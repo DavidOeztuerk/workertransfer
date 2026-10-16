@@ -29,8 +29,9 @@ export interface Transfer {
   tenant_id: string;
   status: TransferStatus;
   /**
-   * Copied from the market status on creation. The platform does NOT contact
-   * the current employer — it does not know who that is.
+   * Copied from the market status on creation. The employer is asked only over
+   * the route both opened (ADR-0050) — see `releases.ts`; the case itself never
+   * names it.
    */
   requires_release: boolean;
   release_confirmed: boolean;
@@ -43,15 +44,14 @@ export interface Transfer {
    * month — absent is "we do not know", never "fine".
    */
   starts_before_earliest?: boolean;
-  offer_fee_cents: number | null;
   created_at: string;
   updated_at: string;
 }
 
+/** Text and start — the fee is agreed between two companies now (ADR-0050). */
 export interface OfferInput {
   note: string;
   start_on: string | null;
-  fee_cents: number | null;
 }
 
 export type PersonAction = "accept-talk" | "accept-offer" | "confirm-release" | "decline";
@@ -65,7 +65,7 @@ export type TransferList = { ok: true; transfers: Transfer[] } | Failure<"failed
 export const RUNNING: TransferStatus[] = ["interested", "talking", "offered", "accepted"];
 
 /**
- * The placement fee in words, in the CHOSEN language.
+ * A release fee in words, in the CHOSEN language.
  *
  * `Intl.NumberFormat` and not by hand: `5.000,00 €` stands like that in the E2E
  * journey, and a hand-written format misses either the narrow space before the
@@ -127,7 +127,6 @@ export const COMPANY_TRANSFER_CASES: readonly ServerCase[] = [
   { status: 409, pattern: /already a running transfer/i, key: "companyTransfers.alreadyRunning" },
   { status: 409, key: "companyTransfers.stepNotNow" },
   { status: 422, pattern: /exceeds \d+ characters/i, key: "companyTransfers.textTooLong" },
-  { status: 422, pattern: /fee cannot be negative/i, key: "companyTransfers.feeNegative" },
   { status: 422, pattern: /start must be a month/i, key: "companyTransfers.startNotAMonth" },
 ];
 
@@ -152,7 +151,7 @@ export function makeOffer(transferId: string, input: OfferInput): Promise<Transf
   // contract's pattern — with a message that looks like a server problem.
   return move(
     `/transfers/${transferId}/offer`,
-    { note: input.note, start_on: input.start_on, fee_cents: input.fee_cents },
+    { note: input.note, start_on: input.start_on },
     "errors.offerNotMade"
   );
 }

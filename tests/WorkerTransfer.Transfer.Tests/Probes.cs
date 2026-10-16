@@ -22,6 +22,12 @@ public sealed class ProbeLedger : IConsentGate
     /// <summary>What was revoked.</summary>
     public List<(Guid Subject, Guid Company)> Revoked { get; } = [];
 
+    /// <summary>Which (person, employer) routes stand open (ADR-0050).</summary>
+    public HashSet<(Guid Subject, Guid Employer)> RoutesOpen { get; } = [];
+
+    /// <summary>How often the route was asked — a cache in front would show as fewer.</summary>
+    public int RouteQuestions { get; private set; }
+
     /// <inheritdoc />
     public Task<bool> MaySeeProfileAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
@@ -70,6 +76,46 @@ public sealed class ProbeLedger : IConsentGate
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public Task<bool> EmployerRouteOpenAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        RouteQuestions++;
+        return Task.FromResult(RoutesOpen.Contains((subject.Value, employer.Value)));
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<bool>> EmployerRoutesOpenAsync(
+        IReadOnlyList<(SubjectId Subject, TenantId Employer)> pairs,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        ArgumentNullException.ThrowIfNull(pairs);
+        RouteQuestions++;
+
+        return Task.FromResult<IReadOnlyList<bool>>(
+            [.. pairs.Select(pair => RoutesOpen.Contains((pair.Subject.Value, pair.Employer.Value)))]);
+    }
+
+    /// <inheritdoc />
+    public Task OpenEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        RoutesOpen.Add((subject.Value, employer.Value));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task CloseEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        RoutesOpen.Remove((subject.Value, employer.Value));
+        return Task.CompletedTask;
+    }
+
     private void ThrowIfSilent()
     {
         if (Silent)
@@ -86,4 +132,55 @@ public sealed class ProbeDelivery : IDelivery
     public Task DeliverAsync(
         SubjectId recipient, string kind, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
+}
+
+/// <summary>identity-service's internal doors, answered from memory.</summary>
+/// <remarks>It REMEMBERS whose name it was asked for — the employer may learn it, nobody else.</remarks>
+public sealed class ProbeIdentity : IIdentityLookup
+{
+    /// <summary>The companies that exist.</summary>
+    public HashSet<Guid> Companies { get; } = [];
+
+    /// <summary>Civil names.</summary>
+    public Dictionary<Guid, string> Names { get; } = [];
+
+    /// <summary>Members per company.</summary>
+    public Dictionary<Guid, List<Guid>> Members { get; } = [];
+
+    /// <summary>Whose names were asked for.</summary>
+    public List<Guid> NamesAsked { get; } = [];
+
+    /// <summary>When set, identity-service is out.</summary>
+    public bool Silent { get; set; }
+
+    /// <inheritdoc />
+    public Task<bool> CompanyExistsAsync(TenantId company, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        return Task.FromResult(Companies.Contains(company.Value));
+    }
+
+    /// <inheritdoc />
+    public Task<string?> PersonNameAsync(SubjectId subject, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        NamesAsked.Add(subject.Value);
+        return Task.FromResult(Names.TryGetValue(subject.Value, out var name) ? name : null);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<SubjectId>> MembersAsync(TenantId company, CancellationToken cancellationToken = default)
+    {
+        ThrowIfSilent();
+        return Task.FromResult<IReadOnlyList<SubjectId>>(
+            Members.TryGetValue(company.Value, out var members) ? [.. members.Select(id => new SubjectId(id))] : []);
+    }
+
+    private void ThrowIfSilent()
+    {
+        if (Silent)
+        {
+            throw new IdentitySilent("Probe: identity-service is silent.");
+        }
+    }
 }

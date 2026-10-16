@@ -399,7 +399,7 @@ Two checks sit in two places on purpose. **Freemail is rejected at registration*
 
 **`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `MembershipPermission` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
 
-Eight routes now demand an `admin`, and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
+Twelve routes now demand an `admin` — eight since PBI-2, four since ADR-0050 — and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
 
 | route | why `admin` |
 |---|---|
@@ -409,8 +409,10 @@ Eight routes now demand an `admin`, and the line behind them is written down onc
 | `POST /jobs/{id}/publish` | the advert starts representing the company |
 | `POST /jobs/{id}/close` | it stops — and with it the chance to apply |
 | `PUT /companies/me/profile` | the shop window, public and for everyone |
-| `POST /transfers/{id}/offer` | start date and placement fee |
-| `POST /transfers/{id}/complete` | states that both hold |
+| `POST /transfers/{id}/offer` | the start date |
+| `POST /transfers/{id}/complete` | states that it holds |
+| `PUT /transfers/employer/setting` | lets other companies ask about the own staff (ADR-0050) |
+| `POST /transfers/{id}/release`, `/transfers/releases/{id}/terms`, `/accept` | a release month and a fee — one company pays, the other lets somebody go sooner |
 
 **A third role since 07.10.2026: `recruiter`** ([ADR-0048](docs/adr/0048-der-recruiter-macht-den-ersten-schritt.md), VISION-FRAGEN B7). The roles are **ordered**, `member` < `recruiter` < `admin`, and `ServiceDefaults.Roles.CompanyPermissions` names a *minimum* per permission (`role >= minimum`) — so an admin may approach too, and a fourth role must be inserted where it belongs in `CompanyRole` or it silently gains or loses rights. The recruiter's one addition is the **first contact** to a person who did not come forward: `POST /resumes/{subject}/requests`, `POST /market/{subject}/requests`, `POST /advisor/conversations`. Searching stays `member`. resume-service therefore needs `Identity__BaseUrl`/`Identity__Secret` now. In the UI the 403 reads `errors.recruiterOnly` via `RECRUITER_CASES`, never "choose a company".
 
@@ -946,6 +948,17 @@ Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-frei
 **The AI advisor** ([ADR-0049](docs/adr/0049-der-ki-berater-ist-ein-agent-der-person.md), 08.10.2026, VISION-FRAGEN B4/B5/D4): `POST /messages/{kind}/{ref}/advice` — on a click, for the person only (a company gets 403; an agent for both sides is the conflict D4 forbids). It reads the sent messages of that one conversation and **her own facts with her token** — mandate (advisor-service) and earliest start (transfer-service, H2) — and nothing else (`AdviceContext` is pinned). A silent source is written into the prompt as *not reachable*, never left out. No legal verdict (§ 2 RDG), no number about her, every statement with its source; the advice is stored nowhere and sent to nobody. Speaking *for* her goes through the existing draft-and-release path.
 
 **Erasure:** the person's conversations fall whole, the company's messages in them too. An erased *member*'s released messages stay in the other person's conversation with `author_id = null`; their unreleased drafts go.
+
+### The way to the current employer: two consents, and a negotiation between companies
+
+Built 16.10.2026 under [ADR-0050](docs/adr/0050-der-alte-arbeitgeber-mit-zwei-zustimmungen.md) (VISION-FRAGEN C1, C3, D1). It ends the transfer draft's "the platform never contacts the employer" — **only** where both allow it.
+
+- **The employer's half** is a company setting, `admin`, visible nowhere outside the company, without a word like "insolvency". It decides only whether a *new* inquiry may be made.
+- **The person's half: naming the employer IS the consent.** She does it on the employer's careers page; `employer_routes` (a `SubjectKeyedTable`) is only the pointer, the consent is `employer.route:tenant:<X>` in the ledger, asked at every company read and step (ADR-0013). Closing the route deletes "works at X" and ends running negotiations. Without both halves every company sees **one 404** — no route, employer not asking, consent revoked, own employer: told apart, each would say where she works.
+- **The employer sees a person only when a company asks** — her civil name through identity's person door, *after* the ledger check. There is no list of who opened a route; that list would be "who is listening".
+- **The release negotiation** (`release_negotiations`, one per transfer): a month and a fee or none, terms set alternately, accepted only by the side that did not set them; then **she agrees last** and can decline in every running state. Both companies see her earliest regular start from her notice period (H2) — the one place a company sees it. The platform suggests no price and moves no money.
+- **The offer to the person carries no fee any more**; `Retention.KeepPaid` now means "a completed transfer with a settled negotiation that has a fee" — still `false`.
+- Company steps notify the person and the other company's members as `transfer_update`; her own steps notify nobody.
 
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 

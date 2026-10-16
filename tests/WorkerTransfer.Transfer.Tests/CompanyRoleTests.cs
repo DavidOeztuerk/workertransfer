@@ -20,8 +20,8 @@ namespace WorkerTransfer.Transfer.Tests;
 /// <remarks>
 /// <para>Showing interest, approaching somebody, reading one's own cases —
 /// approach work, and with it the work somebody is invited for. An
-/// <em>offer</em> names a start date and a placement fee, and a
-/// <em>completion</em> states that both hold: both bind the company.</para>
+/// <em>offer</em> names a start date, and a
+/// <em>completion</em> states that it holds: both bind the company.</para>
 ///
 /// <para><strong><c>withdraw</c> deliberately does not stand with them</strong>,
 /// and the suite for it stands here: whoever may begin a case has to be allowed
@@ -108,7 +108,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
     private static Task<HttpResponseMessage> Offer(HttpClient browser, Guid caseItem) =>
         browser.PostAsJsonAsync($"/transfers/{caseItem}/offer", new
         {
-            note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
+            note = "We are offering the job.", start_on = "2026-10"
         });
 
     /// <summary>Asking for the market status is a first contact: at least a recruiter (ADR-0048).</summary>
@@ -138,7 +138,7 @@ public class CompanyRoleTests(Postgres postgres) : IAsyncLifetime
         var asMember = await Offer(AsCompany(company), caseItem);
 
         asMember.StatusCode.Should().Be(
-            HttpStatusCode.Forbidden, "an offer names a date and a fee");
+            HttpStatusCode.Forbidden, "an offer names a start date and binds the company");
 
         _roles.Answer = CompanyRole.Admin;
         var asAdmin = await Offer(AsCompany(company), caseItem);

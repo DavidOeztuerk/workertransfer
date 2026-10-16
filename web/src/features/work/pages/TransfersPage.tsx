@@ -16,12 +16,12 @@ import {
 } from "../../../shared/components/ui";
 import { failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
+import { ReleaseBlock } from "../components/ReleaseBlock";
 import { useAsync } from "../lib/useAsync";
 import {
   type PersonAction,
   RUNNING,
   type Transfer,
-  euro,
   listMyTransfers,
   personMove,
 } from "../api/transfers";
@@ -45,9 +45,10 @@ const STATUS_KEY: Record<Transfer["status"], string> = {
  * possible at any time, in every step — that is no courtesy but the condition
  * for a conversation being reasonable at all.
  *
- * <strong>The last step belongs to the person.</strong> This platform does not
- * ask the current employer: it does not know who that is and should not know.
- * Whether somebody may leave, they confirm themselves.
+ * <strong>The last step belongs to the person.</strong> This platform asks the
+ * current employer only over the route she and her employer both opened
+ * (ADR-0050), and even then she agrees last. Whether she may leave, she
+ * confirms herself.
  */
 export function TransfersPage() {
   const { t } = useTranslation();
@@ -211,14 +212,10 @@ function TransferCard({
                 </Typography>
               ) : null}
             </Typography>
-            <Typography component="dt" variant="body2" color="text.secondary">
-              {t("transfers.fee")}
-            </Typography>
-            <Typography component="dd" sx={{ m: 0 }}>
-              {euro(transfer.offer_fee_cents)}
-            </Typography>
           </Box>
         ) : null}
+
+        {transfer.requires_release ? <ReleaseBlock transferId={transfer.id} /> : null}
 
         {transfer.status === "accepted" && needsRelease ? (
           <Alert severity="info" sx={{ mb: 2 }}>

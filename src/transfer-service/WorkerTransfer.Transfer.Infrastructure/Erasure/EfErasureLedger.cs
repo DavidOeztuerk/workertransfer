@@ -4,13 +4,14 @@ using WorkerTransfer.Outbox;
 using WorkerTransfer.Transfer.Application.Erasure;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Domain.Releases;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Erasure;
 
 /// <summary>What an erasure really touches in this service.</summary>
 /// <remarks>
-/// Five statements, and the pairing of the middle two is the whole design: a
+/// The pairing of the two statements about market requests is the whole design: a
 /// row <em>about</em> the person falls, a row in which the person merely
 /// <em>acted</em> stays without their name. Without that distinction a
 /// recruiter giving up their private account would erase cases belonging to
@@ -52,10 +53,16 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
                 setters => setters.SetProperty(row => row.RequestedBy, (Guid?)null),
                 cancellationToken);
 
+        // "My employer is X" — it existed only because she consented (ADR-0050).
+        await context.EmployerRoutes
+            .Where(row => row.Id == subject.Value)
+            .ExecuteDeleteAsync(cancellationToken);
+
         var theirs = context.Cases.Where(row => row.SubjectId == subject.Value);
+        var paid = theirs.Where(Paid());
 
         var kept = keepPaid
-            ? await theirs.CountAsync(Paid(), cancellationToken)
+            ? await paid.CountAsync(cancellationToken)
             : 0;
 
         // Written out rather than as a ternary in the expression: this is the
@@ -63,13 +70,24 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
         // should see what it does — not have to look up operator precedence.
         if (keepPaid)
         {
+            var keptIds = paid.Select(row => row.Id);
+
+            await context.Negotiations
+                .Where(row => row.SubjectId == subject.Value && !keptIds.Contains(row.TransferId))
+                .ExecuteDeleteAsync(cancellationToken);
+
             await theirs
-                .Where(row => !(Completed.Contains(row.Status)
-                                  && row.OfferFeeCents != null))
+                .Where(row => !keptIds.Contains(row.Id))
                 .ExecuteDeleteAsync(cancellationToken);
         }
         else
         {
+            // The negotiation was about her: it falls with the transfer it
+            // belonged to, fee and all.
+            await context.Negotiations
+                .Where(row => row.SubjectId == subject.Value)
+                .ExecuteDeleteAsync(cancellationToken);
+
             await theirs.ExecuteDeleteAsync(cancellationToken);
         }
 
@@ -83,11 +101,18 @@ public sealed class EfErasureLedger(TransferDbContext context) : IErasureLedger
         return kept;
     }
 
-    /// <summary>A completed deal <em>with</em> a fee.</summary>
+    /// <summary>A completed deal <em>with</em> an agreed fee.</summary>
     /// <remarks>
-    /// Without a fee no trade has come into being that anything could hang on —
-    /// and a conversation is no contract.
+    /// The fee stands in the settled release negotiation since ADR-0050 — the
+    /// offer to the person no longer carries one. Without a fee no trade has
+    /// come into being that anything could hang on, and a conversation is no
+    /// contract.
     /// </remarks>
-    private static System.Linq.Expressions.Expression<Func<CaseRow, bool>> Paid() =>
-        row => Completed.Contains(row.Status) && row.OfferFeeCents != null;
+    private System.Linq.Expressions.Expression<Func<CaseRow, bool>> Paid() =>
+        row => Completed.Contains(row.Status)
+               && context.Negotiations.Any(negotiation => negotiation.TransferId == row.Id
+                                                          && negotiation.Status == Settled
+                                                          && negotiation.FeeCents != null);
+
+    private static readonly string Settled = NegotiationWords.Word(NegotiationState.Settled);
 }

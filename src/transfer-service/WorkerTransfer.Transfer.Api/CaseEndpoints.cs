@@ -147,12 +147,12 @@ public static class CaseEndpoints
             ArgumentNullException.ThrowIfNull(body);
 
             var result = await mediator.Send(
-                new MakeOfferCommand(id, company, body.Note, body.StartOn, body.FeeCents),
+                new MakeOfferCommand(id, company, body.Note, body.StartOn),
                 cancellationToken);
 
             await Responses.Write(context, result, cancellationToken);
         })
-        // An offer names a start date and a fee — it binds the company, and
+        // An offer names a start date — it binds the company, and
         // that is why it demands an `admin`. Resolved from the membership table
         // of identity-service, never from the token.
         .RequireAuthorization(AdminPermissionExtensions.Policy(CasePermissions.Offer));

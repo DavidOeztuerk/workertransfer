@@ -14,6 +14,9 @@ using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.Transfer.Domain.Requests;
 using WorkerTransfer.Transfer.Domain.Market;
 using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Domain.Employers;
+using WorkerTransfer.Transfer.Domain.Releases;
+using WorkerTransfer.Transfer.Infrastructure.Identity;
 using WorkerTransfer.Transfer.Infrastructure.Notification;
 using WorkerTransfer.Transfer.Infrastructure.Consent;
 using WorkerTransfer.Transfer.Infrastructure.Erasure;
@@ -52,6 +55,8 @@ public static class TransferInfrastructure
             configuration.GetSection(NotificationSettings.Section));
         services.Configure<ErasureSettings>(
             configuration.GetSection(ErasureSettings.Section));
+        services.Configure<IdentitySettings>(
+            configuration.GetSection(IdentitySettings.Section));
 
 
         services.AddSingleton(_ => TransferDbContextFactory.DataSource(connectionString));
@@ -68,6 +73,10 @@ public static class TransferInfrastructure
         services.AddScoped<INoticeStore, EfNoticeStore>();
         services.AddScoped<IRequestStore, EfRequestStore>();
         services.AddScoped<ITransferStore, EfTransferStore>();
+        services.AddScoped<IEmployerSettingStore, EfEmployerSettingStore>();
+        services.AddScoped<IEmployerRouteStore, EfEmployerRouteStore>();
+        services.AddScoped<IReleaseStore, EfReleaseStore>();
+        services.AddScoped<IIdentityLookup, HttpIdentityLookup>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IErasureLedger, EfErasureLedger>();
         services.AddScoped<IConsentGate, HttpConsentGate>();

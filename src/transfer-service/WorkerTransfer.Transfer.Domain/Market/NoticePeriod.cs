@@ -43,9 +43,10 @@ public sealed class NoticeError(string reason) : MarketError(reason);
 /// <remarks>
 /// <para><strong>Seen by the person only.</strong> Not by a company, not with a
 /// market release: the earliest change says when somebody could be gone, and
-/// that is the strongest lever in a negotiation. Whether both companies may
-/// see the REMAINING time in a buyout case is Phase 4, and then with both
-/// consents (C1).</para>
+/// that is the strongest lever in a negotiation. The one exception is a
+/// release negotiation over the route she opened to her employer: there both
+/// companies see her earliest regular start, under that consent and nowhere
+/// else (ADR-0050).</para>
 ///
 /// <para><strong>A date, never a price.</strong> The longer the remaining
 /// period, the more a buyout would be worth — and the platform names no

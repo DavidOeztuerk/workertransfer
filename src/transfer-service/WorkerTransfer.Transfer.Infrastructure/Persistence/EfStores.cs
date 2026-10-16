@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.Transfer.Domain.Requests;
 using WorkerTransfer.Transfer.Domain.Market;
 using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Domain.Employers;
+using WorkerTransfer.Transfer.Domain.Releases;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
@@ -301,7 +303,6 @@ public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
         row.ReleaseConfirmed = caseItem.ReleaseConfirmed;
         row.OfferNote = caseItem.OfferText;
         row.OfferStartOn = caseItem.OfferStart;
-        row.OfferFeeCents = caseItem.OfferFeeCents;
         row.UpdatedAt = caseItem.ChangedAt.UtcDateTime;
     }
 
@@ -318,7 +319,169 @@ public sealed class EfTransferStore(TransferDbContext context) : ITransferStore
             row.Message,
             row.OfferNote,
             row.OfferStartOn,
-            row.OfferFeeCents,
+            new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
+            new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
+}
+
+/// <summary>Reads and writes <c>employer_settings</c>.</summary>
+public sealed class EfEmployerSettingStore(TransferDbContext context) : IEmployerSettingStore
+{
+    /// <inheritdoc />
+    public async Task<EmployerSetting?> GetAsync(TenantId company, CancellationToken cancellationToken = default)
+    {
+        var row = await context.EmployerSettings
+            .FirstOrDefaultAsync(entry => entry.TenantId == company.Value, cancellationToken);
+
+        return row is null
+            ? null
+            : new EmployerSetting(company, row.AcceptsInquiries, new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync(EmployerSetting setting, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(setting);
+
+        var row = await context.EmployerSettings
+            .AsTracking()
+            .FirstOrDefaultAsync(entry => entry.TenantId == setting.Company.Value, cancellationToken);
+
+        if (row is null)
+        {
+            row = new EmployerSettingRow { TenantId = setting.Company.Value };
+            context.EmployerSettings.Add(row);
+        }
+
+        row.AcceptsInquiries = setting.AcceptsInquiries;
+        row.UpdatedAt = setting.ChangedAt.UtcDateTime;
+    }
+}
+
+/// <summary>Reads and writes <c>employer_routes</c>.</summary>
+public sealed class EfEmployerRouteStore(TransferDbContext context) : IEmployerRouteStore
+{
+    /// <inheritdoc />
+    public async Task<EmployerRoute?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default)
+    {
+        var row = await context.EmployerRoutes
+            .FirstOrDefaultAsync(entry => entry.Id == subject.Value, cancellationToken);
+
+        return row is null
+            ? null
+            : new EmployerRoute(subject, new TenantId(row.EmployerId), new DateTimeOffset(row.OpenedAt, TimeSpan.Zero));
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync(EmployerRoute route, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+
+        var row = await context.EmployerRoutes
+            .AsTracking()
+            .FirstOrDefaultAsync(entry => entry.Id == route.Subject.Value, cancellationToken);
+
+        if (row is null)
+        {
+            row = new EmployerRouteRow { Id = route.Subject.Value };
+            context.EmployerRoutes.Add(row);
+        }
+
+        row.EmployerId = route.Employer.Value;
+        row.OpenedAt = route.OpenedAt.UtcDateTime;
+    }
+
+    /// <inheritdoc />
+    public Task DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default) =>
+        context.EmployerRoutes.Where(entry => entry.Id == subject.Value).ExecuteDeleteAsync(cancellationToken);
+}
+
+/// <summary>Reads and writes <c>release_negotiations</c>.</summary>
+public sealed class EfReleaseStore(TransferDbContext context) : IReleaseStore
+{
+    private static readonly string[] Running =
+        [.. NegotiationWords.Running.Select(NegotiationWords.Word)];
+
+    /// <inheritdoc />
+    public async Task<ReleaseNegotiation?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var row = await context.Negotiations.FirstOrDefaultAsync(entry => entry.Id == id, cancellationToken);
+        return row is null ? null : ToAggregate(row);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReleaseNegotiation?> ForCaseAsync(Guid caseId, CancellationToken cancellationToken = default)
+    {
+        var row = await context.Negotiations
+            .FirstOrDefaultAsync(entry => entry.TransferId == caseId, cancellationToken);
+        return row is null ? null : ToAggregate(row);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReleaseNegotiation>> ForCurrentEmployerAsync(
+        TenantId company, CancellationToken cancellationToken = default)
+    {
+        var rows = await context.Negotiations
+            .Where(entry => entry.CurrentTenantId == company.Value)
+            .OrderByDescending(entry => entry.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(ToAggregate)];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReleaseNegotiation>> RunningForAsync(
+        SubjectId subject, CancellationToken cancellationToken = default)
+    {
+        var rows = await context.Negotiations
+            .Where(entry => entry.SubjectId == subject.Value && Running.Contains(entry.Status))
+            .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(ToAggregate)];
+    }
+
+    /// <inheritdoc />
+    public async Task SaveAsync(ReleaseNegotiation negotiation, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(negotiation);
+
+        var row = await context.Negotiations
+            .AsTracking()
+            .FirstOrDefaultAsync(entry => entry.Id == negotiation.Id, cancellationToken);
+
+        if (row is null)
+        {
+            row = new NegotiationRow
+            {
+                Id = negotiation.Id,
+                TransferId = negotiation.CaseId,
+                SubjectId = negotiation.Subject.Value,
+                HiringTenantId = negotiation.Hiring.Value,
+                CurrentTenantId = negotiation.Current.Value,
+                CreatedAt = negotiation.CreatedAt.UtcDateTime
+            };
+            context.Negotiations.Add(row);
+        }
+
+        row.Status = NegotiationWords.Word(negotiation.State);
+        row.ReleaseMonth = negotiation.ReleaseMonth;
+        row.FeeCents = negotiation.FeeCents;
+        row.TermsBy = NegotiationWords.Word(negotiation.TermsBy);
+        row.UpdatedAt = negotiation.ChangedAt.UtcDateTime;
+    }
+
+    private static ReleaseNegotiation ToAggregate(NegotiationRow row) =>
+        ReleaseNegotiation.Restore(
+            row.Id,
+            row.TransferId,
+            new SubjectId(row.SubjectId),
+            new TenantId(row.HiringTenantId),
+            new TenantId(row.CurrentTenantId),
+            NegotiationWords.Read(row.Status)
+            ?? throw new InvalidOperationException($"Unknown negotiation state in the database: {row.Status}"),
+            row.ReleaseMonth,
+            row.FeeCents,
+            NegotiationWords.ReadSide(row.TermsBy)
+            ?? throw new InvalidOperationException($"Unknown side in the database: {row.TermsBy}"),
             new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
             new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero));
 }

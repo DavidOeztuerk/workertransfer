@@ -24,6 +24,7 @@ import {
 import { type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
 import { NoticeCard } from "../components/NoticeCard";
+import { EmployerRouteCard } from "../components/EmployerRoute";
 import { useAsync } from "../lib/useAsync";
 import {
   type Availability,
@@ -356,6 +357,7 @@ export function MarketPage() {
         </CardContent>
       </Card>
       <NoticeCard />
+      <EmployerRouteCard />
     </PageShell>
   );
 }

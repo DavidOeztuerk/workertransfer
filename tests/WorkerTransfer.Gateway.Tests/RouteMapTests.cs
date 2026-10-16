@@ -373,10 +373,17 @@ public sealed class RouteMapTests
                 "POST /resumes/00000000-0000-0000-0000-000000000001/requests",
                 "POST /market/00000000-0000-0000-0000-000000000001/requests",
                 "POST /advisor/conversations",
-                "POST /messages/approaches"
+                "POST /messages/approaches",
+
+                // ADR-0050: the release negotiation binds both companies, and
+                // so does letting others ask about the own staff.
+                "PUT /transfers/employer/setting",
+                "POST /transfers/00000000-0000-0000-0000-000000000001/release",
+                "POST /transfers/releases/00000000-0000-0000-0000-000000000001/terms",
+                "POST /transfers/releases/00000000-0000-0000-0000-000000000001/accept"
             ],
-            "exactly these nine show the difference in the map; whoever protects "
-            + "a tenth this way or opens one changes this list deliberately");
+            "exactly these thirteen show the difference in the map; whoever protects "
+            + "a fourteenth this way or opens one changes this list deliberately");
 
         differing.Should().OnlyContain(
             row => row.Member == 403,

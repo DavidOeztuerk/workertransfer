@@ -91,14 +91,64 @@ public sealed class CaseRow
 
     public string? OfferStartOn { get; set; }
 
-    public long? OfferFeeCents { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>One row of <c>employer_settings</c> — a company's, nothing personal.</summary>
+public sealed class EmployerSettingRow
+{
+    /// <summary>The company. It <em>is</em> the key.</summary>
+    public Guid TenantId { get; set; }
+
+    public bool AcceptsInquiries { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>One row of <c>employer_routes</c> — "my employer is X, and X may be asked" (ADR-0050).</summary>
+/// <remarks>
+/// It exists only while the person consents: naming the employer and opening
+/// the route are one act, closing it deletes the row.
+/// </remarks>
+public sealed class EmployerRouteRow
+{
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
+    public Guid Id { get; set; }
+
+    public Guid EmployerId { get; set; }
+
+    public DateTime OpenedAt { get; set; }
+}
+
+/// <summary>One row of <c>release_negotiations</c>.</summary>
+public sealed class NegotiationRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TransferId { get; set; }
+
+    public Guid SubjectId { get; set; }
+
+    public Guid HiringTenantId { get; set; }
+
+    public Guid CurrentTenantId { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public string ReleaseMonth { get; set; } = string.Empty;
+
+    public long? FeeCents { get; set; }
+
+    public string TermsBy { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>The three tables this service owns — and its outbox.</summary>
+/// <summary>The tables this service owns — and its outbox.</summary>
 /// <remarks>
 /// There is no shared database and therefore no shared outbox either
 /// (ADR-0004/0025) — it hangs in <em>this</em> context, so the intent commits
@@ -121,6 +171,15 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
 
     /// <summary>The cases.</summary>
     public DbSet<CaseRow> Cases => Set<CaseRow>();
+
+    /// <summary>Whether a company lets others ask about its staff.</summary>
+    public DbSet<EmployerSettingRow> EmployerSettings => Set<EmployerSettingRow>();
+
+    /// <summary>The routes people opened to their employer.</summary>
+    public DbSet<EmployerRouteRow> EmployerRoutes => Set<EmployerRouteRow>();
+
+    /// <summary>The release negotiations.</summary>
+    public DbSet<NegotiationRow> Negotiations => Set<NegotiationRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -209,8 +268,6 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
                 .HasColumnName("offer_note").HasColumnType("text").IsRequired();
             entity.Property(row => row.OfferStartOn)
                 .HasColumnName("offer_start_on").HasMaxLength(7);
-            entity.Property(row => row.OfferFeeCents)
-                .HasColumnName("offer_fee_cents").HasColumnType("bigint");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
@@ -224,6 +281,54 @@ public sealed class TransferDbContext(DbContextOptions<TransferDbContext> option
                 .IsUnique()
                 .HasDatabaseName("uq_running_transfer")
                 .HasFilter(RunningFilter());
+        });
+
+        modelBuilder.Entity<EmployerSettingRow>(entity =>
+        {
+            entity.ToTable("employer_settings");
+            entity.HasKey(row => row.TenantId);
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").ValueGeneratedNever();
+            entity.Property(row => row.AcceptsInquiries).HasColumnName("accepts_inquiries").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        });
+
+        modelBuilder.Entity<EmployerRouteRow>(entity =>
+        {
+            entity.ToTable("employer_routes");
+            // The key IS the person — the erasure guard recognises the table by
+            // this annotation, not by a column name.
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.EmployerId).HasColumnName("employer_id").IsRequired();
+            entity.Property(row => row.OpenedAt).HasColumnName("opened_at").IsRequired();
+        });
+
+        modelBuilder.Entity<NegotiationRow>(entity =>
+        {
+            entity.ToTable("release_negotiations");
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.TransferId).HasColumnName("transfer_id").IsRequired();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.HiringTenantId).HasColumnName("hiring_tenant_id").IsRequired();
+            entity.Property(row => row.CurrentTenantId).HasColumnName("current_tenant_id").IsRequired();
+            entity.Property(row => row.Status).HasColumnName("status").HasMaxLength(16).IsRequired();
+            entity.Property(row => row.ReleaseMonth)
+                .HasColumnName("release_month").HasMaxLength(7).IsRequired();
+            entity.Property(row => row.FeeCents).HasColumnName("fee_cents").HasColumnType("bigint");
+            entity.Property(row => row.TermsBy).HasColumnName("terms_by").HasMaxLength(8).IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+
+            entity.HasIndex(row => row.SubjectId);
+            entity.HasIndex(row => row.CurrentTenantId);
+
+            // One negotiation per transfer, ever: a refusal stands, and asking
+            // again under a new row would be following up past it.
+            entity.HasIndex(row => row.TransferId)
+                .IsUnique()
+                .HasDatabaseName("uq_release_negotiations_transfer");
         });
 
         modelBuilder.ConfigureOutbox();

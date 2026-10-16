@@ -41,7 +41,7 @@
 #   POST   /jobs/{id}/publish                 eine Anzeige hinstellen
 #   POST   /jobs/{id}/close                   sie wegnehmen
 #   PUT    /companies/me/profile              das oeffentliche Schaufenster
-#   POST   /transfers/{id}/offer              Termin und Gebuehr
+#   POST   /transfers/{id}/offer              der Termin
 #   POST   /transfers/{id}/complete           den Abschluss feststellen
 #
 # Und DREI verlangen seit ADR-0048 mindestens einen `recruiter` — den ersten
@@ -53,6 +53,17 @@
 #
 # `firma` ist Admin und darf das auch (die Rollen sind geordnet); `mitglied`
 # bekommt 403, VOR dem Blick auf Rumpf und Person.
+#
+# Und VIER seit ADR-0050 wieder einen `admin` — sie binden die Firma, die eine
+# zahlt, die andere laesst jemanden frueher gehen:
+#
+#   PUT    /transfers/employer/setting        Anfragen zum eigenen Personal zulassen
+#   POST   /transfers/{id}/release            beim Arbeitgeber eine Freigabe anfragen
+#   POST   /transfers/releases/{id}/terms     Monat und Abloese auf den Tisch legen
+#   POST   /transfers/releases/{id}/accept    die Bedingungen der anderen Seite annehmen
+#
+# `refuse` und `withdraw` an derselben Verhandlung stehen NICHT dabei: wer
+# gefragt werden darf, muss ablehnen duerfen.
 #
 # SICHTBAR wird der Unterschied hier nur in FUENF Zeilen, und der Grund ist
 # lehrreich genug, um ihn aufzuschreiben: die drei Verwaltungsrouten nennen die
@@ -485,6 +496,26 @@ gruppen:
       - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/offer', ohne: 401, person: 403, mitglied: 403, firma: 404 }
       - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/complete', ohne: 401, person: 403, mitglied: 403, firma: 404 }
       - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      # Der Weg zum alten Arbeitgeber (ADR-0050). Den Arbeitgeber nennen IST die
+      # Zustimmung; ohne `employer_id` 422, eine erfundene Firma waere 404.
+      - { methode: GET, pfad: '/market/me/employer', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/market/me/employer', ohne: 401, person: 422, mitglied: 422, firma: 422, rumpf: '{}' }
+      - { methode: DELETE, pfad: '/market/me/employer', ohne: 401, person: 204, mitglied: 204, firma: 204 }
+      # Die Einstellung der Firma: lesen darf jedes Mitglied, schalten nur ein
+      # `admin`. Eine Person hat keine — 403, eine Aussage ueber den Aufrufer.
+      - { methode: GET, pfad: '/transfers/employer/setting', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: PUT, pfad: '/transfers/employer/setting', ohne: 401, person: 403, mitglied: 403, firma: 200, rumpf: '{}' }
+      - { methode: GET, pfad: '/transfers/employer/inquiries', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      # Die Verhandlung: jedes Nein ueber die Reichweite einer Firma ist EIN 404 —
+      # kein Weg, fremder Vorgang, Arbeitgeber fragt nicht, Zustimmung zurueck.
+      - { methode: GET, pfad: '/transfers/00000000-0000-0000-0000-000000000001/release', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/00000000-0000-0000-0000-000000000001/release', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/terms', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/accept', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/refuse', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/withdraw', ohne: 401, person: 403, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/agree', ohne: 401, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/transfers/releases/00000000-0000-0000-0000-000000000001/decline', ohne: 401, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'GitHub — die eigene, bewiesene Verbindung'
     warum: |

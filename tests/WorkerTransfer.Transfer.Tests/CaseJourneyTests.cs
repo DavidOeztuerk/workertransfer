@@ -181,11 +181,10 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var offered = await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
+            note = "We are offering the job.", start_on = "2026-10"
         });
 
         offered.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(offered)).GetProperty("offer_fee_cents").GetInt64().Should().Be(250_000);
 
         (await asAnna.PostAsync($"/transfers/{id}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
@@ -425,9 +424,14 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
         otherCompany.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>There is no negative fee.</summary>
+    /// <summary>The offer to the person carries no fee any more (C3, ADR-0050).</summary>
+    /// <remarks>
+    /// It had no recipient: the current employer was never part of the case.
+    /// A <c>fee_cents</c> from an old client is ignored, not stored, and does
+    /// not come back — a fee is agreed between two companies now.
+    /// </remarks>
     [Fact]
-    public async Task A_negative_fee_is_refused()
+    public async Task An_offer_carries_no_fee_any_more()
     {
         var company = Guid.CreateVersion7();
         var anna = await Approachable(company);
@@ -436,10 +440,14 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var offer = await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "Offer.", fee_cents = -1L
+            note = "Offer.", fee_cents = 250_000L
         });
 
-        offer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        offer.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(offer)).TryGetProperty("offer_fee_cents", out _).Should().BeFalse();
+
+        var hers = (await Json(await AsPerson(anna).GetAsync("/transfers/me"))).EnumerateArray().Single();
+        hers.TryGetProperty("offer_fee_cents", out _).Should().BeFalse();
     }
 
     /// <summary>Only the company's moves are notified.</summary>

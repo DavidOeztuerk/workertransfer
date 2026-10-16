@@ -10,6 +10,7 @@
     <ProjectReference Include="..\WorkerTransfer.Transfer.Application\WorkerTransfer.Transfer.Application.csproj" />
     <ProjectReference Include="..\WorkerTransfer.Transfer.Domain\WorkerTransfer.Transfer.Domain.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Outbox\WorkerTransfer.Outbox.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
     <!--

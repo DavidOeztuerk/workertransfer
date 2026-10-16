@@ -19,6 +19,7 @@ import { failureKey } from "../../../shared/api/errors";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { InitiativeBlock } from "../../messages/components/InitiativeBlock";
+import { EmployerRouteOffer } from "../../work/components/EmployerRoute";
 import { remoteLabel, searchJobs,
   salaryText,
   PERIOD_KEY,
@@ -268,6 +269,9 @@ export function CareerPage() {
           ) : null}
         </CardContent>
       </Card>
+      {signedIn && !forCompany && tenantId ? (
+        <EmployerRouteOffer companyId={tenantId} companyName={profile.display_name} />
+      ) : null}
     </PageShell>
   );
 }

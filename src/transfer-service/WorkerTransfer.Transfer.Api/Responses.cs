@@ -8,6 +8,8 @@ using WorkerTransfer.Transfer.Contracts;
 using WorkerTransfer.Transfer.Domain.Requests;
 using WorkerTransfer.Transfer.Domain.Market;
 using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Domain.Releases;
+using WorkerTransfer.Transfer.Application.Releases;
 
 namespace WorkerTransfer.Transfer.Api;
 
@@ -62,6 +64,16 @@ public static class Responses
                 await ProblemDetailsMiddleware.Write(
                     call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                     "Request failed", "the consent ledger did not answer");
+
+                return AlreadyWritten;
+            }
+            catch (IdentitySilent)
+            {
+                // Not "no such company" and not "no such person": nobody knows
+                // just now, and the answer says so.
+                await ProblemDetailsMiddleware.Write(
+                    call.HttpContext, StatusCodes.Status503ServiceUnavailable,
+                    "Request failed", "identity-service did not answer");
 
                 return AlreadyWritten;
             }
@@ -274,11 +286,71 @@ public static class Responses
             caseItem.Message,
             caseItem.OfferText,
             caseItem.OfferStart,
-            caseItem.OfferFeeCents,
             caseItem.CreatedAt,
             caseItem.ChangedAt,
             earliestStart is { } earliest && NoticeWords.ReadStart(caseItem.OfferStart) is { } start
                 ? start < earliest
                 : null);
+    }
+
+    /// <summary>Writes the result of a step on a release negotiation.</summary>
+    public static async Task Write(
+        HttpContext context,
+        ReleaseResult result,
+        CancellationToken cancellationToken,
+        int successStatus = StatusCodes.Status200OK)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        switch (result)
+        {
+            case ReleaseResult.Done done:
+                context.Response.StatusCode = successStatus;
+                await context.Response.WriteAsJsonAsync(ToWire(done.View), cancellationToken);
+                return;
+
+            case ReleaseResult.Unknown:
+                // Not present, not yours, route closed, employer not asking —
+                // one answer. Each difference would tell a company something
+                // about where she works.
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status404NotFound, "Request failed", "No such release negotiation");
+                return;
+
+            case ReleaseResult.StateConflict conflict:
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status409Conflict, "Request failed", conflict.Reason);
+                return;
+
+            case ReleaseResult.InvalidInput invalid:
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", invalid.Reason);
+                return;
+
+            default:
+                throw new InvalidOperationException($"Unhandled result: {result}");
+        }
+    }
+
+    /// <summary>A release negotiation — or its possibility — on the wire.</summary>
+    public static ReleaseNegotiationV1 ToWire(ReleaseView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        var negotiation = view.Negotiation;
+
+        return new ReleaseNegotiationV1(
+            negotiation?.Id,
+            view.CaseId,
+            view.Hiring.Value,
+            view.Current.Value,
+            view.Side is { } side ? NegotiationWords.Word(side) : "person",
+            negotiation is null ? "possible" : NegotiationWords.Word(negotiation.State),
+            negotiation?.ReleaseMonth,
+            negotiation?.FeeCents,
+            negotiation is null ? null : NegotiationWords.Word(negotiation.TermsBy),
+            view.RegularFrom,
+            negotiation?.ChangedAt,
+            view.PersonName);
     }
 }
