@@ -8,12 +8,12 @@ namespace WorkerTransfer.ServiceDefaults.Ai;
 /// Anthropic.
 /// </summary>
 /// <remarks>
-/// <para><strong>OpenAI-compatible is the default, because Mistral speaks
-/// it</strong> (VISION-FRAGEN E2: Mistral, EU, is the platform's provider;
-/// Ollama and anything else of that shape too). Anthropic stays selectable.
-/// The label is the same one a person's own access carries
-/// (<c>AiAccessV1.Provider</c>), so the evidence report counts both in one
-/// vocabulary.</para>
+/// <para><strong>OpenAI-compatible is the default, because the platform's
+/// model speaks it</strong> — until the start the operator's local Ollama
+/// (ADR-0051), and Mistral, OpenAI and anything else of that shape too.
+/// Anthropic has its own format. The label is the same one a person's own
+/// access carries (<c>AiAccessV1.Provider</c>), so the evidence report counts
+/// both in one vocabulary.</para>
 ///
 /// <para>Only the format lives here. What goes into the prompt is decided by
 /// each service's own context type (ADR-0024) and never by this class.</para>
@@ -26,11 +26,12 @@ public static class ModelWire
     /// <summary>The label for Anthropic's messages endpoint.</summary>
     public const string Anthropic = "anthropic";
 
-    /// <summary>The platform's default endpoint: Mistral, in the EU.</summary>
-    public const string DefaultAddress = "https://api.mistral.ai/v1/chat/completions";
+    /// <summary>The platform's default endpoint until the start: the operator's local Ollama (ADR-0051).</summary>
+    /// <remarks>Nothing leaves the machine. Compose sets it again from <c>WORKERTRANSFER_AI_URL</c>.</remarks>
+    public const string DefaultAddress = "http://host.docker.internal:11434/v1/chat/completions";
 
-    /// <summary>The platform's default model.</summary>
-    public const string DefaultModel = "mistral-medium-latest";
+    /// <summary>The platform's default model — one the operator has pulled into Ollama.</summary>
+    public const string DefaultModel = "qwen2.5-coder:7b";
 
     /// <summary>The <c>max_tokens</c> an Anthropic request carries at least.</summary>
     /// <remarks>

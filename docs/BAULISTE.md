@@ -94,6 +94,8 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 - ~~Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen~~ — ADR-0050,
   16.10.2026.
 - ~~Nachrichten und Agenten-Entwürfe werden gespeichert~~ — ADR-0047, 07.10.2026.
+- ~~Ein KI-Zugang: Plattform-Modell und eigener Schlüssel~~ — ADR-0051,
+  17.10.2026.
 - **Inserate von außen**: nur offizielle Abrufe, Nachweis per DNS — ergänzt
   ADR-0004 (kein Scraping) um den erlaubten Weg.
 - **Anmelden über fremde Konten**: wo die Anmeldung lebt, und dass ein
@@ -101,7 +103,10 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 
 ## Vor dem Start (siehe `VISION-FRAGEN.md` und `VISION-FRAGEN-2.md`)
 
-- Geschäftsmodell (G1, G2, Q1) — **bewusst zurückgestellt, letzter Punkt**
+- Geschäftsmodell (G1, G2, Q1) — **bewusst zurückgestellt, letzter Punkt**;
+  dazu der KI-Anbieter der Plattform im Betrieb und ob Menschen ihn per Abo
+  oder Kontingent bekommen (ADR-0051) — ohne dass ein Anschreiben am leeren
+  Kontingent abbricht
 - Wer betreibt die Plattform (Q2) und wo läuft sie (Q3) — offen
 - Control Plane im Betrieb: Keycloak, echte Lizenz (I2, Q4)
 - Juristen-Liste J1–J17, **gesammelt vor dem Start** (Q7), dazu Impressum,
@@ -122,6 +127,9 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
   Dokumentenmanager, Portfolio-Helfer, Karriere-Coach; für Firmen
   Interview-Vorbereitung, Angebots-Entwurf, Personalplanung
 - Agenten von Drittanbietern, mit Prüfung (O3)
+- **KI-Schlüssel der Firma** für Inserat-Hilfe, Scout und Antworten der Firma;
+  weitere Anbieter für eigene Schlüssel (Gemini, Ollama Cloud, Hugging Face)
+  (ADR-0051)
 - Bewerbungen per E-Mail aus dem **eigenen Postfach** (P1)
 - Arbeitgeber gibt Personal aktiv ab (C1, Q5) — Richtung steht
 - Gespräch Person ↔ alter Arbeitgeber über den geöffneten Weg (D1, Q6)

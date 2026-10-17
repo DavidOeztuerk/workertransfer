@@ -59,14 +59,14 @@ public sealed class SettingsHandler(IAccountSettingsStore store)
 
     internal static string Label(AiProvider provider) => provider switch
     {
-        AiProvider.OpenAiCompatible => "openai_compatible",
+        AiProvider.OpenAi => "openai",
         AiProvider.Anthropic => "anthropic",
         _ => "none"
     };
 
     internal static AiProvider Provider(string? label) => label switch
     {
-        "openai_compatible" => AiProvider.OpenAiCompatible,
+        "openai" => AiProvider.OpenAi,
         "anthropic" => AiProvider.Anthropic,
         _ => AiProvider.None
     };
@@ -82,14 +82,12 @@ public sealed class SettingsHandler(IAccountSettingsStore store)
 /// <param name="Subject">The caller.</param>
 /// <param name="DeleteAfterMonths">The lapse, or <c>null</c>.</param>
 /// <param name="Provider">The AI provider as a label.</param>
-/// <param name="Address">Its address.</param>
 /// <param name="Model">Its model.</param>
 /// <param name="AiAuditLog">Whether requests are logged.</param>
 public sealed record SetSettingsCommand(
     SubjectId Subject,
     int? DeleteAfterMonths,
     string Provider,
-    string Address,
     string Model,
     bool AiAuditLog) : ICommandMessage<SettingsView>;
 
@@ -108,7 +106,6 @@ public sealed class SetSettingsHandler(IAccountSettingsStore store)
         state.SetPrivacy(request.DeleteAfterMonths);
         state.SetAi(
             SettingsHandler.Provider(request.Provider),
-            request.Address,
             request.Model,
             request.AiAuditLog);
 
@@ -163,12 +160,25 @@ public sealed class SetAiKeyHandler(
 /// shape: <c>GET /account/settings</c> deliberately does not carry the key.
 /// </remarks>
 public sealed record InternalAiAccess(
-    string Provider, string Address, string Model, string Key);
+    string Provider, string Address, string Model, string Key)
+{
+    /// <summary>No own access: the asking service takes the platform's model.</summary>
+    public static readonly InternalAiAccess None = new("none", string.Empty, string.Empty, string.Empty);
+}
 
 /// <summary>Read a person's AI access — for other services, not for the browser.</summary>
 public sealed record InternalAiAccessQuery(SubjectId Subject) : IQueryMessage<InternalAiAccess>;
 
 /// <inheritdoc cref="InternalAiAccessQuery" />
+/// <remarks>
+/// <para><strong>Without a key there is no own access</strong>, whatever
+/// provider is chosen — so every asking service decides with one rule: an own
+/// access replaces the platform's model, none leaves it (ADR-0051).</para>
+///
+/// <para>The provider travels in the WIRE's vocabulary
+/// (<c>AiAccessV1.Provider</c>): OpenAI speaks the OpenAI-compatible format,
+/// Anthropic its own.</para>
+/// </remarks>
 public sealed class InternalAiAccessHandler(
     IAccountSettingsStore store, ISecrets secrets)
     : IRequestHandler<InternalAiAccessQuery, InternalAiAccess>
@@ -180,12 +190,16 @@ public sealed class InternalAiAccessHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var state = await store.GetAsync(request.Subject, cancellationToken);
+        var key = secrets.Decrypt(state.EncryptedKey) ?? string.Empty;
 
-        return new InternalAiAccess(
-            SettingsHandler.Label(state.Provider),
-            state.Address,
-            state.Model,
-            secrets.Decrypt(state.EncryptedKey) ?? string.Empty);
+        if (state.Provider == AiProvider.None || key.Length == 0 || state.Model.Length == 0)
+        {
+            return InternalAiAccess.None;
+        }
+
+        var wire = state.Provider == AiProvider.Anthropic ? "anthropic" : "openai_compatible";
+
+        return new InternalAiAccess(wire, state.Address, state.Model, key);
     }
 }
 

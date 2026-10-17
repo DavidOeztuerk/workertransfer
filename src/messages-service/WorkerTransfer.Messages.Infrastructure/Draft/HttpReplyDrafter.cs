@@ -13,7 +13,7 @@ using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Messages.Infrastructure.Draft;
 
-/// <summary>The platform's model — Mistral (EU) unless the operator says otherwise.</summary>
+/// <summary>The platform's model — the operator's local Ollama until the start (ADR-0051).</summary>
 /// <remarks>
 /// The same section <c>Draft</c> as in the four other seams. The property names
 /// ARE the environment keys (<c>Draft__ApiKey</c>, <c>Draft__BaseUrl</c>,

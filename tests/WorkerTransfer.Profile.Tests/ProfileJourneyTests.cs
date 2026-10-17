@@ -49,7 +49,7 @@ public sealed class ProbeDrafter : IDrafter
     public DraftSituation? Last { get; private set; }
 
     public Task<string> DraftAsync(
-        DraftSituation situation, CancellationToken cancellationToken = default)
+        DraftSituation situation, SubjectId requestedBy, CancellationToken cancellationToken = default)
     {
         Last = situation;
         return Task.FromResult("I work on distributed systems.");

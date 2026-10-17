@@ -9,13 +9,13 @@ using ScoutDraft = WorkerTransfer.Scout.Infrastructure.Draft.DraftSettings;
 namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
-/// Mistral (EU) is the platform's default provider, and both wire formats are
-/// spoken correctly (VISION-FRAGEN E2).
+/// The operator's local Ollama is the platform's default until the start
+/// (ADR-0051), and both wire formats are spoken correctly.
 /// </summary>
 public sealed class ModelWireTests
 {
     [Fact]
-    public void Every_seam_defaults_to_Mistral()
+    public void Every_seam_defaults_to_the_local_model()
     {
         // Four settings types, four chances to keep a default abroad.
         var seams = new (string Provider, string Address, string Model)[]
@@ -29,8 +29,8 @@ public sealed class ModelWireTests
         seams.Should().AllSatisfy(seam =>
         {
             seam.Provider.Should().Be(ModelWire.OpenAiCompatible);
-            new Uri(seam.Address).Host.Should().Be("api.mistral.ai");
-            seam.Model.Should().StartWith("mistral");
+            new Uri(seam.Address).Host.Should().Be("host.docker.internal");
+            seam.Model.Should().Be(ModelWire.DefaultModel);
         });
     }
 

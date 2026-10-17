@@ -1,5 +1,9 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Noelia.Core.Identity;
+using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.Profile.Application.Ports;
 
@@ -18,12 +22,14 @@ public sealed class DraftSettings
     public const string Section = "Draft";
 
     /// <summary>
-    /// Empty means: no foreign service is called, and the interface says so.
+    /// Empty means: the platform has no model, and without an own key the
+    /// interface says so.
     /// </summary>
     /// <remarks>
     /// The default is expressly <em>no</em> provider. Digital sovereignty means
     /// something quite practical here: unless somebody deposits a key, not a
-    /// word of this system leaves the system.
+    /// word of this system leaves the system. A local Ollama reads no key — any
+    /// value switches it on (ADR-0051).
     /// </remarks>
     public string ApiKey { get; set; } = string.Empty;
 
@@ -44,48 +50,66 @@ public sealed class DraftSettings
 
     /// <summary>
     /// Which wire format the address speaks: <c>openai_compatible</c>
-    /// (Mistral, the default) or <c>anthropic</c>.
+    /// (Ollama until the start, ADR-0051) or <c>anthropic</c>.
     /// </summary>
     public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
-/// <summary>The drafter when none is set up.</summary>
+/// <summary>identity-service's internal door, and the paper that opens it.</summary>
 /// <remarks>
-/// It is not silent and does not deliver a template either — it says that it
-/// does not exist. A draft that does not come from the model but looks like it
-/// would be the worse answer: the person would take it for a suggestion and
-/// could not know that nobody was asked.
+/// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
+/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone
+/// leaves its value on the default, silently. Empty means: no own access is
+/// asked for, and the platform's model drafts.
 /// </remarks>
-public sealed class NoDrafter : IDrafter
+public sealed class IdentitySettings
 {
-    /// <inheritdoc />
-    public Task<string> DraftAsync(
-        DraftSituation situation, CancellationToken cancellationToken = default) =>
-        throw new DraftUnavailable("No draft provider is set up.");
+    /// <summary>The configuration section.</summary>
+    public const string Section = "Identity";
+
+    /// <summary>The base address of identity-service.</summary>
+    public string BaseUrl { get; set; } = string.Empty;
+
+    /// <summary>The services' shared secret.</summary>
+    public string Secret { get; set; } = string.Empty;
+
+    /// <summary>How long to wait.</summary>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>Asks a model, once, and keeps nothing.</summary>
 /// <remarks>
-/// One call, one text. No second pass that rewrites the person's text a second
-/// time unasked, and no row anywhere saying that somebody asked (ADR-0024).
+/// <para>One call, one text. No second pass that rewrites the person's text a
+/// second time unasked, and no row anywhere saying that somebody asked
+/// (ADR-0024).</para>
+///
+/// <para><strong>Her own key first, the platform's model otherwise</strong>
+/// (ADR-0051) — the same rule as the cover letter and the reply drafts. A
+/// silent identity-service is refused, not quietly replaced by the platform's
+/// model: she may have chosen her own provider precisely to keep her text
+/// away from ours.</para>
 /// </remarks>
 public sealed class HttpDrafter(
     IHttpClientFactory factory,
-    IOptions<DraftSettings> settings) : IDrafter
+    IOptions<DraftSettings> settings,
+    IOptions<IdentitySettings> identity) : IDrafter
 {
+    /// <summary>The client's name for the internal door.</summary>
+    public const string IdentityClient = "identity-internal";
+
     private readonly DraftSettings _settings = settings.Value;
+    private readonly IdentitySettings _identity = identity.Value;
 
     /// <inheritdoc />
     public async Task<string> DraftAsync(
         DraftSituation situation,
+        SubjectId requestedBy,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(situation);
 
-        if (string.IsNullOrEmpty(_settings.ApiKey))
-        {
-            throw new DraftUnavailable("No draft provider is set up.");
-        }
+        var access = await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform()
+            ?? throw new DraftUnavailable("No draft provider is set up.");
 
         using var client = factory.CreateClient(nameof(HttpDrafter));
 
@@ -94,7 +118,7 @@ public sealed class HttpDrafter(
         // What goes out stands in DraftSituation and nowhere else: no name,
         // no address, no SubjectId, no employer.
         using var request = ModelWire.Request(
-            _settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey,
+            access.Provider, access.BaseUrl, access.Model, access.Key,
             DraftSituation.Rules, situation.Prompt, maxTokens: 400);
 
         HttpResponseMessage response;
@@ -139,7 +163,7 @@ public sealed class HttpDrafter(
             try
             {
                 text = ModelWire.Text(
-                    _settings.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
+                    access.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
             }
             catch (JsonException)
             {
@@ -149,6 +173,65 @@ public sealed class HttpDrafter(
             return text
                 ?? throw new DraftUnavailable(
                     "The draft provider answers in an unexpected form.");
+        }
+    }
+
+    private AiAccessV1? Platform() =>
+        _settings.ApiKey.Length == 0
+            ? null
+            : new AiAccessV1(_settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey);
+
+    /// <summary>Her own access — or <c>null</c> when she set none up.</summary>
+    private async Task<AiAccessV1?> OwnAccessAsync(SubjectId subject, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(_identity.BaseUrl) || string.IsNullOrEmpty(_identity.Secret))
+        {
+            return null;
+        }
+
+        using var client = factory.CreateClient(IdentityClient);
+        client.Timeout = _identity.Timeout;
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, new Uri(new Uri(_identity.BaseUrl), $"/internal/account/{subject.Value}/ai"));
+        request.Headers.Add("X-Notify-Secret", _identity.Secret);
+
+        HttpResponseMessage response;
+
+        try
+        {
+            response = await client.SendAsync(request, cancellationToken);
+        }
+        catch (Exception error) when (error is HttpRequestException
+                                          || (error is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            throw new DraftUnavailable("identity-service (internal) is not reachable.");
+        }
+
+        using (response)
+        {
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new DraftUnavailable($"identity-service (internal) answers with {(int)response.StatusCode}.");
+            }
+
+            AiAccessV1? access;
+
+            try
+            {
+                access = await response.Content.ReadFromJsonAsync<AiAccessV1>(cancellationToken);
+            }
+            catch (JsonException)
+            {
+                throw new DraftUnavailable("identity-service (internal) sent an unusable answer.");
+            }
+
+            return access is { Key.Length: > 0 } && ModelWire.IsKnown(access.Provider) ? access : null;
         }
     }
 }

@@ -102,8 +102,8 @@ describe("the catalogues", () => {
       // A company name is the same in every language.
       "en:settings.providerAnthropic",
       "fr:settings.providerAnthropic",
-      // "Adresse" is the same word in French.
-      "fr:settings.address",
+      "en:settings.providerOpenAi",
+      "fr:settings.providerOpenAi",
       "fr:footer.copyright",
       "fr:scout.skillsExample",
     ]);

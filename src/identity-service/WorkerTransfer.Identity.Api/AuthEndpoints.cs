@@ -14,14 +14,16 @@ public sealed record LoginBody(string Email, string Password);
 
 /// <summary>What a caller sends to change their settings.</summary>
 /// <param name="DeleteAfterMonths">The lapse in months, or <c>null</c>.</param>
-/// <param name="AiProvider">none, openai_compatible or anthropic.</param>
-/// <param name="AiBaseUrl">The provider's address.</param>
-/// <param name="AiModel">The model.</param>
+/// <param name="AiProvider">none (the platform's model), openai or anthropic.</param>
+/// <param name="AiModel">The model; empty takes the provider's default.</param>
 /// <param name="AiAuditLog">Whether requests are logged.</param>
+/// <remarks>
+/// No address: it belongs to the provider and is set by the platform
+/// (ADR-0051). An <c>ai_base_url</c> an old client still sends is ignored.
+/// </remarks>
 public sealed record SettingsBody(
     [property: JsonPropertyName("delete_after_months")] int? DeleteAfterMonths,
     [property: JsonPropertyName("ai_provider")] string AiProvider = "none",
-    [property: JsonPropertyName("ai_base_url")] string AiBaseUrl = "",
     [property: JsonPropertyName("ai_model")] string AiModel = "",
     [property: JsonPropertyName("ai_audit_log")] bool AiAuditLog = false);
 
@@ -452,7 +454,6 @@ public static class AuthEndpoints
                         actor.Subject,
                         body.DeleteAfterMonths,
                         body.AiProvider,
-                        body.AiBaseUrl,
                         body.AiModel,
                         body.AiAuditLog),
                     cancellationToken);

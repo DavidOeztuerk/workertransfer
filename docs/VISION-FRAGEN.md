@@ -415,7 +415,10 @@ der KI-Recruiter nur auf der Seite der Firma; der alte Arbeitgeber nie.
    vor dem Senden, nach der Antwort wieder eingesetzt. Freitext lässt sich nicht
    zuverlässig schwärzen — dort schützt die Wahl des Anbieters.
 2. **Standard-Anbieter: Mistral (EU).** Die Person kann einen anderen wählen;
-   **Ollama (lokal) bleibt** möglich.
+   **Ollama (lokal) bleibt** möglich. **Geändert am 17.10.2026 (ADR-0051):** bis
+   zum Start ist das lokale Ollama der Plattform-Standard; eigene Schlüssel
+   (Anthropic, OpenAI) ersetzen ihn; welcher Anbieter im Betrieb läuft, wird
+   mit dem Geschäftsmodell entschieden.
 3. **Hinweis im Gespräch**, wenn der Berater mitliest: keine Gesundheitsdaten o. Ä.
    (Art. 9 DSGVO).
 4. **Auftragsverarbeitungsvertrag** mit dem Anbieter (Art. 28) → Juristen-Liste.

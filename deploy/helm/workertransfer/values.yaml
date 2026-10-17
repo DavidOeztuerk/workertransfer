@@ -121,8 +121,10 @@ secrets:
 
 # The key for the drafting help (ADR-0024). EMPTY means: it is off, and the UI
 # says so. It never stands in the repository — for a local run
-# WORKERTRANSFER_AI_KEY=... make k8s-up is enough. Mistral (EU) is the
-# default provider (VISION-FRAGEN E2); its API is OpenAI-compatible.
+# WORKERTRANSFER_AI_KEY=... make k8s-up is enough. Compose runs the local
+# Ollama until the start (ADR-0051); the cluster keeps Mistral (EU,
+# OpenAI-compatible) as the operation's candidate — which provider the platform
+# runs is decided with the business model before the start.
 aiKey: ""
 draftingProvider: openai_compatible
 draftingModel: mistral-medium-latest
@@ -258,6 +260,13 @@ services:
       # Asks the ledger before it shows a foreign profile (ADR-0013,
       # synchronous and without a cache).
       Consent__BaseUrl: http://consent-service:8002
+      # A person's own key drafts her profile text (ADR-0051).
+      # `Identity__Secret` hangs on this line in _helpers.tpl.
+      Identity__BaseUrl: http://identity-service:8001
+      # Where a person's OWN key may reach (ADR-0051) — declared for the
+      # egress boundary, which reads its allowed hosts from the configuration.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     drafting: true
 
   - name: resume-service
@@ -317,6 +326,10 @@ services:
       Lookup__Profile: http://profile-service:8003
       Lookup__Resume: http://resume-service:8004
       Lookup__Companies: http://companies-service:8008
+      # Where a person's OWN key may reach (ADR-0051) — declared for the
+      # egress boundary, which reads its allowed hosts from the configuration.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     drafting: true
 
   - name: companies-service
@@ -438,6 +451,10 @@ services:
       # line in _helpers.tpl.
       Identity__BaseUrl: http://identity-service:8001
       Notifications__BaseUrl: http://notification-service:8010
+      # Where a person's OWN key may reach (ADR-0051) — declared for the
+      # egress boundary, which reads its allowed hosts from the configuration.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     drafting: true
       # NOT entered: the address a person submits. It is stored and shown,
       # never fetched.

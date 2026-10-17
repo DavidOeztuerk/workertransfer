@@ -1,3 +1,4 @@
+using Noelia.Core.Identity;
 using WorkerTransfer.Profile.Domain.Profile;
 
 namespace WorkerTransfer.Profile.Application.Ports;
@@ -107,5 +108,9 @@ public interface IDrafter
     /// <exception cref="DraftUnavailable">
     /// No provider set up, or it does not answer.
     /// </exception>
-    Task<string> DraftAsync(DraftSituation situation, CancellationToken cancellationToken = default);
+    /// <param name="situation">What goes out — and only that.</param>
+    /// <param name="requestedBy">Whose own key, if any, is used (ADR-0051). It never reaches the model.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    Task<string> DraftAsync(
+        DraftSituation situation, SubjectId requestedBy, CancellationToken cancellationToken = default);
 }

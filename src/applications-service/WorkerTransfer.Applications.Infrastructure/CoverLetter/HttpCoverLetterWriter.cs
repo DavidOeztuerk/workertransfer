@@ -43,7 +43,7 @@ public sealed class CoverLetterSettings
 
     /// <summary>
     /// Which wire format the operator's address speaks: <c>openai_compatible</c>
-    /// (Mistral, the default) or <c>anthropic</c>.
+    /// (Ollama until the start, ADR-0051) or <c>anthropic</c>.
     /// </summary>
     public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }

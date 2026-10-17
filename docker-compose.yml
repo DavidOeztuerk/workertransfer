@@ -248,18 +248,26 @@ services:
       # Measured exactly like that on 11.09.2026 — twelve E2E journeys red, the
       # route map green, because the status codes were right.
       Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
-      # The AI seam. EMPTY is valid and the default: without a key no external
-      # service is called, and the UI says so (ADR-0024). That is why `:-` and
-      # not `:?` — a missing key must not stop the stack, unlike the three real
-      # secrets.
+      # The AI seam. EMPTY is valid and the default: without a key the
+      # platform has no model, and the UI says so (ADR-0024). That is why `:-`
+      # and not `:?` — a missing key must not stop the stack, unlike the three
+      # real secrets. Until the start the platform's model is the local Ollama
+      # (ADR-0051), which reads no key: any value switches it on.
       Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
-      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # A person's own key drafts her profile text instead of the platform's
+      # model (ADR-0051): fetched behind the shared secret, and the two hosts
+      # it may reach declared for the egress boundary.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     ports:
       - "8003:8003"
 
@@ -328,18 +336,19 @@ services:
       # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
       Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
-      # The AI seam. EMPTY is valid and the default: without a key no external
-      # service is called, and the UI says so (ADR-0024). That is why `:-` and
-      # not `:?` — a missing key must not stop the stack, unlike the three real
-      # secrets.
+      # The AI seam. EMPTY is valid and the default: without a key the
+      # platform has no model, and the UI says so (ADR-0024). That is why `:-`
+      # and not `:?` — a missing key must not stop the stack, unlike the three
+      # real secrets. Until the start the platform's model is the local Ollama
+      # (ADR-0051), which reads no key: any value switches it on.
       Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
-      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
     ports:
       - "8006:8006"
 
@@ -367,34 +376,26 @@ services:
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
-      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
-      # THE TARGETS A PERSON MAY CHOOSE FOR THEIR OWN AI ACCESS.
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # THE TARGETS OF A PERSON'S OWN KEY (ADR-0051).
       #
-      # `Draft__BaseUrl` above is the operator's default. A person can,
-      # however, set up an access OF THEIR OWN (provider, address, model) — a
-      # local model, for instance, and exactly for that the cover-letter writer
-      # says "measured against Ollama".
+      # `Draft__BaseUrl` above is the platform's model. A person can deposit a
+      # key of her own — Anthropic or OpenAI for now — and it then drafts
+      # instead. Its address stands in the DATABASE, not in the configuration,
+      # and is therefore invisible to the egress boundary: measured on
+      # 10.09.2026 every cover-letter job answered `EgressDeniedException` for a
+      # target nobody had declared — the job started, never wrote, and in the
+      # UI simply nothing happened.
       #
-      # That address stands in the DATABASE, not in the configuration, and was
-      # therefore invisible to the egress boundary: measured on 10.09.2026 every
-      # cover-letter job answered with
-      # `EgressDeniedException: Outbound call to 'host.docker.internal' is not
-      # allowed` — the job started, never wrote, and in the UI simply nothing
-      # happened.
-      #
-      # That is why the OPERATOR declares here where a person may point, and
-      # the person chooses within it. That is no concession to the boundary but
-      # its point: a target nobody declared stays shut — and without this
-      # declaration any person could send the requests to any foreign server.
-      #
-      # The value is read by NOBODY except the derivation in
-      # `ServiceFoundation` — it takes the host from every configuration value
-      # that reads as an absolute http address. The port does not matter; the
-      # boundary checks only the host.
-      Draft__AllowedTargets__0: ${WORKERTRANSFER_AI_TARGET_1:-http://host.docker.internal}
-      Draft__AllowedTargets__1: ${WORKERTRANSFER_AI_TARGET_2:-http://localhost}
+      # So the platform declares here the two hosts a person's key may reach,
+      # and the person cannot type an address at all. The value is read by
+      # NOBODY except the derivation in `ServiceFoundation`, which takes the
+      # host from every configuration value that reads as an absolute http
+      # address.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
       # Where the applying person's OWN details come from. Fetched on the
       # server and not sent by the browser: "only the person's own data" is a
       # promise only the server can keep.
@@ -527,9 +528,9 @@ services:
       # says so — instead of showing an empty draft somebody sends to a person
       # by accident (ADR-0024).
       Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
-      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
-      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
     ports:
       - "8012:8012"
 
@@ -629,13 +630,13 @@ services:
       Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The reply drafts. Empty key means: no draft, and the UI says so.
       Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
-      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
-      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
-      # Where a person may point their OWN access — the same declaration as for
-      # the cover letter; without it a local model is refused at the boundary.
-      Draft__AllowedTargets__0: ${WORKERTRANSFER_AI_TARGET_1:-http://host.docker.internal}
-      Draft__AllowedTargets__1: ${WORKERTRANSFER_AI_TARGET_2:-http://localhost}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # Where a person's OWN key may reach — the same declaration as for the
+      # cover letter (ADR-0051).
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     ports:
       - "8015:8015"
 
