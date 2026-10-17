@@ -32,6 +32,18 @@ public static class ModelWire
     /// <summary>The platform's default model.</summary>
     public const string DefaultModel = "mistral-medium-latest";
 
+    /// <summary>The <c>max_tokens</c> an Anthropic request carries at least.</summary>
+    /// <remarks>
+    /// Current Claude models think before they write, and the thinking counts
+    /// against <c>max_tokens</c>. With the few hundred tokens a draft needs,
+    /// the thinking alone could use them up and the answer would carry no
+    /// text. Only what is generated is billed, so the room costs nothing.
+    /// </remarks>
+    public const int AnthropicRoom = 16_000;
+
+    /// <summary>How hard an Anthropic model thinks about a draft: a short text needs little.</summary>
+    public const string AnthropicEffort = "low";
+
     /// <summary>Whether the label is one this class can speak.</summary>
     public static bool IsKnown(string provider) =>
         provider is OpenAiCompatible or Anthropic;
@@ -79,7 +91,8 @@ public static class ModelWire
                     Content = JsonContent.Create(new
                     {
                         model,
-                        max_tokens = maxTokens,
+                        max_tokens = Math.Max(maxTokens, AnthropicRoom),
+                        output_config = new { effort = AnthropicEffort },
                         system,
                         messages = new[] { new { role = "user", content = user } }
                     })
@@ -115,12 +128,33 @@ public static class ModelWire
                 : null;
         }
 
-        return root.TryGetProperty("content", out var blocks)
-               && blocks.ValueKind == JsonValueKind.Array
-               && blocks.GetArrayLength() > 0
-               && blocks[0].TryGetProperty("text", out var text)
-               && text.ValueKind == JsonValueKind.String
-            ? text.GetString()
-            : null;
+        // A refusal carries no draft, whatever else stands in the answer.
+        if (root.TryGetProperty("stop_reason", out var stop)
+            && stop.ValueKind == JsonValueKind.String
+            && stop.GetString() == "refusal")
+        {
+            return null;
+        }
+
+        if (!root.TryGetProperty("content", out var blocks) || blocks.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        // The first TEXT block, not the first block: current models put a
+        // thinking block in front, and its text field is empty or absent.
+        foreach (var block in blocks.EnumerateArray())
+        {
+            if (block.TryGetProperty("type", out var kind)
+                && kind.ValueKind == JsonValueKind.String
+                && kind.GetString() == "text"
+                && block.TryGetProperty("text", out var text)
+                && text.ValueKind == JsonValueKind.String)
+            {
+                return text.GetString();
+            }
+        }
+
+        return null;
     }
 }

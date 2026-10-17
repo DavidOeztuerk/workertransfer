@@ -368,7 +368,9 @@ public sealed class HttpCoverLetterWriter(
             Content = JsonContent.Create(new
             {
                 model = access.Model,
-                max_tokens = MaxTokens,
+                // Room to think before writing (ModelWire.AnthropicRoom).
+                max_tokens = Math.Max(MaxTokens, ModelWire.AnthropicRoom),
+                output_config = new { effort = ModelWire.AnthropicEffort },
                 stream = true,
                 system = CoverLetterContext.Rules,
                 messages = new[] { new { role = "user", content = instruction } }

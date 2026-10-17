@@ -72,6 +72,11 @@ public sealed class ModelWireTests
 
         using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
         body.RootElement.GetProperty("system").GetString().Should().Be("RULES");
+
+        // Current models think first, and the thinking counts against
+        // max_tokens: 400 would leave no text.
+        body.RootElement.GetProperty("max_tokens").GetInt32().Should().BeGreaterThanOrEqualTo(ModelWire.AnthropicRoom);
+        body.RootElement.GetProperty("output_config").GetProperty("effort").GetString().Should().Be("low");
     }
 
     [Fact]
@@ -87,6 +92,8 @@ public sealed class ModelWireTests
     [InlineData(ModelWire.Anthropic, """{"content":[{"type":"text","text":"Hallo"}]}""", "Hallo")]
     [InlineData(ModelWire.OpenAiCompatible, """{"content":[{"text":"wrong shape"}]}""", null)]
     [InlineData(ModelWire.Anthropic, """{"choices":[]}""", null)]
+    [InlineData(ModelWire.Anthropic, """{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"Hallo"}]}""", "Hallo")]
+    [InlineData(ModelWire.Anthropic, """{"stop_reason":"refusal","content":[{"type":"text","text":"no"}]}""", null)]
     public void The_text_is_read_in_the_providers_own_shape(string provider, string json, string? expected)
     {
         ModelWire.Text(provider, json).Should().Be(expected);
