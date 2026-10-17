@@ -1,6 +1,6 @@
 # Vision-Fragen, Runde 2
 
-Stand 16.10.2026. Runde 1 (`VISION-FRAGEN.md`) ist beantwortet und gebaut,
+Stand 16.10.2026, **beantwortet am 17.10.2026** — zusammen im Gespräch. Runde 1 (`VISION-FRAGEN.md`) ist beantwortet und gebaut,
 bis auf die Vertragsvorlagen (blockiert durch den Juristen, J7). Diese Runde
 holt nach, was aus dem ursprünglichen Auftrag (`docs/vision/kon.txt`) weder
 gebaut noch geklärt ist, und die Punkte, die wir auf „vor dem Start“
@@ -54,7 +54,7 @@ ATS-Anbieters (J14).
 
 **Vorschlag:** A + C zuerst, B später.
 
-**Antwort:**
+**Antwort:** **A + C, 17.10.2026 — MVP.** Offizielle Stellenabrufe der ATS-Anbieter und eine Feed-Adresse, die die Firma selbst einträgt. Stellendaten der Website (B) später.
 
 ### L2. Wie wird bewiesen, dass die Quelle der Firma gehört?
 
@@ -71,7 +71,7 @@ einspielen.
 
 **Vorschlag:** A.
 
-**Antwort:**
+**Antwort:** **A, 17.10.2026 — MVP.** DNS-TXT-Eintrag auf der Firmendomain; derselbe Nachweis trägt später die Subdomain (M3).
 
 ### L3. Wie kommen geholte Inserate auf die Plattform?
 
@@ -85,7 +85,7 @@ Dazu: Verschwindet ein Inserat an der Quelle, wird es hier **geschlossen**
 
 **Vorschlag:** C, Vorgabe „Entwurf“.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026 — MVP.** Die Firma wählt pro Quelle; Vorgabe ist „Entwurf“. Verschwindet ein Inserat an der Quelle, wird es hier geschlossen.
 
 ### L4. Wie oft wird abgeholt?
 
@@ -96,7 +96,7 @@ Dazu: Verschwindet ein Inserat an der Quelle, wird es hier **geschlossen**
 
 **Vorschlag:** B.
 
-**Antwort:**
+**Antwort:** **B, 17.10.2026 — MVP.** Einmal täglich, dazu „jetzt abholen“ auf Klick.
 
 ### L5. Wohin geht eine Bewerbung auf ein geholtes Inserat?
 
@@ -111,7 +111,7 @@ Löschversprechen greifen dort nicht — die Person verlässt die Plattform.
 
 **Vorschlag:** A, C als spätere Option.
 
-**Antwort:**
+**Antwort:** **A, 17.10.2026 — MVP.** Die Bewerbung kommt auf die Plattform, wie jede andere. Wahl pro Quelle (C) später.
 
 ---
 
@@ -129,7 +129,7 @@ sie „ein besseres Gefühl“ für die Firma bekommt.
 - C) Beides.
 - D) Nicht bauen.
 
-**Antwort:**
+**Antwort:** **Nach dem MVP, 17.10.2026.** Die persönliche Seite kommt in der nächsten Version; M3 und M4 stehen als Richtung fest, M2 und M5 werden dann entschieden.
 
 ### M2. Was steht darauf? (mehrere möglich)
 
@@ -142,7 +142,7 @@ sie „ein besseres Gefühl“ für die Firma bekommt.
 - [ ] Stand der Bewerbung
 - [ ] Direkt bewerben / antworten
 
-**Antwort:**
+**Antwort:** Mit M1 nach dem MVP — dann entscheiden.
 
 ### M3. Unter welcher Adresse?
 
@@ -158,7 +158,7 @@ auf uns zeigen lassen.
 
 **Vorschlag:** C.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026 — Richtung für nach dem MVP.** Sofort unter WorkerTransfer, Subdomain für Firmen, die sie einrichten.
 
 ### M4. Wer kommt auf die Seite, und was verrät die Adresse?
 
@@ -174,7 +174,7 @@ jetzigen Arbeitgeber.
 
 **Vorschlag:** C.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026 — Richtung für nach dem MVP.** Allgemeiner Teil über einen geheimen, ablaufenden Link ohne Namen, alles mit Namen nach Anmeldung.
 
 ### M5. Erfährt die Firma, ob die Person die Seite angesehen hat?
 
@@ -188,7 +188,7 @@ und es ist Druck auf die Person.
 
 **Vorschlag:** A.
 
-**Antwort:**
+**Antwort:** Mit M1 nach dem MVP — dann entscheiden. Vorgabe bis dahin: kein Gelesen-Status (ADR-0047).
 
 ---
 
@@ -213,7 +213,7 @@ Fähigkeiten) und hier hochladen.
 
 **Vorschlag:** B + C. A erst mit dem Identitätsanbieter aus I2.
 
-**Antwort:**
+**Antwort:** **A + B + C, 17.10.2026 — nach dem MVP.** Import aus dem eigenen Export, Link aufs Profil und Anmelden mit LinkedIn, alles in der nächsten Version.
 
 ### N2. XING
 
@@ -229,7 +229,7 @@ ist vor dem Bau zu messen. Einen Datenexport muss jedes Netzwerk herausgeben
 
 **Vorschlag:** A, B nach Messung.
 
-**Antwort:**
+**Antwort:** **A, B nach Messung, 17.10.2026 — MVP.** Ein Link aufs eigene XING-Profil; ein Import aus dem eigenen Export, wenn das Format brauchbar ist.
 
 ### N3. Weitere Verbindungen (mehrere möglich, jeweils ja / nein / später)
 
@@ -245,7 +245,7 @@ ist vor dem Bau zu messen. Einen Datenexport muss jedes Netzwerk herausgeben
 Schon entschieden und nicht neu gefragt: **Unterschrift** außerhalb (F3),
 **Termine** als eigene kleine `.ics`-Lösung später (E1).
 
-**Antwort:**
+**Antwort:** **17.10.2026.** **MVP:** Anmelden mit Google / Microsoft / Apple; Dokumente aus Google Drive / OneDrive / Dropbox (nur die gewählte Datei). **Nach dem MVP:** Open Badges / Credly, GitLab, Videotermin-Link, Rückweg ins ATS.
 
 ### N4. MCP — Anbindung an KI-Assistenten
 
@@ -264,7 +264,7 @@ Personendaten würde eine Firma fremde Daten an einen KI-Dienst weitergeben.
 
 **Vorschlag:** D vor dem Start; danach A, dann B.
 
-**Antwort:**
+**Antwort:** **D, 17.10.2026 — nach dem MVP:** zuerst ein MCP-Zugang für die Person zu ihren eigenen Daten, danach für Firmen nur mit Firmendaten.
 
 ---
 
@@ -298,7 +298,7 @@ keiner bewertet Personen für eine Firma.
 Schon gebaut: Anschreiben-Agent, KI-Berater, KI-Scout und Recruiter-Entwurf,
 Inserat-Hilfe, Vorschläge aus Dokumenten.
 
-**Antwort:**
+**Antwort:** **Alle nach dem MVP, 17.10.2026.** Keiner der neun Agenten kommt vor dem Start; die Grenzen in den Tabellen gelten, wenn sie gebaut werden.
 
 ### O2. Diese Agenten aus dem Auftrag werden nicht gebaut — bestätigst du?
 
@@ -309,7 +309,7 @@ Inserat-Hilfe, Vorschläge aus Dokumenten.
   Anhang III Nr. 4), D3.
 - **Team-Analyse über Personen** — Leistungsbewertung von Beschäftigten.
 
-**Antwort:**
+**Antwort:** **Bestätigt, 17.10.2026.** Diese vier Arten werden nie gebaut.
 
 ### O3. Agenten von Drittanbietern (Marktplatz)?
 
@@ -320,7 +320,7 @@ Inserat-Hilfe, Vorschläge aus Dokumenten.
 
 **Vorschlag:** B, nicht vor dem Start.
 
-**Antwort:**
+**Antwort:** **B, 17.10.2026 — nach dem MVP**, mit denselben Regeln und einer Prüfung jedes Agenten.
 
 ---
 
@@ -345,7 +345,7 @@ Einwilligungsregister und Löschversprechen enden an der Mail.
 
 **Vorschlag:** A vor dem Start; C später, wenn gewünscht.
 
-**Antwort:**
+**Antwort:** **A, 17.10.2026.** Nicht im MVP; später Versand aus dem eigenen Postfach (C).
 
 ### P2. Vorlagen fürs Anschreiben?
 
@@ -357,7 +357,7 @@ schreibt der Agent als Text.
 - B) Gestaltungsvorlagen auch fürs Anschreiben, passend zum Lebenslauf.
 - C) B + „Motivationsschreiben“ als eigene Art.
 
-**Antwort:**
+**Antwort:** **B, 17.10.2026 — MVP.** Gestaltungsvorlagen fürs Anschreiben, passend zu den Lebenslauf-Vorlagen.
 
 ---
 
@@ -380,7 +380,7 @@ Arbeitsuchenden höchstens 2.000 €, von Firmen frei.
 **Vorschlag:** A oder B — Personen zahlen nie, sonst verdient die Plattform an
 der Person, für die der Berater arbeitet.
 
-**Antwort:**
+**Antwort:** **D, 17.10.2026.** Weiter zurückgestellt — letzter Punkt vor dem Start.
 
 ### Q2. Wer betreibt die Plattform?
 
@@ -391,7 +391,7 @@ Für Impressum, Datenschutzerklärung (Verantwortlicher) und Gewerbeanzeige.
 - B) Eine GmbH oder UG.
 - C) Noch offen.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026.** Noch offen — vor dem Start entscheiden.
 
 ### Q3. Wo läuft sie?
 
@@ -404,7 +404,7 @@ Für Impressum, Datenschutzerklärung (Verantwortlicher) und Gewerbeanzeige.
 **Vorschlag:** A — passt zu Mistral (EU) und zur Egress-Grenze, kein
 Drittland für die Daten.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026.** Noch offen — vor dem Start entscheiden.
 
 ### Q4. Control Plane im Betrieb (I2)
 
@@ -414,7 +414,7 @@ Vorgemerkt: eigener Identitätsanbieter (z. B. Keycloak) und eine echte Lizenz.
 - A) So, vor dem Start.
 - B) Anders: …
 
-**Antwort:**
+**Antwort:** **A, 17.10.2026.** Eigener Identitätsanbieter (z. B. Keycloak) und echte Lizenz, vor dem Start.
 
 ### Q5. Ein Arbeitgeber gibt Personal aktiv ab (C1, eigener Fall)
 
@@ -429,7 +429,7 @@ Wort „Insolvenz“.
 - B) Nicht bauen.
 - C) Später.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026 — so bauen, nach dem MVP.**
 
 ### Q6. Person ↔ alter Arbeitgeber auf der Plattform (D1, dritter Weg)
 
@@ -443,7 +443,7 @@ Firma vor (ADR-0050). Aufhebung und Zeugnis klärt die Person selbst
 - B) Nicht auf der Plattform.
 - C) Später.
 
-**Antwort:**
+**Antwort:** **C, 17.10.2026 — nach dem MVP.** Bis dahin Checklisten und Musterschreiben.
 
 ### Q7. Wann geht die Juristenliste raus?
 
@@ -454,7 +454,7 @@ J1–J13 aus Runde 1 und J14–J17 unten.
 - B) Gesammelt kurz vor dem Start.
 - C) Weiß nicht, wen.
 
-**Antwort:**
+**Antwort:** **B, 17.10.2026.** Gesammelt kurz vor dem Start.
 
 ---
 

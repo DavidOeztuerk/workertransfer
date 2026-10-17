@@ -75,37 +75,64 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 |---|---|---|---|
 | **Vertragsvorlagen**, automatisch gefüllt | F1 | L | **blockiert**: die Vorlagen schreibt oder gibt ein Jurist frei (J7) |
 
+## Phase 6 — Runde 2, was ins MVP gehört (`VISION-FRAGEN-2.md`, 17.10.2026)
+
+| Was | Frage | Größe | Bemerkung |
+|---|---|---|---|
+| **Karriereseiten-Anbindung**: offizielle ATS-Abrufe (Greenhouse, Lever, Personio-XML, Recruitee …) und ein eigener Feed der Firma | L1 | L | jeder Anbieter erst gegen die echte Schnittstelle gemessen, dann gebaut; kein Scraping |
+| **Domain-Nachweis** per DNS-TXT-Eintrag | L2 | M | trägt später auch die Subdomain der persönlichen Seite (M3) |
+| Abruf täglich + „jetzt abholen“; pro Quelle Entwurf oder direkt (Vorgabe Entwurf); an der Quelle verschwunden → hier geschlossen | L3, L4 | M | Bewerbungen auf ein geschlossenes Inserat bleiben |
+| Bewerbung auf geholte Inserate **über die Plattform** | L5 | S | Mappe, Anschreiben-Agent und Einwilligungen gelten wie sonst |
+| **XING**: Link im Profil; Import aus dem eigenen Export nach Messung | N2 | S | |
+| **Anmelden mit Google / Microsoft / Apple** | N3 | M | eine Entscheidung vorab: in identity-service selbst oder über den Identitätsanbieter aus Q4 — ADR |
+| **Dokumente aus Drive / OneDrive / Dropbox** | N3 | M | nur die gewählte Datei, kein Ordnerzugriff; Ziel-Hosts in der Egress-Grenze deklarieren |
+| **Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen | P2 | M | |
+
 ## Neue ADRs, die mit dem Bau nötig werden
 
 - ~~Der Berater ist ein Agent der Person~~ — ADR-0049, 08.10.2026.
 - ~~Der alte Arbeitgeber darf vorkommen, mit zwei Zustimmungen~~ — ADR-0050,
   16.10.2026.
 - ~~Nachrichten und Agenten-Entwürfe werden gespeichert~~ — ADR-0047, 07.10.2026.
+- **Inserate von außen**: nur offizielle Abrufe, Nachweis per DNS — ergänzt
+  ADR-0004 (kein Scraping) um den erlaubten Weg.
+- **Anmelden über fremde Konten**: wo die Anmeldung lebt, und dass ein
+  fremdes Konto nie mehr liefert als Name und E-Mail.
 
-## Vor dem Start (siehe `VISION-FRAGEN.md`)
+## Vor dem Start (siehe `VISION-FRAGEN.md` und `VISION-FRAGEN-2.md`)
 
-- Geschäftsmodell (G1, G2)
-- Control Plane im Betrieb: Keycloak, echte Lizenz (I2)
-- Arbeitgeber gibt Personal aktiv ab (C1)
-- Juristen-Liste J1–J12, dazu Impressum, Datenschutzerklärung, Nutzungsbedingungen
+- Geschäftsmodell (G1, G2, Q1) — **bewusst zurückgestellt, letzter Punkt**
+- Wer betreibt die Plattform (Q2) und wo läuft sie (Q3) — offen
+- Control Plane im Betrieb: Keycloak, echte Lizenz (I2, Q4)
+- Juristen-Liste J1–J17, **gesammelt vor dem Start** (Q7), dazu Impressum,
+  Datenschutzerklärung, Nutzungsbedingungen
 
-## Später
+## Nach dem MVP
 
+- **Persönliche Seite** für eine Person unter der Firmen-Subdomain (M):
+  Richtung steht — sofort unter WorkerTransfer, Subdomain optional (M3);
+  geheimer Link ohne Namen, Persönliches nach Anmeldung (M4); was darauf
+  steht (M2) und ob die Firma Aufrufe sieht (M5) wird dann entschieden
+- **LinkedIn** (N1): Import aus dem eigenen Export, Link, Anmelden mit LinkedIn
+- Open Badges / Credly, GitLab, Videotermin-Link, Rückweg ins ATS (N3)
+- Stellendaten von der Firmenwebsite (L1-B), Bewerbungsweg pro Quelle (L5-C)
+- **MCP** (N4): zuerst für die Person zu ihren eigenen Daten, dann für Firmen
+  nur mit Firmendaten
+- **Agenten** (O1): Interview-Trainer, Lebenslauf-Optimierer, Lern-Coach,
+  Dokumentenmanager, Portfolio-Helfer, Karriere-Coach; für Firmen
+  Interview-Vorbereitung, Angebots-Entwurf, Personalplanung
+- Agenten von Drittanbietern, mit Prüfung (O3)
+- Bewerbungen per E-Mail aus dem **eigenen Postfach** (P1)
+- Arbeitgeber gibt Personal aktiv ab (C1, Q5) — Richtung steht
+- Gespräch Person ↔ alter Arbeitgeber über den geöffneten Weg (D1, Q6)
 - Termine im Gespräch (E1-C): eigene kleine Lösung mit `.ics`
 - Treuhand für die Ablöse (C4-B), über einen lizenzierten Zahlungsanbieter
 - kununu als Gehaltsquelle, nur per Partnervertrag
 - Seite „Meine Sitzungen → diese abmelden“ — Noelia 7.0.1 trägt den Sitzungswiderruf, die Seite fehlt
 
-## Nicht im Katalog behandelt — nächste Fragerunde
+## Nie (O2, bestätigt 17.10.2026)
 
-**Gestellt am 16.10.2026 in `docs/VISION-FRAGEN-2.md`** (L–Q, J14–J17),
-zusammen mit den Punkten „vor dem Start“.
-
-Aus dem ursprünglichen Auftrag (kon.txt, Z. 896), weder gebaut noch geklärt:
-
-- **Karriereseiten-Anbindung:** Inserate automatisch von der Firmenwebsite holen
-  (nur über offizielle Schnittstellen, ADR-0004).
-- **Subdomain der Firma** mit einer persönlichen Seite für jeden Bewerber.
-- **LinkedIn / Xing** und weitere Verbindungen.
-- **Weitere Agenten** aus dem Vorschlag damals (Interview-Trainer,
-  Lebenslauf-Optimierer, Lern-Coach …) — welche davon gewollt sind.
+- Candidate Ranking, Match Score, Wechselwahrscheinlichkeit (ADR-0022)
+- Gehaltsempfehlung über eine Person an die Firma
+- Interview-Agent, der Bewerber bewertet (Hochrisiko-KI, D3)
+- Team-Analyse über Personen
