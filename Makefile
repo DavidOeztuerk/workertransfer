@@ -7,7 +7,7 @@
 .DEFAULT_GOAL := help
 DOTNET_SLN := WorkerTransfer.slnx
 
-.PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
+.PHONY: help check check-dotnet check-web build test test-web validate validate-e2e e2e ai-check \
         fix dev env up down images route-map analyze evidence evidence-check \
         control-plane control-plane-down k8s-up k8s-down k8s-lint k8s-seed clean
 
@@ -69,10 +69,19 @@ route-map:  # Drive docs/routenkarte.yml against the running stack.
 	@# The COMPLETENESS of the map is checked by RouteMapTests and runs in
 	@# every suite. Here the ANSWERS are checked, and that needs the stack:
 	@# `make up` first.
-	./scripts/route-map.sh
+	@# Without the platform model, as CI measures it: `POST /profiles/me/draft`
+	@# answers 503 there and 200 with the local Ollama (ADR-0051).
+	./scripts/without-model.sh ./scripts/route-map.sh
 
 validate-e2e:  # The browser journeys as well; needs the running stack.
 	./scripts/validate.sh --e2e
+
+e2e:  # The browser journeys alone, against a stack without the platform model (as CI).
+	./scripts/e2e.sh
+
+ai-check:  # Does the platform's model answer? Profile help and a cover letter, the real way.
+	@# Needs `make up` and a model behind WORKERTRANSFER_AI_* (ADR-0051).
+	./scripts/ai-check.sh
 
 fix:  # Format.
 	dotnet format $(DOTNET_SLN)
