@@ -51,7 +51,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 
 | Anbieter | Stand | Bemerkung |
 |---|---|---|
-| Google, Microsoft, Apple | **MVP offen** (N3) | vorher ein ADR: wo die Anmeldung lebt, und dass ein fremdes Konto nie mehr liefert als Name und E-Mail |
+| Google, Microsoft, Apple | **gebaut** (ADR-0053), **aus** bis zur Registrierung | identity-service ist selbst Relying Party; verknüpft über die Kennung des Anbieters, nie über die Adresse. **Vor dem Start:** je eine App beim Anbieter (Google Cloud Console, Microsoft Entra, Apple Developer Program — kostenpflichtig, Apples Schlüssel alle sechs Monate neu signieren) |
 | LinkedIn | **nach dem MVP** (N1) | |
 | Keycloak (für die Noelia Control Plane) | **vor dem Start** (I2, Q4) | heute läuft sie nur lokal ohne Identitätsanbieter |
 

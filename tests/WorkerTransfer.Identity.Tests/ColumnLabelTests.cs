@@ -35,7 +35,9 @@ public class ColumnLabelTests(Postgres postgres)
     [
         "register", "login_success", "login_failure", "token_refresh", "token_revoke",
         "tenant_switch", "tenant_switch_denied", "email_verified", "company_created",
-        "member_invited", "member_joined", "invitation_withdrawn", "member_removed"
+        "member_invited", "member_joined", "invitation_withdrawn", "member_removed",
+        // ADR-0053: a provider bound to, or taken off, an account.
+        "external_linked", "external_unlinked"
     ];
 
     private static readonly string[] AccountStatusValue =
@@ -45,7 +47,7 @@ public class ColumnLabelTests(Postgres postgres)
 
     public static TheoryData<string, string[], int> Enumerations => new()
     {
-        { "audit_action", AuditTrail, 13 },
+        { "audit_action", AuditTrail, 15 },
         { "account_status", AccountStatusValue, 4 }
     };
 
@@ -119,15 +121,20 @@ public class ColumnLabelTests(Postgres postgres)
             "src", "identity-service",
             "WorkerTransfer.Identity.Infrastructure", "Persistence", "Migrations");
 
+        // The LATEST migration that names the type decides: one that extends
+        // an enumeration (ADR-0053 added two audit actions) carries the whole
+        // list in its first annotation, the `Up` side.
         var migrationMatch = Directory.EnumerateFiles(folder, "*.cs")
-            .Where(path => !path.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal))
+            .Where(path => !path.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal)
+                           && !path.EndsWith(".Designer.cs", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
             .Select(File.ReadAllText)
             .Select(text => Regex.Match(
                 text, $@"""Npgsql:Enum:{type}"", ""(?<values>[^""]*)""",
                 RegexOptions.None, TimeSpan.FromSeconds(5)))
-            .SingleOrDefault(hit => hit.Success);
+            .LastOrDefault(hit => hit.Success);
 
-        migrationMatch.Should().NotBeNull($"exactly one migration has to create {type}");
+        migrationMatch.Should().NotBeNull($"a migration has to create {type}");
 
         migrationMatch!.Groups["values"].Value.Split(',')
             .Should().BeEquivalentTo(labels);

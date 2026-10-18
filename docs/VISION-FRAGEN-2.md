@@ -261,6 +261,8 @@ Schon entschieden und nicht neu gefragt: **Unterschrift** außerhalb (F3),
 
 **Antwort:** **17.10.2026.** **MVP:** Anmelden mit Google / Microsoft / Apple; Dokumente aus Google Drive / OneDrive / Dropbox (nur die gewählte Datei). **Nach dem MVP:** Open Badges / Credly, GitLab, Videotermin-Link, Rückweg ins ATS.
 
+**Anmelden gebaut am 18.10.2026** (ADR-0053). Die Knöpfe erscheinen, sobald der Betreiber die drei Apps registriert hat. Eine Adresse, zu der es schon ein Konto gibt, wird nie automatisch verknüpft — verbinden geht angemeldet in den Einstellungen; Microsoft-Konten bekommen unsere Bestätigungsmail, weil Microsoft keine Adresse bestätigt.
+
 ### N4. MCP — Anbindung an KI-Assistenten
 
 **Optionen:**

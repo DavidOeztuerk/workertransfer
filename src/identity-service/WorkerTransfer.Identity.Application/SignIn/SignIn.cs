@@ -66,7 +66,11 @@ public sealed class SignInHandler(
         // before answering Failed, so how long an answer takes says nothing
         // about whether the address is known. Reordering these two operands
         // brings the timing channel back.
-        if (passwords.Verify(request.Password, account?.PasswordHash) == PasswordVerification.Failed
+        // An account made through a provider has no password entry (ADR-0053);
+        // it goes in as null, which costs the same work as an unknown address.
+        var entry = string.IsNullOrEmpty(account?.PasswordHash) ? null : account.PasswordHash;
+
+        if (passwords.Verify(request.Password, entry) == PasswordVerification.Failed
             || account is null)
         {
             await RecordRefusal(

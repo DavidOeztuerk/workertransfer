@@ -21,7 +21,7 @@ public class AuditTrailTests(Postgres postgres)
         IdentityDbContextFactory.For(postgres.ConnectionString);
 
     /// <summary>
-    /// All thirteen, one by one. A member whose label the column does not know
+    /// All fifteen, one by one. A member whose label the column does not know
     /// fails on the first write of that action — which, for
     /// <c>invitation_withdrawn</c>, could be months after the mistake.
     /// </summary>
@@ -29,7 +29,7 @@ public class AuditTrailTests(Postgres postgres)
     public async Task Every_action_can_be_written_and_read_back()
     {
         var all = Enum.GetValues<AuditAction>();
-        all.Should().HaveCount(13);
+        all.Should().HaveCount(15);
 
         foreach (var action in all)
         {

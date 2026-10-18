@@ -168,6 +168,15 @@ gruppen:
       - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 403, firma: 403 }
       - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, mitglied: 200, firma: 200 }
+      # ADR-0053: anmelden mit Google, Microsoft, Apple. Im Stapel ohne
+      # Zugangsdaten ist jeder Anbieter aus — `start` und der Rueckweg haben
+      # dann keine Tuer (404), die Liste ist leer. Verbunden ist niemand: 404.
+      - { methode: GET, pfad: '/auth/external', ohne: 200, person: 200, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/auth/external/google/start', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/auth/external/google/callback', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: POST, pfad: '/auth/external/apple/callback', ohne: 404, person: 404, mitglied: 404, firma: 404 }
+      - { methode: GET, pfad: '/auth/external/links', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      - { methode: DELETE, pfad: '/auth/external/links/google', ohne: 401, person: 404, mitglied: 404, firma: 404 }
 
   - name: 'Das eigene Konto'
     warum: |

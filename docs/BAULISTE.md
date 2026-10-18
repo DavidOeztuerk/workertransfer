@@ -85,7 +85,7 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 | ~~Bewerbung auf geholte Inserate **über die Plattform**~~ | L5 | S | **gebaut** — ein geholtes Inserat ist ein Inserat wie jedes andere |
 | ~~**Inserat bearbeiten**: eine Seite dafür fehlt ganz; bei geholten Inseraten nur Fähigkeiten, Gehalt und PLZ~~ | — | S | **gebaut 18.10.2026** — `/company/jobs/:id/edit`; ohne Fähigkeiten bekommt ein geholtes Inserat kein Häkchen und keinen Scout |
 | ~~**XING**: Link im Profil~~; Import aus dem eigenen Export nach Messung | N2 | S | **Link gebaut 18.10.2026** — er nennt die Person, das Formular sagt es vorher; der Import braucht einen echten Export zum Messen |
-| **Anmelden mit Google / Microsoft / Apple** | N3 | M | eine Entscheidung vorab: in identity-service selbst oder über den Identitätsanbieter aus Q4 — ADR |
+| ~~**Anmelden mit Google / Microsoft / Apple**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0053) — identity-service selbst, verknüpft über die Kennung des Anbieters, nie über die Adresse; **aus**, bis der Betreiber die drei Apps registriert (`.env.example`) |
 | **Dokumente aus Drive / OneDrive / Dropbox** | N3 | M | nur die gewählte Datei, kein Ordnerzugriff; Ziel-Hosts in der Egress-Grenze deklarieren |
 | **Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen | P2 | M | |
 

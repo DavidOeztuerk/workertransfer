@@ -49,6 +49,7 @@ await app.MigrateSchemaAsync<IdentityDbContext>();
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
 app.MapAuthEndpoints();
+app.MapExternalLoginEndpoints();
 app.MapRegistrationEndpoints();
 app.MapCompanyEndpoints();
 app.MapNotifyEndpoints();
