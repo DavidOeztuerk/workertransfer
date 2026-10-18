@@ -105,4 +105,13 @@ public interface IJobStore
     /// </remarks>
     Task<int> WithdrawAsync(
         TenantId company, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>The advert fetched from this source under this id, or <c>null</c>.</summary>
+    Task<Job?> ByOriginAsync(Guid sourceId, string externalId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every advert fetched from this source, in any state.</summary>
+    Task<IReadOnlyList<Job>> FromSourceAsync(Guid sourceId, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes an advert — only ever a draft nobody could apply to.</summary>
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

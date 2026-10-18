@@ -380,10 +380,16 @@ public sealed class RouteMapTests
                 "PUT /transfers/employer/setting",
                 "POST /transfers/00000000-0000-0000-0000-000000000001/release",
                 "POST /transfers/releases/00000000-0000-0000-0000-000000000001/terms",
-                "POST /transfers/releases/00000000-0000-0000-0000-000000000001/accept"
+                "POST /transfers/releases/00000000-0000-0000-0000-000000000001/accept",
+
+                // ADR-0052: a source in "direct" publishes in the company's name.
+                "POST /jobs/sources",
+                "PUT /jobs/sources/00000000-0000-0000-0000-000000000001",
+                "DELETE /jobs/sources/00000000-0000-0000-0000-000000000001",
+                "POST /jobs/sources/00000000-0000-0000-0000-000000000001/fetch"
             ],
-            "exactly these thirteen show the difference in the map; whoever protects "
-            + "a fourteenth this way or opens one changes this list deliberately");
+            "exactly these seventeen show the difference in the map; whoever protects "
+            + "an eighteenth this way or opens one changes this list deliberately");
 
         differing.Should().OnlyContain(
             row => row.Member == 403,

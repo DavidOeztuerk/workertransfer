@@ -25,4 +25,7 @@ public static class JobPermissions
 
     /// <summary>Closing an advert.</summary>
     public const string Close = "jobs.close";
+
+    /// <summary>Setting up, fetching or removing a source of adverts — a source in "direct" publishes in the company's name (ADR-0052).</summary>
+    public const string Sources = "jobs.sources";
 }

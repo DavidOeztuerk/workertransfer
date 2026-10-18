@@ -337,6 +337,12 @@ public static class JobEndpoints
             await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status409Conflict, "Request failed", error.Message);
         }
+        catch (MirroredError error)
+        {
+            // 409 for the same reason: the body may be fine, the advert belongs to its source.
+            await ProblemDetailsMiddleware.Write(
+                context, StatusCodes.Status409Conflict, "Request failed", error.Message);
+        }
         catch (InputError error)
         {
             await ProblemDetailsMiddleware.Write(
@@ -435,7 +441,9 @@ public static class JobEndpoints
         job.UpdatedAt,
         job.Salary is { } salary
             ? new SalaryV1(salary.Minimum, salary.Maximum, salary.Period.ToString().ToLowerInvariant())
-            : null);
+            : null,
+        job.Origin is null ? null : true,
+        job.Origin is { Url.Length: > 0 } origin ? origin.Url : null);
 
     private static Task NotSignedIn(HttpContext context) =>
         ProblemDetailsMiddleware.Write(

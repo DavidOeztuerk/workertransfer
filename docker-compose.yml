@@ -349,6 +349,13 @@ services:
       Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
       Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # Where a company's adverts come from (ADR-0052): the ATS' official
+      # APIs. They stand here for the same reason as the model's address —
+      # the egress boundary lets through what the configuration names.
+      # Personio is a domain, not an address: every company has a host below it.
+      Sources__Greenhouse: https://boards-api.greenhouse.io
+      Sources__Lever: https://api.lever.co
+      Sources__Personio: jobs.personio.de
     ports:
       - "8006:8006"
 

@@ -43,6 +43,16 @@ namespace WorkerTransfer.Jobs.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("employment_type");
 
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("ExternalUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("external_url");
+
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasColumnType("text")
@@ -82,6 +92,10 @@ namespace WorkerTransfer.Jobs.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("skills");
 
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -104,9 +118,79 @@ namespace WorkerTransfer.Jobs.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
+                    b.HasIndex("SourceId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_jobs_source_external")
+                        .HasFilter("source_id IS NOT NULL");
+
                     b.HasIndex("Status", "PublishedAt");
 
                     b.ToTable("jobs", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Jobs.Infrastructure.Persistence.JobSourceRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("domain");
+
+                    b.Property<DateTime?>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("mode");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTime?>("ProvenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proven_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("job_sources", (string)null);
                 });
 #pragma warning restore 612, 618
         }

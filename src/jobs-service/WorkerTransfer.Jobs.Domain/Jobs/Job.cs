@@ -105,8 +105,10 @@ public sealed class Job
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? publishedAt,
-        SalaryBand? salary)
+        SalaryBand? salary,
+        JobOrigin? origin = null)
     {
+        Origin = origin;
         Id = id;
         Company = company;
         Title = title;
@@ -165,6 +167,13 @@ public sealed class Job
     /// <summary>Where it stands.</summary>
     public JobState State { get; private set; }
 
+    /// <summary>Where the advert was fetched from, or <c>null</c>: written on the platform (ADR-0052).</summary>
+    /// <remarks>
+    /// A fetched advert mirrors its source: it is not edited here, because the
+    /// next fetch would overwrite the edit without anybody noticing.
+    /// </remarks>
+    public JobOrigin? Origin { get; private set; }
+
     /// <summary>When it was written.</summary>
     public DateTimeOffset CreatedAt { get; }
 
@@ -213,9 +222,76 @@ public sealed class Job
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         DateTimeOffset? publishedAt,
-        SalaryBand? salary = null) =>
+        SalaryBand? salary = null,
+        JobOrigin? origin = null) =>
         new(id, company, title, description, location, postalCode, remote, employment,
-            skills, state, createdAt, updatedAt, publishedAt, salary);
+            skills, state, createdAt, updatedAt, publishedAt, salary, origin);
+
+    /// <summary>An advert fetched from a source — a draft until somebody or the source's mode publishes it.</summary>
+    /// <remarks>
+    /// Over-long texts are shortened, not refused: the source decides its
+    /// length, and refusing would leave the advert out without the company
+    /// learning why.
+    /// </remarks>
+    public static Job Import(TenantId company, JobOrigin origin, ExternalAdvert advert, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentNullException.ThrowIfNull(advert);
+
+        var job = Create(
+            company,
+            Shorten(advert.Title, MaxTitleLength),
+            Shorten(advert.Description, MaxDescriptionLength),
+            Shorten(advert.Location, MaxLocationLength),
+            string.Empty,
+            advert.Remote,
+            advert.Employment,
+            SkillList.Empty,
+            now);
+
+        job.Origin = origin;
+        return job;
+    }
+
+    /// <summary>Takes over what the source says now — unless the advert is closed.</summary>
+    public void Mirror(ExternalAdvert advert, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(advert);
+
+        if (State is JobState.Closed)
+        {
+            return;
+        }
+
+        var title = Text("The title", Shorten(advert.Title, MaxTitleLength), required: true, MaxTitleLength);
+        var description = Text(
+            "The description", Shorten(advert.Description, MaxDescriptionLength), required: true, MaxDescriptionLength);
+        var location = Shorten(advert.Location, MaxLocationLength);
+        var link = JobOrigin.Link(advert.Url);
+
+        if (title == Title && description == Description && location == Location
+            && advert.Remote == Remote && advert.Employment == Employment && link == Origin?.Url)
+        {
+            return;
+        }
+
+        Origin = Origin is null ? null : Origin with { Url = link };
+        Title = title;
+        Description = description;
+        Location = location;
+        Remote = advert.Remote;
+        Employment = advert.Employment;
+        UpdatedAt = now;
+    }
+
+    /// <summary>The source was removed: the advert becomes one of the company's own.</summary>
+    public void Detach() => Origin = null;
+
+    private static string Shorten(string? value, int limit)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        return trimmed.Length <= limit ? trimmed : trimmed[..(limit - 1)].TrimEnd() + "…";
+    }
 
     /// <summary>Changes the content.</summary>
     /// <exception cref="TransitionNotAllowed">Nobody changes a closed advert any more.</exception>
@@ -235,6 +311,19 @@ public sealed class Job
         if (State is JobState.Closed)
         {
             throw new TransitionNotAllowed(State, JobState.Draft);
+        }
+
+        // A mirrored advert takes its text from the source; what an ATS does
+        // not carry — skills, salary, postal code — the company adds here, or
+        // the advert never gets a tick (ADR-0052).
+        if (Origin is not null
+            && ((title ?? string.Empty).Trim() != Title
+                || (description ?? string.Empty).Trim() != Description
+                || (location ?? string.Empty).Trim() != Location
+                || remote != Remote
+                || employment != Employment))
+        {
+            throw new MirroredError();
         }
 
         Title = Text("The title", title, required: true, MaxTitleLength);
@@ -294,3 +383,48 @@ public sealed class Job
             : trimmed;
     }
 }
+
+/// <summary>Where a fetched advert came from (ADR-0052).</summary>
+/// <param name="SourceId">The company's source.</param>
+/// <param name="ExternalId">The advert's id at the source.</param>
+/// <param name="Url">Its address at the source — an https link or empty, shown and never fetched.</param>
+public sealed record JobOrigin(Guid SourceId, string ExternalId, string Url)
+{
+    /// <summary>The longest id a source may give an advert — the column's width.</summary>
+    public const int MaxIdLength = 200;
+
+    /// <summary>The longest link kept — the column's width.</summary>
+    public const int MaxUrlLength = 500;
+
+    /// <summary>The origin of an advert, or <c>null</c> when its id cannot be kept.</summary>
+    public static JobOrigin? Of(Guid sourceId, ExternalAdvert advert)
+    {
+        ArgumentNullException.ThrowIfNull(advert);
+
+        return advert.ExternalId.Length is > 0 and <= MaxIdLength
+            ? new JobOrigin(sourceId, advert.ExternalId, Link(advert.Url))
+            : null;
+    }
+
+    /// <summary>The link, if it is an absolute https address of bearable length — otherwise nothing.</summary>
+    /// <remarks>
+    /// The page renders it as a link. A source decides what it says, and a
+    /// <c>javascript:</c> address in a feed must not become one.
+    /// </remarks>
+    public static string Link(string? url) =>
+        url is { Length: > 0 and <= MaxUrlLength }
+        && Uri.TryCreate(url, UriKind.Absolute, out var address)
+        && address.Scheme == Uri.UriSchemeHttps
+            ? url
+            : string.Empty;
+}
+
+/// <summary>An advert as a source describes it, already read into our words.</summary>
+public sealed record ExternalAdvert(
+    string ExternalId,
+    string Title,
+    string Description,
+    string Location,
+    RemoteMode Remote,
+    EmploymentKind Employment,
+    string Url);
