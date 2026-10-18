@@ -53,6 +53,7 @@ import {
   uploadDocument,
 } from "../api/resume";
 import { failureKey } from "../../../shared/api/errors";
+import { CloudFiles } from "../components/CloudFiles";
 
 /**
  * How the CV is kept: not chosen yet, typed in by hand, or as an uploaded
@@ -452,6 +453,15 @@ export function ResumePage() {
                   }}
                 />
               </Button>
+              <CloudFiles
+                extensions={["pdf", "png", "jpg", "jpeg"]}
+                disabled={uploading !== null}
+                onFile={(file) => {
+                  setCvFile(file);
+                  setCvName(file.name.replace(/\.[^/.]+$/, ""));
+                  setError(null);
+                }}
+              />
               {cvFile ? (
                 <>
                   <Typography variant="body2" color="text.secondary">
@@ -553,6 +563,15 @@ export function ResumePage() {
                 }}
               />
             </Button>
+            <CloudFiles
+              extensions={["pdf", "png", "jpg", "jpeg"]}
+              disabled={uploading !== null}
+              onFile={(file) => {
+                setChosenFile(file);
+                setDocumentName(file.name.replace(/\.[^/.]+$/, ""));
+                setError(null);
+              }}
+            />
             {chosenFile ? (
               <>
                 <Typography variant="body2" color="text.secondary">
@@ -996,6 +1015,15 @@ export function ResumePage() {
                 }}
               />
             </Button>
+            <CloudFiles
+              extensions={["pdf", "png", "jpg", "jpeg"]}
+              disabled={uploading !== null}
+              onFile={(file) => {
+                setChosenFile(file);
+                setDocumentName(file.name.replace(/\.[^/.]+$/, ""));
+                setError(null);
+              }}
+            />
             {chosenFile ? (
               <>
                 <Typography variant="body2" color="text.secondary">{chosenFile.name}</Typography>

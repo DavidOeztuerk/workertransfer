@@ -127,3 +127,24 @@ export const MESSAGES_BASE_URL = resolve(
   import.meta.env.VITE_MESSAGES_BASE_URL,
   8015
 );
+
+/**
+ * A setting without a fallback: runtime value, then build-time value — empty
+ * means the feature is off. Used by the file pickers (ADR-0054), whose keys an
+ * operator registers; without them no button appears.
+ */
+function optional(key: string, raw: string | undefined): string {
+  const live = runtime(key);
+  if (typeof live === "string" && live.length > 0) return live;
+  return typeof raw === "string" ? raw : "";
+}
+
+/** Google Drive through the Picker, `drive.file` only (ADR-0054). */
+export const GOOGLE_PICKER = {
+  clientId: optional("GOOGLE_PICKER_CLIENT_ID", import.meta.env.VITE_GOOGLE_PICKER_CLIENT_ID),
+  apiKey: optional("GOOGLE_PICKER_API_KEY", import.meta.env.VITE_GOOGLE_PICKER_API_KEY),
+  appId: optional("GOOGLE_PICKER_APP_ID", import.meta.env.VITE_GOOGLE_PICKER_APP_ID),
+};
+
+/** Dropbox through the Chooser — an app key, no OAuth (ADR-0054). */
+export const DROPBOX_APP_KEY = optional("DROPBOX_APP_KEY", import.meta.env.VITE_DROPBOX_APP_KEY);

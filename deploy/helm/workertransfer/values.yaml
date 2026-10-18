@@ -213,6 +213,14 @@ web:
   # port compose uses, so the UI has one address in both environments.
   nodePort: 30173
 
+  # Files from Google Drive and Dropbox (ADR-0054). Empty: no button. Public
+  # values — they stand in every browser that loads the page.
+  googlePicker:
+    clientId: ""
+    apiKey: ""
+    appId: ""
+  dropboxAppKey: ""
+
 # --- The services -----------------------------------------------------------
 # One list two templates run over (Deployment, Service) — the same principle as
 # the x-service anchor in docker-compose.yml. Adding a service is an entry, not

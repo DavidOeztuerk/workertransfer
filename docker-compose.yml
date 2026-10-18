@@ -719,6 +719,12 @@ services:
       # The UI calls the gateway for every request; the gateway serves the API
       # and nothing else (ADR-0040).
       VITE_API_BASE_URL: http://localhost:8090
+      # Files from Google Drive and Dropbox (ADR-0054) — empty means no button.
+      # Public values by nature: they stand in every browser that loads the page.
+      VITE_GOOGLE_PICKER_CLIENT_ID: ${WORKERTRANSFER_GOOGLE_PICKER_CLIENT_ID:-}
+      VITE_GOOGLE_PICKER_API_KEY: ${WORKERTRANSFER_GOOGLE_PICKER_API_KEY:-}
+      VITE_GOOGLE_PICKER_APP_ID: ${WORKERTRANSFER_GOOGLE_PICKER_APP_ID:-}
+      VITE_DROPBOX_APP_KEY: ${WORKERTRANSFER_DROPBOX_APP_KEY:-}
     volumes:
       - ./web/src:/app/src
       - ./web/public:/app/public

@@ -1151,6 +1151,14 @@ const de = {
     failed: "Der Weg ließ sich gerade nicht ändern.",
   },
 
+  cloudFiles: {
+    google: "Aus Google Drive",
+    dropbox: "Aus Dropbox",
+    fetching: "Wird geholt…",
+    hint: "Geholt wird nur die Datei, die du dort auswählst — sonst sieht die Plattform nichts in deinem Speicher. Hochgeladen wird sie erst mit „Hochladen“.",
+    failed: "Die Datei ließ sich nicht holen. Versuch es noch einmal oder lade sie von deinem Gerät hoch.",
+  },
+
   externalLogin: {
     google: "Google",
     microsoft: "Microsoft",

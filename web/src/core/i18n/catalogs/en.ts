@@ -1147,6 +1147,14 @@ const en: Catalog = {
     failed: "The route could not be changed just now.",
   },
 
+  cloudFiles: {
+    google: "From Google Drive",
+    dropbox: "From Dropbox",
+    fetching: "Fetching…",
+    hint: "Only the file you choose there is fetched — the platform sees nothing else of your storage. It is uploaded only with “Upload”.",
+    failed: "The file could not be fetched. Please try again or upload it from your device.",
+  },
+
   externalLogin: {
     google: "Google",
     microsoft: "Microsoft",
