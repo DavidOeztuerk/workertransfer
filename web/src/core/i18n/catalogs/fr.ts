@@ -1189,6 +1189,14 @@ const fr: Catalog = {
   },
 
   companyJobs: {
+    edit: "Modifier",
+    editTitle: "Modifier l’offre",
+    save: "Enregistrer les modifications",
+    saving: "Enregistrement…",
+    notFound: "Cette offre n’existe pas — ou pas dans votre entreprise.",
+    mirroredFields: "Le titre, le texte, le lieu, le mode de travail et le type d’emploi viennent de votre source et s’y modifient. Ici, vous ajoutez ce que le logiciel de recrutement n’apporte pas : compétences, salaire et code postal — sans compétences, les candidats ne voient aucune coche.",
+    mirroredConflict: "Le texte de cette offre appartient à votre source. Modifiez-le là-bas ; la prochaine récupération le reprendra.",
+    closedNoEdit: "Une offre fermée n’est plus modifiée — les candidatures se réfèrent à son texte.",
     mirrored: "Depuis votre source — le texte se modifie là-bas",
     atSource: "Voir à la source",
     matchingPeople: "Personnes correspondantes",

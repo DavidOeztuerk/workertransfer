@@ -83,7 +83,7 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 | ~~**Nachweis der Quelle**: ein Code, den die Firma in ein Inserat im ATS schreibt; ein eigener Feed liegt auf der eigenen Domain~~ | L2 | M | **gebaut 18.10.2026** — korrigiert: DNS und ein Link auf der eigenen Seite beweisen beide nicht, dass das Board der Firma gehört |
 | ~~Abruf täglich + „jetzt abholen“; pro Quelle Entwurf oder direkt (Vorgabe Entwurf); an der Quelle verschwunden → hier geschlossen~~ | L3, L4 | M | **gebaut 18.10.2026**; Bewerbungen auf ein geschlossenes Inserat bleiben |
 | ~~Bewerbung auf geholte Inserate **über die Plattform**~~ | L5 | S | **gebaut** — ein geholtes Inserat ist ein Inserat wie jedes andere |
-| **Inserat bearbeiten**: eine Seite dafür fehlt ganz; bei geholten Inseraten nur Fähigkeiten, Gehalt und PLZ | — | S | der Server kann es (ADR-0052); ohne Fähigkeiten bekommt ein geholtes Inserat kein Häkchen und keinen Scout |
+| ~~**Inserat bearbeiten**: eine Seite dafür fehlt ganz; bei geholten Inseraten nur Fähigkeiten, Gehalt und PLZ~~ | — | S | **gebaut 18.10.2026** — `/company/jobs/:id/edit`; ohne Fähigkeiten bekommt ein geholtes Inserat kein Häkchen und keinen Scout |
 | **XING**: Link im Profil; Import aus dem eigenen Export nach Messung | N2 | S | |
 | **Anmelden mit Google / Microsoft / Apple** | N3 | M | eine Entscheidung vorab: in identity-service selbst oder über den Identitätsanbieter aus Q4 — ADR |
 | **Dokumente aus Drive / OneDrive / Dropbox** | N3 | M | nur die gewählte Datei, kein Ordnerzugriff; Ziel-Hosts in der Egress-Grenze deklarieren |

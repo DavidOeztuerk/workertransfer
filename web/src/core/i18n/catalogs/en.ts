@@ -1189,6 +1189,14 @@ const en: Catalog = {
   },
 
   companyJobs: {
+    edit: "Edit",
+    editTitle: "Edit job",
+    save: "Save changes",
+    saving: "Saving…",
+    notFound: "This job does not exist — or not at your company.",
+    mirroredFields: "Title, text, place, work mode and employment come from your source and are changed there. Here you add what the applicant tracking system does not bring: skills, salary and postal code — without skills applicants see no ticks.",
+    mirroredConflict: "This job's text belongs to your source. Change it there; the next fetch takes it over.",
+    closedNoEdit: "A closed job is not changed any more — applications refer to its text.",
     mirrored: "From your source — the text is changed there",
     atSource: "View at the source",
     matchingPeople: "Matching people",

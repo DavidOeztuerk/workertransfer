@@ -1193,6 +1193,14 @@ const de = {
   },
 
   companyJobs: {
+    edit: "Bearbeiten",
+    editTitle: "Stelle bearbeiten",
+    save: "Änderungen speichern",
+    saving: "Wird gespeichert…",
+    notFound: "Diese Stelle gibt es nicht — oder nicht bei eurem Unternehmen.",
+    mirroredFields: "Titel, Text, Ort, Arbeitsform und Beschäftigung kommen aus eurer Quelle und werden dort geändert. Hier ergänzt ihr, was das Bewerbermanagement nicht mitbringt: Fähigkeiten, Gehalt und PLZ — ohne Fähigkeiten sehen Bewerbende keine Häkchen.",
+    mirroredConflict: "Der Text dieser Stelle gehört eurer Quelle. Ändert ihn dort; der nächste Abruf übernimmt ihn.",
+    closedNoEdit: "Eine geschlossene Stelle wird nicht mehr geändert — Bewerbungen beziehen sich auf ihren Text.",
     mirrored: "Aus eurer Quelle — der Text wird dort geändert",
     atSource: "An der Quelle ansehen",
     matchingPeople: "Passende Personen",

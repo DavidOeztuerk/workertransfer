@@ -22,6 +22,7 @@ export const companyRoutes: RouteObject[] = [
   { path: "/scout", element: lazyRoute(() => import("./pages/ScoutPage"), "ScoutPage") },
   { path: "/company/jobs", element: lazyRoute(() => import("./pages/CompanyJobsPage"), "CompanyJobsPage") },
   { path: "/company/jobs/new", element: lazyRoute(() => import("./pages/CompanyJobNewPage"), "CompanyJobNewPage") },
+  { path: "/company/jobs/:id/edit", element: lazyRoute(() => import("./pages/CompanyJobNewPage"), "CompanyJobEditPage") },
   { path: "/company/team", element: lazyRoute(() => import("./pages/CompanyTeamPage"), "CompanyTeamPage") },
   { path: "/company/team/invite", element: lazyRoute(() => import("./pages/CompanyTeamInvitePage"), "CompanyTeamInvitePage") },
   { path: "/company/profile", element: lazyRoute(() => import("./pages/CompanyProfilePage"), "CompanyProfilePage") },

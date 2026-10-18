@@ -208,6 +208,14 @@ export function CompanyJobsPage() {
                             {t("companyJobs.matchingPeople")}
                           </Button>
                         ) : null}
+                        <Button
+                          component={RouterLink}
+                          to={`/company/jobs/${job.id}/edit`}
+                          variant="outlined"
+                          size="small"
+                        >
+                          {t("companyJobs.edit")}
+                        </Button>
                         {job.status === "draft" ? (
                           <Button
                             variant="contained"
