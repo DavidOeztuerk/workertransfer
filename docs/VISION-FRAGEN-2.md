@@ -377,6 +377,8 @@ schreibt der Agent als Text.
 
 **Antwort:** **B, 17.10.2026 — MVP.** Gestaltungsvorlagen fürs Anschreiben, passend zu den Lebenslauf-Vorlagen.
 
+**Gebaut am 18.10.2026.** Keine eigene Wahl fürs Anschreiben: es folgt der Vorlage, die auf der Lebenslaufseite gewählt ist — eine Mappe, deren Brief und Lebenslauf aussehen wie von zwei Leuten, liest sich schlechter als jedes für sich.
+
 ---
 
 ## Q. Vor dem Start — aus Runde 1 verschoben

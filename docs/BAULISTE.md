@@ -87,7 +87,7 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 | ~~**XING**: Link im Profil~~; Import aus dem eigenen Export nach Messung | N2 | S | **Link gebaut 18.10.2026** — er nennt die Person, das Formular sagt es vorher; der Import braucht einen echten Export zum Messen |
 | ~~**Anmelden mit Google / Microsoft / Apple**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0053) — identity-service selbst, verknüpft über die Kennung des Anbieters, nie über die Adresse; **aus**, bis der Betreiber die drei Apps registriert (`.env.example`) |
 | ~~**Dokumente aus Google Drive / Dropbox**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0054): nur die gewählte Datei, im Browser geholt, über den bestehenden Upload; aus bis zur Registrierung; **OneDrive nicht** — sein Picker liest alle Dateien |
-| **Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen | P2 | M | |
+| ~~**Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen~~ | P2 | M | **gebaut 18.10.2026** — das Anschreiben trägt die Vorlage des Lebenslaufs (schlicht, klassisch, modern), bei der Person wie in der Mappe der Firma |
 
 ## Neue ADRs, die mit dem Bau nötig werden
 
