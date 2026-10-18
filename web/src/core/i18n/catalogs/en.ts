@@ -741,6 +741,7 @@ const en: Catalog = {
   },
 
   drafts: {
+    templateFollows: "The layout follows your CV template — you can change it under “CV”.",
     title: "My drafts",
     signInRequired: "Please <1>sign in</1> to see your drafts.",
     lead: "Drafts of your applications. Open shows the letter — Approve and Send turn it into an application.",

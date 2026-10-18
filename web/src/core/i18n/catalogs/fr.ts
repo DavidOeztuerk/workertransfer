@@ -741,6 +741,7 @@ const fr: Catalog = {
   },
 
   drafts: {
+    templateFollows: "La mise en forme suit le modèle de votre CV — vous pouvez le changer sous « CV ».",
     title: "Mes brouillons",
     signInRequired: "Veuillez vous <1>connecter</1> pour voir vos brouillons.",
     lead: "Brouillons de vos candidatures. Ouvrir montre la lettre — Approuver et Envoyer en font une candidature.",

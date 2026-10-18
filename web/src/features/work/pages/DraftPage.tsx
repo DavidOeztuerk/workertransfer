@@ -440,13 +440,20 @@ export function DraftPage() {
                 }
               />
             ) : (
-              <LetterSheet
-                subject={draft.subject}
-                text={draft.body}
-                emptyHint={writing ? t("drafts.writingNow") : t("drafts.emptyLetter")}
-                sender={senderFromSession(session, address.data)}
-                recipient={recipientFromCompany(company.data, job.data)}
-              />
+              <>
+                <LetterSheet
+                  subject={draft.subject}
+                  text={draft.body}
+                  emptyHint={writing ? t("drafts.writingNow") : t("drafts.emptyLetter")}
+                  sender={senderFromSession(session, address.data)}
+                  recipient={recipientFromCompany(company.data, job.data)}
+                  // The CV's template (P2); the company's folder shows the same.
+                  template={curriculumVitae.data?.ok ? curriculumVitae.data.value?.template : undefined}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  {t("drafts.templateFollows")}
+                </Typography>
+              </>
             )}
 
             {empty || editing || writing ? null : (
