@@ -233,7 +233,7 @@ const fr: Catalog = {
   draftHelp: {
     labelNew: "Se faire aider à écrire",
     labelRephrase: "Faire reformuler ce texte",
-    hint: "Facultatif : ce qui compte pour vous (« plus court », « plus factuel », « je suis infirmier »). Votre texte de profil et vos compétences sont transmis à Anthropic pour cela. Vos nom et adresse, non. Rien n’est enregistré — la proposition arrive dans le champ ci-dessus.",
+    hint: "Facultatif : ce qui compte pour vous (« plus court », « plus factuel », « je suis infirmier »). Votre texte de profil et vos compétences sont transmis pour cela au modèle d’IA de la plateforme — ou à votre propre fournisseur, si vous avez enregistré votre propre clé dans les paramètres. Vos nom et adresse, non. Rien n’est enregistré — la proposition arrive dans le champ ci-dessus.",
     inProgress: "Rédaction en cours…",
     buttonNew: "Obtenir une proposition",
     buttonReplaces: "Obtenir une proposition (remplace le texte ci-dessus)",
@@ -1178,7 +1178,7 @@ const fr: Catalog = {
     creating: "Création…",
     helpNew: "Se faire aider à écrire",
     helpRephrase: "Faire reformuler l’annonce",
-    helpHint: "Facultatif : ce qui compte pour vous (« plus court », « moins de formules toutes faites »). Titre, description, lieu et compétences recherchées sont transmis à Anthropic pour cela — rien sur les candidats. La proposition n’invente aucune exigence supplémentaire, et elle n’est enregistrée que lorsque vous créez le brouillon.",
+    helpHint: "Facultatif : ce qui compte pour vous (« plus court », « moins de formules toutes faites »). Titre, description, lieu et compétences recherchées sont transmis pour cela au modèle d’IA de la plateforme — rien sur les candidats. La proposition n’invente aucune exigence supplémentaire, et elle n’est enregistrée que lorsque vous créez le brouillon.",
     helpInProgress: "Rédaction…",
     helpButton: "Obtenir une proposition",
     helpButtonReplaces: "Obtenir une proposition (remplace la description)",

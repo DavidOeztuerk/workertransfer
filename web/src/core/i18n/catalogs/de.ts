@@ -236,7 +236,7 @@ const de = {
   draftHelp: {
     labelNew: "Beim Schreiben helfen lassen",
     labelRephrase: "Text umformulieren lassen",
-    hint: "Optional: was dir wichtig ist („kürzer“, „sachlicher“, „ich bin Pflegefachkraft“). Dein Profiltext und deine Fähigkeiten gehen dafür an Anthropic. Name und Adresse nicht. Gespeichert wird nichts — der Vorschlag landet im Feld oben.",
+    hint: "Optional: was dir wichtig ist („kürzer“, „sachlicher“, „ich bin Pflegefachkraft“). Dein Profiltext und deine Fähigkeiten gehen dafür an das KI-Modell der Plattform — oder an deinen Anbieter, wenn du in den Einstellungen einen eigenen Schlüssel hinterlegt hast. Name und Adresse nicht. Gespeichert wird nichts — der Vorschlag landet im Feld oben.",
     inProgress: "Wird geschrieben…",
     buttonNew: "Vorschlag holen",
     buttonReplaces: "Vorschlag holen (ersetzt den Text oben)",
@@ -1182,7 +1182,7 @@ const de = {
     creating: "Wird angelegt…",
     helpNew: "Beim Schreiben helfen lassen",
     helpRephrase: "Anzeige umformulieren lassen",
-    helpHint: "Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, Ort und die gesuchten Fähigkeiten gehen dafür an Anthropic — nichts über Bewerbende. Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn ihr den Entwurf anlegt.",
+    helpHint: "Optional: was euch wichtig ist („kürzer“, „weniger Floskeln“). Titel, Beschreibung, Ort und die gesuchten Fähigkeiten gehen dafür an das KI-Modell der Plattform — nichts über Bewerbende. Anforderungen erfindet der Vorschlag keine dazu, und gespeichert wird er erst, wenn ihr den Entwurf anlegt.",
     helpInProgress: "Wird geschrieben…",
     helpButton: "Vorschlag holen",
     helpButtonReplaces: "Vorschlag holen (ersetzt die Beschreibung)",

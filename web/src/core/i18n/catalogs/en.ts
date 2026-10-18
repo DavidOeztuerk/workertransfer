@@ -233,7 +233,7 @@ const en: Catalog = {
   draftHelp: {
     labelNew: "Get help writing this",
     labelRephrase: "Have this text rephrased",
-    hint: "Optional: what matters to you (“shorter”, “more factual”, “I am a nurse”). Your profile text and your skills go to Anthropic for this. Your name and address do not. Nothing is stored — the suggestion lands in the field above.",
+    hint: "Optional: what matters to you (“shorter”, “more factual”, “I am a nurse”). Your profile text and your skills go to the platform’s AI model for this — or to your own provider, if you have stored your own key in the settings. Your name and address do not. Nothing is stored — the suggestion lands in the field above.",
     inProgress: "Writing…",
     buttonNew: "Get a suggestion",
     buttonReplaces: "Get a suggestion (replaces the text above)",
@@ -1178,7 +1178,7 @@ const en: Catalog = {
     creating: "Creating…",
     helpNew: "Get help writing this",
     helpRephrase: "Have this advert rephrased",
-    helpHint: "Optional: what matters to you (“shorter”, “fewer clichés”). Title, description, location and the skills sought go to Anthropic for this — nothing about applicants. The suggestion invents no extra requirements, and it is only stored once you create the draft.",
+    helpHint: "Optional: what matters to you (“shorter”, “fewer clichés”). Title, description, location and the skills sought go to the platform’s AI model for this — nothing about applicants. The suggestion invents no extra requirements, and it is only stored once you create the draft.",
     helpInProgress: "Writing…",
     helpButton: "Get a suggestion",
     helpButtonReplaces: "Get a suggestion (replaces the description)",
