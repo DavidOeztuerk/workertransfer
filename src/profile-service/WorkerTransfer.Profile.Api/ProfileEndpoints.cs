@@ -43,7 +43,9 @@ public sealed record ProfileBody(
     /// no voluntary one.
     /// </remarks>
     [property: JsonPropertyName("commute_km")] string? CommuteKm = null,
-    [property: JsonPropertyName("relocation")] string? Relocation = null);
+    [property: JsonPropertyName("relocation")] string? Relocation = null,
+    /// <summary>Her own XING profile — names her; <c>null</c> takes it back.</summary>
+    [property: JsonPropertyName("xing_url")] string? XingUrl = null);
 
 /// <summary>What somebody sends to get help with phrasing.</summary>
 public sealed record DraftBody(string Wish);
@@ -92,7 +94,8 @@ public static class ProfileEndpoints
                         caller.Subject, body.Headline, body.Bio,
                         body.Location, body.RemoteOk, body.Skills ?? [],
                         CommuteTerms.Read(body.CommuteKm),
-                        RelocationTerms.Read(body.Relocation)),
+                        RelocationTerms.Read(body.Relocation),
+                        body.XingUrl),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(ToWire(profile), cancellationToken);
@@ -259,6 +262,7 @@ public static class ProfileEndpoints
         // to tell "said nothing" from "field does not exist".
         ["commute_km"] = CommuteTerms.Word(profile.Commute),
         ["relocation"] = RelocationTerms.Word(profile.Relocation),
+        ["xing_url"] = profile.Xing,
         ["updated_at"] = profile.UpdatedAt
     };
 

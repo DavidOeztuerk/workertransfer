@@ -306,6 +306,9 @@ const en: Catalog = {
   },
 
   profile: {
+    xing: "XING profile",
+    xingHint: "Optional. Note: your XING profile shows your name. Whoever may see your profile here then knows who you are — your current employer too, if you made your profile public. Leaving it empty takes the link back.",
+    xingInvalid: "Please give the address of your XING profile, e.g. https://www.xing.com/profile/First_Last.",
     commute: "How far would you commute?",
     commuteHint: "Voluntary. A company only sees a tick against its own vacancy, never a distance.",
     notStated: "Not stated",
@@ -1302,6 +1305,7 @@ const en: Catalog = {
   },
 
   companyApplications: {
+    xing: "The person’s XING profile",
     title: "View application",
     signInRequired: "Please <1>sign in</1> to see this application.",
     lead: "Here you see the full application with cover letter, CV, portfolio and documents. The tabs show only what the person has released.",

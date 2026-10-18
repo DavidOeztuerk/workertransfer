@@ -24,6 +24,7 @@ import type { ApiError } from "../../../core/store/thunkHelpers";
 import { type MessageKey, failureKey } from "../../../shared/api/errors";
 import {
   type CommuteReadiness,
+  PROFILE_CASES,
   type Profile,
   type RelocationReadiness,
   getMyProfile,
@@ -69,6 +70,7 @@ interface FormState {
   /** Empty text means "said nothing" — in the form, not on the wire. */
   commute_km: string;
   relocation: string;
+  xing: string;
 }
 
 const EMPTY: FormState = {
@@ -79,6 +81,7 @@ const EMPTY: FormState = {
   skills: "",
   commute_km: "",
   relocation: "",
+  xing: "",
 };
 
 /**
@@ -105,6 +108,7 @@ function toForm(profile: Profile | null): FormState {
     skills: profile.skills.join(", "),
     commute_km: profile.commute_km ?? "",
     relocation: profile.relocation ?? "",
+    xing: profile.xing_url ?? "",
   };
 }
 
@@ -308,6 +312,7 @@ export function ProfilePage() {
           ? null
           : (form.relocation as RelocationReadiness),
       skills: parseSkills(form.skills),
+      xing_url: form.xing.trim() === "" ? null : form.xing.trim(),
     });
     setSaving(false);
     if (result.ok) {
@@ -559,8 +564,20 @@ export function ProfilePage() {
               ))}
             </TextField>
 
+            <TextField
+              // It names her: a XING profile shows the civil name that the
+              // platform otherwise releases last (ADR-0037 stage 3). The hint
+              // says so before saving — the link is her choice, not a default.
+              label={t("profile.xing")}
+              helperText={t("profile.xingHint")}
+              placeholder="https://www.xing.com/profile/…"
+              value={form.xing}
+              onChange={(event) => change("xing", event.target.value)}
+              slotProps={{ htmlInput: { maxLength: 200, inputMode: "url" } }}
+            />
+
             {error !== null ? (
-              <ErrorBlock error={error.error} fallback={error.fallback} />
+              <ErrorBlock error={error.error} fallback={error.fallback} cases={PROFILE_CASES} />
             ) : null}
             {saved && error === null ? (
               <Alert

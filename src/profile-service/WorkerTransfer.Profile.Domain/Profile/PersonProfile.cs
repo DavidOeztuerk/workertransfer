@@ -47,6 +47,7 @@ public sealed class PersonProfile
         SkillList skills,
         CommuteReadiness? commute,
         RelocationReadiness? relocation,
+        string? xing,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt)
     {
@@ -58,6 +59,7 @@ public sealed class PersonProfile
         Skills = skills;
         Commute = commute;
         Relocation = relocation;
+        Xing = xing;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
     }
@@ -100,6 +102,9 @@ public sealed class PersonProfile
     /// <summary>Whether they would relocate, or <c>null</c>.</summary>
     public RelocationReadiness? Relocation { get; private set; }
 
+    /// <summary>Her own XING profile, or <c>null</c> — see <see cref="XingAddress"/>.</summary>
+    public string? Xing { get; private set; }
+
     /// <summary>When the profile came into being.</summary>
     public DateTimeOffset CreatedAt { get; }
 
@@ -119,14 +124,15 @@ public sealed class PersonProfile
         SkillList skills,
         DateTimeOffset now,
         CommuteReadiness? commute = null,
-        RelocationReadiness? relocation = null)
+        RelocationReadiness? relocation = null,
+        string? xing = null)
     {
         var (checkedHeadline, checkedText, checkedLocation) = Check(headline, text, location);
 
         return new PersonProfile(
             subject, checkedHeadline, checkedText, checkedLocation, remoteOk,
             skills ?? SkillList.Empty,
-            commute, relocation, now, now);
+            commute, relocation, XingAddress.Normalize(xing), now, now);
     }
 
     /// <summary>Rebuilds a stored profile.</summary>
@@ -146,10 +152,11 @@ public sealed class PersonProfile
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
         CommuteReadiness? commute = null,
-        RelocationReadiness? relocation = null) =>
+        RelocationReadiness? relocation = null,
+        string? xing = null) =>
         new(subject, headline, text, location, remoteOk,
             skills ?? SkillList.Empty,
-            commute, relocation, createdAt, updatedAt);
+            commute, relocation, xing, createdAt, updatedAt);
 
     /// <summary>Changes all fields at once.</summary>
     /// <remarks>
@@ -167,9 +174,11 @@ public sealed class PersonProfile
         SkillList skills,
         DateTimeOffset now,
         CommuteReadiness? commute = null,
-        RelocationReadiness? relocation = null)
+        RelocationReadiness? relocation = null,
+        string? xing = null)
     {
         var (checkedHeadline, checkedText, checkedLocation) = Check(headline, text, location);
+        var checkedXing = XingAddress.Normalize(xing);
 
         Headline = checkedHeadline;
         Text = checkedText;
@@ -181,6 +190,7 @@ public sealed class PersonProfile
         // would make taking a statement back impossible.
         Commute = commute;
         Relocation = relocation;
+        Xing = checkedXing;
         UpdatedAt = now;
     }
 

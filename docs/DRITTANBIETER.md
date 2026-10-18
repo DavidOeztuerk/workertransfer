@@ -60,7 +60,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | Anbieter | Stand | Bemerkung |
 |---|---|---|
 | GitHub | **gebaut** (ADR-0033) | eigene, bewiesene Verbindung; OAuth oder Gist |
-| XING | **MVP offen** (N2) | Link im Profil; Import aus dem eigenen Export erst nach Messung |
+| XING | Link **gebaut** (N2), Import **MVP offen** | der Link nennt die Person und reist nur mit dem vollen Profil; der Import aus dem eigenen Export erst nach Messung an einem echten Export |
 | LinkedIn-Import aus dem eigenen Export | **nach dem MVP** (N1) | |
 | Google Drive, OneDrive, Dropbox | **MVP offen** (N3) | nur die gewählte Datei, kein Ordnerzugriff; Hosts in der Egress-Grenze |
 | Open Badges / Credly, GitLab | **nach dem MVP** (N3) | |

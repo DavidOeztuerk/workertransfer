@@ -114,6 +114,11 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<string>("Xing")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("xing_url");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UpdatedAt", "Id")

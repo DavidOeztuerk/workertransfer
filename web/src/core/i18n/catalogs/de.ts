@@ -309,6 +309,9 @@ const de = {
   },
 
   profile: {
+    xing: "XING-Profil",
+    xingHint: "Freiwillig. Achtung: Dein XING-Profil zeigt deinen Namen. Wer dein Profil hier sehen darf, weiß damit, wer du bist — auch dein jetziger Arbeitgeber, wenn du dein Profil öffentlich gemacht hast. Leer lassen nimmt den Link zurück.",
+    xingInvalid: "Bitte die Adresse deines XING-Profils angeben, z. B. https://www.xing.com/profile/Vorname_Nachname.",
     commute: "Wie weit würdest du pendeln?",
     commuteHint: "Freiwillig. Ein Unternehmen sieht daraus nur ein Häkchen zu seiner Stelle, nie eine Entfernung.",
     notStated: "Keine Angabe",
@@ -1306,6 +1309,7 @@ const de = {
   },
 
   companyApplications: {
+    xing: "XING-Profil der Person",
     title: "Bewerbung ansehen",
     signInRequired: "Bitte <1>anmelden</1>, um diese Bewerbung zu sehen.",
     lead: "Hier siehst du die vollständige Bewerbung mit Anschreiben, Lebenslauf, Portfolio und Unterlagen. Die Reiter zeigen nur das, was die Person freigegeben hat.",

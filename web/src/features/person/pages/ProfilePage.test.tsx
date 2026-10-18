@@ -404,3 +404,51 @@ describe("ProfilePage — suggestions from one's own documents", () => {
     expect(screen.queryByText(/Aus deinen Unterlagen/)).toBeNull();
   });
 });
+
+/**
+ * The XING link (VISION-FRAGEN-2 N2) names the person — the form says so
+ * before saving, the link goes out trimmed, an empty field takes it back.
+ */
+describe("ProfilePage — the XING link", () => {
+  it("says before saving that the link shows the name", async () => {
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
+
+    expect(await screen.findByLabelText(/XING-Profil/)).toBeInTheDocument();
+    expect(screen.getByText(/Dein XING-Profil zeigt deinen Namen/)).toBeInTheDocument();
+  });
+
+  it("sends the link, and an emptied field takes it back", async () => {
+    wire.set("GET /profiles/me", { body: { ...PROFILE, xing_url: "https://www.xing.com/profile/Anna_B" } });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
+    const user = userEvent.setup();
+
+    const field = await screen.findByLabelText(/XING-Profil/);
+    await waitFor(() => expect(field).toHaveValue("https://www.xing.com/profile/Anna_B"));
+    await user.click(screen.getByRole("button", { name: /Speichern/ }));
+    await waitFor(() => expect(wire.last("PUT /profiles/me")).toBeDefined());
+    expect(wire.last("PUT /profiles/me")?.body).toMatchObject({ xing_url: "https://www.xing.com/profile/Anna_B" });
+
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: /Speichern/ }));
+    await waitFor(() => expect(wire.last("PUT /profiles/me")?.body).toMatchObject({ xing_url: null }));
+  });
+
+  it("reads a refused address in German", async () => {
+    wire.set("PUT /profiles/me", {
+      status: 422,
+      body: {
+        title: "Request failed",
+        detail: "The XING link must be a XING profile address (https://www.xing.com/profile/…).",
+        correlationId: "c",
+      },
+    });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText(/XING-Profil/), "https://evil.example/x");
+    await user.click(screen.getByRole("button", { name: /Speichern/ }));
+
+    expect(await screen.findByText(/Bitte die Adresse deines XING-Profils angeben/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/must be a XING profile address/);
+  });
+});

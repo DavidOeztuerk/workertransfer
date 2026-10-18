@@ -40,6 +40,7 @@ public sealed class EfProfileStore(ProfileDbContext context) : IProfileStore
                 Skills = [.. profile.Skills.Values],
                 Commute = profile.Commute,
                 Relocation = profile.Relocation,
+                Xing = profile.Xing,
                 CreatedAt = profile.CreatedAt,
                 UpdatedAt = profile.UpdatedAt
             });
@@ -54,6 +55,7 @@ public sealed class EfProfileStore(ProfileDbContext context) : IProfileStore
         row.Skills = [.. profile.Skills.Values];
         row.Commute = profile.Commute;
         row.Relocation = profile.Relocation;
+        row.Xing = profile.Xing;
         row.UpdatedAt = profile.UpdatedAt;
     }
 
@@ -175,5 +177,6 @@ public sealed class EfProfileStore(ProfileDbContext context) : IProfileStore
             row.CreatedAt,
             row.UpdatedAt,
             row.Commute,
-            row.Relocation);
+            row.Relocation,
+            row.Xing);
 }

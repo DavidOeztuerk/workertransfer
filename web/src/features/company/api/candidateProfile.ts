@@ -19,6 +19,8 @@ export interface Profile {
   location: string;
   remote_ok: boolean;
   skills: string[];
+  /** Her own XING profile, if she named one — an https link to www.xing.com only. */
+  xing_url?: string | null;
   updated_at: string;
 }
 

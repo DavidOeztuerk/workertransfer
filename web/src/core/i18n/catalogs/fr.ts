@@ -306,6 +306,9 @@ const fr: Catalog = {
   },
 
   profile: {
+    xing: "Profil XING",
+    xingHint: "Facultatif. Attention : votre profil XING montre votre nom. Quiconque peut voir votre profil ici sait alors qui vous êtes — votre employeur actuel aussi, si vous avez rendu votre profil public. Laisser vide retire le lien.",
+    xingInvalid: "Veuillez indiquer l’adresse de votre profil XING, p. ex. https://www.xing.com/profile/Prenom_Nom.",
     commute: "Jusqu’où feriez-vous la navette ?",
     commuteHint: "Facultatif. Une entreprise n’en voit qu’une coche pour son propre poste, jamais une distance.",
     notStated: "Non précisé",
@@ -1302,6 +1305,7 @@ const fr: Catalog = {
   },
 
   companyApplications: {
+    xing: "Profil XING de la personne",
     title: "Voir la candidature",
     signInRequired: "Veuillez vous <1>connecter</1> pour voir cette candidature.",
     lead: "Ici, vous voyez la candidature complète avec lettre de motivation, CV, portfolio et pièces jointes. Les onglets n’affichent que ce que la personne a autorisé.",

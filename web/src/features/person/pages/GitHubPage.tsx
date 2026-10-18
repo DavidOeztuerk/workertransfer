@@ -506,6 +506,7 @@ export function GitHubPage() {
                       // optional.
                       commute_km: ownProfile.profile.commute_km,
                       relocation: ownProfile.profile.relocation,
+                      xing_url: ownProfile.profile.xing_url,
                     });
                     return result;
                   })
