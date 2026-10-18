@@ -47,6 +47,13 @@ export interface Job {
   updated_at: string;
   /** What the job pays — `null`: not stated, and the page says so (B5). */
   salary: Salary | null;
+  /**
+   * Fetched from the company's ATS or own feed (ADR-0052): its text is
+   * changed there, not here.
+   */
+  mirrored: boolean;
+  /** Where it stands at its source — only an https link, or nothing. */
+  source_url: string | null;
 }
 
 export type SalaryPeriod = "year" | "month" | "hour";
@@ -89,6 +96,8 @@ interface JobWire {
   published_at: string | null;
   updated_at: string;
   salary?: Salary | null;
+  mirrored?: boolean;
+  source_url?: string;
 }
 
 /** From the wire into the shape the UI works with. */
@@ -107,6 +116,8 @@ function fromWire(wire: JobWire): Job {
     published_at: wire.published_at,
     updated_at: wire.updated_at,
     salary: wire.salary ?? null,
+    mirrored: wire.mirrored === true,
+    source_url: wire.source_url ?? null,
   };
 }
 

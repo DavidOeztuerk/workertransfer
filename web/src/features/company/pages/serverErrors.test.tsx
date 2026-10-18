@@ -153,6 +153,7 @@ describe("a refused step reads in German", () => {
   it("publishing without the admin role says who may", async () => {
     stubFetch((url, init) => {
       if (url.includes("/publish") && init?.method === "POST") return problem(403, "not permitted");
+      if (url.includes("/jobs/sources")) return { body: [] };
       return { body: [JOB] };
     });
     draw(<CompanyJobsPage />);
