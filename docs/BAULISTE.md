@@ -18,7 +18,7 @@ Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
 | Lebenslauf-Vorlage, Bewerbung auf Inserat | B2 | gebaut |
 | **Nachrichten pro Vorgang** (Bewerbung) mit Entwurf und Freigabe | E1, D2 | gebaut 07.10.2026 (ADR-0047, `messages-service`) |
 | **Platzhalter-Schicht**, Anschreiben darauf umgestellt | E2 | gebaut 07.10.2026 (`ServiceDefaults/Ai/Placeholders.cs`) |
-| **Mistral als Standard-Anbieter**, Ollama bleibt | E2 | gebaut 07.10.2026 (`Draft__Provider`, `ModelWire`) |
+| ~~**Mistral als Standard-Anbieter**~~, Ollama bleibt | E2 | gebaut 07.10.2026 (`Draft__Provider`, `ModelWire`) — **abgelöst durch ADR-0051** (17.10.2026): bis zum Start das lokale Ollama, der Anbieter im Betrieb wird vor dem Start mit dem Geschäftsmodell entschieden |
 | Hinweis „keine Gesundheitsdaten" über jedem Nachrichtenfeld | E2 | gebaut 07.10.2026 — immer, nicht erst wenn ein Berater mitliest |
 
 ## Phase 1 — Grundlagen, ohne die kein Agent arbeiten kann
