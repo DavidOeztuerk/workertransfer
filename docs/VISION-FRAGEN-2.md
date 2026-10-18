@@ -71,7 +71,19 @@ einspielen.
 
 **Vorschlag:** A.
 
-**Antwort:** **A, 17.10.2026 — MVP.** DNS-TXT-Eintrag auf der Firmendomain; derselbe Nachweis trägt später die Subdomain (M3).
+**Antwort:** ~~A, DNS-TXT~~ — **korrigiert am 17.10.2026: B, MVP.** Ein
+DNS-Eintrag beweist nur die Domain (die ist per E-Mail schon bewiesen), nicht
+dass ein Board der Firma gehört: eine fremde Firma könnte „greenhouse:acme“
+in ihr eigenes DNS schreiben. Deshalb: eine Seite auf der nachgewiesenen
+Domain verlinkt das Board, geprüft beim Einrichten und vor jedem Abruf; ein
+eigener Feed muss auf der eigenen Domain liegen.
+
+**Noch einmal korrigiert am 18.10.2026: ein Code im Board** (ADR-0052). Der
+Link auf der eigenen Seite hat dasselbe Loch wie der DNS-Eintrag — Firma B kann
+genauso auf Acmes Board verlinken. Beweisen kann nur, was allein der Inhaber
+des Boards ändern kann: die Firma schreibt einen Code der Plattform in ein
+Inserat in ihrem ATS. Der eigene Feed bleibt durch seinen Ort bewiesen. Ein
+echter Login beim ATS kommt nach dem MVP (`DRITTANBIETER.md`).
 
 ### L3. Wie kommen geholte Inserate auf die Plattform?
 

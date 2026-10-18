@@ -79,10 +79,11 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 
 | Was | Frage | Größe | Bemerkung |
 |---|---|---|---|
-| **Karriereseiten-Anbindung**: offizielle ATS-Abrufe (Greenhouse, Lever, Personio-XML, Recruitee …) und ein eigener Feed der Firma | L1 | L | jeder Anbieter erst gegen die echte Schnittstelle gemessen, dann gebaut; kein Scraping |
-| **Domain-Nachweis** per DNS-TXT-Eintrag | L2 | M | trägt später auch die Subdomain der persönlichen Seite (M3) |
-| Abruf täglich + „jetzt abholen“; pro Quelle Entwurf oder direkt (Vorgabe Entwurf); an der Quelle verschwunden → hier geschlossen | L3, L4 | M | Bewerbungen auf ein geschlossenes Inserat bleiben |
-| Bewerbung auf geholte Inserate **über die Plattform** | L5 | S | Mappe, Anschreiben-Agent und Einwilligungen gelten wie sonst |
+| ~~**Karriereseiten-Anbindung**: offizielle ATS-Abrufe (Greenhouse, Lever, Personio-XML) und ein eigener Feed der Firma~~ | L1 | L | **gebaut 18.10.2026** (ADR-0052); weitere ATS nach dem MVP, siehe `DRITTANBIETER.md` |
+| ~~**Nachweis der Quelle**: ein Code, den die Firma in ein Inserat im ATS schreibt; ein eigener Feed liegt auf der eigenen Domain~~ | L2 | M | **gebaut 18.10.2026** — korrigiert: DNS und ein Link auf der eigenen Seite beweisen beide nicht, dass das Board der Firma gehört |
+| ~~Abruf täglich + „jetzt abholen“; pro Quelle Entwurf oder direkt (Vorgabe Entwurf); an der Quelle verschwunden → hier geschlossen~~ | L3, L4 | M | **gebaut 18.10.2026**; Bewerbungen auf ein geschlossenes Inserat bleiben |
+| ~~Bewerbung auf geholte Inserate **über die Plattform**~~ | L5 | S | **gebaut** — ein geholtes Inserat ist ein Inserat wie jedes andere |
+| **Inserat bearbeiten**: eine Seite dafür fehlt ganz; bei geholten Inseraten nur Fähigkeiten, Gehalt und PLZ | — | S | der Server kann es (ADR-0052); ohne Fähigkeiten bekommt ein geholtes Inserat kein Häkchen und keinen Scout |
 | **XING**: Link im Profil; Import aus dem eigenen Export nach Messung | N2 | S | |
 | **Anmelden mit Google / Microsoft / Apple** | N3 | M | eine Entscheidung vorab: in identity-service selbst oder über den Identitätsanbieter aus Q4 — ADR |
 | **Dokumente aus Drive / OneDrive / Dropbox** | N3 | M | nur die gewählte Datei, kein Ordnerzugriff; Ziel-Hosts in der Egress-Grenze deklarieren |
@@ -96,8 +97,8 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 - ~~Nachrichten und Agenten-Entwürfe werden gespeichert~~ — ADR-0047, 07.10.2026.
 - ~~Ein KI-Zugang: Plattform-Modell und eigener Schlüssel~~ — ADR-0051,
   17.10.2026.
-- **Inserate von außen**: nur offizielle Abrufe, Nachweis per DNS — ergänzt
-  ADR-0004 (kein Scraping) um den erlaubten Weg.
+- ~~Inserate von außen: nur offizielle Abrufe, das Board beweist sich mit einem
+  Code~~ — ADR-0052, 17./18.10.2026.
 - **Anmelden über fremde Konten**: wo die Anmeldung lebt, und dass ein
   fremdes Konto nie mehr liefert als Name und E-Mail.
 
@@ -121,6 +122,8 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 - **LinkedIn** (N1): Import aus dem eigenen Export, Link, Anmelden mit LinkedIn
 - Open Badges / Credly, GitLab, Videotermin-Link, Rückweg ins ATS (N3)
 - Stellendaten von der Firmenwebsite (L1-B), Bewerbungsweg pro Quelle (L5-C)
+- **ATS mit echtem Login** statt Code, weitere ATS, automatische Bindung für
+  Greenhouse-Einbetter, Rückweg ins ATS (ADR-0052, `DRITTANBIETER.md`)
 - **MCP** (N4): zuerst für die Person zu ihren eigenen Daten, dann für Firmen
   nur mit Firmendaten
 - **Agenten** (O1): Interview-Trainer, Lebenslauf-Optimierer, Lern-Coach,
