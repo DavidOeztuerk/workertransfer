@@ -21,6 +21,7 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { OccupationalFieldSelect } from "../../../shared/components/ui";
 import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { AuthCard } from "../components/AuthCard";
+import { ExternalSignIn } from "../components/ExternalSignIn";
 import { AuthModeTabs } from "../components/AuthModeTabs";
 import {
   isPublicEmailDomain,
@@ -280,6 +281,8 @@ export function RegisterPage() {
           {running ? t("register.inProgress") : t("register.button")}
         </Button>
       </Box>
+
+      <ExternalSignIn register />
     </AuthCard>
   );
 }

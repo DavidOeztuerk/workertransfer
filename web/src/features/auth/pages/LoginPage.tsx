@@ -11,6 +11,7 @@ import type { ServerCase } from "../../../shared/api/errors";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
+import { ExternalSignIn } from "../components/ExternalSignIn";
 import { errorCleared } from "../store/authSlice";
 import { login } from "../store/authThunks";
 
@@ -148,6 +149,8 @@ export function LoginPage() {
           {pending ? t("login.inProgress") : t("login.button")}
         </Button>
       </Box>
+
+      <ExternalSignIn />
     </AuthCard>
   );
 }
