@@ -219,8 +219,9 @@ public static class MarketEndpoints
             }
 
             var notice = await mediator.Send(new MyNoticeQuery(actor.Subject), cancellationToken);
+            var status = await mediator.Send(new MyMarketStatusQuery(actor.Subject), cancellationToken);
             await context.Response.WriteAsJsonAsync(
-                Responses.ToWire(notice, Responses.Today(context)), cancellationToken);
+                Responses.ToWire(notice, Responses.Today(context), status.IsEmployed), cancellationToken);
         });
 
         market.MapPut("/me/notice", async (
@@ -247,8 +248,9 @@ public static class MarketEndpoints
             {
                 var notice = await mediator.Send(
                     new StateNoticeCommand(actor.Subject, body.Length, unit, end), cancellationToken);
+                var status = await mediator.Send(new MyMarketStatusQuery(actor.Subject), cancellationToken);
                 await context.Response.WriteAsJsonAsync(
-                    Responses.ToWire(notice, Responses.Today(context)), cancellationToken);
+                    Responses.ToWire(notice, Responses.Today(context), status.IsEmployed), cancellationToken);
             }
             catch (MarketError error)
             {
