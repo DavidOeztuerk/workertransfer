@@ -89,6 +89,9 @@ export function MarketPage() {
 
   const [availability, setAvailability] = useState<Availability>("unavailable");
   const [employed, setEmployed] = useState(false);
+  // What the SERVER holds, not the box: the notice period's dates count only
+  // while the saved status says employed, so the cards follow the save.
+  const [savedEmployed, setSavedEmployed] = useState(false);
   const [note, setNote] = useState("");
   const [openFrom, setOpenFrom] = useState("");
   const [openUntil, setOpenUntil] = useState("");
@@ -104,6 +107,7 @@ export function MarketPage() {
     if (adopted || !current.data?.ok) return;
     setAvailability(current.data.status.availability);
     setEmployed(current.data.status.employed);
+    setSavedEmployed(current.data.status.employed);
     setNote(current.data.status.note);
     setOpenFrom(current.data.status.open_from ?? "");
     setOpenUntil(current.data.status.open_until ?? "");
@@ -137,6 +141,7 @@ export function MarketPage() {
     if (result.ok) {
       setError(null);
       setSaved(true);
+      setSavedEmployed(employed);
       current.reload();
     } else {
       setError(t(failureKey(result.error, "errors.marketStatusNotSaved", SAVE_CASES)));
@@ -307,6 +312,11 @@ export function MarketPage() {
                 sx={{ mb: 2, display: "block" }}
               />
 
+              {/* A window to be approachable in means nothing to someone who
+                  is not approachable; the dates stay stored and come back
+                  with the choice. */}
+              {availability === "unavailable" ? null : (
+              <>
               <Typography variant="h4" sx={{ mb: 0.5 }}>
                 {t("market.window")}
               </Typography>
@@ -335,6 +345,8 @@ export function MarketPage() {
                   slotProps={{ inputLabel: { shrink: true } }}
                 />
               </Box>
+              </>
+              )}
 
               <TextField
                 label={t("market.note")}
@@ -356,8 +368,10 @@ export function MarketPage() {
           ) : null}
         </CardContent>
       </Card>
-      <NoticeCard />
-      <EmployerRouteCard />
+      {/* A notice period and a way through one's employer exist only with an
+          employer. An open route still shows, so it can be closed. */}
+      {savedEmployed ? <NoticeCard /> : null}
+      <EmployerRouteCard employed={savedEmployed} />
     </PageShell>
   );
 }

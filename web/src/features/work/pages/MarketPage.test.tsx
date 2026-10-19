@@ -105,4 +105,31 @@ describe("the market status form", () => {
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Speichern$/ })).not.toBeInTheDocument();
   });
+
+  it("asks about a notice period only of someone with a job", async () => {
+    stubFetch(async () => json(200, { ...STORED, employed: false }));
+    renderWithStore(<MarketPage />, { auth: PERSON });
+
+    expect(await screen.findByRole("radio", { name: /Ich höre zu/ })).toBeChecked();
+    expect(screen.queryByRole("heading", { name: "Meine Kündigungsfrist" })).not.toBeInTheDocument();
+  });
+
+  it("shows the notice period once a job is stated", async () => {
+    stubFetch(async () => json(200, STORED));
+    renderWithStore(<MarketPage />, { auth: PERSON });
+
+    expect(await screen.findByRole("heading", { name: "Meine Kündigungsfrist" })).toBeInTheDocument();
+  });
+
+  it("asks for no window while somebody is not approachable at all", async () => {
+    stubFetch(async () => json(200, { ...STORED, availability: "unavailable" }));
+    renderWithStore(<MarketPage />, { auth: PERSON });
+    const user = userEvent.setup();
+
+    await screen.findByRole("radio", { name: /Gerade nicht/ });
+    expect(screen.queryByText("Mein Zeitfenster")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /Ich höre zu/ }));
+    expect(screen.getByText("Mein Zeitfenster")).toBeInTheDocument();
+  });
 });
