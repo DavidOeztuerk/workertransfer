@@ -1147,6 +1147,14 @@ const fr: Catalog = {
     failed: "La voie n’a pas pu être modifiée pour le moment.",
   },
 
+  cloudFiles: {
+    google: "Depuis Google Drive",
+    dropbox: "Depuis Dropbox",
+    fetching: "Récupération…",
+    hint: "Seul le fichier que vous y choisissez est récupéré — la plateforme ne voit rien d’autre de votre stockage. Il n’est téléversé qu’avec « Téléverser ».",
+    failed: "Le fichier n’a pas pu être récupéré. Réessayez ou téléversez-le depuis votre appareil.",
+  },
+
   externalLogin: {
     google: "Google",
     microsoft: "Microsoft",

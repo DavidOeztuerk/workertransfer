@@ -982,6 +982,10 @@ Built 18.10.2026 under [ADR-0053](docs/adr/0053-anmelden-mit-fremden-konten.md) 
 - **No token is kept, no provider is audited** (`AuditEvent.AllowedMetadata`); an account made through a provider has no password entry (`SignInHandler` passes it as null), and its last way in cannot be taken off (409).
 - **Empty client ids mean off** — `GET /auth/external` lists only configured providers, `start` and `callback` of an unconfigured one are 404.
 
+### Files from Google Drive and Dropbox: only the chosen one, fetched in the browser
+
+Built 18.10.2026 under [ADR-0054](docs/adr/0054-dateien-aus-drive-und-dropbox.md). Google's Picker with `drive.file` and Dropbox's Chooser (an app key, no OAuth) put the chosen file into the CV page's existing upload form — **chosen is not stored**, only "Upload" files it, through `POST /resumes/me/documents`. No token reaches a service; Google's is revoked once the file is here. The providers' scripts load on the click, never with the page. The fetched file is typed by its ending, because a provider may answer `application/octet-stream`. **OneDrive is deliberately missing**: its picker v8 needs `Files.Read` on all of a person's files. Keys come from the runtime config (`GOOGLE_PICKER_*`, `DROPBOX_APP_KEY`); empty means no button. The web UI has **no Content-Security-Policy** yet — a pre-launch item; the hosts to allow stand in the ADR.
+
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 
 Built 12.09.2026 under ADR-0043. It is PBI-7, and it closes the last place where
@@ -1200,4 +1204,5 @@ that script was built against.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `docs/DRITTANBIETER.md` — every third-party system, built or to come, with its state (18.10.2026).
 - `docs/adr/0053-anmelden-mit-fremden-konten.md` — signing in with Google, Microsoft, Apple; never linked by the address. 18.10.2026.
+- `docs/adr/0054-dateien-aus-drive-und-dropbox.md` — files from Drive and Dropbox, only the chosen one; why OneDrive is not there. 18.10.2026.
 - `AGENTS.md` — concise command + convention reference.

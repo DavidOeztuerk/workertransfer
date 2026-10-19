@@ -62,7 +62,8 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | GitHub | **gebaut** (ADR-0033) | eigene, bewiesene Verbindung; OAuth oder Gist |
 | XING | Link **gebaut** (N2), Import **MVP offen** | der Link nennt die Person und reist nur mit dem vollen Profil; der Import aus dem eigenen Export erst nach Messung an einem echten Export |
 | LinkedIn-Import aus dem eigenen Export | **nach dem MVP** (N1) | |
-| Google Drive, OneDrive, Dropbox | **MVP offen** (N3) | nur die gewählte Datei, kein Ordnerzugriff; Hosts in der Egress-Grenze |
+| Google Drive, Dropbox | **gebaut** (ADR-0054), **aus** bis zur Registrierung | nur die gewählte Datei: Drive über `drive.file` und den Picker, Dropbox über den Chooser ohne OAuth; alles im Browser, kein Token erreicht den Server; aus, bis der Betreiber die Apps registriert |
+| OneDrive | **nicht gebaut** (ADR-0054) | der Picker v8 verlangt Lesezugriff auf **alle** Dateien (`Files.Read`) — das bricht „nur die gewählte Datei“ (N3); neu messen, wenn Microsoft Einzeldateien anbietet |
 | Open Badges / Credly, GitLab | **nach dem MVP** (N3) | |
 
 ## 5. Kommunikation und Termine
@@ -86,6 +87,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | System | Stand | Bemerkung |
 |---|---|---|
 | Hosting | **vor dem Start** (Q2, Q3) | wer betreibt, wo läuft es |
+| Content-Security-Policy der Oberfläche | **vor dem Start** | die Web-Oberfläche liefert keine; die Hosts der Datei-Auswahl stehen in ADR-0054 |
 | Infisical | **vor dem Start** | füllt die Umgebung; der Mechanismus bleibt `.env` |
 | Noelia Control Plane | **gebaut** lokal, Lizenz **vor dem Start** | |
 | Valkey, Postgres, Jaeger | **gebaut**, selbst betrieben | keine fremden Dienste |

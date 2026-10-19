@@ -86,7 +86,7 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 | ~~**Inserat bearbeiten**: eine Seite dafür fehlt ganz; bei geholten Inseraten nur Fähigkeiten, Gehalt und PLZ~~ | — | S | **gebaut 18.10.2026** — `/company/jobs/:id/edit`; ohne Fähigkeiten bekommt ein geholtes Inserat kein Häkchen und keinen Scout |
 | ~~**XING**: Link im Profil~~; Import aus dem eigenen Export nach Messung | N2 | S | **Link gebaut 18.10.2026** — er nennt die Person, das Formular sagt es vorher; der Import braucht einen echten Export zum Messen |
 | ~~**Anmelden mit Google / Microsoft / Apple**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0053) — identity-service selbst, verknüpft über die Kennung des Anbieters, nie über die Adresse; **aus**, bis der Betreiber die drei Apps registriert (`.env.example`) |
-| **Dokumente aus Drive / OneDrive / Dropbox** | N3 | M | nur die gewählte Datei, kein Ordnerzugriff; Ziel-Hosts in der Egress-Grenze deklarieren |
+| ~~**Dokumente aus Google Drive / Dropbox**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0054): nur die gewählte Datei, im Browser geholt, über den bestehenden Upload; aus bis zur Registrierung; **OneDrive nicht** — sein Picker liest alle Dateien |
 | **Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen | P2 | M | |
 
 ## Neue ADRs, die mit dem Bau nötig werden
@@ -112,6 +112,8 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 - Control Plane im Betrieb: Keycloak, echte Lizenz (I2, Q4)
 - Juristen-Liste J1–J17, **gesammelt vor dem Start** (Q7), dazu Impressum,
   Datenschutzerklärung, Nutzungsbedingungen
+- **Content-Security-Policy** für die Web-Oberfläche — es gibt keine; die Hosts
+  der Datei-Auswahl stehen in ADR-0054
 
 ## Nach dem MVP
 

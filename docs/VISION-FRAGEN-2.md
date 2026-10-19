@@ -263,6 +263,8 @@ Schon entschieden und nicht neu gefragt: **Unterschrift** außerhalb (F3),
 
 **Anmelden gebaut am 18.10.2026** (ADR-0053). Die Knöpfe erscheinen, sobald der Betreiber die drei Apps registriert hat. Eine Adresse, zu der es schon ein Konto gibt, wird nie automatisch verknüpft — verbinden geht angemeldet in den Einstellungen; Microsoft-Konten bekommen unsere Bestätigungsmail, weil Microsoft keine Adresse bestätigt.
 
+**Dateien gebaut am 18.10.2026** (ADR-0054): Google Drive und Dropbox, nur die gewählte Datei. **OneDrive nicht** — gemessen: sein Picker verlangt Lesezugriff auf alle Dateien, und die Antwort hier sagt „nur die gewählte Datei“.
+
 ### N4. MCP — Anbindung an KI-Assistenten
 
 **Optionen:**

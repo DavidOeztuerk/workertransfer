@@ -38,5 +38,10 @@ data:
       SCOUT_BASE_URL: {{ $origin | quote }},
       ADVISOR_BASE_URL: {{ $origin | quote }},
       ASSESSMENT_BASE_URL: {{ $origin | quote }},
-      MESSAGES_BASE_URL: {{ $origin | quote }}
+      MESSAGES_BASE_URL: {{ $origin | quote }},
+      // Files from Google Drive and Dropbox (ADR-0054); empty means no button.
+      GOOGLE_PICKER_CLIENT_ID: {{ .Values.web.googlePicker.clientId | quote }},
+      GOOGLE_PICKER_API_KEY: {{ .Values.web.googlePicker.apiKey | quote }},
+      GOOGLE_PICKER_APP_ID: {{ .Values.web.googlePicker.appId | quote }},
+      DROPBOX_APP_KEY: {{ .Values.web.dropboxAppKey | quote }}
     };
