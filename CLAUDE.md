@@ -972,6 +972,16 @@ Built 18.10.2026 under [ADR-0052](docs/adr/0052-inserate-von-aussen-nur-offiziel
 - **A feed must not reach inside**: the `company-site` client checks the resolved address at connect time (`HttpCompanySite.PublicOnly`) and follows redirects by hand, on the same domain only.
 - **Mirrored adverts**: the text belongs to the source (409 on a change here); skills, salary and postal code the company adds here. Gone at the source closes a published advert and deletes a draft; closed stays closed; a failed read changes nothing; only an https link is kept as `source_url`. Removing a source hands its adverts over as the company's own.
 
+### Signing in with Google, Microsoft, Apple: identity-service itself, never linked by the address
+
+Built 18.10.2026 under [ADR-0053](docs/adr/0053-anmelden-mit-fremden-konten.md) (VISION-FRAGEN-2 N3). identity-service is the relying party itself (code, PKCE, nonce); Noelia has nothing for it.
+
+- **Linked by the provider's id (`external_logins`: provider, `sub`, account), never by the address.** An unknown id whose proven address already has an account is *not* linked — otherwise whoever can enter a foreign address at a provider takes that account over; binding happens only signed in, under settings. **Microsoft vouches for no address** (measured: no `email_verified`, the issuer is per tenant), so a Microsoft account gets our confirmation mail and a known address the registration's "somebody tried" mail — the same answer either way.
+- **The callback runs through the service**, because Apple answers with a form post. State, verifier, nonce and intent ride in a sealed, short-lived `external_flow` cookie (`SameSite=None; Secure` for Apple), so a flow finishes only in the browser that started it.
+- **The exchange is a query, the decision a command**; the freshly created account is signed in from the aggregate, not re-read — inside the transaction the row is not written yet.
+- **No token is kept, no provider is audited** (`AuditEvent.AllowedMetadata`); an account made through a provider has no password entry (`SignInHandler` passes it as null), and its last way in cannot be taken off (409).
+- **Empty client ids mean off** — `GET /auth/external` lists only configured providers, `start` and `callback` of an unconfigured one are 404.
+
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 
 Built 12.09.2026 under ADR-0043. It is PBI-7, and it closes the last place where
@@ -1189,4 +1199,5 @@ that script was built against.
 - `docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md` — messages per process, and drafts only a human being releases. 07.10.2026.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `docs/DRITTANBIETER.md` — every third-party system, built or to come, with its state (18.10.2026).
+- `docs/adr/0053-anmelden-mit-fremden-konten.md` — signing in with Google, Microsoft, Apple; never linked by the address. 18.10.2026.
 - `AGENTS.md` — concise command + convention reference.

@@ -110,6 +110,12 @@ describe("the catalogues", () => {
       "fr:sources.kindLever",
       "en:sources.kindPersonio",
       "fr:sources.kindPersonio",
+      "en:externalLogin.google",
+      "fr:externalLogin.google",
+      "en:externalLogin.microsoft",
+      "fr:externalLogin.microsoft",
+      "en:externalLogin.apple",
+      "fr:externalLogin.apple",
       "fr:footer.copyright",
       "fr:scout.skillsExample",
     ]);

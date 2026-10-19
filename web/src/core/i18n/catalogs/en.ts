@@ -306,6 +306,9 @@ const en: Catalog = {
   },
 
   profile: {
+    xing: "XING profile",
+    xingHint: "Optional. Note: your XING profile shows your name. Whoever may see your profile here then knows who you are — your current employer too, if you made your profile public. Leaving it empty takes the link back.",
+    xingInvalid: "Please give the address of your XING profile, e.g. https://www.xing.com/profile/First_Last.",
     commute: "How far would you commute?",
     commuteHint: "Voluntary. A company only sees a tick against its own vacancy, never a distance.",
     notStated: "Not stated",
@@ -1144,6 +1147,30 @@ const en: Catalog = {
     failed: "The route could not be changed just now.",
   },
 
+  externalLogin: {
+    google: "Google",
+    microsoft: "Microsoft",
+    apple: "Apple",
+    or: "or",
+    signInWith: "Sign in with {{provider}}",
+    registerWith: "Sign up with {{provider}}",
+    hint: "A provider creates an account for you as a person. You found a company with your company address through the form above.",
+    linked: "Connected. You can now sign in this way too.",
+    checkMail: "We have sent you an email. Confirm your address in it, then you can sign in.",
+    addressTaken: "There is already an account for this address. Sign in with your password and then connect the provider in the settings under “Ways to sign in”.",
+    linkTaken: "This provider account is already connected to another account here — or your account already has this provider.",
+    unavailable: "The provider did not answer just now. Please try again in a moment.",
+    refused: "The sign-in was not accepted.",
+    failed: "The sign-in did not complete. Please start it again.",
+    lastWayIn: "This is your only way to sign in. Without it you could not get into your account any more.",
+    waysTitle: "Ways to sign in",
+    passwordSet: "Password: set.",
+    passwordNone: "Password: none — you sign in through a provider.",
+    linkedLine: "{{provider}}, connected on {{date}}",
+    unlink: "Disconnect",
+    link: "Connect {{provider}}",
+  },
+
   sources: {
     title: "Jobs from your applicant tracking system",
     lead: "Connect your board at Greenhouse, Lever or Personio, or a feed of your own. The jobs are fetched daily and mirrored here; applications run through this platform. The text is changed at the source.",
@@ -1302,6 +1329,7 @@ const en: Catalog = {
   },
 
   companyApplications: {
+    xing: "The person’s XING profile",
     title: "View application",
     signInRequired: "Please <1>sign in</1> to see this application.",
     lead: "Here you see the full application with cover letter, CV, portfolio and documents. The tabs show only what the person has released.",

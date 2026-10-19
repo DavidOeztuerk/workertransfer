@@ -26,7 +26,9 @@ public sealed record StoreProfileCommand(
     IReadOnlyList<string> Skills,
     /// <summary>A stage, or <c>null</c> for "said nothing" (ADR-0041).</summary>
     CommuteReadiness? Commute = null,
-    RelocationReadiness? Relocation = null) : ICommandMessage<PersonProfile>;
+    RelocationReadiness? Relocation = null,
+    /// <summary>Her own XING profile, or <c>null</c>: none (taken back if there was one).</summary>
+    string? Xing = null) : ICommandMessage<PersonProfile>;
 
 /// <summary>Writes the profile and records the write in the trail.</summary>
 public sealed class StoreProfileHandler(
@@ -54,14 +56,14 @@ public sealed class StoreProfileHandler(
             profile = PersonProfile.Create(
                 request.Subject, request.Headline, request.Text, request.Location,
                 request.RemoteOk, skills, now,
-                request.Commute, request.Relocation);
+                request.Commute, request.Relocation, request.Xing);
         }
         else
         {
             existing.Change(
                 request.Headline, request.Text, request.Location,
                 request.RemoteOk, skills, now,
-                request.Commute, request.Relocation);
+                request.Commute, request.Relocation, request.Xing);
             profile = existing;
         }
 

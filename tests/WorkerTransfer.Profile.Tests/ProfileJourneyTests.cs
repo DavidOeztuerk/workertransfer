@@ -468,6 +468,53 @@ public class ProfileJourneyTests(Postgres postgres) : IAsyncLifetime
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    private static object WithXing(string? xing) => new
+    {
+        headline = "Welder",
+        bio = "",
+        location = "Leipzig",
+        remote_ok = false,
+        skills = Array.Empty<string>(),
+        xing_url = xing
+    };
+
+    /// <summary>
+    /// The XING link (VISION-FRAGEN-2 N2) is stored in one shape, and the form
+    /// sending none takes it back.
+    /// </summary>
+    [Fact]
+    public async Task A_xing_link_is_kept_in_one_shape_and_taken_back_by_leaving_it_out()
+    {
+        var browser = AsPerson(Guid.CreateVersion7());
+
+        (await browser.PutAsJsonAsync("/profiles/me", WithXing("  https://xing.com/profile/Anna_Schmidt7/?sc_o=share  ")))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(await browser.GetAsync("/profiles/me"))).GetProperty("xing_url").GetString()
+            .Should().Be("https://www.xing.com/profile/Anna_Schmidt7");
+
+        (await browser.PutAsJsonAsync("/profiles/me", WithXing(null))).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(await browser.GetAsync("/profiles/me"))).GetProperty("xing_url").ValueKind
+            .Should().Be(JsonValueKind.Null, "a link one cannot take back is no voluntary one");
+    }
+
+    /// <summary>Only a XING profile — the page renders it as a link in front of every company.</summary>
+    [Theory]
+    [InlineData("https://evil.example/profile/Anna")]
+    [InlineData("http://www.xing.com/profile/Anna")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("https://www.xing.com/pages/acme")]
+    [InlineData("https://www.xing.com.evil.test/profile/Anna")]
+    [InlineData("https://www.xing.com/profile/Anna/../../evil")]
+    public async Task Only_a_xing_profile_is_a_xing_link(string address)
+    {
+        var browser = AsPerson(Guid.CreateVersion7());
+
+        var answer = await browser.PutAsJsonAsync("/profiles/me", WithXing(address));
+
+        answer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await answer.Content.ReadAsStringAsync()).Should().Contain("XING profile address");
+    }
+
     private static string WithoutCorrelation(string problem) =>
         System.Text.RegularExpressions.Regex.Replace(
             problem, "\"correlationId\":\"[^\"]*\",?", string.Empty,

@@ -13,6 +13,11 @@ function answerInOrder(...sequence: Answer[]) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
+      // The provider buttons ask on load (ADR-0053); that is not part of the
+      // sequence these tests describe.
+      if (new URL(url).pathname === "/auth/external") {
+        return new Response(JSON.stringify({ providers: [] }), { status: 200 });
+      }
       asked.push({
         path: new URL(url).pathname,
         body: String(init?.body ?? ""),

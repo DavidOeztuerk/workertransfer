@@ -1,6 +1,7 @@
 import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { PROFILE_BASE_URL } from "../../../env";
+import type { ServerCase } from "../../../shared/api/errors";
 import { PROFILE_VISIBILITY, type ConsentResult, isGranted, setGranted } from "./consent";
 import { i18n } from "../../../core/i18n/i18n";
 
@@ -36,6 +37,8 @@ export interface Profile {
   /** `null` means "said nothing" — a state, not an omission (ADR-0041). */
   commute_km: CommuteReadiness | null;
   relocation: RelocationReadiness | null;
+  /** Her own XING profile — it names her (VISION-FRAGEN-2 N2). `null`: none. */
+  xing_url: string | null;
   updated_at: string;
 }
 
@@ -47,7 +50,17 @@ export interface ProfileInput {
   skills: string[];
   commute_km: CommuteReadiness | null;
   relocation: RelocationReadiness | null;
+  /** Required on purpose: every caller writes the WHOLE profile, and `null` takes the link back. */
+  xing_url: string | null;
 }
+
+/**
+ * The server's sentences that need their own answer. The pattern matches
+ * profile-service `ProfileErrors.cs`, which points back here.
+ */
+export const PROFILE_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /XING profile address/i, key: "profile.xingInvalid" },
+];
 
 /**
  * "None created yet" and "not loadable" are different answers.
@@ -98,6 +111,7 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
         // voluntary one (ADR-0041).
         commute_km: input.commute_km,
         relocation: input.relocation,
+        xing_url: input.xing_url,
       },
     },
     "errors.profileNotSaved"

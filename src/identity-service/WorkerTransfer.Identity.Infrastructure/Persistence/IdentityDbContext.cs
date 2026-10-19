@@ -161,6 +161,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<NoeliaRefreshToken> RefreshTokens => Set<NoeliaRefreshToken>();
 
+    /// <summary>Providers bound to an account (ADR-0053).</summary>
+    public DbSet<ExternalLoginRow> ExternalLogins => Set<ExternalLoginRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -327,6 +330,22 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.ConfigureNoeliaRefreshTokens();
 
+        modelBuilder.Entity<ExternalLoginRow>(entity =>
+        {
+            entity.ToTable("external_logins");
+            // One row per provider id: the same Google account cannot sign
+            // into two accounts here.
+            entity.HasKey(row => new { row.Provider, row.ProviderSubject });
+            entity.Property(row => row.Provider).HasColumnName("provider").HasMaxLength(16);
+            entity.Property(row => row.ProviderSubject).HasColumnName("provider_subject").HasMaxLength(255);
+            entity.Property(row => row.UserId).HasColumnName("user_id");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at");
+            // Falls with the account (ADR-0027): the cascade, not a line in the
+            // erasure that somebody could forget.
+            entity.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(row => new { row.UserId, row.Provider }).IsUnique();
+        });
+
         base.OnModelCreating(modelBuilder);
     }
 }
@@ -452,4 +471,17 @@ public sealed class InvitationRow
     public DateTime ExpiresAt { get; set; }
 
     public DateTime? AcceptedAt { get; set; }
+}
+
+/// <summary>One row of <c>external_logins</c> — a provider's id bound to an account (ADR-0053).</summary>
+/// <remarks>No token, no address: the provider's id is all a later sign-in needs.</remarks>
+public sealed class ExternalLoginRow
+{
+    public string Provider { get; set; } = string.Empty;
+
+    public string ProviderSubject { get; set; } = string.Empty;
+
+    public Guid UserId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
 }

@@ -56,6 +56,9 @@ public sealed class ProfileRow
     /// <summary>The column <c>relocation</c>, <c>null</c> for "said nothing".</summary>
     public RelocationReadiness? Relocation { get; set; }
 
+    /// <summary>The column <c>xing_url</c>, <c>null</c> for none.</summary>
+    public string? Xing { get; set; }
+
     /// <summary>The column <c>created_at</c>.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
@@ -230,6 +233,7 @@ public sealed class ProfileDbContext(DbContextOptions<ProfileDbContext> options)
                 .HasColumnName("commute_km").HasMaxLength(16).HasConversion(CommuteConverter);
             row.Property(column => column.Relocation)
                 .HasColumnName("relocation").HasMaxLength(16).HasConversion(RelocationConverter);
+            row.Property(column => column.Xing).HasColumnName("xing_url").HasMaxLength(200);
             row.Property(column => column.CreatedAt).HasColumnName("created_at");
             row.Property(column => column.UpdatedAt).HasColumnName("updated_at");
 

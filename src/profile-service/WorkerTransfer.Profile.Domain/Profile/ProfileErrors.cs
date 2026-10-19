@@ -22,3 +22,8 @@ public sealed class LocationError()
 /// </remarks>
 public sealed class WishError()
     : InputError($"The wish may have at most {PersonProfile.MaxWishLength} characters.");
+
+/// <summary>The XING link is not the address of a XING profile.</summary>
+public sealed class XingError()
+    // web/src/features/person/api/profile.ts matches this sentence.
+    : InputError("The XING link must be a XING profile address (https://www.xing.com/profile/…).");

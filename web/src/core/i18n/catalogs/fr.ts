@@ -306,6 +306,9 @@ const fr: Catalog = {
   },
 
   profile: {
+    xing: "Profil XING",
+    xingHint: "Facultatif. Attention : votre profil XING montre votre nom. Quiconque peut voir votre profil ici sait alors qui vous êtes — votre employeur actuel aussi, si vous avez rendu votre profil public. Laisser vide retire le lien.",
+    xingInvalid: "Veuillez indiquer l’adresse de votre profil XING, p. ex. https://www.xing.com/profile/Prenom_Nom.",
     commute: "Jusqu’où feriez-vous la navette ?",
     commuteHint: "Facultatif. Une entreprise n’en voit qu’une coche pour son propre poste, jamais une distance.",
     notStated: "Non précisé",
@@ -1144,6 +1147,30 @@ const fr: Catalog = {
     failed: "La voie n’a pas pu être modifiée pour le moment.",
   },
 
+  externalLogin: {
+    google: "Google",
+    microsoft: "Microsoft",
+    apple: "Apple",
+    or: "ou",
+    signInWith: "Se connecter avec {{provider}}",
+    registerWith: "S’inscrire avec {{provider}}",
+    hint: "Un fournisseur crée un compte pour vous en tant que personne. Vous fondez une entreprise avec votre adresse professionnelle via le formulaire ci-dessus.",
+    linked: "Connecté. Vous pouvez désormais aussi vous connecter ainsi.",
+    checkMail: "Nous vous avons envoyé un e-mail. Confirmez-y votre adresse, puis vous pourrez vous connecter.",
+    addressTaken: "Un compte existe déjà pour cette adresse. Connectez-vous avec votre mot de passe, puis reliez le fournisseur dans les paramètres sous « Moyens de connexion ».",
+    linkTaken: "Ce compte chez le fournisseur est déjà relié à un autre compte ici — ou votre compte a déjà ce fournisseur.",
+    unavailable: "Le fournisseur n’a pas répondu pour le moment. Réessayez dans un instant.",
+    refused: "La connexion n’a pas été acceptée.",
+    failed: "La connexion n’a pas abouti. Veuillez la relancer.",
+    lastWayIn: "C’est votre seul moyen de connexion. Sans lui, vous ne pourriez plus accéder à votre compte.",
+    waysTitle: "Moyens de connexion",
+    passwordSet: "Mot de passe : défini.",
+    passwordNone: "Mot de passe : aucun — vous vous connectez via un fournisseur.",
+    linkedLine: "{{provider}}, relié le {{date}}",
+    unlink: "Délier",
+    link: "Relier {{provider}}",
+  },
+
   sources: {
     title: "Offres depuis votre logiciel de recrutement",
     lead: "Connectez votre tableau Greenhouse, Lever ou Personio, ou votre propre flux. Les offres sont récupérées chaque jour et reflétées ici ; les candidatures passent par cette plateforme. Le texte se modifie à la source.",
@@ -1302,6 +1329,7 @@ const fr: Catalog = {
   },
 
   companyApplications: {
+    xing: "Profil XING de la personne",
     title: "Voir la candidature",
     signInRequired: "Veuillez vous <1>connecter</1> pour voir cette candidature.",
     lead: "Ici, vous voyez la candidature complète avec lettre de motivation, CV, portfolio et pièces jointes. Les onglets n’affichent que ce que la personne a autorisé.",

@@ -290,7 +290,10 @@ public sealed class RouteMapTests
             "/auth/resend-verification",
             "/companies/by-slug/gibt-es-nicht",
             "/companies/00000000-0000-0000-0000-000000000001/profile",
-            "/jobs"
+            "/jobs",
+            // ADR-0053: which sign-in buttons to draw — a statement about this
+            // server's configuration, before anybody is signed in.
+            "/auth/external"
         ];
 
         foreach (var entry in Entries().Where(row => row.Anonymous is >= 200 and < 300))

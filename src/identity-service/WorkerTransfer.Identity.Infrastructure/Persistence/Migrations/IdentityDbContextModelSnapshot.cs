@@ -23,7 +23,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "account_status", new[] { "active", "disabled", "pending", "suspended" });
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "company_created", "email_verified", "invitation_withdrawn", "login_failure", "login_success", "member_invited", "member_joined", "member_removed", "register", "tenant_switch", "tenant_switch_denied", "token_refresh", "token_revoke" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "company_created", "email_verified", "external_linked", "external_unlinked", "invitation_withdrawn", "login_failure", "login_success", "member_invited", "member_joined", "member_removed", "register", "tenant_switch", "tenant_switch_denied", "token_refresh", "token_revoke" });
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -179,6 +179,34 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.ExternalLoginRow", b =>
+                {
+                    b.Property<string>("Provider")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_subject");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Provider", "ProviderSubject");
+
+                    b.HasIndex("UserId", "Provider")
+                        .IsUnique();
+
+                    b.ToTable("external_logins", (string)null);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.InvitationRow", b =>
@@ -521,6 +549,15 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.HasIndex("DeliveredAt");
 
                     b.ToTable("outbox", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.ExternalLoginRow", b =>
+                {
+                    b.HasOne("WorkerTransfer.Identity.Infrastructure.Persistence.UserRow", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.InvitationRow", b =>

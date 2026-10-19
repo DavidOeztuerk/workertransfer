@@ -73,6 +73,13 @@ public static class IdentityInfrastructure
 
         services.AddEntityFrameworkRefreshTokens<IdentityDbContext>();
         services.AddScoped<IUserRepository, EfUserRepository>();
+
+        // Signing in with Google, Microsoft, Apple (ADR-0053). Without a
+        // client id a provider is off and the page shows no button for it.
+        services.Configure<ExternalLoginSettings>(configuration.GetSection(ExternalLoginSettings.Section));
+        services.AddScoped<IExternalLoginStore, EfExternalLoginStore>();
+        services.AddScoped<IExternalProviders, HttpExternalProviders>();
+        services.AddHttpClient(HttpExternalProviders.ClientName);
         services.AddScoped<IMembershipRepository, EfMembershipRepository>();
         services.AddScoped<ICompanyRepository, EfCompanyRepository>();
         services.AddScoped<IVerificationTokenRepository, EfVerificationTokenRepository>();

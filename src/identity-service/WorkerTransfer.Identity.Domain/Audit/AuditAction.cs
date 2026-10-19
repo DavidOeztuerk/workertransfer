@@ -57,5 +57,11 @@ public enum AuditAction
     InvitationWithdrawn,
 
     /// <summary>Someone was removed from a company.</summary>
-    MemberRemoved
+    MemberRemoved,
+
+    /// <summary>A provider's sign-in was bound to an account (ADR-0053).</summary>
+    ExternalLinked,
+
+    /// <summary>A provider's sign-in was taken off an account.</summary>
+    ExternalUnlinked
 }

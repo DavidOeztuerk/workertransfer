@@ -309,6 +309,9 @@ const de = {
   },
 
   profile: {
+    xing: "XING-Profil",
+    xingHint: "Freiwillig. Achtung: Dein XING-Profil zeigt deinen Namen. Wer dein Profil hier sehen darf, weiß damit, wer du bist — auch dein jetziger Arbeitgeber, wenn du dein Profil öffentlich gemacht hast. Leer lassen nimmt den Link zurück.",
+    xingInvalid: "Bitte die Adresse deines XING-Profils angeben, z. B. https://www.xing.com/profile/Vorname_Nachname.",
     commute: "Wie weit würdest du pendeln?",
     commuteHint: "Freiwillig. Ein Unternehmen sieht daraus nur ein Häkchen zu seiner Stelle, nie eine Entfernung.",
     notStated: "Keine Angabe",
@@ -1148,6 +1151,30 @@ const de = {
     failed: "Der Weg ließ sich gerade nicht ändern.",
   },
 
+  externalLogin: {
+    google: "Google",
+    microsoft: "Microsoft",
+    apple: "Apple",
+    or: "oder",
+    signInWith: "Mit {{provider}} anmelden",
+    registerWith: "Mit {{provider}} registrieren",
+    hint: "Über einen Anbieter entsteht ein Konto für dich als Person. Ein Unternehmen gründest du mit deiner Firmenadresse über das Formular oben.",
+    linked: "Verbunden. Du kannst dich jetzt auch so anmelden.",
+    checkMail: "Wir haben dir eine Mail geschickt. Bestätige darin deine Adresse, dann kannst du dich anmelden.",
+    addressTaken: "Zu dieser Adresse gibt es schon ein Konto. Melde dich mit deinem Passwort an und verbinde den Anbieter danach in den Einstellungen unter „Anmeldewege“.",
+    linkTaken: "Dieses Konto beim Anbieter ist schon mit einem anderen Konto hier verbunden — oder dein Konto hat diesen Anbieter schon.",
+    unavailable: "Der Anbieter hat gerade nicht geantwortet. Versuch es gleich noch einmal.",
+    refused: "Die Anmeldung wurde nicht angenommen.",
+    failed: "Die Anmeldung ist nicht zustande gekommen. Bitte starte sie noch einmal.",
+    lastWayIn: "Das ist dein einziger Anmeldeweg. Ohne ihn kämst du nicht mehr in dein Konto.",
+    waysTitle: "Anmeldewege",
+    passwordSet: "Passwort: gesetzt.",
+    passwordNone: "Passwort: keines — du meldest dich über einen Anbieter an.",
+    linkedLine: "{{provider}}, verbunden am {{date}}",
+    unlink: "Trennen",
+    link: "{{provider}} verbinden",
+  },
+
   sources: {
     title: "Stellen aus eurem Bewerbermanagement",
     lead: "Verbindet euer Board bei Greenhouse, Lever oder Personio oder einen eigenen Feed. Die Stellen werden täglich abgeholt und hier gespiegelt, Bewerbungen laufen über diese Plattform. Geändert wird der Text an der Quelle.",
@@ -1306,6 +1333,7 @@ const de = {
   },
 
   companyApplications: {
+    xing: "XING-Profil der Person",
     title: "Bewerbung ansehen",
     signInRequired: "Bitte <1>anmelden</1>, um diese Bewerbung zu sehen.",
     lead: "Hier siehst du die vollständige Bewerbung mit Anschreiben, Lebenslauf, Portfolio und Unterlagen. Die Reiter zeigen nur das, was die Person freigegeben hat.",

@@ -211,6 +211,31 @@ services:
       Erasure__BaseUrls__advisor: http://advisor-service:8013
       Erasure__BaseUrls__assessment: http://assessment-service:8014
       Erasure__BaseUrls__messages: http://messages-service:8015
+      # Signing in with Google, Microsoft, Apple (ADR-0053). Without a client
+      # id a provider is off and no button appears — that is the default,
+      # hence `:-` and not `:?`. The callback runs through the gateway; the
+      # address registered at each provider is
+      # `{CallbackBase}/auth/external/{google|microsoft|apple}/callback`.
+      # The endpoints were measured from each discovery document on
+      # 18.10.2026 and stand here so the egress boundary lets them through.
+      ExternalLogin__CallbackBase: ${WORKERTRANSFER_PUBLIC_URL:-http://localhost:8090}
+      ExternalLogin__Google__ClientId: ${WORKERTRANSFER_GOOGLE_CLIENT_ID:-}
+      ExternalLogin__Google__ClientSecret: ${WORKERTRANSFER_GOOGLE_CLIENT_SECRET:-}
+      ExternalLogin__Google__AuthorizationEndpoint: https://accounts.google.com/o/oauth2/v2/auth
+      ExternalLogin__Google__TokenEndpoint: https://oauth2.googleapis.com/token
+      ExternalLogin__Google__Issuer: https://accounts.google.com
+      ExternalLogin__Microsoft__ClientId: ${WORKERTRANSFER_MICROSOFT_CLIENT_ID:-}
+      ExternalLogin__Microsoft__ClientSecret: ${WORKERTRANSFER_MICROSOFT_CLIENT_SECRET:-}
+      ExternalLogin__Microsoft__AuthorizationEndpoint: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+      ExternalLogin__Microsoft__TokenEndpoint: https://login.microsoftonline.com/common/oauth2/v2.0/token
+      ExternalLogin__Microsoft__Issuer: https://login.microsoftonline.com/{tenantid}/v2.0
+      ExternalLogin__Apple__ClientId: ${WORKERTRANSFER_APPLE_CLIENT_ID:-}
+      ExternalLogin__Apple__TeamId: ${WORKERTRANSFER_APPLE_TEAM_ID:-}
+      ExternalLogin__Apple__KeyId: ${WORKERTRANSFER_APPLE_KEY_ID:-}
+      ExternalLogin__Apple__PrivateKey: ${WORKERTRANSFER_APPLE_PRIVATE_KEY:-}
+      ExternalLogin__Apple__AuthorizationEndpoint: https://appleid.apple.com/auth/authorize
+      ExternalLogin__Apple__TokenEndpoint: https://appleid.apple.com/auth/token
+      ExternalLogin__Apple__Issuer: https://appleid.apple.com
     depends_on:
       postgres:
         condition: service_healthy

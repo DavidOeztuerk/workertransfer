@@ -4,6 +4,7 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import Link from "@mui/material/Link";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
@@ -131,6 +132,11 @@ export function CompanyApplicationPage() {
           <Typography variant="body2" color="text.secondary">
             {job.data?.title ?? t("companyApplications.jobUnknown")}
           </Typography>
+          {profile.data?.xing_url ? (
+            <Link href={profile.data.xing_url} target="_blank" rel="noopener noreferrer" variant="body2">
+              {t("companyApplications.xing")}
+            </Link>
+          ) : null}
         </CardContent>
       </Card>
 

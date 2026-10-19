@@ -19,6 +19,7 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { AppearanceSections } from "../../../shared/components/layout/appearance";
 import { SignInRequired } from "../components/SignInRequired";
 import { CivilIdentity } from "../components/CivilIdentity";
+import { SignInWays } from "../../auth/components/SignInWays";
 import { useAsync } from "../lib/useAsync";
 import {
   type AccountSettings,
@@ -169,6 +170,7 @@ export function SettingsPage() {
 
       <AppearanceBlock />
       <CivilIdentity />
+      <SignInWays />
       <PrivacyBlock />
       <AiBlock />
       <RecordsBlock />

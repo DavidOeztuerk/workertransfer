@@ -570,7 +570,7 @@ public static class AuthEndpoints
         context.Response.WriteAsJsonAsync(
             new Dictionary<string, string> { ["status"] = "ok" }, cancellationToken);
 
-    private static void SetCookies(HttpContext context, string access, string refresh)
+    internal static void SetCookies(HttpContext context, string access, string refresh)
     {
         var secure = !context.RequestServices
             .GetRequiredService<IHostEnvironment>().IsDevelopment();

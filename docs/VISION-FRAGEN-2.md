@@ -243,6 +243,8 @@ ist vor dem Bau zu messen. Einen Datenexport muss jedes Netzwerk herausgeben
 
 **Antwort:** **A, B nach Messung, 17.10.2026 — MVP.** Ein Link aufs eigene XING-Profil; ein Import aus dem eigenen Export, wenn das Format brauchbar ist.
 
+**Gebaut am 18.10.2026 (der Link).** Nur eine XING-Profiladresse, gespeichert als `https://www.xing.com/profile/<name>`. **Der Link nennt die Person** — ihren Namen gibt die Plattform sonst zuletzt frei (ADR-0037 Stufe 3). Deshalb sagt das Formular vor dem Speichern, dass jeder, der das Profil sehen darf, damit weiß, wer sie ist; der Link reist nur mit dem vollen Profil, nie in den Treffern des Scouts. Der Import wartet auf einen echten XING-Export zum Messen.
+
 ### N3. Weitere Verbindungen (mehrere möglich, jeweils ja / nein / später)
 
 | Verbindung | Wofür | Antwort |
@@ -258,6 +260,8 @@ Schon entschieden und nicht neu gefragt: **Unterschrift** außerhalb (F3),
 **Termine** als eigene kleine `.ics`-Lösung später (E1).
 
 **Antwort:** **17.10.2026.** **MVP:** Anmelden mit Google / Microsoft / Apple; Dokumente aus Google Drive / OneDrive / Dropbox (nur die gewählte Datei). **Nach dem MVP:** Open Badges / Credly, GitLab, Videotermin-Link, Rückweg ins ATS.
+
+**Anmelden gebaut am 18.10.2026** (ADR-0053). Die Knöpfe erscheinen, sobald der Betreiber die drei Apps registriert hat. Eine Adresse, zu der es schon ein Konto gibt, wird nie automatisch verknüpft — verbinden geht angemeldet in den Einstellungen; Microsoft-Konten bekommen unsere Bestätigungsmail, weil Microsoft keine Adresse bestätigt.
 
 ### N4. MCP — Anbindung an KI-Assistenten
 
