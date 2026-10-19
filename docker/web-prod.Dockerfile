@@ -30,7 +30,14 @@ RUN pnpm build
 
 FROM nginx:1.29-alpine AS runtime
 
-COPY docker/web-nginx.conf /etc/nginx/conf.d/default.conf
+# A template: nginx's entrypoint renders it into conf.d/default.conf at start,
+# substituting WT_API_ORIGIN (docker/web-nginx.conf.template says why).
+COPY docker/web-nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# The gateway's origin in compose and in the local cluster. The chart sets the
+# real one; without a value the policy would name a literal "${WT_API_ORIGIN}"
+# and every API call would be refused.
+ENV WT_API_ORIGIN=http://localhost:8090
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80

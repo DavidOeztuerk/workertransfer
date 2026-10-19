@@ -35,8 +35,8 @@ Speicher der Seite, bis die Datei geholt ist. Die Egress-Grenze der Dienste
 bleibt unberührt.
 
 **Die Skripte der Anbieter lädt erst der Klick.** Wer die Seite nur ansieht,
-spricht weder mit Google noch mit Dropbox. Für eine spätere
-Content-Security-Policy der Oberfläche (es gibt noch keine — vor dem Start)
+spricht weder mit Google noch mit Dropbox. Für die
+Content-Security-Policy der Oberfläche (seit 20.10.2026 in `docker/web-nginx.conf.template`)
 stehen die Hosts hier: `apis.google.com`, `accounts.google.com`,
 `www.googleapis.com`, `www.dropbox.com`, `*.dropboxusercontent.com`.
 
