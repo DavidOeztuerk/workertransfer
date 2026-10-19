@@ -219,6 +219,36 @@ public static class AuthEndpoints
             }
         });
 
+        // Back to oneself — only ever gives rights away, so it asks no
+        // membership. Before it, the way back was signing out and in again.
+        auth.MapPost("/self", async (
+            IMediator mediator,
+            ICurrentPrincipal principal,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (principal.Current is not { } actor)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status401Unauthorized,
+                    "Request failed", "not authenticated");
+                return;
+            }
+
+            if (await mediator.Send(new SwitchToSelfCommand(actor.Subject), cancellationToken)
+                is CompanySwitchResult.Switched switched)
+            {
+                SetCookies(context, switched.AccessToken, switched.RefreshToken);
+                await context.Response.WriteAsJsonAsync(
+                    new Dictionary<string, string> { ["status"] = "ok" }, cancellationToken);
+                return;
+            }
+
+            await ProblemDetailsMiddleware.Write(
+                context, StatusCodes.Status401Unauthorized,
+                "Request failed", "invalid credentials");
+        });
+
         auth.MapPost("/logout", async (
             IMediator mediator,
             HttpContext context,

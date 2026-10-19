@@ -166,6 +166,9 @@ gruppen:
       - { methode: POST, pfad: '/auth/verify-email', ohne: 422, person: 422, mitglied: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/resend-verification', ohne: 422, person: 422, mitglied: 422, firma: 422 }
       - { methode: POST, pfad: '/auth/refresh', ohne: 401, person: 200, mitglied: 200, firma: 200 }
+      # Zurueck zu sich selbst: gibt nur Rechte ab, fragt deshalb keine
+      # Mitgliedschaft — auch wer schon als Person handelt, bekommt 200.
+      - { methode: POST, pfad: '/auth/self', ohne: 401, person: 200, mitglied: 200, firma: 200 }
       - { methode: POST, pfad: '/auth/company/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 403, firma: 403 }
       - { methode: GET, pfad: '/auth/session', ohne: 200, person: 200, mitglied: 200, firma: 200 }
       # ADR-0053: anmelden mit Google, Microsoft, Apple. Im Stapel ohne

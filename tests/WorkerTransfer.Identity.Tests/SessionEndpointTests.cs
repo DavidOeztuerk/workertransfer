@@ -217,6 +217,34 @@ public class SessionEndpointTests(Postgres postgres) : IAsyncLifetime
         withInvented.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    /// <summary>
+    /// The way back without signing out — and it holds past a refresh, which
+    /// is where a remembered company would come back.
+    /// </summary>
+    [Fact]
+    public async Task Whoever_acts_for_a_company_can_act_as_themselves_again()
+    {
+        var company = await CreateCompanyWithMember(_anna);
+        var browser = await SignedInBrowser();
+        await browser.PostAsync($"/auth/company/{company}", null);
+
+        var back = await browser.PostAsync("/auth/self", null);
+
+        back.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(await browser.GetAsync("/me")))["tenant_id"].Should().BeNull();
+
+        (await browser.PostAsync("/auth/refresh", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(await browser.GetAsync("/me")))["tenant_id"].Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Without_a_sign_in_nobody_goes_back_to_themselves()
+    {
+        var response = await Browser().PostAsync("/auth/self", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     [Fact]
     public async Task Without_a_sign_in_nobody_switches_company()
     {
