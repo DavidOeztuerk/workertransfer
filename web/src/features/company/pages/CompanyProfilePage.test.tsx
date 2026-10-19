@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithStore } from "../test/render";
@@ -88,7 +88,8 @@ describe("the company profile form", () => {
       auth: { ...FOR_COMPANY, memberships: [{ id: FOR_COMPANY.session.tenantId, name: "Muster GmbH", role: "admin" }] },
     });
 
-    expect(await screen.findByLabelText(/Anzeigename/)).toHaveValue("Muster GmbH");
+    // The suggestion lands one render after the field: wait for the value.
+    await waitFor(() => expect(screen.getByLabelText(/Anzeigename/)).toHaveValue("Muster GmbH"));
   });
 
   it("keeps a stored name over the registered one", async () => {
