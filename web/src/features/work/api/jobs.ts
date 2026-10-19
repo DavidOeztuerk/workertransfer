@@ -45,6 +45,18 @@ export interface Job {
   status: JobStatus;
   published_at: string | null;
   updated_at: string;
+  /** What the job pays — `null`: not stated, and the page says so (B5). */
+  salary: Salary | null;
+}
+
+export type SalaryPeriod = "year" | "month" | "hour";
+
+/** Gross, whole euros, both ends. A number about the JOB, never about a person. */
+export interface Salary {
+  min: number;
+  max: number;
+  period: SalaryPeriod;
+  currency: string;
 }
 
 /**
@@ -76,6 +88,7 @@ interface JobWire {
   status: JobStatus;
   published_at: string | null;
   updated_at: string;
+  salary?: Salary | null;
 }
 
 /** From the wire into the shape the UI works with. */
@@ -93,6 +106,26 @@ function fromWire(wire: JobWire): Job {
     status: wire.status,
     published_at: wire.published_at,
     updated_at: wire.updated_at,
+    salary: wire.salary ?? null,
+  };
+}
+
+/**
+ * Into the service's words. Until 07.10.2026 the input went out as it was —
+ * `remote` and `employment` where the service reads `remote_mode` and
+ * `employment_type` — and every advert was "on site, full time", whatever the
+ * form said. The same seam as `fromWire`, in the other direction.
+ */
+function toWire(input: JobInput) {
+  return {
+    title: input.title,
+    description: input.description,
+    location: input.location,
+    postal_code: input.postal_code,
+    remote_mode: input.remote,
+    employment_type: input.employment,
+    skills: input.skills,
+    salary: input.salary ?? null,
   };
 }
 
@@ -104,6 +137,8 @@ export interface JobInput {
   remote: RemoteMode;
   employment: EmploymentType;
   skills: string[];
+  /** Both ends or none; `null` means "not stated". */
+  salary?: { min: number; max: number; period: SalaryPeriod } | null;
 }
 
 export interface SearchFilters {
@@ -133,6 +168,8 @@ export interface SearchFilters {
   lat?: number;
   lon?: number;
   radiusKm?: number;
+  /** Only adverts that state a salary range — for the salary comparison (B5). */
+  withSalary?: boolean;
 }
 
 export type SearchError = "offline" | "failed";
@@ -199,6 +236,7 @@ export function searchQuery(filters: SearchFilters, page = 1, pageSize?: number)
   // Do not send empty filters at all: the server would read `remote=` as a
   // filter on an empty value and find nothing.
   if (filters.q !== undefined && filters.q !== "") params.set("q", filters.q);
+  if (filters.withSalary === true) params.set("with_salary", "true");
   if (filters.location !== undefined && filters.location !== "")
     params.set("location", filters.location);
   if (filters.remote !== undefined && filters.remote !== "") params.set("remote", filters.remote);
@@ -354,11 +392,11 @@ async function saveJob(
 // No `tenant_id` in the body: the company stands in the token and is checked
 // against the membership. What the client cannot send, it cannot forge.
 export function createJob(input: JobInput): Promise<JobResult> {
-  return saveJob("/jobs", "POST", input);
+  return saveJob("/jobs", "POST", toWire(input));
 }
 
 export function updateJob(jobId: string, input: JobInput): Promise<JobResult> {
-  return saveJob(`/jobs/${jobId}`, "PUT", input);
+  return saveJob(`/jobs/${jobId}`, "PUT", toWire(input));
 }
 
 export function publishJob(jobId: string): Promise<JobResult> {
@@ -399,3 +437,31 @@ export async function draftJobText(input: {
     "unavailable"
   );
 }
+
+/**
+ * The range as a person reads it: "42.000–52.000 € brutto/Jahr".
+ * Formatted in the page's language; the period word comes from the catalogue.
+ */
+export function salaryText(
+  salary: Salary,
+  language: string,
+  periodWord: (period: SalaryPeriod) => string
+): string {
+  const amount = new Intl.NumberFormat(language, {
+    style: "currency",
+    currency: salary.currency || "EUR",
+    maximumFractionDigits: 0,
+  });
+  const range =
+    salary.min === salary.max
+      ? amount.format(salary.min)
+      : `${amount.format(salary.min)} – ${amount.format(salary.max)}`;
+  return `${range} ${periodWord(salary.period)}`;
+}
+
+/** The period word as a catalogue key — "brutto/Jahr", "gross/month". */
+export const PERIOD_KEY = {
+  year: "jobs.perYear",
+  month: "jobs.perMonth",
+  hour: "jobs.perHour",
+} as const satisfies Record<SalaryPeriod, string>;

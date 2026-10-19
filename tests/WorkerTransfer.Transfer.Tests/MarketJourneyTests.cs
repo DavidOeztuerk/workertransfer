@@ -117,6 +117,64 @@ public class MarketJourneyTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>A word that does not exist is 422 and no crash.</summary>
+    // -----------------------------------------------------------------
+    // The person's own window (VISION-FRAGEN H1)
+    // -----------------------------------------------------------------
+
+    private static Task<HttpResponseMessage> SetWindow(HttpClient browser, string? from, string? until) =>
+        browser.PutAsJsonAsync("/market/me", new
+        {
+            availability = "open", employed = true, note = "", open_from = from, open_until = until
+        });
+
+    private static string Day(int offset) =>
+        DateOnly.FromDateTime(DateTime.UtcNow).AddDays(offset).ToString("yyyy-MM-dd");
+
+    [Theory]
+    [InlineData(-10, 10, true)]
+    [InlineData(5, 30, false)]
+    [InlineData(-30, -1, false)]
+    public async Task Outside_the_own_window_nobody_may_approach(int from, int until, bool approachable)
+    {
+        var response = await SetWindow(AsPerson(Guid.CreateVersion7()), Day(from), Day(until));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(response)).GetProperty("is_approachable").GetBoolean().Should().Be(approachable);
+    }
+
+    [Fact]
+    public async Task One_open_end_is_a_window_too()
+    {
+        var response = await SetWindow(AsPerson(Guid.CreateVersion7()), null, Day(-1));
+
+        (await Json(response)).GetProperty("is_approachable").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_window_upside_down_is_422()
+    {
+        (await SetWindow(AsPerson(Guid.CreateVersion7()), Day(10), Day(5)))
+            .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task The_person_sees_her_window_and_a_company_only_today()
+    {
+        var anna = Guid.CreateVersion7();
+        var company = Guid.CreateVersion7();
+        await SetWindow(AsPerson(anna), Day(5), Day(30));
+        _ledger.MarketReleased.Add((anna, company));
+
+        var own = await Json(await AsPerson(anna).GetAsync("/market/me"));
+        own.GetProperty("open_from").GetString().Should().Be(Day(5));
+        own.GetProperty("open_until").GetString().Should().Be(Day(30));
+
+        var seen = await Json(await AsCompany(company).GetAsync($"/market/{anna}"));
+        seen.GetProperty("is_approachable").GetBoolean().Should().BeFalse();
+        seen.TryGetProperty("open_from", out _).Should().BeFalse("when somebody plans to leave is theirs");
+        seen.TryGetProperty("open_until", out _).Should().BeFalse();
+    }
+
     [Fact]
     public async Task An_invented_state_is_422()
     {

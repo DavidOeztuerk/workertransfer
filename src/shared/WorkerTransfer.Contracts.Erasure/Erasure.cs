@@ -103,7 +103,7 @@ public static class ErasureRecipient
     [
         "consent", "profile", "resume", "portfolio",
         "applications", "transfer", "github", "notification", "scout", "advisor",
-        "assessment"
+        "assessment", "messages"
     ];
 
     /// <summary>The final notice to the person. Itself an outbox row.</summary>

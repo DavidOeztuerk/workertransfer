@@ -61,6 +61,10 @@
           {
             "Name": "assessment-service",
             "Address": "http://localhost:8014/noelia"
+          },
+          {
+            "Name": "messages-service",
+            "Address": "http://localhost:8015/noelia"
           }
         ]
       }

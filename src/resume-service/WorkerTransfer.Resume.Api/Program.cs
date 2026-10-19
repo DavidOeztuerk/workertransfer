@@ -1,3 +1,5 @@
+using WorkerTransfer.Resume.Api.Authorization;
+using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Resume.Api;
 using WorkerTransfer.Resume.Infrastructure;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
@@ -15,6 +17,12 @@ const string serviceName = "resume-service";
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
     ArtificialIntelligence.NotUsed);
+
+// The first contact to a person is a recruiter's (ADR-0048). Who that is,
+// identity-service's membership table says per request (`Identity__BaseUrl`,
+// `Identity__Secret`); without them the route answers 503, not 403.
+builder.Services.AddCompanyPermissions(
+    builder.Configuration, [], [ResumePermissions.Request]);
 
 builder.Services.AddResumeInfrastructure(
     builder.Configuration,

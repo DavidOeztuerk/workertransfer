@@ -110,6 +110,100 @@ public class JobJourneyTests(Postgres postgres) : IAsyncLifetime
         return id;
     }
 
+    /// <summary>The salary range travels in and out, and is read by everyone (B5).</summary>
+    [Fact]
+    public async Task A_stated_salary_range_is_published_with_the_advert()
+    {
+        var company = Guid.CreateVersion7();
+        var browser = AsCompany(company);
+
+        var created = await browser.PostAsJsonAsync("/jobs", new
+        {
+            title = "Welder",
+            description = "TIG and MIG.",
+            salary = new { min = 42_000, max = 52_000, period = "year" }
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await Json(created)).GetProperty("id").GetGuid();
+        await browser.PostAsync($"/jobs/{id}/publish", null);
+
+        var read = await Json(await Anonymous().GetAsync($"/jobs/{id}"));
+        var salary = read.GetProperty("salary");
+        salary.GetProperty("min").GetInt32().Should().Be(42_000);
+        salary.GetProperty("max").GetInt32().Should().Be(52_000);
+        salary.GetProperty("period").GetString().Should().Be("year");
+        salary.GetProperty("currency").GetString().Should().Be("EUR");
+    }
+
+    /// <summary>The salary comparison reads only adverts that state a range (B5).</summary>
+    [Fact]
+    public async Task With_salary_returns_only_adverts_that_state_a_range()
+    {
+        var company = Guid.CreateVersion7();
+        var browser = AsCompany(company);
+        var stamp = Guid.NewGuid().ToString("N")[..8];
+
+        var stated = await browser.PostAsJsonAsync("/jobs", new
+        {
+            title = $"Welder {stamp}", description = "TIG.",
+            salary = new { min = 3_000, max = 3_600, period = "month" }
+        });
+        var silent = await browser.PostAsJsonAsync("/jobs", new { title = $"Welder {stamp} B", description = "MIG." });
+
+        foreach (var created in new[] { stated, silent })
+        {
+            var id = (await Json(created)).GetProperty("id").GetGuid();
+            await browser.PostAsync($"/jobs/{id}/publish", null);
+        }
+
+        var all = await Json(await Anonymous().GetAsync($"/jobs?q=Welder%20{stamp}"));
+        var withSalary = await Json(await Anonymous().GetAsync($"/jobs?q=Welder%20{stamp}&with_salary=true"));
+
+        all.GetProperty("items").GetArrayLength().Should().Be(2);
+        withSalary.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("title").GetString())
+            .Should().Equal($"Welder {stamp}");
+    }
+
+    /// <summary>Not stated is a statement too — <c>null</c>, never a made-up figure.</summary>
+    [Fact]
+    public async Task Without_a_range_the_advert_says_null()
+    {
+        var created = await Write(AsCompany(Guid.CreateVersion7()));
+
+        (await Json(created)).GetProperty("salary").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task One_end_alone_is_a_422()
+    {
+        var refused = await AsCompany(Guid.CreateVersion7()).PostAsJsonAsync("/jobs", new
+        {
+            title = "Welder",
+            description = "TIG and MIG.",
+            salary = new { min = 42_000 }
+        });
+
+        refused.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task A_change_can_remove_the_range_again()
+    {
+        var browser = AsCompany(Guid.CreateVersion7());
+        var created = await browser.PostAsJsonAsync("/jobs", new
+        {
+            title = "Welder",
+            description = "TIG and MIG.",
+            salary = new { min = 3_000, max = 3_400, period = "month" }
+        });
+        var id = (await Json(created)).GetProperty("id").GetGuid();
+
+        var changed = await browser.PutAsJsonAsync($"/jobs/{id}", new { title = "Welder", description = "TIG and MIG." });
+
+        changed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(changed)).GetProperty("salary").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
     /// <summary>
     /// Whoever writes an advert should be able to read it before applications
     /// come in on it.

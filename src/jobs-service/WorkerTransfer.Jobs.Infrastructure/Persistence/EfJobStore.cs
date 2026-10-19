@@ -59,11 +59,20 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         Guid? company = null,
         string employment = "",
         SearchRadius? radius = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool withSalaryOnly = false)
     {
         // The state is filtered HERE and never by the caller: a `status=draft`
         // on the wire would be a way to read other companies' drafts.
         var query = context.Jobs.Where(candidate => candidate.Status == "published");
+
+        // The salary comparison (B5) reads adverts that STATE a range. Filtered
+        // here, not in the browser: otherwise one page of twenty could hold
+        // none, and "nothing found" would be a claim about the market.
+        if (withSalaryOnly)
+        {
+            query = query.Where(candidate => candidate.SalaryMin != null && candidate.SalaryMax != null);
+        }
 
         if (!string.IsNullOrWhiteSpace(location))
         {
@@ -236,7 +245,15 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         ToState(row.Status),
         new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
         new DateTimeOffset(row.UpdatedAt, TimeSpan.Zero),
-        row.PublishedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null);
+        row.PublishedAt is { } at ? new DateTimeOffset(at, TimeSpan.Zero) : null,
+        row.SalaryMin is { } low && row.SalaryMax is { } high
+            ? SalaryBand.Restore(low, high, row.SalaryPeriod switch
+            {
+                "month" => SalaryPeriod.Month,
+                "hour" => SalaryPeriod.Hour,
+                _ => SalaryPeriod.Year
+            })
+            : null);
 
     private static JobRow ToRow(Job job)
     {
@@ -264,6 +281,9 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         row.Status = Word(job.State);
         row.UpdatedAt = job.UpdatedAt.UtcDateTime;
         row.PublishedAt = job.PublishedAt?.UtcDateTime;
+        row.SalaryMin = job.Salary?.Minimum;
+        row.SalaryMax = job.Salary?.Maximum;
+        row.SalaryPeriod = job.Salary?.Period.ToString().ToLowerInvariant();
     }
 
     // The stored words below are the column values of every existing row and

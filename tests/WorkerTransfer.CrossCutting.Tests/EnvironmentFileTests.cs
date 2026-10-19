@@ -33,7 +33,7 @@ public sealed class EnvironmentFileTests
 
         return [.. Regex.Matches(
                 withoutComments,
-                @"\$\{(?<name>WORKERTRANSFER_[A-Z_]+|ANTHROPIC_API_KEY)[:}]",
+                @"\$\{(?<name>WORKERTRANSFER_[A-Z_]+)[:}]",
                 RegexOptions.None,
                 TimeSpan.FromSeconds(5))
             .Select(hit => hit.Groups["name"].Value)
@@ -172,7 +172,7 @@ public sealed class EnvironmentFileTests
                         && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .ToList();
 
-        entryPoints.Should().HaveCount(15, "fourteen services and the gateway");
+        entryPoints.Should().HaveCount(16, "fifteen services and the gateway");
 
         foreach (var path in entryPoints)
         {

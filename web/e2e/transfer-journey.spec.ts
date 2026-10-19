@@ -113,22 +113,23 @@ test("a transfer comes only from three yeses — and the employer is never asked
   await candidate.getByRole("button", { name: /Gespräch annehmen/i }).click();
   await expect(candidate.getByRole("heading", { name: /Ihr seid im Gespräch/ })).toBeVisible();
 
-  // The company makes an offer. The placement fee is recorded, not moved — the
-  // platform handles no money.
+  // The company makes an offer — text and start, no fee: a fee is agreed
+  // between two companies, never offered to the person (ADR-0050).
   await recruiter.goto("/company/transfers");
   await expect(recruiter.getByText(/Braucht eine Freigabe/)).toBeVisible();
+  await expect(recruiter.getByLabel(/Ablöse/)).toHaveCount(0);
   await recruiter.getByLabel(/^Angebot/).fill("Backend team lead");
   await recruiter.getByLabel(/^Start/).fill("2026-11");
-  await recruiter.getByLabel(/Ablöse in Euro/).fill("5000");
   await recruiter.getByRole("button", { name: /Angebot machen/i }).click();
   await expect(recruiter.getByRole("heading", { name: /Angebot abgegeben/ })).toBeVisible();
+  // She opened no route to her employer: nothing about one appears.
+  await expect(recruiter.getByRole("region", { name: "Frühere Freigabe beim Arbeitgeber" })).toHaveCount(0);
 
   // The person accepts — and afterwards has to confirm herself that her
-  // employer lets her go. This platform does not ask him.
+  // employer lets her go. Nobody asked him.
   await candidate.goto("/transfers");
-  await expect(candidate.getByText("5.000,00 €")).toBeVisible();
   await candidate.getByRole("button", { name: /Angebot annehmen/i }).click();
-  await expect(candidate.getByText(/Diese Plattform fragt ihn nicht/)).toBeVisible();
+  await expect(candidate.getByText(/Es fehlt noch, dass dein Arbeitgeber dich gehen lässt/)).toBeVisible();
 
   // The company cannot complete here — never. If the case needs a release, the
   // last step belongs to the person: she is the only one who knows whether she

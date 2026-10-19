@@ -174,7 +174,8 @@ public static class NotificationEndpoints
                         [NotificationKind.ApplicationReceived] = body.ApplicationReceived,
                         [NotificationKind.ProfileDiscovered] = body.ProfileDiscovered,
                         [NotificationKind.AdvisorConversation] = body.AdvisorConversation,
-                        [NotificationKind.AssessmentUpdate] = body.AssessmentUpdate
+                        [NotificationKind.AssessmentUpdate] = body.AssessmentUpdate,
+                        [NotificationKind.MessageReceived] = body.MessageReceived
                     }),
                 cancellationToken);
 
@@ -221,5 +222,6 @@ public static class NotificationEndpoints
             preference.Wants(NotificationKind.ApplicationReceived),
             preference.Wants(NotificationKind.ProfileDiscovered),
             preference.Wants(NotificationKind.AdvisorConversation),
-            preference.Wants(NotificationKind.AssessmentUpdate));
+            preference.Wants(NotificationKind.AssessmentUpdate),
+            preference.Wants(NotificationKind.MessageReceived));
 }

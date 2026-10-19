@@ -5,6 +5,7 @@ using WorkerTransfer.Transfer.Application.Messages;
 using WorkerTransfer.Transfer.Application.Ports;
 using WorkerTransfer.Transfer.Domain.Market;
 using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Domain.Releases;
 
 namespace WorkerTransfer.Transfer.Application.Cases;
 
@@ -80,8 +81,7 @@ public sealed record CompanyMoveCommand(Guid Id, TenantId Company, CompanyMove M
     : ICommandMessage<CaseResult>;
 
 /// <summary>The company makes an offer.</summary>
-public sealed record MakeOfferCommand(
-    Guid Id, TenantId Company, string Text, string? Start, long? FeeCents)
+public sealed record MakeOfferCommand(Guid Id, TenantId Company, string Text, string? Start)
     : ICommandMessage<CaseResult>;
 
 /// <summary>This person's cases.</summary>
@@ -97,6 +97,7 @@ public sealed class CaseCommands(
     ITransferStore store,
     IMarketStore market,
     IConsentGate gate,
+    IReleaseStore releases,
     IOutbox outbox,
     TimeProvider clock) :
     IRequestHandler<ShowInterestCommand, CaseResult>,
@@ -126,7 +127,7 @@ public sealed class CaseCommands(
             return new CaseResult.NotApproachable();
         }
 
-        if (!status.IsApproachable)
+        if (!status.IsApproachableOn(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime)))
         {
             // The release permits SEEING, not DISTURBING.
             return new CaseResult.NotApproachable();
@@ -204,6 +205,7 @@ public sealed class CaseCommands(
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
+        await CloseNegotiationAsync(caseItem, now, cancellationToken);
 
         // The person's moves are NOT notified: they know what they did, and a
         // mail to a company distribution list carrying a human being's name
@@ -246,6 +248,7 @@ public sealed class CaseCommands(
         }
 
         await store.SaveAsync(caseItem, cancellationToken);
+        await CloseNegotiationAsync(caseItem, now, cancellationToken);
         await Notify(caseItem, cancellationToken);
 
         return new CaseResult.Done(caseItem);
@@ -266,8 +269,7 @@ public sealed class CaseCommands(
 
         try
         {
-            caseItem.MakeOffer(
-                request.Text, request.Start, request.FeeCents, clock.GetUtcNow());
+            caseItem.MakeOffer(request.Text, request.Start, clock.GetUtcNow());
         }
         catch (CaseError error)
         {
@@ -307,6 +309,24 @@ public sealed class CaseCommands(
     private Task Notify(
         Transfer.Domain.Cases.Transfer caseItem, CancellationToken cancellationToken) =>
         outbox.NoteAsync(caseItem.Subject, NotificationKinds.Moved, cancellationToken);
+
+    /// <summary>A transfer that ended takes its running negotiation with it.</summary>
+    /// <remarks>
+    /// Otherwise the employer's list would go on showing an inquiry about a
+    /// move that is no longer happening.
+    /// </remarks>
+    private async Task CloseNegotiationAsync(
+        Transfer.Domain.Cases.Transfer caseItem, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (caseItem.IsRunning
+            || await releases.ForCaseAsync(caseItem.Id, cancellationToken) is not { IsRunning: true } negotiation)
+        {
+            return;
+        }
+
+        negotiation.Close(now);
+        await releases.SaveAsync(negotiation, cancellationToken);
+    }
 
     private static CaseResult ToResult(CaseError error) => error switch
     {

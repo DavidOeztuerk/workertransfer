@@ -30,6 +30,14 @@ public static class ConsentKey
     /// employer, who is on the same platform.
     /// </remarks>
     public static string Market(TenantId company) => $"market.visibility:tenant:{company}";
+
+    /// <summary>"My employer X may be asked about me" (ADR-0050).</summary>
+    /// <remarks>
+    /// Scoped to the employer she named, not to the asking company: the
+    /// consent is about who may be <em>asked</em>. Which companies may ask
+    /// follows from the transfer they run with her.
+    /// </remarks>
+    public static string EmployerRoute(TenantId employer) => $"employer.route:tenant:{employer}";
 }
 
 /// <summary>Reads the ledger and writes into it.</summary>
@@ -70,4 +78,27 @@ public interface IConsentGate
     /// <exception cref="ConsentGateSilent">The ledger did not answer.</exception>
     Task RevokeAsync(
         SubjectId subject, TenantId company, CancellationToken cancellationToken = default);
+
+    /// <summary>Whether the route to this employer is open right now (ADR-0050).</summary>
+    /// <exception cref="ConsentGateSilent">The ledger did not answer.</exception>
+    Task<bool> EmployerRouteOpenAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default);
+
+    /// <summary>The same question for several pairs, in the order asked.</summary>
+    /// <exception cref="ConsentGateSilent">
+    /// The ledger did not answer, or answered a different number of times.
+    /// </exception>
+    Task<IReadOnlyList<bool>> EmployerRoutesOpenAsync(
+        IReadOnlyList<(SubjectId Subject, TenantId Employer)> pairs,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Opens the route — written with the person's own token.</summary>
+    /// <exception cref="ConsentGateSilent">The ledger did not answer.</exception>
+    Task OpenEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default);
+
+    /// <summary>Closes it.</summary>
+    /// <exception cref="ConsentGateSilent">The ledger did not answer.</exception>
+    Task CloseEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default);
 }

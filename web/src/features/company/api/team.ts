@@ -8,7 +8,8 @@ import { request } from "../../../core/api/client";
 import { API_BASE_URL } from "../../../env";
 import { type Failure, interpretError } from "../../../shared/api/errors";
 
-export type Role = "admin" | "member";
+/** Ordered: member < recruiter < admin (ADR-0048). */
+export type Role = "admin" | "recruiter" | "member";
 
 export interface CompanyMember {
   user_id: string;

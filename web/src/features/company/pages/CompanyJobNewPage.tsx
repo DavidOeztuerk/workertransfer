@@ -23,6 +23,7 @@ import {
   draftJobText,
   employmentLabel,
   remoteLabel,
+  type SalaryPeriod,
 } from "../../work/api/jobs";
 
 interface JobDraft {
@@ -33,6 +34,9 @@ interface JobDraft {
   remote: RemoteMode;
   employment: EmploymentType;
   skills: string;
+  salaryMin: string;
+  salaryMax: string;
+  salaryPeriod: SalaryPeriod;
 }
 
 const EMPTY: JobDraft = {
@@ -43,7 +47,24 @@ const EMPTY: JobDraft = {
   remote: "none",
   employment: "full_time",
   skills: "",
+  salaryMin: "",
+  salaryMax: "",
+  salaryPeriod: "year",
 };
+
+/**
+ * Both fields empty is "not stated" — a statement the advert then shows. One
+ * end alone goes out as it is and the service refuses it: "from 40,000"
+ * reads like a range and hides its ceiling.
+ */
+function salaryOf(draft: JobDraft): { min: number; max: number; period: SalaryPeriod } | null {
+  if (draft.salaryMin.trim() === "" && draft.salaryMax.trim() === "") return null;
+  return {
+    min: Number(draft.salaryMin),
+    max: Number(draft.salaryMax),
+    period: draft.salaryPeriod,
+  };
+}
 
 const skillsOf = (raw: string): string[] =>
   raw
@@ -61,6 +82,7 @@ const CREATE_CASES: readonly ServerCase[] = [
   { status: 422, pattern: /is longer than \d+ characters/i, key: "companyJobs.fieldTooLong" },
   { status: 422, pattern: /skill may have at most/i, key: "companyJobs.skillTooLong" },
   { status: 422, pattern: /at most \d+ skills/i, key: "companyJobs.tooManySkills" },
+  { status: 422, pattern: /salary range/i, key: "companyJobs.salaryInvalid" },
 ];
 
 /**
@@ -120,6 +142,7 @@ export function CompanyJobNewPage() {
       remote: draft.remote,
       employment: draft.employment,
       skills: skillsOf(draft.skills),
+      salary: salaryOf(draft),
     });
     setRunning(false);
 
@@ -221,6 +244,35 @@ export function CompanyJobNewPage() {
                 </MenuItem>
               ))}
             </TextField>
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
+              <TextField
+                label={t("companyJobs.salaryMin")}
+                type="number"
+                value={draft.salaryMin}
+                onChange={(e) => setDraft({ ...draft, salaryMin: e.target.value })}
+                slotProps={{ htmlInput: { min: 1, step: 1, inputMode: "numeric" } }}
+              />
+              <TextField
+                label={t("companyJobs.salaryMax")}
+                type="number"
+                value={draft.salaryMax}
+                onChange={(e) => setDraft({ ...draft, salaryMax: e.target.value })}
+                slotProps={{ htmlInput: { min: 1, step: 1, inputMode: "numeric" } }}
+              />
+              <TextField
+                select
+                label={t("companyJobs.salaryPeriod")}
+                value={draft.salaryPeriod}
+                onChange={(e) => setDraft({ ...draft, salaryPeriod: e.target.value as SalaryPeriod })}
+              >
+                <MenuItem value="year">{t("jobs.periodYear")}</MenuItem>
+                <MenuItem value="month">{t("jobs.periodMonth")}</MenuItem>
+                <MenuItem value="hour">{t("jobs.periodHour")}</MenuItem>
+              </TextField>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {t("companyJobs.salaryHint")}
+            </Typography>
             <TextField
               label={t("companyJobs.skills")}
               helperText={t("companyJobs.skillsHint")}

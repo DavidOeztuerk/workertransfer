@@ -210,6 +210,7 @@ services:
       Erasure__BaseUrls__scout: http://scout-service:8012
       Erasure__BaseUrls__advisor: http://advisor-service:8013
       Erasure__BaseUrls__assessment: http://assessment-service:8014
+      Erasure__BaseUrls__messages: http://messages-service:8015
     depends_on:
       postgres:
         condition: service_healthy
@@ -251,12 +252,14 @@ services:
       # service is called, and the UI says so (ADR-0024). That is why `:-` and
       # not `:?` — a missing key must not stop the stack, unlike the three real
       # secrets.
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8003:8003"
 
@@ -268,6 +271,11 @@ services:
       SERVICE_DIR: resume
       ASPNETCORE_URLS: "http://0.0.0.0:8004"
       ConnectionStrings__resume: Host=postgres;Port=5432;Database=resume;Username=worker;Password=worker
+      # Who may ask a person for their CV: at least a `recruiter` (ADR-0048),
+      # read from identity-service's membership table per request. Without
+      # these two lines the request route answers 503 — rightly, and visibly.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
       Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
@@ -324,12 +332,14 @@ services:
       # service is called, and the UI says so (ADR-0024). That is why `:-` and
       # not `:?` — a missing key must not stop the stack, unlike the three real
       # secrets.
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8006:8006"
 
@@ -352,12 +362,14 @@ services:
       # The cover-letter agent. Empty means: NOTHING is called, and the UI says
       # so — instead of showing an empty draft somebody releases by accident
       # (ADR-0034).
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       # The address stands HERE and not only as a default in the source: a
       # built-in destination abroad is exactly what the sovereignty report is
       # meant to surface — and the egress boundary reads its allowed hosts from
       # the configuration (ServiceFoundation.cs).
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
       # THE TARGETS A PERSON MAY CHOOSE FOR THEIR OWN AI ACCESS.
       #
       # `Draft__BaseUrl` above is the operator's default. A person can,
@@ -514,8 +526,10 @@ services:
       # The draft of an approach. Empty means: NOTHING is called, and the UI
       # says so — instead of showing an empty draft somebody sends to a person
       # by accident (ADR-0024).
-      Draft__ApiKey: ${ANTHROPIC_API_KEY:-}
-      Draft__BaseUrl: https://api.anthropic.com/v1/messages
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
     ports:
       - "8012:8012"
 
@@ -583,6 +597,47 @@ services:
       # chosen by a stranger into a server request.
     ports:
       - "8014:8014"
+
+  messages-service:
+    <<: *service
+    container_name: workertransfer-messages
+    environment:
+      <<: *environment
+      SERVICE_DIR: messages
+      ASPNETCORE_URLS: "http://0.0.0.0:8015"
+      ConnectionStrings__messages: Host=postgres;Port=5432;Database=messages;Username=worker;Password=worker
+      # One conversation per process (ADR-0047). WHO BELONGS TO IT is asked of
+      # the process's own service, with the caller's token, at every request —
+      # without this line every conversation answers 503.
+      Applications__BaseUrl: http://applications-service:8007
+      # An APPROACH stands on the ledger (`profile.visibility:*`): the company
+      # side asks it at every request. Without this line every approach
+      # answers 503 — rightly, and visibly.
+      Consent__BaseUrl: http://consent-service:8002
+      # The AI advisor reads the person's OWN facts with her token (ADR-0049):
+      # her mandate and her earliest start. Without these lines it advises
+      # without them — and says so.
+      OwnFacts__AdvisorUrl: http://advisor-service:8013
+      OwnFacts__TransferUrl: http://transfer-service:8009
+      # A company's members — the recipients when the person writes — and a
+      # person's own AI access for their drafts. The same door and secret as
+      # everywhere.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # "A message arrived" — via the outbox, free of content (ADR-0025).
+      Notifications__BaseUrl: http://notification-service:8010
+      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      # The reply drafts. Empty key means: no draft, and the UI says so.
+      Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
+      Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-https://api.mistral.ai/v1/chat/completions}
+      Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
+      Draft__Model: ${WORKERTRANSFER_AI_MODEL:-mistral-medium-latest}
+      # Where a person may point their OWN access — the same declaration as for
+      # the cover letter; without it a local model is refused at the boundary.
+      Draft__AllowedTargets__0: ${WORKERTRANSFER_AI_TARGET_1:-http://host.docker.internal}
+      Draft__AllowedTargets__1: ${WORKERTRANSFER_AI_TARGET_2:-http://localhost}
+    ports:
+      - "8015:8015"
 
   gateway:
     <<: *service

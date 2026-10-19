@@ -126,7 +126,7 @@ fi
 
 helm upgrade --install "$RELEASE" "$CHART" \
   --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
-  --set anthropicApiKey="${ANTHROPIC_API_KEY:-}" \
+  --set aiKey="${WORKERTRANSFER_AI_KEY:-}" \
   --set secrets.jwtPrivateKey="$jwt_private" \
   --set secrets.jwtPublicKey="$jwt_public" \
   --wait --timeout 12m

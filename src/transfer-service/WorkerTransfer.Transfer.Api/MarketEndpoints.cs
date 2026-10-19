@@ -1,3 +1,5 @@
+using WorkerTransfer.Transfer.Api.Authorization;
+using WorkerTransfer.ServiceDefaults.Roles;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.ServiceDefaults;
@@ -56,11 +58,12 @@ public static class MarketEndpoints
                 // somebody else's market status.
                 var status = await mediator.Send(
                     new SaveMarketStatusCommand(
-                        actor.Subject, availability, body.Employed, body.Note),
+                        actor.Subject, availability, body.Employed, body.Note,
+                        body.OpenFrom, body.OpenUntil),
                     cancellationToken);
 
                 await context.Response.WriteAsJsonAsync(
-                    Responses.ToWire(status), cancellationToken);
+                    Responses.ToWire(status, Responses.Today(context), own: true), cancellationToken);
             }
             catch (MarketError error)
             {
@@ -88,7 +91,7 @@ public static class MarketEndpoints
             var status = await mediator.Send(
                 new MyMarketStatusQuery(actor.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status, Responses.Today(context), own: true), cancellationToken);
         });
 
         // Who asked — and what holds right now. `active` comes fresh from the
@@ -196,6 +199,76 @@ public static class MarketEndpoints
             await Responses.Write(
                 context, result, cancellationToken,
                 active: null, successStatus: StatusCodes.Status201Created);
+        })
+        // A first contact to a person who did not come forward: at least a
+        // `recruiter` (ADR-0048), resolved from identity-service's membership
+        // table per request. The check stands BEFORE the body and the person
+        // are looked at.
+        .RequireAuthorization(AdminPermissionExtensions.Policy(MarketPermissions.Request));
+
+        // The notice period (VISION-FRAGEN H2) — the person's own, and there is
+        // no route by which anybody else reads it.
+        market.MapGet("/me/notice", async (
+            IMediator mediator, ICurrentPrincipal principal, HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (principal.Current is not { } actor)
+            {
+                await Responses.NotAuthenticated(context);
+                return;
+            }
+
+            var notice = await mediator.Send(new MyNoticeQuery(actor.Subject), cancellationToken);
+            await context.Response.WriteAsJsonAsync(
+                Responses.ToWire(notice, Responses.Today(context)), cancellationToken);
+        });
+
+        market.MapPut("/me/notice", async (
+            WriteNoticeV1? body, IMediator mediator, ICurrentPrincipal principal, HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (principal.Current is not { } actor)
+            {
+                await Responses.NotAuthenticated(context);
+                return;
+            }
+
+            if (body is null
+                || NoticeWords.ReadUnit(body.Unit) is not { } unit
+                || NoticeWords.ReadEnd(body.End) is not { } end)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "unit and end are required");
+                return;
+            }
+
+            try
+            {
+                var notice = await mediator.Send(
+                    new StateNoticeCommand(actor.Subject, body.Length, unit, end), cancellationToken);
+                await context.Response.WriteAsJsonAsync(
+                    Responses.ToWire(notice, Responses.Today(context)), cancellationToken);
+            }
+            catch (MarketError error)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", error.Message);
+            }
+        });
+
+        market.MapDelete("/me/notice", async (
+            IMediator mediator, ICurrentPrincipal principal, HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (principal.Current is not { } actor)
+            {
+                await Responses.NotAuthenticated(context);
+                return;
+            }
+
+            await mediator.Send(new WithdrawNoticeCommand(actor.Subject), cancellationToken);
+            context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
 
         market.MapGet("/{subjectId:guid}", async (
@@ -225,7 +298,7 @@ public static class MarketEndpoints
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Responses.ToWire(status), cancellationToken);
+            await context.Response.WriteAsJsonAsync(Responses.ToWire(status, Responses.Today(context), own: false), cancellationToken);
         });
 
         return app;

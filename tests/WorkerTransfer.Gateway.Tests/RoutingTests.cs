@@ -38,6 +38,9 @@ public class RoutingTests(Landscape landscape)
     [InlineData("/notifications/me", "notification")]
     [InlineData("/assessments", "assessment")]
     [InlineData("/assessments/me", "assessment")]
+    [InlineData("/messages/me", "messages")]
+    [InlineData("/messages/application/7f000001-0000-0000-0000-000000000000", "messages")]
+    [InlineData("/messages/drafts/7f000001-0000-0000-0000-000000000000/release", "messages")]
     public async Task An_address_lands_at_its_service(string path, string expected)
     {
         var (service, arrived) = await landscape.Ask(path);

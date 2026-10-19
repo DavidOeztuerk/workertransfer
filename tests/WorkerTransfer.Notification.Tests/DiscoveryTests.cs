@@ -212,18 +212,20 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
         (await Inbox(anna)).GetArrayLength().Should().Be(1);
     }
 
-    /// <summary>The kind is one of eight, and all eight are settable.</summary>
+    /// <summary>The kind is one of nine, and all nine are settable.</summary>
     /// <remarks>
     /// The eighth came with assessment-service (ADR-0042):
-    /// <c>assessment_update</c>. This number stands here so that a new kind does
+    /// <c>assessment_update</c>; the ninth with messages-service (ADR-0047):
+    /// <c>message_received</c>. This number stands here so that a new kind does
     /// not arrive silently — every one is a switch a human being gets to see,
     /// and a kind added unnoticed would be a mail nobody asked for.
     /// </remarks>
     [Fact]
-    public void There_are_eight_kinds() =>
-        NotificationKinds.All.Should().HaveCount(8)
+    public void There_are_nine_kinds() =>
+        NotificationKinds.All.Should().HaveCount(9)
             .And.Contain(NotificationKind.ProfileDiscovered)
-            .And.Contain(NotificationKind.AssessmentUpdate);
+            .And.Contain(NotificationKind.AssessmentUpdate)
+            .And.Contain(NotificationKind.MessageReceived);
 
     /// <summary>Only this one kind carries a daily cap.</summary>
     /// <remarks>

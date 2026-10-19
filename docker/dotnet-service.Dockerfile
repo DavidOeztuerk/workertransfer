@@ -52,6 +52,7 @@ RUN set -eu; \
         "scout:src/scout-service/WorkerTransfer.Scout.Api" \
         "advisor:src/advisor-service/WorkerTransfer.Advisor.Api" \
         "assessment:src/assessment-service/WorkerTransfer.Assessment.Api" \
+        "messages:src/messages-service/WorkerTransfer.Messages.Api" \
         "notification:src/notification-service/WorkerTransfer.Notification.Api" \
         "gateway:src/gateway/WorkerTransfer.Gateway" \
     ; do \

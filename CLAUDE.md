@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.1** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
-Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
+Fifteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
 The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
 
 ### The layout, so nobody guesses
 
 ```
-src/            fourteen services, gateway/, shared/
+src/            fifteen services, gateway/, shared/
 tests/          nineteen test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
@@ -41,6 +41,7 @@ package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.jso
 | `scout-service` | 8012 | the search for people — ticks and evidence, never a number |
 | `advisor-service` | 8013 | the mandate — four values; the stages live in the ledger |
 | `assessment-service` | 8014 | the work sample — the effort in hours, and one evaluation the person always reads |
+| `messages-service` | 8015 | one conversation per process — and drafts only a human being releases |
 
 The gateway (`src/gateway`, port 8090) is the single entrance. `src/shared/` holds seven things and no more: `ServiceDefaults` (the one call every service makes), `Outbox`, `Skills`, `DocumentStore` (bytes for certificates, never a PDF the server rendered — `Ablage` until 24.09.2026), and three `Contracts.*` packages (`Identity`, `Consent`, `Erasure`) that carry versioned boundary DTOs — never a shared domain model. The eighth, `Nachweis`, collapsed into Noelia with ADR-0045; the checks WorkerTransfer answers itself live in `ServiceDefaults/Checks`.
 
@@ -398,7 +399,7 @@ Two checks sit in two places on purpose. **Freemail is rejected at registration*
 
 **`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `MembershipPermission` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
 
-Eight routes now demand an `admin`, and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
+Twelve routes now demand an `admin` — eight since PBI-2, four since ADR-0050 — and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
 
 | route | why `admin` |
 |---|---|
@@ -408,8 +409,12 @@ Eight routes now demand an `admin`, and the line behind them is written down onc
 | `POST /jobs/{id}/publish` | the advert starts representing the company |
 | `POST /jobs/{id}/close` | it stops — and with it the chance to apply |
 | `PUT /companies/me/profile` | the shop window, public and for everyone |
-| `POST /transfers/{id}/offer` | start date and placement fee |
-| `POST /transfers/{id}/complete` | states that both hold |
+| `POST /transfers/{id}/offer` | the start date |
+| `POST /transfers/{id}/complete` | states that it holds |
+| `PUT /transfers/employer/setting` | lets other companies ask about the own staff (ADR-0050) |
+| `POST /transfers/{id}/release`, `/transfers/releases/{id}/terms`, `/accept` | a release month and a fee — one company pays, the other lets somebody go sooner |
+
+**A third role since 07.10.2026: `recruiter`** ([ADR-0048](docs/adr/0048-der-recruiter-macht-den-ersten-schritt.md), VISION-FRAGEN B7). The roles are **ordered**, `member` < `recruiter` < `admin`, and `ServiceDefaults.Roles.CompanyPermissions` names a *minimum* per permission (`role >= minimum`) — so an admin may approach too, and a fourth role must be inserted where it belongs in `CompanyRole` or it silently gains or loses rights. The recruiter's one addition is the **first contact** to a person who did not come forward: `POST /resumes/{subject}/requests`, `POST /market/{subject}/requests`, `POST /advisor/conversations`. Searching stays `member`. resume-service therefore needs `Identity__BaseUrl`/`Identity__Secret` now. In the UI the 403 reads `errors.recruiterOnly` via `RECRUITER_CASES`, never "choose a company".
 
 Three of those already had the check in the *handler*; moving it to the endpoint moved it **before** the body is looked at — otherwise a stranger learns from the difference 400/403 that their body was fine.
 
@@ -619,7 +624,7 @@ Certificates ride a capability of their own: `documents.visibility:tenant:<id>` 
 
 ### Erasure: the default deletes completely (ADR-0027)
 
-`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to eleven recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`, `advisor`, `assessment` — `ErasureRecipient.Services`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `ErasureRecipientTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `SubjectKeyedTable` annotation.
+`POST /account/erasure` at identity-service — self only, **no reason field**: demanding a justification from someone who wants to leave is a lever against them. It immediately revokes every session and disables the account, then cascades over the **outbox** to twelve recipients (`consent`, `profile`, `resume`, `portfolio`, `applications`, `transfer`, `github`, `notification`, `scout`, `advisor`, `assessment`, `messages` — `ErasureRecipient.Services`) and identity itself, last. `jobs-service` and `companies-service` are **not** recipients — they hold nothing about a natural person, and `ErasureRecipientTests` goes red the moment any service grows a personal table and is not on the list. That guard reads the **EF model**, not the source, and uses two signals: personal column names *and* the `SubjectKeyedTable` annotation.
 
 Three things are load-bearing:
 
@@ -648,6 +653,10 @@ There is deliberately no score, no percentage, no match endpoint and no match co
 There are **two** consumers and they are mirror images. `POST /profiles/me/draft` helps a *person* say what they want to say; `POST /jobs/draft` helps a *company* phrase **its own advert**. Neither ever says anything *about* anyone — that is what makes the second one buildable without its own weighing, where a scout, a candidate ranking or a salary recommendation would all aim at people.
 
 Each service owns its own `IDrafter` port and its own context type rather than sharing one prompt with branches — the profile context carries no name, no email, no subject id, no employer, no CV; the job context carries no tenant and no company name. Tests pin both field sets. A shared prompt with an `if` is exactly where "invent nothing about the person" would one day apply to an advert, or worse, the reverse.
+
+**The platform's provider is Mistral (EU), since 07.10.2026** (VISION-FRAGEN E2). Its API is OpenAI-compatible, so all four seams take `Draft__Provider` (`openai_compatible` default, `anthropic` selectable) and speak through `ServiceDefaults/Ai/ModelWire.cs`; compose fills `Draft__*` from `WORKERTRANSFER_AI_{KEY,PROVIDER,URL,MODEL}`. **An `.env` still carrying `ANTHROPIC_API_KEY` is not read any more** — rename it. A person's own access (`AiAccessV1`) still wins over the platform's for the cover letter; "none" in the account settings means *the platform default*, not *off* — the label said "nothing leaves" and was false since the operator fallback existed.
+
+**Known values leave as placeholders** (`ServiceDefaults/Ai/Placeholders.cs`, VISION-FRAGEN E2): the cover-letter writer masks the person's name (and its parts), the addressee and every former employer in the *whole* instruction — they also stand in free text — and restores them in the answer and in every streamed fragment. It masks at the last step before the wire so no caller can forget it. It cannot find what a person typed about somebody else in free text; there the choice of provider protects.
 
 With no API key configured, nothing external is ever called and the UI says so. Nothing is stored — not the prompt, not the answer; the draft lives in the form until it is saved, and then it is the author's text. Errors report the failure kind, never the content. Do not add memory, a vector store, or a background suggestion — all three either store or act unasked. **There is deliberately no plan-act-reflect loop and no ledger entry**: a reflect stage means two calls to rewrite the user's own words unasked, and a ledger entry would assert a standing permission nobody gave — the button is the consent, informed and per use.
 
@@ -742,6 +751,8 @@ row is needed anywhere; delivery stays at-least-once and a second delivery is
 harmless.
 
 There is no `/me/scouting` and no table of who looked at whom.
+
+**The scout per advert** (07.10.2026, ADR-0036 Ergänzung, VISION-FRAGEN B1): `GET /scout/jobs/{id}/candidates` is *this* search with the company's own published advert's skills as the words — all four conditions unchanged, opened on a click from `/company/jobs`, never run in the background. A draft, closed or foreign advert is one 404; an advert without skills is 422, never the empty search (which would list everybody who released). Up to twenty skills go in; profile-service's door used to cut silently at ten.
 
 **Three filters PBI-3 names are decided against, not pending** (ADR-0036 §6–8):
 the **occupational field** never becomes a filter — it contradicts ADR-0039
@@ -915,6 +926,39 @@ thirteen rows now.
 The eighth notification kind came with it: `assessment_update`, for both
 movements ("a task was set for you", "your evaluation is in"). The second is why
 the kind exists — without it a person learns of a reply at their next visit.
+
+### messages-service: one conversation per process, and a draft goes out only released
+
+Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md) — Phase 1 of `docs/BAULISTE.md`, the ground every later agent stands on (VISION-FRAGEN D2, E1, E2). Phase 1 knows one kind of process: **`application`**.
+
+**Who belongs to a conversation is decided by the process's own service, not here.** Before every read and write, `HttpProcessLookup` asks `GET /applications/{id}` **with the caller's token**, synchronously, no cache; 404 there is 404 here, byte-identical whether or not the conversation exists. The capacity in the token decides the side: acting for the company → `company`, acting as oneself → `person`. A silent applications-service is **503**, never 404.
+
+**A draft is a message in state `draft`, and only its own side sees it** — filtered in the SQL (`VisibleToAsync`), not further up. It comes into being on a click (`POST …/draft`), a human being edits and **releases** it; discarding deletes the row. The model call is a *query* (`ComposeReplyQuery`) and the draft is saved by a separate command, so no transaction stays open for the seconds a model takes. There is **no route** that sends a draft without a release; `MessageJourneyTests` pins the closed set of six.
+
+**What reaches the model:** `ReplyContext` — the writing side, the last twenty *sent* messages of this one conversation, the person's name (only to be masked) and a language. Never a draft, a profile, a CV or another conversation; the rules forbid judging the other side (D2/D3). The person's side uses their own AI access if they set one up — a silent identity-service is refused, not quietly replaced by the platform's provider — the company's side the platform's (Mistral).
+
+**`origin` (`human`/`agent`) is shown to the own side only**, and no author id ever goes out; whether a recipient must learn that a model drafted a released message is lawyer question J2.
+
+**No read state, no unread count** — "has the company read it?" is pressure and a statement about a person's behaviour. The ninth notification kind, `message_received`, names nobody; a person writing notifies every member but the writer.
+
+**The approach** (second kind, `approach`, Phase 2): a company's first message to a person who released their profile to it, opened only by `POST /messages/approaches` with at least a `recruiter` (ADR-0048) and a yes from the ledger. One conversation per company/person pair — the reference is derived from both, never the subject id itself (it stands in URLs). Its parties stand in the conversation; the **company side asks the ledger at every request**, the person side never — a revocation stops the company and leaves the person reading. The first text is the scout's approach draft (the AI recruiter), released in the hit card; `/messages` lists every conversation with its counterpart only (`company_id` for the person, `person_id` for the company).
+
+**The unsolicited application** (third kind, `initiative`, 08.10.2026, VISION-FRAGEN B2) is the approach's mirror: a person writes to a company from its careers page, and **sending releases her profile to that company** — written with *her* token through `IReleaseWriter`, the one place messages-service writes to the ledger. Text is checked before the release, the company's members before either (none → 404, no release).
+
+**The AI advisor** ([ADR-0049](docs/adr/0049-der-ki-berater-ist-ein-agent-der-person.md), 08.10.2026, VISION-FRAGEN B4/B5/D4): `POST /messages/{kind}/{ref}/advice` — on a click, for the person only (a company gets 403; an agent for both sides is the conflict D4 forbids). It reads the sent messages of that one conversation and **her own facts with her token** — mandate (advisor-service) and earliest start (transfer-service, H2) — and nothing else (`AdviceContext` is pinned). A silent source is written into the prompt as *not reachable*, never left out. No legal verdict (§ 2 RDG), no number about her, every statement with its source; the advice is stored nowhere and sent to nobody. Speaking *for* her goes through the existing draft-and-release path.
+
+**Erasure:** the person's conversations fall whole, the company's messages in them too. An erased *member*'s released messages stay in the other person's conversation with `author_id = null`; their unreleased drafts go.
+
+### The way to the current employer: two consents, and a negotiation between companies
+
+Built 16.10.2026 under [ADR-0050](docs/adr/0050-der-alte-arbeitgeber-mit-zwei-zustimmungen.md) (VISION-FRAGEN C1, C3, D1). It ends the transfer draft's "the platform never contacts the employer" — **only** where both allow it.
+
+- **The employer's half** is a company setting, `admin`, visible nowhere outside the company, without a word like "insolvency". It decides only whether a *new* inquiry may be made.
+- **The person's half: naming the employer IS the consent.** She does it on the employer's careers page; `employer_routes` (a `SubjectKeyedTable`) is only the pointer, the consent is `employer.route:tenant:<X>` in the ledger, asked at every company read and step (ADR-0013). Closing the route deletes "works at X" and ends running negotiations. Without both halves every company sees **one 404** — no route, employer not asking, consent revoked, own employer: told apart, each would say where she works.
+- **The employer sees a person only when a company asks** — her civil name through identity's person door, *after* the ledger check. There is no list of who opened a route; that list would be "who is listening".
+- **The release negotiation** (`release_negotiations`, one per transfer): a month and a fee or none, terms set alternately, accepted only by the side that did not set them; then **she agrees last** and can decline in every running state. Both companies see her earliest regular start from her notice period (H2) — the one place a company sees it. The platform suggests no price and moves no money.
+- **The offer to the person carries no fee any more**; `Retention.KeepPaid` now means "a completed transfer with a settled negotiation that has a fee" — still `false`.
+- Company steps notify the person and the other company's members as `transfer_update`; her own steps notify nobody.
 
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 
@@ -1130,5 +1174,6 @@ that script was built against.
 - `docs/glossary.md` — the terms.
 - `docs/MESSUNG-GEHEIMNISFRAGE.md` — where the master key lies, what a key change costs (everything), and the measurement behind the three table rows above. 12.09.2026.
 - `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). `sitzungswiderruf-liest-sid.md` is closed (fixed in Noelia 7.0.1, 07.10.2026); its two side findings — no `UseTokenRevocation` in the default chain, a `text/plain` refusal — stay open there. `verschluesselung-verschluesselt-nicht.md` is **closed**: fixed in 4.4.2, re-measured against 7.0.0 on 07.10.2026 (no plaintext in the envelope, a foreign key fails on the GCM tag). `AddEncryption` stays out anyway — `SecretStore` covers what we encrypt.
+- `docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md` — messages per process, and drafts only a human being releases. 07.10.2026.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
 - `AGENTS.md` — concise command + convention reference.

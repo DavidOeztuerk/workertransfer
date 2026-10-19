@@ -51,7 +51,8 @@ public class ErasureRecipientTests
         { "notification", typeof(Notification.Infrastructure.Persistence.NotificationDbContext) },
         { "scout", typeof(Scout.Infrastructure.Persistence.ScoutDbContext) },
         { "advisor", typeof(Advisor.Infrastructure.Persistence.AdvisorDbContext) },
-        { "assessment", typeof(Assessment.Infrastructure.Persistence.AssessmentDbContext) }
+        { "assessment", typeof(Assessment.Infrastructure.Persistence.AssessmentDbContext) },
+        { "messages", typeof(Messages.Infrastructure.Persistence.MessagesDbContext) }
     };
 
     /// <summary>

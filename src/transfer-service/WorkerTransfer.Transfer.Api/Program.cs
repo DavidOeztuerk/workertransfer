@@ -25,10 +25,18 @@ builder.Services.AddWorkerTransferDefaults(
 //
 // `withdraw` is deliberately not among them: whoever may start must be allowed
 // to stop.
-builder.Services.AddAdminPermissions(
+//
+// Asking a person for their market status is a first contact: at least a
+// `recruiter` (ADR-0048).
+//
+// The release negotiation (ADR-0050) binds both companies — one pays, the
+// other lets somebody go sooner — and so does allowing inquiries at all.
+// Refusing and withdrawing stand nowhere here, for the same reason as
+// `withdraw`.
+builder.Services.AddCompanyPermissions(
     builder.Configuration,
-    CasePermissions.Offer,
-    CasePermissions.Complete);
+    [CasePermissions.Offer, CasePermissions.Complete, CasePermissions.Release, CasePermissions.Inquiries],
+    [MarketPermissions.Request]);
 
 builder.Services.AddTransferInfrastructure(
     builder.Configuration,
@@ -44,6 +52,7 @@ app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
 app.MapMarketEndpoints();
 app.MapCaseEndpoints();
+app.MapReleaseEndpoints();
 app.MapErasureEndpoints();
 
 await app.RunAsync();

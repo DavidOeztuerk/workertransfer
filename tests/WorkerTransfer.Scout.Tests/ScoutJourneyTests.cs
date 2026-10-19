@@ -103,6 +103,91 @@ public class ScoutJourneyTests(Postgres postgres) : IAsyncLifetime
     }
 
     // ---------------------------------------------------------------------
+    // The scout per advert (VISION-FRAGEN B1)
+    // ---------------------------------------------------------------------
+
+    private static readonly Guid Advert = Guid.Parse("aaaaaaaa-1111-1111-1111-111111111111");
+
+    private void Stock(Guid company, bool published, params string[] skills) =>
+        _jobs.Stock[Advert] = new JobStatement(
+            "Kiel", "24103", Attendance.OnSite, company, skills, published);
+
+    [Fact]
+    public async Task The_advert_hands_its_skills_to_the_search()
+    {
+        Stock(Company, published: true, "WIG", "MIG", "Postgres");
+        var subject = Guid.NewGuid();
+        _search.Stock.Add(Profile(subject, ["WIG"]));
+        _ledger.Released.Add((subject, Company));
+
+        var response = await AsCompany().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _search.LastFilter!.NamedWords.Should().BeEquivalentTo(["WIG", "MIG", "PostgreSQL"]);
+        _search.LastFilter.Location.Should().BeEmpty("the advert's place is a tick, never a filter");
+        (await Json(response)).GetProperty("items").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task All_twenty_skills_of_an_advert_reach_the_search()
+    {
+        var twenty = Enumerable.Range(1, 20).Select(number => $"skill{number}").ToArray();
+        Stock(Company, published: true, twenty);
+
+        (await AsCompany().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        _search.LastFilter!.NamedWords.Should().HaveCount(20, "cutting would search half an advert");
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task A_draft_or_a_foreign_advert_is_404(bool foreign, bool published)
+    {
+        Stock(foreign ? Guid.NewGuid() : Company, published, "WIG");
+
+        (await AsCompany().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_missing_advert_is_the_same_404()
+    {
+        (await AsCompany().GetAsync(new Uri($"/scout/jobs/{Guid.NewGuid()}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task An_advert_without_skills_is_422_and_searches_nobody()
+    {
+        Stock(Company, published: true);
+
+        var response = await AsCompany().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative));
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        _search.LastFilter.Should().BeNull("an empty filter would list everybody who released");
+    }
+
+    [Fact]
+    public async Task A_silent_job_service_is_503_here()
+    {
+        _jobs.Silent = true;
+
+        (await AsCompany().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task A_person_gets_403_and_a_stranger_401()
+    {
+        (await AsPerson().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await _service.CreateClient().GetAsync(new Uri($"/scout/jobs/{Advert}/candidates", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ---------------------------------------------------------------------
     // The ledger
     // ---------------------------------------------------------------------
 

@@ -664,6 +664,9 @@ Rechtsberatung.
   Checklisten (B6, F2); automatisch gefüllte Vertragsvorlagen (F1, vgl. BGH
   „Smartlaw“).
 - **Dateien:** `docs/superpowers/specs/2026-08-02-contract-templates-design.md`; `docs/VISION-FRAGEN.md` B5, B6, F1, F2.
+  Seit 08.10.2026 dazu: die Checklisten `web/src/features/public/pages/ChecklistsPage.tsx`
+  mit ihren Texten (`checklists.*` in `web/src/core/i18n/catalogs/de.ts`) und der
+  Fristrechner `src/transfer-service/WorkerTransfer.Transfer.Domain/Market/NoticePeriod.cs`.
 
 ### J7. Die Vertragsvorlagen selbst
 
@@ -704,6 +707,18 @@ Rechtsberatung.
   „Konformität“, kein „Zertifikat“)? Impressum, Datenschutzerklärung und
   Nutzungsbedingungen sind heute nur Gerüst ohne Inhalt.
 - **Dateien:** `scripts/evidence_documents.py`, `docs/adr/0044-nachweis-belege-statt-konformitaet.md`, `web/src/core/i18n/catalogs/de.ts` (Abschnitte Impressum, Datenschutz, Nutzungsbedingungen).
+
+### J13. Gehaltsspanne im Inserat: Pflicht oder freiwillig?
+
+- **Frage:** Die Entgelttransparenz-Richtlinie (EU 2023/970, Art. 5) verlangt
+  das Einstiegsentgelt oder seine Spanne **vor dem Vorstellungsgespräch** — im
+  Inserat oder auf anderem Weg. Heute ist das Feld freiwillig, und ein
+  Inserat ohne Angabe zeigt „Gehalt nicht angegeben“. Muss die Plattform es zur
+  Pflicht machen, sobald das deutsche Umsetzungsgesetz gilt? Reicht brutto in
+  ganzen Euro mit Zeitraum (Jahr, Monat, Stunde)?
+- **Dateien:** `src/jobs-service/WorkerTransfer.Jobs.Domain/Jobs/SalaryBand.cs`,
+  `web/src/features/company/pages/CompanyJobNewPage.tsx`,
+  `web/src/core/i18n/catalogs/de.ts` (`companyJobs.salaryHint`).
 
 ---
 

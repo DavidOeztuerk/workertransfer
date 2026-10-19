@@ -20,3 +20,4 @@ CREATE DATABASE github OWNER worker;
 CREATE DATABASE scout OWNER worker;
 CREATE DATABASE advisor OWNER worker;
 CREATE DATABASE assessment OWNER worker;
+CREATE DATABASE messages OWNER worker;

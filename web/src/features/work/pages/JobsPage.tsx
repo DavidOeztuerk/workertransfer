@@ -27,6 +27,8 @@ import {
   type SearchFailure,
   placeNear,
   searchJobs,
+  salaryText,
+  PERIOD_KEY,
 } from "../api/jobs";
 import { getDrafts, listMyApplications } from "../api/applications";
 import { getMyProfile } from "../api/profile";
@@ -119,7 +121,7 @@ export function JobsPage() {
   // sentences explain what the page already shows itself: that it stands there
   // without sign-in, and that a button "Bewerben" sits under every card. Two
   // lines that push the first hit down.
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { signedIn, loading } = useActor();
   const myApplications = useAsync(
     (signal) => listMyApplications(signal),
@@ -401,6 +403,9 @@ export function JobsPage() {
                             ? job.location
                             : t("jobs.locationMissing")}{" "}
                           · {remoteLabel(job.remote)} · {employmentLabel(job.employment)}
+                          · {job.salary !== null
+                            ? salaryText(job.salary, i18n.language, (period) => t(PERIOD_KEY[period]))
+                            : t("jobs.salaryMissing")}
                         </Typography>
                         <Typography sx={{ whiteSpace: "pre-line" }}>
                           {job.description}

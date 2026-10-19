@@ -49,7 +49,7 @@ public sealed class HttpAiAccessLookup(
         if (_draft.ApiKey.Length > 0)
         {
             return new AiAccess(
-                "anthropic",
+                _draft.Provider,
                 _draft.BaseUrl,
                 _draft.Model,
                 _draft.ApiKey);

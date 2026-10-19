@@ -90,6 +90,18 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         var paid = await Case(anna, company, "completed", fee: 500_000);
         var running = await Case(anna, Guid.CreateVersion7(), "talking");
         await Status(anna);
+        await using (var arrange = postgres.Context())
+        {
+            arrange.NoticePeriods.Add(new NoticeRow
+            {
+                Id = anna, Length = 3, Unit = "month", End = "month_end", UpdatedAt = DateTime.UtcNow
+            });
+            arrange.EmployerRoutes.Add(new EmployerRouteRow
+            {
+                Id = anna, EmployerId = Guid.CreateVersion7(), OpenedAt = DateTime.UtcNow
+            });
+            await arrange.SaveChangesAsync();
+        }
 
         var response = await Erase(anna);
 
@@ -102,16 +114,23 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
         (await context.Cases.AnyAsync(row => row.Id == paid)).Should().BeFalse();
         (await context.Cases.AnyAsync(row => row.Id == running)).Should().BeFalse();
         (await context.MarketStatus.AnyAsync(row => row.Id == anna)).Should().BeFalse();
+        (await context.NoticePeriods.AnyAsync(row => row.Id == anna)).Should().BeFalse("when she could be gone falls too");
+        (await context.EmployerRoutes.AnyAsync(row => row.Id == anna))
+            .Should().BeFalse("'works at X' existed only because she consented (ADR-0050)");
+        (await context.Negotiations.AnyAsync(row => row.SubjectId == anna))
+            .Should().BeFalse("the negotiation was about her, fee and all");
     }
 
     /// <summary>
     /// The flipped switch covers <strong>exactly one</strong> row class: a
-    /// completed deal <em>with</em> a fee.
+    /// completed deal <em>with</em> a fee — agreed in a settled release
+    /// negotiation since ADR-0050, and kept along with it.
     /// </summary>
     /// <remarks>
     /// No extension to <c>interested</c>/<c>talking</c>/<c>offered</c> — a
     /// conversation is no contract — and without a fee no trade has come into
-    /// being that anything could hang on.
+    /// being that anything could hang on. A fee two companies agreed on but the
+    /// person did not (<c>agreed</c>) is no trade either.
     /// </remarks>
     [Fact]
     public async Task The_flipped_switch_covers_exactly_the_paid_completion()
@@ -126,6 +145,10 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             anna, Guid.CreateVersion7(), "offered", fee: 500_000);
         var declinedPaid = await Case(
             anna, Guid.CreateVersion7(), "declined", fee: 500_000);
+        var completedWithoutFee = await Case(
+            anna, Guid.CreateVersion7(), "completed", fee: null, negotiation: "settled");
+        var completedNotYetHers = await Case(
+            anna, Guid.CreateVersion7(), "completed", fee: 500_000, negotiation: "agreed");
 
         await using var context = postgres.Context();
         var ledger = new EfErasureLedger(context);
@@ -142,7 +165,15 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
 
         left.Should().BeEquivalentTo([completedPaid, acceptedPaid]);
         left.Should().NotContain(
-            [completedUnpaid, offeredPaid, declinedPaid]);
+            [completedUnpaid, offeredPaid, declinedPaid, completedWithoutFee, completedNotYetHers]);
+
+        var negotiations = await context.Negotiations
+            .Where(row => row.SubjectId == anna)
+            .Select(row => row.TransferId)
+            .ToListAsync();
+
+        negotiations.Should().BeEquivalentTo([completedPaid, acceptedPaid],
+            "the fee is what is kept, so its negotiation stays with the case — and only that one");
     }
 
     /// <summary>
@@ -301,7 +332,10 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// Straight into the table: reaching a paid completion over the routes costs
     /// five calls and checks nothing here that is not checked elsewhere already.
     /// </remarks>
-    private async Task<Guid> Case(Guid subject, Guid company, string state, long? fee = null)
+    /// <param name="fee">The release fee; a negotiation is written when it or <paramref name="negotiation"/> is given.</param>
+    /// <param name="negotiation">The negotiation's state; <c>settled</c> when only a fee is given.</param>
+    private async Task<Guid> Case(
+        Guid subject, Guid company, string state, long? fee = null, string? negotiation = null)
     {
         await using var context = postgres.Context();
         var now = DateTime.UtcNow;
@@ -313,12 +347,30 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             Status = state,
             Message = "We might have something for you.",
             OfferNote = fee is null ? string.Empty : "Offer.",
-            OfferFeeCents = fee,
             CreatedAt = now,
             UpdatedAt = now
         };
 
         context.Cases.Add(row);
+
+        if (fee is not null || negotiation is not null)
+        {
+            context.Negotiations.Add(new NegotiationRow
+            {
+                Id = Guid.CreateVersion7(),
+                TransferId = row.Id,
+                SubjectId = subject,
+                HiringTenantId = company,
+                CurrentTenantId = Guid.CreateVersion7(),
+                Status = negotiation ?? "settled",
+                ReleaseMonth = "2026-12",
+                FeeCents = fee,
+                TermsBy = "hiring",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
         await context.SaveChangesAsync();
 
         return row.Id;

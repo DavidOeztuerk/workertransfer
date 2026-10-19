@@ -213,4 +213,7 @@ public sealed record ForeignConnectionV1(
 public sealed record ForeignJobV1(
     [property: JsonPropertyName("location")] string? Location,
     [property: JsonPropertyName("postal_code")] string? PostalCode,
-    [property: JsonPropertyName("remote_mode")] string? RemoteMode);
+    [property: JsonPropertyName("remote_mode")] string? RemoteMode,
+    [property: JsonPropertyName("tenant_id")] Guid TenantId = default,
+    [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null,
+    [property: JsonPropertyName("status")] string? Status = null);

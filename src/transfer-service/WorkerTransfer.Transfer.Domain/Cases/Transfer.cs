@@ -107,6 +107,14 @@ public sealed class TransitionNotAllowed(TransferState now, string what)
 /// safer. Between an assurance nobody can redeem and one that endangers
 /// nobody, the second is the more honest.
 /// </para>
+/// <para>
+/// Since ADR-0050 there is one way to the employer, and it still does not run
+/// through this class: the person names her employer and consents in one act
+/// (<c>EmployerRoute</c>), the employer allows inquiries
+/// (<c>EmployerSetting</c>), and an earlier release is negotiated beside the
+/// case (<c>ReleaseNegotiation</c>). The case itself holds no employer, and
+/// the last step stays hers.
+/// </para>
 /// </remarks>
 public sealed class Transfer
 {
@@ -123,7 +131,6 @@ public sealed class Transfer
         string message,
         string offerText,
         string? offerStart,
-        long? offerFeeCents,
         DateTimeOffset createdAt,
         DateTimeOffset changedAt)
     {
@@ -136,7 +143,6 @@ public sealed class Transfer
         Message = message;
         OfferText = offerText;
         OfferStart = offerStart;
-        OfferFeeCents = offerFeeCents;
         CreatedAt = createdAt;
         ChangedAt = changedAt;
     }
@@ -175,14 +181,6 @@ public sealed class Transfer
     /// <summary>When it is meant to start, or <c>null</c>.</summary>
     public string? OfferStart { get; private set; }
 
-    /// <summary>The agreed placement fee in cents, or <c>null</c>.</summary>
-    /// <remarks>
-    /// Recorded, not moved: the platform holds no money. It is a number two
-    /// companies agree on, and it stands here so both sides have the same one
-    /// in view.
-    /// </remarks>
-    public long? OfferFeeCents { get; private set; }
-
     /// <summary>When it began.</summary>
     public DateTimeOffset CreatedAt { get; }
 
@@ -205,7 +203,7 @@ public sealed class Transfer
         DateTimeOffset now) =>
         new(Guid.CreateVersion7(), subject, company, TransferState.Interested, needsRelease,
             releaseConfirmed: false, Text("Message", message), string.Empty,
-            null, null, now, now);
+            null, now, now);
 
     /// <summary>The case as a row holds it.</summary>
     public static Transfer Restore(
@@ -218,11 +216,10 @@ public sealed class Transfer
         string message,
         string offerText,
         string? offerStart,
-        long? offerFeeCents,
         DateTimeOffset createdAt,
         DateTimeOffset changedAt) =>
         new(id, subject, company, state, needsRelease, releaseConfirmed, message,
-            offerText, offerStart, offerFeeCents, createdAt, changedAt);
+            offerText, offerStart, createdAt, changedAt);
 
     // --- The person ------------------------------------------------------
 
@@ -277,21 +274,34 @@ public sealed class Transfer
     // --- The company -----------------------------------------------------
 
     /// <summary>The company makes an offer.</summary>
-    public void MakeOffer(
-        string text, string? start, long? feeCents, DateTimeOffset now)
+    /// <remarks>
+    /// Text and start, and no fee: the field "Ablöse" had no recipient, since
+    /// the current employer was never part of the case. A fee now stands where
+    /// two companies agree on it — <c>ReleaseNegotiation</c> (C3, ADR-0050).
+    /// </remarks>
+    public void MakeOffer(string text, string? start, DateTimeOffset now)
     {
         EnsureState(TransferState.Talking, "offered");
 
-        if (feeCents is < 0)
+        OfferText = Text("Offer", text);
+        OfferStart = Month(start);
+        MoveTo(TransferState.Offered, now);
+    }
+
+    /// <summary>The start as a month — <c>yyyy-MM</c> — or <c>null</c>.</summary>
+    private static string? Month(string? start)
+    {
+        var trimmed = (start ?? string.Empty).Trim();
+
+        if (trimmed.Length == 0)
         {
-            // web/src/features/work/api/transfers.ts (COMPANY_TRANSFER_CASES) matches this sentence.
-            throw new OfferError("A transfer fee cannot be negative");
+            return null;
         }
 
-        OfferText = Text("Offer", text);
-        OfferStart = start;
-        OfferFeeCents = feeCents;
-        MoveTo(TransferState.Offered, now);
+        // web/src/features/work/api/transfers.ts (COMPANY_TRANSFER_CASES) matches this sentence.
+        return Months.IsMonth(trimmed)
+            ? trimmed
+            : throw new OfferError("The start must be a month (yyyy-MM)");
     }
 
     /// <summary>The company completes.</summary>

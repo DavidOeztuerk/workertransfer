@@ -1,3 +1,5 @@
+using WorkerTransfer.Resume.Api.Authorization;
+using WorkerTransfer.ServiceDefaults.Roles;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.DocumentStore;
@@ -209,7 +211,12 @@ public static class ResumeEndpoints
                 cancellationToken);
 
             await WriteResultAsync(context, result, cancellationToken, StatusCodes.Status201Created);
-        });
+        })
+        // A first contact to a person who did not come forward: at least a
+        // `recruiter` (ADR-0048), resolved from identity-service's membership
+        // table per request. The check stands BEFORE the body and the person
+        // are looked at.
+        .RequireAuthorization(AdminPermissionExtensions.Policy(ResumePermissions.Request));
 
         // The company's own list. `active` is null here: the company already has
         // the answer in the form of the data it does or does not get, and a

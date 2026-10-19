@@ -50,6 +50,11 @@ public sealed record InboxEntryV1(
 /// it off loses the mail and not the entry — that stands behind the sign-in in
 /// their own list.
 /// </para>
+/// <para>
+/// <c>message_received</c> — "a message arrived" (ADR-0047) — stands at
+/// <c>true</c>: a reply the person never hears of would be a conversation
+/// they learn of at their next visit.
+/// </para>
 /// </remarks>
 public sealed record NotificationPreferencesV1(
     [property: JsonPropertyName("resume_request")] bool ResumeRequest,
@@ -59,4 +64,5 @@ public sealed record NotificationPreferencesV1(
     [property: JsonPropertyName("application_received")] bool ApplicationReceived = true,
     [property: JsonPropertyName("profile_discovered")] bool ProfileDiscovered = true,
     [property: JsonPropertyName("advisor_conversation")] bool AdvisorConversation = true,
-    [property: JsonPropertyName("assessment_update")] bool AssessmentUpdate = true);
+    [property: JsonPropertyName("assessment_update")] bool AssessmentUpdate = true,
+    [property: JsonPropertyName("message_received")] bool MessageReceived = true);

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Applications.Infrastructure.CoverLetter;
 
@@ -14,7 +15,7 @@ namespace WorkerTransfer.Applications.Infrastructure.CoverLetter;
 /// <para>
 /// The property names ARE the environment keys (<c>Draft__ApiKey</c>,
 /// <c>Draft__BaseUrl</c>, <c>Draft__Timeout</c>,
-/// <c>Draft__Model</c>); renaming one alone leaves its value on the default,
+/// <c>Draft__Model</c>, <c>Draft__Provider</c>); renaming one alone leaves its value on the default,
 /// silently.
 /// </para>
 /// </remarks>
@@ -27,7 +28,7 @@ public sealed class CoverLetterSettings
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The provider's address.</summary>
-    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
+    public string BaseUrl { get; set; } = ModelWire.DefaultAddress;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -38,7 +39,13 @@ public sealed class CoverLetterSettings
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(60);
 
     /// <summary>Which model.</summary>
-    public string Model { get; set; } = "claude-sonnet-5";
+    public string Model { get; set; } = ModelWire.DefaultModel;
+
+    /// <summary>
+    /// Which wire format the operator's address speaks: <c>openai_compatible</c>
+    /// (Mistral, the default) or <c>anthropic</c>.
+    /// </summary>
+    public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
 /// <summary>The cover-letter writer when none is set up.</summary>
@@ -126,7 +133,7 @@ public sealed class HttpCoverLetterWriter(
         ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(context);
 
-        return AskAsync(access, Instruction(context), progress, cancellationToken);
+        return AskMaskedAsync(access, context, Instruction(context), progress, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -159,7 +166,51 @@ public sealed class HttpCoverLetterWriter(
             builder.AppendLine($"{number + 1}. {comments[number]}");
         }
 
-        return AskAsync(access, builder.ToString(), progress, cancellationToken);
+        return AskMaskedAsync(access, context, builder.ToString(), progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// What the platform knows as a field goes out as a placeholder (E2): the
+    /// person's name, the addressee, every former employer.
+    /// </summary>
+    /// <remarks>
+    /// Masked HERE, at the last step before the wire, so no caller can forget
+    /// it. The whole instruction is masked — the name also stands in the
+    /// person's own text, the employer in the job description.
+    /// </remarks>
+    public static Placeholders PlaceholdersFor(CoverLetterContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var placeholders = new Placeholders();
+        placeholders.AddPersonName(context.OwnName);
+        placeholders.Add("COMPANY", context.Company);
+
+        foreach (var station in context.OwnCareer)
+        {
+            placeholders.Add("EMPLOYER", station.Employer, numbered: true);
+        }
+
+        return placeholders;
+    }
+
+    private async Task<string> AskMaskedAsync(
+        AiAccess access,
+        CoverLetterContext context,
+        string instruction,
+        Func<string, Task>? progress,
+        CancellationToken cancellationToken)
+    {
+        var placeholders = PlaceholdersFor(context);
+
+        Func<string, Task>? restoring = progress is null
+            ? null
+            : fragment => progress(placeholders.RestoreFragment(fragment));
+
+        var answer = await AskAsync(
+            access, placeholders.Mask(instruction), restoring, cancellationToken);
+
+        return placeholders.Restore(answer);
     }
 
     /// <summary>The instruction, from the context and nothing else.</summary>

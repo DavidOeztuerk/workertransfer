@@ -68,6 +68,13 @@
     <Project Path="src/jobs-service/WorkerTransfer.Jobs.Domain/WorkerTransfer.Jobs.Domain.csproj" />
     <Project Path="src/jobs-service/WorkerTransfer.Jobs.Infrastructure/WorkerTransfer.Jobs.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/messages-service/">
+    <Project Path="src/messages-service/WorkerTransfer.Messages.Api/WorkerTransfer.Messages.Api.csproj" />
+    <Project Path="src/messages-service/WorkerTransfer.Messages.Application/WorkerTransfer.Messages.Application.csproj" />
+    <Project Path="src/messages-service/WorkerTransfer.Messages.Contracts/WorkerTransfer.Messages.Contracts.csproj" />
+    <Project Path="src/messages-service/WorkerTransfer.Messages.Domain/WorkerTransfer.Messages.Domain.csproj" />
+    <Project Path="src/messages-service/WorkerTransfer.Messages.Infrastructure/WorkerTransfer.Messages.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/notification-service/">
     <Project Path="src/notification-service/WorkerTransfer.Notification.Api/WorkerTransfer.Notification.Api.csproj" />
     <Project Path="src/notification-service/WorkerTransfer.Notification.Application/WorkerTransfer.Notification.Application.csproj" />
@@ -113,6 +120,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/WorkerTransfer.Advisor.Tests/WorkerTransfer.Advisor.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Assessment.Tests/WorkerTransfer.Assessment.Tests.csproj" />
+    <Project Path="tests/WorkerTransfer.Messages.Tests/WorkerTransfer.Messages.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Applications.Tests/WorkerTransfer.Applications.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Companies.Tests/WorkerTransfer.Companies.Tests.csproj" />
     <Project Path="tests/WorkerTransfer.Consent.Tests/WorkerTransfer.Consent.Tests.csproj" />

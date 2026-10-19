@@ -1,6 +1,6 @@
-using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.Jobs.Application.Ports;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Draft;
@@ -9,7 +9,7 @@ namespace WorkerTransfer.Jobs.Infrastructure.Draft;
 /// <remarks>
 /// The property names ARE the environment keys (<c>Draft__ApiKey</c>,
 /// <c>Draft__BaseUrl</c>, <c>Draft__Timeout</c>,
-/// <c>Draft__Model</c>); renaming one alone leaves its value on the default,
+/// <c>Draft__Model</c>, <c>Draft__Provider</c>); renaming one alone leaves its value on the default,
 /// silently.
 /// </remarks>
 public sealed class DraftSettings
@@ -23,7 +23,7 @@ public sealed class DraftSettings
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>The provider's address.</summary>
-    public string BaseUrl { get; set; } = "https://api.anthropic.com/v1/messages";
+    public string BaseUrl { get; set; } = ModelWire.DefaultAddress;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -35,7 +35,13 @@ public sealed class DraftSettings
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Which model.</summary>
-    public string Model { get; set; } = "claude-haiku-4-5-20251001";
+    public string Model { get; set; } = ModelWire.DefaultModel;
+
+    /// <summary>
+    /// Which wire format the address speaks: <c>openai_compatible</c>
+    /// (Mistral, the default) or <c>anthropic</c>.
+    /// </summary>
+    public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
 /// <summary>The drafter when none is set up.</summary>
@@ -74,21 +80,11 @@ public sealed class HttpDrafter(
 
         client.Timeout = _settings.Timeout;
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, _settings.BaseUrl)
-        {
-            // What goes out stands in AdvertDraft and nowhere else: no
-            // tenant_id, no company name, nothing about a human being.
-            Content = JsonContent.Create(new
-            {
-                model = _settings.Model,
-                max_tokens = 800,
-                system = AdvertDraft.Rules,
-                messages = new[] { new { role = "user", content = draft.Prompt } }
-            })
-        };
-
-        request.Headers.Add("x-api-key", _settings.ApiKey);
-        request.Headers.Add("anthropic-version", "2023-06-01");
+        // What goes out stands in AdvertDraft and nowhere else: no
+        // tenant_id, no company name, nothing about a human being.
+        using var request = ModelWire.Request(
+            _settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey,
+            AdvertDraft.Rules, draft.Prompt, maxTokens: 800);
 
         HttpResponseMessage response;
 
@@ -125,14 +121,20 @@ public sealed class HttpDrafter(
                     $"The draft provider answers with {(int)response.StatusCode}.");
             }
 
-            using var parsed = JsonDocument.Parse(
-                await response.Content.ReadAsStringAsync(cancellationToken));
+            string? text;
 
-            return parsed.RootElement.TryGetProperty("content", out var content)
-                   && content.GetArrayLength() > 0
-                   && content[0].TryGetProperty("text", out var text)
-                ? text.GetString() ?? string.Empty
-                : throw new DraftUnavailable(
+            try
+            {
+                text = ModelWire.Text(
+                    _settings.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
+            }
+            catch (JsonException)
+            {
+                text = null;
+            }
+
+            return text
+                ?? throw new DraftUnavailable(
                     "The draft provider answers in an unexpected form.");
         }
     }

@@ -1,3 +1,5 @@
+using WorkerTransfer.Advisor.Api.Authorization;
+using WorkerTransfer.ServiceDefaults.Roles;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Advisor.Application.Conversations;
@@ -262,7 +264,12 @@ public static class AdvisorEndpoints
             {
                 await Unprocessable(context, error.Message);
             }
-        });
+        })
+        // A first contact to a person who did not come forward: at least a
+        // `recruiter` (ADR-0048), resolved from identity-service's membership
+        // table per request. The check stands BEFORE the body and the person
+        // are looked at.
+        .RequireAuthorization(AdminPermissionExtensions.Policy(AdvisorPermissions.Open));
 
         advisor.MapGet("/conversations", async (
             IMediator mediator,

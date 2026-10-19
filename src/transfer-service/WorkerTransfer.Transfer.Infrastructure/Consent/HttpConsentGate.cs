@@ -68,6 +68,8 @@ public sealed class HttpConsentGate(
 
     private const string Reason = "access to the market status withdrawn";
 
+    private const string RouteReason = "route to the employer closed";
+
     private readonly ConsentSettings _settings = settings.Value;
 
     /// <inheritdoc />
@@ -81,21 +83,62 @@ public sealed class HttpConsentGate(
         GrantedAsync(subject, ConsentKey.Market(company), cancellationToken);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<bool>> MayEachSeeMarketAsync(
+    public Task<IReadOnlyList<bool>> MayEachSeeMarketAsync(
         IReadOnlyList<(SubjectId Subject, TenantId Company)> pairs,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pairs);
 
-        var verdicts = new List<bool>(pairs.Count);
+        return EachGrantedAsync(
+            [.. pairs.Select(pair => (pair.Subject, ConsentKey.Market(pair.Company)))],
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> EmployerRouteOpenAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default) =>
+        GrantedAsync(subject, ConsentKey.EmployerRoute(employer), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<bool>> EmployerRoutesOpenAsync(
+        IReadOnlyList<(SubjectId Subject, TenantId Employer)> pairs,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pairs);
+
+        return EachGrantedAsync(
+            [.. pairs.Select(pair => (pair.Subject, ConsentKey.EmployerRoute(pair.Employer)))],
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task OpenEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default) =>
+        await AskAsync<Grant, JsonElement>(
+            "/consent/grant",
+            new Grant(subject.Value, ConsentKey.EmployerRoute(employer)),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public async Task CloseEmployerRouteAsync(
+        SubjectId subject, TenantId employer, CancellationToken cancellationToken = default) =>
+        await AskAsync<Revocation, JsonElement>(
+            "/consent/revoke",
+            new Revocation(subject.Value, ConsentKey.EmployerRoute(employer), RouteReason),
+            cancellationToken);
+
+    private async Task<IReadOnlyList<bool>> EachGrantedAsync(
+        IReadOnlyList<(SubjectId Subject, string Capability)> questions,
+        CancellationToken cancellationToken)
+    {
+        var verdicts = new List<bool>(questions.Count);
 
         // Chunked, because the ledger caps a batch question. Several round
         // trips are still one per hundred instead of one per row.
-        foreach (var batch in pairs.Chunk(ConsentLimits.MaxBatchSize))
+        foreach (var batch in questions.Chunk(ConsentLimits.MaxBatchSize))
         {
             var question = new ConsentBatchQuestionV1(
-                [.. batch.Select(pair => new ConsentQuestionV1(
-                    pair.Subject.Value, ConsentKey.Market(pair.Company)))]);
+                [.. batch.Select(pair => new ConsentQuestionV1(pair.Subject.Value, pair.Capability))]);
 
             var response = await AskAsync<ConsentBatchQuestionV1,
                 ConsentBatchResponseV1>("/consent/check-batch", question, cancellationToken);

@@ -57,6 +57,8 @@ export function SiteFooter() {
 
           <FooterColumn title={t("footer.platform")}>
             <FooterLink to="/jobs">{t("footer.jobs")}</FooterLink>
+            <FooterLink to="/checklists">{t("footer.checklists")}</FooterLink>
+            <FooterLink to="/salaries">{t("footer.salaries")}</FooterLink>
             {signedIn ? (
               <>
                 <FooterLink to="/market">{t("footer.marketStatus")}</FooterLink>

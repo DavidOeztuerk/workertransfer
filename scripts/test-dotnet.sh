@@ -30,7 +30,7 @@ cd "$(dirname "$0")/.."
 export DOTNET_CLI_UI_LANGUAGE=en
 
 suites=(DocumentStore Outbox Skills CrossCutting Gateway Identity Consent Profile Resume Portfolio
-        Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment)
+        Jobs Applications Companies Transfer GitHub Notification Scout Advisor Assessment Messages)
 
 red=0
 total=0

@@ -575,6 +575,20 @@
         }
       ],
       "Priority": 10
+    },
+    // One conversation per process (ADR-0047). Nothing lies under `/messages`
+    // itself, so one route suffices.
+    {
+      "UpstreamPathTemplate": "/messages/{rest}",
+      "DownstreamPathTemplate": "/messages/{rest}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "messages-service",
+          "Port": 8015
+        }
+      ],
+      "Priority": 10
     }
   ],
 

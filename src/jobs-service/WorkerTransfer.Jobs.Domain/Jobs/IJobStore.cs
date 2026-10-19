@@ -91,7 +91,8 @@ public interface IJobStore
         Guid? company = null,
         string employment = "",
         SearchRadius? radius = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool withSalaryOnly = false);
 
     /// <summary>Withdraws all adverts of a company.</summary>
     /// <returns>How many were withdrawn.</returns>

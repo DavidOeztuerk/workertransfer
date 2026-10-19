@@ -6,6 +6,7 @@ import { authRoutes } from "../../features/auth/routes";
 import { personRoutes } from "../../features/person/routes";
 import { workRoutes } from "../../features/work/routes";
 import { companyRoutes } from "../../features/company/routes";
+import { messageRoutes } from "../../features/messages/routes";
 import { publicRoutes } from "../../features/public/routes";
 
 /**
@@ -32,6 +33,7 @@ const routes: RouteObject[] = [
       ...personRoutes,
       ...workRoutes,
       ...companyRoutes,
+      ...messageRoutes,
       { path: "*", element: <NotFoundPage /> },
     ],
   },

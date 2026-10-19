@@ -23,6 +23,7 @@ import {
   listMyApplications,
   withdrawApplication,
 } from "../api/applications";
+import { ConversationPanel } from "../../messages/components/ConversationPanel";
 
 /** The status as a catalogue key — the wording lies in the catalogues. */
 const STATUS_KEY: Record<ApplicationStatus, string> = {
@@ -69,6 +70,9 @@ export function ApplicationsPage() {
   const { signedIn, subjectId } = useActor();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // One conversation open at a time; opening loads it — never on page load,
+  // so a list of ten applications does not ask messages-service ten times.
+  const [open, setOpen] = useState<string | null>(null);
 
   const applications = useAsync(
     (signal) => listMyApplications(signal),
@@ -195,18 +199,32 @@ export function ApplicationsPage() {
                       </Typography>
                     </Box>
 
-                    {running(application.status) ? (
+                    <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
                       <Button
-                        variant="text"
+                        variant="outlined"
                         size="small"
-                        onClick={() => void withdraw(application.id)}
-                        disabled={busy}
-                        sx={{ flexShrink: 0 }}
+                        aria-expanded={open === application.id}
+                        onClick={() => setOpen(open === application.id ? null : application.id)}
                       >
-                        {t("common.withdraw")}
+                        {open === application.id ? t("messages.toggleHide") : t("messages.toggle")}
                       </Button>
-                    ) : null}
+                      {running(application.status) ? (
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => void withdraw(application.id)}
+                          disabled={busy}
+                        >
+                          {t("common.withdraw")}
+                        </Button>
+                      ) : null}
+                    </Box>
                   </CardContent>
+                  {open === application.id ? (
+                    <CardContent sx={{ borderTop: 1, borderColor: "divider" }}>
+                      <ConversationPanel reference={application.id} />
+                    </CardContent>
+                  ) : null}
                 </Card>
               ))}
             </Box>

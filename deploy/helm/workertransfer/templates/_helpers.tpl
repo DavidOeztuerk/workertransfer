@@ -190,11 +190,13 @@ foreign service is called then.
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_ANTHROPIC_API_KEY
+      key: WORKER_AI_KEY
 - name: Draft__Model
   value: {{ $root.Values.draftingModel | quote }}
 - name: Draft__BaseUrl
   value: {{ $root.Values.draftingUrl | quote }}
+- name: Draft__Provider
+  value: {{ $root.Values.draftingProvider | quote }}
 {{- end }}
 {{- range $key, $value := ($svc.env | default dict) }}
 - name: {{ $key }}

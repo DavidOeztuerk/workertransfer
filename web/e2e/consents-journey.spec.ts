@@ -283,9 +283,9 @@ test("without a configured provider one's own text stays untouched", async ({ pa
 
   await page.getByRole("button", { name: /Vorschlag holen/i }).click();
 
-  // The compose stack passes ANTHROPIC_API_KEY through as `Draft__ApiKey`,
+  // The compose stack passes WORKERTRANSFER_AI_KEY through as `Draft__ApiKey`,
   // empty by default, and CI has no key — so the state checked here is always
-  // "not set up". Whoever starts locally with ANTHROPIC_API_KEY checks something
+  // "not set up". Whoever starts locally with WORKERTRANSFER_AI_KEY checks something
   // else with this test; that is the price of the suite needing no secret.
   //
   // An `.or()` condition stood here first and was worthless: the text field is

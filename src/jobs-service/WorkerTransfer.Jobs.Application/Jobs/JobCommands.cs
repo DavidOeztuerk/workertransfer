@@ -13,7 +13,10 @@ public sealed record JobDetails(
     string PostalCode,
     RemoteMode Remote,
     EmploymentKind Employment,
-    IReadOnlyList<string> Skills);
+    IReadOnlyList<string> Skills,
+    int? SalaryMinimum = null,
+    int? SalaryMaximum = null,
+    SalaryPeriod SalaryPeriod = SalaryPeriod.Year);
 
 /// <summary>Writes a new advert. It begins as a draft.</summary>
 /// <remarks>
@@ -39,7 +42,8 @@ public sealed class CreateJobHandler(IJobStore store, TimeProvider clock)
             request.Company, details.Title, details.Description, details.Location,
             details.PostalCode,
             details.Remote, details.Employment, SkillList.From(details.Skills),
-            clock.GetUtcNow());
+            clock.GetUtcNow(),
+            SalaryBand.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
 
         await store.SaveAsync(job, cancellationToken);
 
@@ -78,7 +82,8 @@ public sealed class ChangeJobHandler(IJobStore store, TimeProvider clock)
         job.Change(
             details.Title, details.Description, details.Location, details.PostalCode,
             details.Remote,
-            details.Employment, SkillList.From(details.Skills), clock.GetUtcNow());
+            details.Employment, SkillList.From(details.Skills), clock.GetUtcNow(),
+            SalaryBand.From(details.SalaryMinimum, details.SalaryMaximum, details.SalaryPeriod));
 
         await store.SaveAsync(job, cancellationToken);
 

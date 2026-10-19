@@ -86,7 +86,16 @@ public enum NotificationKind
     /// line "Your work sample was rejected" would otherwise perhaps land in the
     /// inbox at the current employer.</para>
     /// </remarks>
-    AssessmentUpdate
+    AssessmentUpdate,
+
+    /// <summary>A message arrived in one of this person's conversations.</summary>
+    /// <remarks>
+    /// The ninth kind (ADR-0047). It names <strong>neither the sender nor a
+    /// word of the text</strong>: the mail may land in an inbox the current
+    /// employer reads, and "Stahlbau Nord wrote to you" is exactly the line
+    /// that must not stand there. Who wrote what is read behind the sign-in.
+    /// </remarks>
+    MessageReceived
 }
 
 /// <summary>The words a kind travels under on the wire.</summary>
@@ -94,12 +103,12 @@ public enum NotificationKind
 /// The same words the sending services write into their outbox —
 /// <c>resume_request</c>, <c>market_request</c>, <c>application_update</c>,
 /// <c>transfer_update</c>, <c>application_received</c>, <c>profile_discovered</c>,
-/// <c>advisor_conversation</c>, <c>assessment_update</c>. Two spellings for one
+/// <c>advisor_conversation</c>, <c>assessment_update</c>, <c>message_received</c>. Two spellings for one
 /// kind would be two chances to drop a message silently.
 /// </remarks>
 public static class NotificationKinds
 {
-    /// <summary>All eight, for the settings.</summary>
+    /// <summary>All nine, for the settings.</summary>
     public static readonly IReadOnlyList<NotificationKind> All =
     [
         NotificationKind.ResumeRequest,
@@ -109,7 +118,8 @@ public static class NotificationKinds
         NotificationKind.ApplicationReceived,
         NotificationKind.ProfileDiscovered,
         NotificationKind.AdvisorConversation,
-        NotificationKind.AssessmentUpdate
+        NotificationKind.AssessmentUpdate,
+        NotificationKind.MessageReceived
     ];
 
     /// <summary>The word for a kind.</summary>
@@ -123,6 +133,7 @@ public static class NotificationKinds
         NotificationKind.ProfileDiscovered => "profile_discovered",
         NotificationKind.AdvisorConversation => "advisor_conversation",
         NotificationKind.AssessmentUpdate => "assessment_update",
+        NotificationKind.MessageReceived => "message_received",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -137,6 +148,7 @@ public static class NotificationKinds
         "profile_discovered" => NotificationKind.ProfileDiscovered,
         "advisor_conversation" => NotificationKind.AdvisorConversation,
         "assessment_update" => NotificationKind.AssessmentUpdate,
+        "message_received" => NotificationKind.MessageReceived,
         _ => null
     };
 

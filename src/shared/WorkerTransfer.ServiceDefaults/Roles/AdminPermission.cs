@@ -38,7 +38,7 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 /// truth.</para>
 /// </remarks>
 public sealed class AdminPermission(
-    AdminPermissions permissions,
+    CompanyPermissions permissions,
     ICompanyRoles roles,
     IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<PermissionRequirement>
@@ -51,7 +51,7 @@ public sealed class AdminPermission(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(requirement);
 
-        if (!permissions.RequiresAdmin(requirement.Permission))
+        if (permissions.Minimum(requirement.Permission) is not { } minimum)
         {
             // No Succeed and no Fail: about this permission this service has
             // nothing to say — and another handler may still answer.
@@ -65,7 +65,9 @@ public sealed class AdminPermission(
 
         try
         {
-            if (await roles.RoleAsync(actor, company) == CompanyRole.Admin)
+            // At LEAST the minimum: the roles are ordered (ADR-0048), and an
+            // admin may make a first contact too.
+            if (await roles.RoleAsync(actor, company) >= minimum)
             {
                 context.Succeed(requirement);
             }

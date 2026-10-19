@@ -162,6 +162,42 @@ public class CompanyJourneyTests(Postgres postgres) : IAsyncLifetime
         mine.GetArrayLength().Should().Be(1);
     }
 
+    /// <summary>A recruiter is invited like a member and joins as one (ADR-0048).</summary>
+    [Fact]
+    public async Task A_recruiter_is_invited_and_joins_as_recruiter()
+    {
+        var boss = await Person(Address("boss", NewDomain()), company: "Example GmbH");
+        var company = await FirstCompany(boss);
+
+        var colleague = Address("recruiter", "other.example");
+        (await boss.PostAsJsonAsync(
+                $"/companies/{company}/invitations", new { email = colleague, role = "recruiter" }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var browser = await Person(colleague);
+        var accepted = await browser.PostAsJsonAsync(
+            "/invitations/accept", new { token = LastLink("eingeladen") });
+
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(accepted)).GetProperty("role").GetString().Should().Be("recruiter");
+    }
+
+    [Fact]
+    public async Task An_unknown_role_is_refused_and_names_all_three()
+    {
+        var boss = await Person(Address("boss", NewDomain()), company: "Example GmbH");
+        var company = await FirstCompany(boss);
+
+        var refused = await boss.PostAsJsonAsync(
+            $"/companies/{company}/invitations",
+            new { email = Address("someone", "other.example"), role = "scout" });
+
+        // 400, as for every malformed role since PBI-2: the value is not one
+        // of a closed set, and the refusal names the set.
+        refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await refused.Content.ReadAsStringAsync()).Should().Contain("recruiter");
+    }
+
     /// <summary>
     /// A foreign address is an entirely ordinary case: the domain proves who
     /// owns it, not whom the company may let in.

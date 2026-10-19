@@ -115,6 +115,18 @@ export const ADMIN_CASES: readonly ServerCase[] = [
 ];
 
 /**
+ * The refusal on the three routes of a FIRST CONTACT (ADR-0048): asking for a
+ * CV, asking for the market status, opening an advisor conversation. A 403
+ * there with "not permitted" is about the ROLE — a member, not a recruiter — and
+ * must not read "choose a company", which the status table says for a person
+ * acting as themselves.
+ */
+export const RECRUITER_CASES: readonly ServerCase[] = [
+  { status: 403, pattern: /^not permitted$/i, key: "errors.recruiterOnly" },
+  { status: 503, pattern: /role lookup did not answer/i, key: "errors.serviceSilent" },
+];
+
+/**
  * A failure as a catalogue key — <strong>never the server's sentence.</strong>
  *
  * In this order: the site's own cases (status, and the sentence only where

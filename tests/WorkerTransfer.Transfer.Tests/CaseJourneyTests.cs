@@ -92,6 +92,74 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
             subject_id = subject, message = "We might have something for you."
         });
 
+    /// <summary>
+    /// An offer that starts before the person could leave is marked — for her,
+    /// and only for her (VISION-FRAGEN H2).
+    /// </summary>
+    [Fact]
+    public async Task An_offer_before_the_earliest_change_is_marked_for_the_person_only()
+    {
+        var company = Guid.CreateVersion7();
+        var anna = await Approachable(company);
+        var asAnna = AsPerson(anna);
+        var asCompany = AsCompany(company);
+
+        // Three months to the end of a quarter: from any day today the earliest
+        // start lies at least three months out.
+        (await asAnna.PutAsJsonAsync("/market/me/notice", new { length = 3, unit = "month", end = "quarter_end" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await asAnna.PostAsync($"/transfers/{id}/accept-talk", null);
+        // Next month: earlier than three months to a quarter's end, from any day.
+        var tooEarly = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1).ToString("yyyy-MM");
+        var offered = await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Soon.", start_on = tooEarly });
+        offered.StatusCode.Should().Be(HttpStatusCode.OK, await offered.Content.ReadAsStringAsync());
+
+        var hers = (await Json(await asAnna.GetAsync("/transfers/me"))).EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == id);
+        hers.TryGetProperty("starts_before_earliest", out var mark).Should().BeTrue(hers.ToString());
+        mark.GetBoolean().Should().BeTrue();
+
+        var theirs = (await Json(await asCompany.GetAsync("/transfers"))).EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == id);
+        theirs.TryGetProperty("starts_before_earliest", out _).Should().BeFalse("the company learns nothing of her notice");
+    }
+
+    [Theory]
+    [InlineData("Oktober 2026")]
+    [InlineData("2026-10-15")]
+    public async Task A_start_that_is_no_month_is_422_not_500(string start)
+    {
+        var company = Guid.CreateVersion7();
+        var anna = await Approachable(company);
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await AsPerson(anna).PostAsync($"/transfers/{id}/accept-talk", null);
+
+        (await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Offer.", start_on = start }))
+            .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task The_notice_period_is_hers_to_state_read_and_withdraw()
+    {
+        var asAnna = AsPerson(Guid.CreateVersion7());
+
+        var empty = await Json(await asAnna.GetAsync("/market/me/notice"));
+        empty.GetProperty("length").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var stated = await Json(await asAnna.PutAsJsonAsync(
+            "/market/me/notice", new { length = 4, unit = "week", end = "fifteenth_or_month_end" }));
+        stated.GetProperty("earliest_start").GetString().Should().NotBeNullOrEmpty();
+
+        (await asAnna.PutAsJsonAsync("/market/me/notice", new { length = 99, unit = "month", end = "month_end" }))
+            .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        (await asAnna.DeleteAsync("/market/me/notice")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await Json(await asAnna.GetAsync("/market/me/notice"))).GetProperty("length").ValueKind
+            .Should().Be(JsonValueKind.Null);
+    }
+
     /// <summary>The whole path: interest, conversation, offer, acceptance, completion.</summary>
     [Fact]
     public async Task Interest_conversation_offer_acceptance_completion()
@@ -113,11 +181,10 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var offered = await asCompany.PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "We are offering the job.", start_on = "2026-10", fee_cents = 250_000L
+            note = "We are offering the job.", start_on = "2026-10"
         });
 
         offered.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await Json(offered)).GetProperty("offer_fee_cents").GetInt64().Should().Be(250_000);
 
         (await asAnna.PostAsync($"/transfers/{id}/accept-offer", null))
             .StatusCode.Should().Be(HttpStatusCode.OK);
@@ -357,9 +424,14 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
         otherCompany.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>There is no negative fee.</summary>
+    /// <summary>The offer to the person carries no fee any more (C3, ADR-0050).</summary>
+    /// <remarks>
+    /// It had no recipient: the current employer was never part of the case.
+    /// A <c>fee_cents</c> from an old client is ignored, not stored, and does
+    /// not come back — a fee is agreed between two companies now.
+    /// </remarks>
     [Fact]
-    public async Task A_negative_fee_is_refused()
+    public async Task An_offer_carries_no_fee_any_more()
     {
         var company = Guid.CreateVersion7();
         var anna = await Approachable(company);
@@ -368,10 +440,14 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var offer = await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new
         {
-            note = "Offer.", fee_cents = -1L
+            note = "Offer.", fee_cents = 250_000L
         });
 
-        offer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        offer.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(offer)).TryGetProperty("offer_fee_cents", out _).Should().BeFalse();
+
+        var hers = (await Json(await AsPerson(anna).GetAsync("/transfers/me"))).EnumerateArray().Single();
+        hers.TryGetProperty("offer_fee_cents", out _).Should().BeFalse();
     }
 
     /// <summary>Only the company's moves are notified.</summary>

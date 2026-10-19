@@ -104,7 +104,8 @@ public sealed class Job
         JobState state,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
-        DateTimeOffset? publishedAt)
+        DateTimeOffset? publishedAt,
+        SalaryBand? salary)
     {
         Id = id;
         Company = company;
@@ -119,6 +120,7 @@ public sealed class Job
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
         PublishedAt = publishedAt;
+        Salary = salary;
     }
 
     /// <summary>Which advert.</summary>
@@ -157,6 +159,9 @@ public sealed class Job
     /// <summary>What is asked for.</summary>
     public SkillList Skills { get; private set; }
 
+    /// <summary>What the job pays, as the company states it — or <c>null</c>: not stated.</summary>
+    public SalaryBand? Salary { get; private set; }
+
     /// <summary>Where it stands.</summary>
     public JobState State { get; private set; }
 
@@ -183,14 +188,15 @@ public sealed class Job
         RemoteMode remote,
         EmploymentKind employment,
         SkillList skills,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        SalaryBand? salary = null) =>
         new(
             Guid.CreateVersion7(), company,
             Text("The title", title, required: true, MaxTitleLength),
             Text("The description", description, required: true, MaxDescriptionLength),
             Text("The location", location, required: false, MaxLocationLength),
             Text("The postal code", postalCode, required: false, MaxPostalCodeLength),
-            remote, employment, skills, JobState.Draft, now, now, null);
+            remote, employment, skills, JobState.Draft, now, now, null, salary);
 
     /// <summary>The advert as a row holds it.</summary>
     public static Job Restore(
@@ -206,9 +212,10 @@ public sealed class Job
         JobState state,
         DateTimeOffset createdAt,
         DateTimeOffset updatedAt,
-        DateTimeOffset? publishedAt) =>
+        DateTimeOffset? publishedAt,
+        SalaryBand? salary = null) =>
         new(id, company, title, description, location, postalCode, remote, employment,
-            skills, state, createdAt, updatedAt, publishedAt);
+            skills, state, createdAt, updatedAt, publishedAt, salary);
 
     /// <summary>Changes the content.</summary>
     /// <exception cref="TransitionNotAllowed">Nobody changes a closed advert any more.</exception>
@@ -220,7 +227,8 @@ public sealed class Job
         RemoteMode remote,
         EmploymentKind employment,
         SkillList skills,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        SalaryBand? salary = null)
     {
         // Changing a closed advert would mean changing the text people applied
         // to.
@@ -238,6 +246,7 @@ public sealed class Job
         Remote = remote;
         Employment = employment;
         Skills = skills;
+        Salary = salary;
         UpdatedAt = now;
     }
 

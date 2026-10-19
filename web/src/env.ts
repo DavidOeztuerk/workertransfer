@@ -121,3 +121,9 @@ export const ASSESSMENT_BASE_URL = resolve(
   import.meta.env.VITE_ASSESSMENT_BASE_URL,
   8014
 );
+
+export const MESSAGES_BASE_URL = resolve(
+  "MESSAGES_BASE_URL",
+  import.meta.env.VITE_MESSAGES_BASE_URL,
+  8015
+);

@@ -22,12 +22,18 @@ export interface MarketStatus {
   note: string;
   is_approachable: boolean;
   updated_at: string;
+  /** The person's own window (H1) — present only in her own view. ISO date. */
+  open_from?: string | null;
+  open_until?: string | null;
 }
 
 export interface MarketStatusInput {
   availability: Availability;
   employed: boolean;
   note: string;
+  /** ISO date or empty — an empty end is an open end. */
+  openFrom?: string;
+  openUntil?: string;
 }
 
 export type MarketRequestStatus = "PENDING" | "GRANTED" | "DECLINED";
@@ -114,8 +120,15 @@ export async function saveMyMarketStatus(
     "/market/me",
     {
       method: "PUT",
-      // Exactly the three fields of the contract.
-      body: { availability: input.availability, employed: input.employed, note: input.note },
+      // Exactly the fields of the contract — an empty date goes out as null,
+      // never as "", which the service could not read as a date.
+      body: {
+        availability: input.availability,
+        employed: input.employed,
+        note: input.note,
+        open_from: input.openFrom ? input.openFrom : null,
+        open_until: input.openUntil ? input.openUntil : null,
+      },
     },
     "errors.marketStatusNotSaved"
   );
@@ -251,4 +264,46 @@ export async function getMarketStatus(
     { 503: { reason: "unavailable", titleKey: "errors.ledgerSilent" } },
     "unavailable"
   );
+}
+
+export type NoticeUnit = "week" | "month";
+export type NoticeEnd = "any_day" | "fifteenth_or_month_end" | "month_end" | "quarter_end";
+
+/**
+ * The person's notice period and what follows from it (VISION-FRAGEN H2).
+ * All fields `null`: not stated. Seen by the person only — there is no route
+ * by which a company reads it.
+ */
+export interface Notice {
+  length: number | null;
+  unit: NoticeUnit | null;
+  end: NoticeEnd | null;
+  /** If notice were given today. ISO date. */
+  last_day: string | null;
+  earliest_start: string | null;
+}
+
+export type NoticeResult = { ok: true; notice: Notice } | Failure<"failed" | "invalid">;
+
+export async function getMyNotice(signal?: AbortSignal): Promise<NoticeResult> {
+  const answer = await request<Notice>(TRANSFER_BASE_URL, "/market/me/notice", { signal }, "errors.requestFailed");
+  if (answer.ok && answer.value != null) return { ok: true, notice: answer.value };
+  return { ok: false, reason: "failed", error: answer.ok ? { status: 503, title: "", detail: "" } : answer.error };
+}
+
+export async function saveMyNotice(length: number, unit: NoticeUnit, end: NoticeEnd): Promise<NoticeResult> {
+  const answer = await request<Notice>(
+    TRANSFER_BASE_URL,
+    "/market/me/notice",
+    { method: "PUT", body: { length, unit, end } },
+    "errors.requestFailed"
+  );
+  if (answer.ok && answer.value != null) return { ok: true, notice: answer.value };
+  const error = answer.ok ? { status: 503, title: "", detail: "" } : answer.error;
+  return { ok: false, reason: error.status === 422 ? "invalid" : "failed", error };
+}
+
+export async function withdrawMyNotice(): Promise<boolean> {
+  const answer = await request<null>(TRANSFER_BASE_URL, "/market/me/notice", { method: "DELETE" }, "errors.requestFailed");
+  return answer.ok;
 }

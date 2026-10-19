@@ -109,10 +109,6 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("message");
 
-                    b.Property<long?>("OfferFeeCents")
-                        .HasColumnType("bigint")
-                        .HasColumnName("offer_fee_cents");
-
                     b.Property<string>("OfferNote")
                         .IsRequired()
                         .HasColumnType("text")
@@ -163,6 +159,46 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                     b.ToTable("transfers", (string)null);
                 });
 
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.EmployerRouteRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EmployerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employer_id");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("employer_routes", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.EmployerSettingRow", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("AcceptsInquiries")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepts_inquiries");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("employer_settings", (string)null);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.MarketRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -188,6 +224,14 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<DateOnly?>("OpenFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("open_from");
+
+                    b.Property<DateOnly?>("OpenUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("open_until");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -195,6 +239,104 @@ namespace WorkerTransfer.Transfer.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("market_status", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.NegotiationRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CurrentTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_tenant_id");
+
+                    b.Property<long?>("FeeCents")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_cents");
+
+                    b.Property<Guid>("HiringTenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hiring_tenant_id");
+
+                    b.Property<string>("ReleaseMonth")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("release_month");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("TermsBy")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("terms_by");
+
+                    b.Property<Guid>("TransferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transfer_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrentTenantId");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("TransferId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_release_negotiations_transfer");
+
+                    b.ToTable("release_negotiations", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Transfer.Infrastructure.Persistence.NoticeRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("End")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("end_rule");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("integer")
+                        .HasColumnName("length");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("unit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("notice_periods", (string)null);
 
                     b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });

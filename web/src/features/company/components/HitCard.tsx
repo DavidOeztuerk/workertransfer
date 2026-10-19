@@ -6,10 +6,12 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { Link as RouterLink } from "react-router-dom";
 
 import { useAsync } from "../lib/useAsync";
-import type { Evidence, Hit, Tick } from "../api/scout";
+import { type Evidence, type Hit, type Tick, draftApproach } from "../api/scout";
 import { requestResume } from "../api/resumeRequests";
 import {
   type MarketRequest,
@@ -17,8 +19,9 @@ import {
   requestMarketStatus,
 } from "../../work/api/market";
 import { COMPANY_TRANSFER_CASES, expressInterest } from "../../work/api/transfers";
-import { failureKey } from "../../../shared/api/errors";
+import { failureKey, RECRUITER_CASES } from "../../../shared/api/errors";
 import { openConversation } from "../../work/api/advisor";
+import { DRAFT_CASES, openApproach } from "../../messages/api/messages";
 
 /** As catalogue keys — the wording lies in the catalogues. */
 const APPROACHABILITY: Record<string, string> = {
@@ -82,6 +85,7 @@ export function HitCard({
           </Box>
         ) : null}
 
+        <Approach hit={hit} />
         <ConversationOpener subjectId={hit.subject_id} />
         <ResumeRequestButton subjectId={hit.subject_id} />
         <MarketAccess
@@ -303,13 +307,111 @@ function ConversationOpener({ subjectId }: { subjectId: string }) {
               setMessage(null);
               setDone(true);
             } else {
-              setMessage(t(failureKey(result.error, "errors.conversationNotOpened")));
+              setMessage(t(failureKey(result.error, "errors.conversationNotOpened", RECRUITER_CASES)));
             }
           });
         }}
       >
         {running ? t("scout.requesting") : t("advisor.open")}
       </Button>
+    </Box>
+  );
+}
+
+/**
+ * The first message to this person — the AI recruiter drafts, a human releases
+ * (ADR-0048, VISION-FRAGEN B2/D2).
+ *
+ * <strong>Nothing goes out without the button.</strong> The draft stands in an
+ * editable field, marked as a draft; "Freigeben und senden" opens the one
+ * conversation between this company and this person. Whoever writes the text
+ * themselves skips the model entirely.
+ *
+ * <strong>At least a recruiter.</strong> A member who presses "send" reads
+ * that the first contact is a recruiter's — not "choose a company".
+ */
+function Approach({ hit }: { hit: Hit }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [drafted, setDrafted] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+
+  if (sent !== null) {
+    return (
+      <Typography variant="body2" sx={{ mb: 1 }}>
+        {t("scout.approachSent")}{" "}
+        <RouterLink to={`/messages?kind=approach&reference=${sent}`}>{t("scout.approachOpenConversation")}</RouterLink>
+      </Typography>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Button variant="outlined" size="small" sx={{ mb: 1, mr: 1 }} onClick={() => setOpen(true)}>
+        {t("scout.approach")}
+      </Button>
+    );
+  }
+
+  return (
+    <Box sx={{ display: "grid", gap: 1.5, mb: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
+      <Typography variant="body2" color="text.secondary">
+        {t("scout.approachHint")}
+      </Typography>
+      {drafted ? <Chip size="small" color="warning" label={t("messages.draftChip")} sx={{ justifySelf: "start" }} /> : null}
+      <TextField
+        label={t("scout.approachText")}
+        multiline
+        minRows={4}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        slotProps={{ htmlInput: { maxLength: 4000 } }}
+      />
+      {message !== null ? <Alert severity="warning">{message}</Alert> : null}
+      <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+        <Button
+          variant="outlined"
+          disabled={running}
+          onClick={() => {
+            setRunning(true);
+            void draftApproach(hit.subject_id, hit.checks.map((tick) => tick.word)).then((result) => {
+              setRunning(false);
+              if (result.ok) {
+                setText(result.draft);
+                setDrafted(true);
+                setMessage(null);
+              } else {
+                setMessage(t(failureKey(result.error, "errors.draftNotCreated", DRAFT_CASES)));
+              }
+            });
+          }}
+        >
+          {t("scout.approachDraft")}
+        </Button>
+        <Button
+          variant="contained"
+          disabled={running || text.trim() === ""}
+          onClick={() => {
+            setRunning(true);
+            void openApproach(hit.subject_id, text, drafted).then((result) => {
+              setRunning(false);
+              if (result.ok) {
+                setSent(result.reference);
+              } else {
+                setMessage(t(failureKey(result.error, "errors.messageNotSent", RECRUITER_CASES)));
+              }
+            });
+          }}
+        >
+          {drafted ? t("messages.release") : t("messages.send")}
+        </Button>
+        <Button variant="text" onClick={() => { setOpen(false); setText(""); setDrafted(false); setMessage(null); }}>
+          {t("messages.discard")}
+        </Button>
+      </Box>
     </Box>
   );
 }
@@ -354,7 +456,7 @@ function ResumeRequestButton({ subjectId }: { subjectId: string }) {
               setMessage(null);
               setAsked(true);
             } else {
-              setMessage(t(failureKey(result.error, "errors.requestNotSent")));
+              setMessage(t(failureKey(result.error, "errors.requestNotSent", RECRUITER_CASES)));
             }
           });
         }}
@@ -412,7 +514,7 @@ function MarketAccess({
             setRunning(true);
             void requestMarketStatus(subjectId).then((result) => {
               setRunning(false);
-              setMessage(result.ok ? null : t(failureKey(result.error, "errors.requestNotSent")));
+              setMessage(result.ok ? null : t(failureKey(result.error, "errors.requestNotSent", RECRUITER_CASES)));
               onChanged();
             });
           }}

@@ -18,7 +18,8 @@ public static class Retention
     /// worst possible state.
     /// <para>
     /// It switches <strong>exactly one row class in this service</strong>: a
-    /// completed deal <em>with</em> a fee. No extension to
+    /// completed deal <em>with</em> a fee — since ADR-0050 the fee two companies
+    /// agreed in a settled release negotiation, which is kept along with it. No extension to
     /// <c>interested</c>/<c>talking</c>/<c>offered</c> — a conversation is no
     /// contract — and no "running case" as a rubber word. Without a fee no
     /// trade has come into being that anything could hang on. And no period, in

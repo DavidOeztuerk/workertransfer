@@ -19,6 +19,7 @@ import { useAsync } from "../lib/useAsync";
 import {
   type CompanyMember,
   type Invitation,
+  type Role,
   listInvitations,
   listMembers,
   removeMember,
@@ -37,6 +38,13 @@ import {
  * different label: whoever removes themselves leaves. Two ways for it would be
  * two places where the last administrative role could be treated differently.
  */
+/** The role as a catalogue key. */
+const ROLE_KEY: Record<Role, "team.roleAdmin" | "team.roleRecruiter" | "team.roleMember"> = {
+  admin: "team.roleAdmin",
+  recruiter: "team.roleRecruiter",
+  member: "team.roleMember",
+};
+
 export function CompanyTeamPage() {
   const { t } = useTranslation();
   const { forCompany, tenantId, subjectId } = useActor();
@@ -155,9 +163,7 @@ export function CompanyTeamPage() {
                   key={entry.user_id}
                   title={entry.display_name}
                   meta={t(
-                    entry.role === "admin"
-                      ? "team.roleAdmin"
-                      : "team.roleMember",
+                    ROLE_KEY[entry.role],
                   )}
                   action={
                     isAdmin ? (
@@ -212,9 +218,7 @@ export function CompanyTeamPage() {
                   key={entry.id}
                   title={entry.email}
                   meta={t(
-                    entry.role === "admin"
-                      ? "team.roleAdmin"
-                      : "team.roleMember",
+                    ROLE_KEY[entry.role],
                   )}
                   action={
                     isAdmin ? (

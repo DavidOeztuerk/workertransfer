@@ -45,7 +45,8 @@ public sealed record JobSearchQuery(
     string SearchTerm = "",
     Guid? Company = null,
     string Employment = "",
-    SearchRadius? Radius = null) : IQueryMessage<JobPage>;
+    SearchRadius? Radius = null,
+    bool WithSalaryOnly = false) : IQueryMessage<JobPage>;
 
 /// <inheritdoc cref="JobSearchQuery" />
 public sealed class JobSearchHandler(IJobStore store)
@@ -60,7 +61,7 @@ public sealed class JobSearchHandler(IJobStore store)
         return store.SearchAsync(
             request.Page, request.PageLength, request.Skills,
             request.Location, request.Remote, request.SearchTerm, request.Company,
-            request.Employment, request.Radius, cancellationToken);
+            request.Employment, request.Radius, cancellationToken, request.WithSalaryOnly);
     }
 }
 

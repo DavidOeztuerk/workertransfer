@@ -14,6 +14,8 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { useActor } from "../lib/session";
+import { ReleaseBlock } from "../../work/components/ReleaseBlock";
+import { EmployerInquiries } from "../components/EmployerInquiries";
 import { useAsync } from "../lib/useAsync";
 import { ADMIN_CASES, type ServerCase, failureKey } from "../../../shared/api/errors";
 import {
@@ -22,7 +24,6 @@ import {
   RUNNING,
   type Transfer,
   companyMove,
-  euro,
   listCompanyTransfers,
   makeOffer,
 } from "../../work/api/transfers";
@@ -41,9 +42,9 @@ const STATUS_TITLES: Record<Transfer["status"], string> = {
 /**
  * <c>/company/transfers</c> — the conversations from the company's side.
  *
- * <strong>The placement fee is recorded, not moved.</strong> This platform
- * handles no money. The figure stands there so both sides have the same one in
- * view — not because anything would be transferred here.
+ * <strong>A fee is agreed between two companies, never offered to the
+ * person</strong> — over the route she and her employer both opened
+ * (ADR-0050). It is recorded, not moved: this platform handles no money.
  *
  * <strong>The company may only complete when no release is
  * outstanding.</strong> If the person must first be let go by their employer,
@@ -90,20 +91,11 @@ export function CompanyTransfersPage() {
     transfers.reload();
   }
 
-  async function offer(
-    id: string,
-    text: string,
-    start: string,
-    fee: string,
-  ) {
+  async function offer(id: string, text: string, start: string) {
     setRunning(true);
     const result = await makeOffer(id, {
       note: text,
       start_on: start.trim() === "" ? null : start.trim(),
-      // Euros in the field, cents on the wire — rounded so "1,005" does not
-      // arrive as a fraction of a cent.
-      fee_cents:
-        fee.trim() === "" ? null : Math.round(Number(fee) * 100),
     });
     setRunning(false);
     setError(result.ok ? null : t(failureKey(result.error, "errors.offerNotMade", CASES)));
@@ -119,6 +111,8 @@ export function CompanyTransfersPage() {
       narrow
       lead={t("companyTransfers.lead")}
     >
+      <EmployerInquiries />
+
       {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -158,9 +152,7 @@ export function CompanyTransfersPage() {
             transfer={transfer}
             locked={running}
             onMove={(action) => void move(transfer.id, action)}
-            onOffer={(text, start, fee) =>
-              void offer(transfer.id, text, start, fee)
-            }
+            onOffer={(text, start) => void offer(transfer.id, text, start)}
           />
         ))}
       </Box>
@@ -177,20 +169,20 @@ function TransferCard({
   transfer: Transfer;
   locked: boolean;
   onMove: (action: CompanyAction) => void;
-  onOffer: (text: string, start: string, fee: string) => void;
+  onOffer: (text: string, start: string) => void;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [start, setStart] = useState("");
-  const [fee, setFee] = useState("");
 
   const stillRunning = RUNNING.includes(transfer.status);
   // The rule is SAID, not only enforced: silently dropping the completion
   // button looks like a defect from outside, and whoever does not know the rule
   // hunts for it in the wrong place. The sentence beside it says two things that
   // both belong to the company — that the last step is not theirs, and that the
-  // platform does NOT ask the current employer. The second is the promise this
-  // market hangs on for the person.
+  // platform asks the current employer only where the person and the employer
+  // both allowed it (ADR-0050). The second is the promise this market hangs on
+  // for the person.
   const mayComplete =
     transfer.status === "accepted" && !transfer.requires_release;
   const showsOffer =
@@ -234,21 +226,17 @@ function TransferCard({
             <Typography component="dd" sx={{ m: 0 }}>
               {transfer.offer_start_on ?? "—"}
             </Typography>
-            <Typography component="dt" variant="body2" color="text.secondary">
-              {t("companyTransfers.fee")}
-            </Typography>
-            <Typography component="dd" sx={{ m: 0 }}>
-              {euro(transfer.offer_fee_cents)}
-            </Typography>
           </Box>
         ) : null}
+
+        {transfer.requires_release ? <ReleaseBlock transferId={transfer.id} /> : null}
 
         {transfer.status === "talking" ? (
           <Box
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              onOffer(text, start, fee);
+              onOffer(text, start);
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}
           >
@@ -264,15 +252,11 @@ function TransferCard({
             <TextField
               label={t("companyTransfers.start")}
               helperText={t("companyTransfers.startHint")}
+              type="month"
               placeholder="2026-11"
+              slotProps={{ inputLabel: { shrink: true } }}
               value={start}
               onChange={(e) => setStart(e.target.value)}
-            />
-            <TextField
-              label={t("companyTransfers.fee")}
-              helperText={t("companyTransfers.feeHint")}
-              value={fee}
-              onChange={(e) => setFee(e.target.value)}
             />
             <Box>
               <Button type="submit" variant="contained" disabled={locked}>
