@@ -87,7 +87,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | System | Stand | Bemerkung |
 |---|---|---|
 | Hosting | **vor dem Start** (Q2, Q3) | wer betreibt, wo läuft es |
-| Content-Security-Policy der Oberfläche | **vor dem Start** | die Web-Oberfläche liefert keine; die Hosts der Datei-Auswahl stehen in ADR-0054 |
+| Content-Security-Policy der Oberfläche | **gebaut** (20.10.2026) | im ausgelieferten Image (`docker/web-nginx.conf.template`); erlaubt die Hosts der Datei-Auswahl aus ADR-0054. Picker und Chooser selbst sind erst gemessen, wenn ihre Schlüssel stehen |
 | Infisical | **vor dem Start** | füllt die Umgebung; der Mechanismus bleibt `.env` |
 | Noelia Control Plane | **gebaut** lokal, Lizenz **vor dem Start** | |
 | Valkey, Postgres, Jaeger | **gebaut**, selbst betrieben | keine fremden Dienste |

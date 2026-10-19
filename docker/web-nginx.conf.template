@@ -1,0 +1,85 @@
+# Serving the built UI.
+#
+# In the image and not in the chart: the SPA fallback, the caching rules and
+# the security headers apply the same everywhere. The one value that differs
+# per environment — the API's origin — comes from WT_API_ORIGIN, which nginx's
+# entrypoint substitutes into this template at start (only variables that are
+# DEFINED in the environment are replaced, so nginx's own $uri stays).
+
+# The Content-Security-Policy, written ONCE. Every location below that sets a
+# header of its own must repeat the add_header line: nginx inherits add_header
+# into a location only when the location sets none — so a policy at server
+# level alone would vanish exactly on index.html.
+#
+# - script-src: the bundle, plus the two providers' file pickers (ADR-0054).
+#   They load on a click, never with the page; listed here so the click works.
+# - style-src 'unsafe-inline': MUI's Emotion writes <style> elements at
+#   runtime. A nonce would need a server that renders the page; this one
+#   serves files.
+# - img-src/frame-src blob:: a document is shown from a blob URL
+#   (CompanyApplicationPage), an image as <img>, a PDF in an <iframe>.
+# - connect-src: the gateway, plus the fetch of the CHOSEN file from Drive or
+#   Dropbox and Google's token revocation.
+# - frame-ancestors 'none': nobody frames this UI — a consent switch inside a
+#   stranger's page is the clickjacking case this exists for.
+map $host $wt_csp {
+    default "default-src 'self'; script-src 'self' https://apis.google.com https://accounts.google.com https://www.dropbox.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ${WT_API_ORIGIN} https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://*.dropboxusercontent.com; frame-src blob: https://docs.google.com https://accounts.google.com https://www.dropbox.com; object-src 'none'; base-uri 'self'; form-action 'self' ${WT_API_ORIGIN}; frame-ancestors 'none'";
+}
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # Without this line a RELOAD of /profile or /market answers 404: the client
+    # router knows these paths, nginx does not — on disk there is only
+    # index.html. The first call via a link works, the reload does not, and
+    # exactly this half is the first to slip through when testing.
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Content-Security-Policy $wt_csp always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(self), camera=(), microphone=()" always;
+    }
+
+    # The runtime configuration is replaced by the chart in operation. If it
+    # were cached, the browser would keep pointing at the old addresses after
+    # the environment moved — and nobody would work out why.
+    location = /config.js {
+        add_header Cache-Control "no-store" always;
+        add_header Content-Security-Policy $wt_csp always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(self), camera=(), microphone=()" always;
+    }
+
+    # index.html likewise: it refers to the bundles with their hash in the name.
+    # An old index.html in the cache requests bundles that no longer exist
+    # after the next deploy — the page then stays white.
+    location = /index.html {
+        add_header Cache-Control "no-store" always;
+        add_header Content-Security-Policy $wt_csp always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(self), camera=(), microphone=()" always;
+    }
+
+    # The bundles carry their hash in the name and can therefore stay for ever:
+    # if the content changes, the name changes.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Security-Policy $wt_csp always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(self), camera=(), microphone=()" always;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # No access log with paths on a site that carries slugs of people and
+    # companies in the address (docs/product-scope.md). Errors are still
+    # logged.
+    access_log off;
+}
