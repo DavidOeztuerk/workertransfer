@@ -24,3 +24,7 @@ public sealed class WishError()
 
 /// <summary>The salary range does not keep its rule.</summary>
 public sealed class SalaryError(string reason) : InputError(reason);
+
+/// <summary>A fetched advert's text is changed at its source, not here (ADR-0052).</summary>
+public sealed class MirroredError()
+    : InputError("This advert mirrors a source — change its text there.");

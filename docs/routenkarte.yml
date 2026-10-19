@@ -44,6 +44,14 @@
 #   POST   /transfers/{id}/offer              der Termin
 #   POST   /transfers/{id}/complete           den Abschluss feststellen
 #
+# Dazu seit ADR-0052 die Quellen der Anzeigen — eine Quelle im Modus „direkt"
+# veroeffentlicht, ohne dass jemand `publish` drueckt:
+#
+#   POST   /jobs/sources                      eine Quelle einrichten
+#   PUT    /jobs/sources/{id}                 Entwurf oder direkt
+#   DELETE /jobs/sources/{id}                 sie entfernen
+#   POST   /jobs/sources/{id}/fetch           jetzt abrufen
+#
 # Und DREI verlangen seit ADR-0048 mindestens einen `recruiter` — den ersten
 # Kontakt zu einem Menschen, der sich nicht selbst gemeldet hat:
 #
@@ -376,6 +384,12 @@ gruppen:
       Moeglichkeit, sich zu bewerben. „Ein `member` kann meine Stellen nicht
       loeschen" heisst in dieser Domaene genau `close`: geloescht wird eine
       Anzeige nie.
+
+      Die **Quellen** (ADR-0052) liest jedes Mitglied; einrichten, abrufen,
+      umstellen und entfernen ist `admin` — eine Quelle im Modus „direkt"
+      veroeffentlicht im Namen der Firma, ohne dass jemand `publish` drueckt.
+      Mit `{}` als Rumpf fehlt dem Admin die Art bzw. der Modus: 422. Eine
+      erfundene Quelle ist 404, auch fuer eine fremde Firma.
     eintraege:
       - { methode: POST, pfad: '/jobs/draft', ohne: 401, person: 403, mitglied: 503, firma: 503 }
       - { methode: POST, pfad: '/jobs', ohne: 401, person: 403, mitglied: 422, firma: 422 }
@@ -386,6 +400,11 @@ gruppen:
       - { methode: GET, pfad: '/jobs?page=2&page_size=5', ohne: 200, person: 200, mitglied: 200, firma: 200 }
       - { methode: GET, pfad: '/jobs/00000000-0000-0000-0000-000000000001', ohne: 404, person: 404, mitglied: 404, firma: 404 }
       - { methode: GET, pfad: '/companies/me/jobs', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: GET, pfad: '/jobs/sources', ohne: 401, person: 403, mitglied: 200, firma: 200 }
+      - { methode: POST, pfad: '/jobs/sources', ohne: 401, person: 403, mitglied: 403, firma: 422 }
+      - { methode: PUT, pfad: '/jobs/sources/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 403, firma: 422 }
+      - { methode: DELETE, pfad: '/jobs/sources/00000000-0000-0000-0000-000000000001', ohne: 401, person: 403, mitglied: 403, firma: 404 }
+      - { methode: POST, pfad: '/jobs/sources/00000000-0000-0000-0000-000000000001/fetch', ohne: 401, person: 403, mitglied: 403, firma: 404 }
 
   - name: 'Bewerbungen'
     warum: |

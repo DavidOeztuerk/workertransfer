@@ -232,6 +232,26 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         return open.Count;
     }
 
+    /// <inheritdoc />
+    public async Task<Job?> ByOriginAsync(Guid sourceId, string externalId, CancellationToken cancellationToken = default)
+    {
+        var row = await context.Jobs.FirstOrDefaultAsync(
+            candidate => candidate.SourceId == sourceId && candidate.ExternalId == externalId, cancellationToken);
+
+        return row is null ? null : ToAggregate(row);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Job>> FromSourceAsync(Guid sourceId, CancellationToken cancellationToken = default)
+    {
+        var rows = await context.Jobs.Where(candidate => candidate.SourceId == sourceId).ToListAsync(cancellationToken);
+        return [.. rows.Select(ToAggregate)];
+    }
+
+    /// <inheritdoc />
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        context.Jobs.Where(candidate => candidate.Id == id).ExecuteDeleteAsync(cancellationToken);
+
     private static Job ToAggregate(JobRow row) => Job.Restore(
         row.Id,
         new TenantId(row.TenantId),
@@ -253,6 +273,9 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
                 "hour" => SalaryPeriod.Hour,
                 _ => SalaryPeriod.Year
             })
+            : null,
+        row.SourceId is { } source && row.ExternalId is { } external
+            ? new JobOrigin(source, external, row.ExternalUrl ?? string.Empty)
             : null);
 
     private static JobRow ToRow(Job job)
@@ -284,6 +307,9 @@ public sealed class EfJobStore(JobsDbContext context) : IJobStore
         row.SalaryMin = job.Salary?.Minimum;
         row.SalaryMax = job.Salary?.Maximum;
         row.SalaryPeriod = job.Salary?.Period.ToString().ToLowerInvariant();
+        row.SourceId = job.Origin?.SourceId;
+        row.ExternalId = job.Origin?.ExternalId;
+        row.ExternalUrl = job.Origin?.Url;
     }
 
     // The stored words below are the column values of every existing row and

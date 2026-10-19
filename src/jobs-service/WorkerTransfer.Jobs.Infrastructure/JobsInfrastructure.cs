@@ -5,6 +5,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using Noelia.Infrastructure.Sovereignty;
+using WorkerTransfer.Jobs.Domain.Sources;
+using WorkerTransfer.Jobs.Infrastructure.Sources;
 using WorkerTransfer.Jobs.Application.Behaviors;
 using WorkerTransfer.Jobs.Application.Ports;
 using WorkerTransfer.Jobs.Application.Jobs;
@@ -56,6 +59,8 @@ public static class JobsInfrastructure
         services.AddScoped<IJobStore, EfJobStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
+        Sources(services, configuration);
+
         // Without a deposited key no foreign service is called. That is the
         // default and not a fallback.
         var draft = new DraftSettings();
@@ -76,6 +81,47 @@ public static class JobsInfrastructure
         Evidence(services, draft);
 
         return services;
+    }
+
+    /// <summary>Adverts from a company's ATS or own feed (ADR-0052).</summary>
+    private static void Sources(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SourceSettings>(configuration.GetSection(SourceSettings.Section));
+        services.Configure<IdentityLookupSettings>(configuration.GetSection(IdentityLookupSettings.Section));
+
+        services.AddScoped<IJobSourceStore, EfJobSourceStore>();
+        services.AddScoped<ISourceReader, HttpSourceReader>();
+        services.AddScoped<ICompanySite, HttpCompanySite>();
+        services.AddScoped<ICompanyDomains, HttpCompanyDomains>();
+
+        // A company's page: only ever a public address, checked at connect.
+        services.AddHttpClient(HttpCompanySite.ClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                ConnectCallback = HttpCompanySite.PublicOnly,
+                AllowAutoRedirect = false
+            });
+
+        var known = new KnownDomains();
+        services.AddSingleton(known);
+        services.AddSingleton<IKnownDomains>(known);
+        services.AddHostedService<KnownDomainsLoader>();
+        services.AddHostedService<SourceSchedule>();
+
+        // Noelia's egress policy, widened by the proven domains with a source —
+        // through its interface. Registered by `AddWorkerTransferDefaults`
+        // before this line; `SourceTests` resolves it and fails if it is not
+        // the widened one.
+        var policy = services.LastOrDefault(descriptor => descriptor.ServiceType == typeof(IEgressPolicy));
+
+        if (policy?.ImplementationInstance is IEgressPolicy inner)
+        {
+            var settings = new SourceSettings();
+            configuration.GetSection(SourceSettings.Section).Bind(settings);
+
+            services.Remove(policy);
+            services.AddSingleton<IEgressPolicy>(new CompanyDomainEgress(inner, known, settings.Personio));
+        }
     }
 
     /// <summary>What this service can answer about itself (ADR-0044).</summary>

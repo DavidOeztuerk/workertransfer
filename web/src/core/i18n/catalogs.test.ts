@@ -104,6 +104,12 @@ describe("the catalogues", () => {
       "fr:settings.providerAnthropic",
       "en:settings.providerOpenAi",
       "fr:settings.providerOpenAi",
+      "en:sources.kindGreenhouse",
+      "fr:sources.kindGreenhouse",
+      "en:sources.kindLever",
+      "fr:sources.kindLever",
+      "en:sources.kindPersonio",
+      "fr:sources.kindPersonio",
       "fr:footer.copyright",
       "fr:scout.skillsExample",
     ]);

@@ -401,7 +401,7 @@ Two checks sit in two places on purpose. **Freemail is rejected at registration*
 
 **`admin` vs `member` is enforced since PBI-2, and until then it was not — anywhere.** The tree held **zero** `RequirePermission` outside identity-service: the navigation *hid* company entries and the server answered 403 only where somebody had thought of it. `MembershipPermission` read the role per request from the membership table — and nobody asked. **Hiding is not access control**, and that sentence is the whole reason this was the largest real gap in the tree.
 
-Twelve routes now demand an `admin` — eight since PBI-2, four since ADR-0050 — and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
+Sixteen routes now demand an `admin` — eight since PBI-2, four since ADR-0050, four since ADR-0052 — and the line behind them is written down once so the next route does not reinvent it: **`admin` is whoever binds or changes the company, or who belongs to it; `member` is the daily work in the company's name** — reading, drafting, writing, approaching, processing applications. **In doubt, `member`:** a right that is too narrow turns an invitation into a spectator seat, and then somebody creates a second admin in order to work — and "admin" is a word in a table again.
 
 | route | why `admin` |
 |---|---|
@@ -415,6 +415,7 @@ Twelve routes now demand an `admin` — eight since PBI-2, four since ADR-0050 �
 | `POST /transfers/{id}/complete` | states that it holds |
 | `PUT /transfers/employer/setting` | lets other companies ask about the own staff (ADR-0050) |
 | `POST /transfers/{id}/release`, `/transfers/releases/{id}/terms`, `/accept` | a release month and a fee — one company pays, the other lets somebody go sooner |
+| `POST /jobs/sources`, `PUT`/`DELETE /jobs/sources/{id}`, `POST /jobs/sources/{id}/fetch` | a source in "direct" publishes in the company's name (ADR-0052) |
 
 **A third role since 07.10.2026: `recruiter`** ([ADR-0048](docs/adr/0048-der-recruiter-macht-den-ersten-schritt.md), VISION-FRAGEN B7). The roles are **ordered**, `member` < `recruiter` < `admin`, and `ServiceDefaults.Roles.CompanyPermissions` names a *minimum* per permission (`role >= minimum`) — so an admin may approach too, and a fourth role must be inserted where it belongs in `CompanyRole` or it silently gains or loses rights. The recruiter's one addition is the **first contact** to a person who did not come forward: `POST /resumes/{subject}/requests`, `POST /market/{subject}/requests`, `POST /advisor/conversations`. Searching stays `member`. resume-service therefore needs `Identity__BaseUrl`/`Identity__Secret` now. In the UI the 403 reads `errors.recruiterOnly` via `RECRUITER_CASES`, never "choose a company".
 
@@ -937,7 +938,7 @@ Built 07.10.2026 under [ADR-0047](docs/adr/0047-nachrichten-pro-vorgang-und-frei
 
 **A draft is a message in state `draft`, and only its own side sees it** — filtered in the SQL (`VisibleToAsync`), not further up. It comes into being on a click (`POST …/draft`), a human being edits and **releases** it; discarding deletes the row. The model call is a *query* (`ComposeReplyQuery`) and the draft is saved by a separate command, so no transaction stays open for the seconds a model takes. There is **no route** that sends a draft without a release; `MessageJourneyTests` pins the closed set of six.
 
-**What reaches the model:** `ReplyContext` — the writing side, the last twenty *sent* messages of this one conversation, the person's name (only to be masked) and a language. Never a draft, a profile, a CV or another conversation; the rules forbid judging the other side (D2/D3). The person's side uses their own AI access if they set one up — a silent identity-service is refused, not quietly replaced by the platform's provider — the company's side the platform's (Mistral).
+**What reaches the model:** `ReplyContext` — the writing side, the last twenty *sent* messages of this one conversation, the person's name (only to be masked) and a language. Never a draft, a profile, a CV or another conversation; the rules forbid judging the other side (D2/D3). The person's side uses their own AI access if they set one up — a silent identity-service is refused, not quietly replaced by the platform's provider — the company's side the platform's model (ADR-0051).
 
 **`origin` (`human`/`agent`) is shown to the own side only**, and no author id ever goes out; whether a recipient must learn that a model drafted a released message is lawyer question J2.
 
@@ -961,6 +962,15 @@ Built 16.10.2026 under [ADR-0050](docs/adr/0050-der-alte-arbeitgeber-mit-zwei-zu
 - **The release negotiation** (`release_negotiations`, one per transfer): a month and a fee or none, terms set alternately, accepted only by the side that did not set them; then **she agrees last** and can decline in every running state. Both companies see her earliest regular start from her notice period (H2) — the one place a company sees it. The platform suggests no price and moves no money.
 - **The offer to the person carries no fee any more**; `Retention.KeepPaid` now means "a completed transfer with a settled negotiation that has a fee" — still `false`.
 - Company steps notify the person and the other company's members as `transfer_update`; her own steps notify nobody.
+
+### Adverts from a company's ATS: official reads, and the board proves itself with a code
+
+Built 18.10.2026 under [ADR-0052](docs/adr/0052-inserate-von-aussen-nur-offizielle-abrufe-mit-nachweis.md) (VISION-FRAGEN-2 L1–L5). jobs-service reads Greenhouse, Lever and Personio over their public APIs and a company's own schema.org `JobPosting` feed — never a scraped page.
+
+- **A board name proves nothing**: every board is public, and anybody can type its name. A DNS record or a link on the company's own page proves nothing either — the company controls those, not the board (that was decided twice in round 2 and corrected). The proof is a **code** the platform hands out and the company writes into one advert at its ATS; the read that finds it binds the board and imports in the same step. **An unproven source imports nothing**, and the daily round (`SourceSchedule`, hourly, sources older than a day) reads only proven ones. The code belongs to the source, not the board, so a second company naming the same board gets its own. A feed is proven by lying on the proven domain (ADR-0019).
+- **The egress boundary is widened through Noelia's interface**, never around it: `CompanyDomainEgress` replaces the registered `IEgressPolicy` instance and adds hosts below `Sources__Personio` and the proven domains of companies with a feed, https only. `SourceJourneyTests` resolves the policy from the host and fails if it is not the widened one — Noelia's guard resolves it from DI per client.
+- **A feed must not reach inside**: the `company-site` client checks the resolved address at connect time (`HttpCompanySite.PublicOnly`) and follows redirects by hand, on the same domain only.
+- **Mirrored adverts**: the text belongs to the source (409 on a change here); skills, salary and postal code the company adds here. Gone at the source closes a published advert and deletes a draft; closed stays closed; a failed read changes nothing; only an https link is kept as `source_url`. Removing a source hands its adverts over as the company's own.
 
 ### Suggestions from a person's own documents — a library in-process, an index that falls with the erasure
 
@@ -1178,4 +1188,5 @@ that script was built against.
 - `bugs/` — Noelia debts, each with a reproduction. The correlation id one is closed (it reaches stdout since 4.3.0, measured across a real service hop on 09.09.2026). `sitzungswiderruf-liest-sid.md` is closed (fixed in Noelia 7.0.1, 07.10.2026); its two side findings — no `UseTokenRevocation` in the default chain, a `text/plain` refusal — stay open there. `verschluesselung-verschluesselt-nicht.md` is **closed**: fixed in 4.4.2, re-measured against 7.0.0 on 07.10.2026 (no plaintext in the envelope, a foreign key fails on the GCM tag). `AddEncryption` stays out anyway — `SecretStore` covers what we encrypt.
 - `docs/adr/0047-nachrichten-pro-vorgang-und-freigegebene-entwuerfe.md` — messages per process, and drafts only a human being releases. 07.10.2026.
 - `docs/adr/0044-nachweis-belege-statt-konformitaet.md` — der Nachweis: was ein Programm zeigen kann, was nicht, und wer die Anhang-III-Frage beantwortet. 20.09.2026.
+- `docs/DRITTANBIETER.md` — every third-party system, built or to come, with its state (18.10.2026).
 - `AGENTS.md` — concise command + convention reference.

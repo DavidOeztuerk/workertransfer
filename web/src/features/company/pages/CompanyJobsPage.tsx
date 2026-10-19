@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
@@ -14,6 +15,7 @@ import {
   PageShell,
 } from "../../../shared/components/ui";
 import { ADMIN_CASES, failureKey } from "../../../shared/api/errors";
+import { JobSources } from "../components/JobSources";
 import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
@@ -174,6 +176,22 @@ export function CompanyJobsPage() {
                       <Typography variant="body2" color="text.secondary">
                         {t(STATUS_KEYS[job.status] ?? job.status)}
                       </Typography>
+                      {job.mirrored ? (
+                        // Fetched from the company's ATS or feed (ADR-0052): its
+                        // text is changed there, and the next fetch would undo
+                        // a change made here.
+                        <Typography variant="body2" color="text.secondary">
+                          {t("companyJobs.mirrored")}
+                          {job.source_url !== null ? (
+                            <>
+                              {" · "}
+                              <Link href={job.source_url} target="_blank" rel="noopener noreferrer">
+                                {t("companyJobs.atSource")}
+                              </Link>
+                            </>
+                          ) : null}
+                        </Typography>
+                      ) : null}
                     </Box>
 
                     {job.status !== "closed" ? (
@@ -190,6 +208,14 @@ export function CompanyJobsPage() {
                             {t("companyJobs.matchingPeople")}
                           </Button>
                         ) : null}
+                        <Button
+                          component={RouterLink}
+                          to={`/company/jobs/${job.id}/edit`}
+                          variant="outlined"
+                          size="small"
+                        >
+                          {t("companyJobs.edit")}
+                        </Button>
                         {job.status === "draft" ? (
                           <Button
                             variant="contained"
@@ -217,6 +243,8 @@ export function CompanyJobsPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <JobSources onFetched={jobs.reload} />
     </PageShell>
   );
 }

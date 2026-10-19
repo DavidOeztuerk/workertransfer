@@ -43,12 +43,49 @@ public sealed class JobRow
 
     /// <summary><c>year</c>, <c>month</c> or <c>hour</c>; <c>null</c> without a range.</summary>
     public string? SalaryPeriod { get; set; }
+
+    /// <summary>The source it was fetched from, or <c>null</c>: written here (ADR-0052).</summary>
+    public Guid? SourceId { get; set; }
+
+    /// <summary>Its id at the source.</summary>
+    public string? ExternalId { get; set; }
+
+    /// <summary>Its address at the source.</summary>
+    public string? ExternalUrl { get; set; }
+}
+
+/// <summary>One row of <c>job_sources</c> — a company's ATS board or own feed (ADR-0052).</summary>
+public sealed class JobSourceRow
+{
+    public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public string Kind { get; set; } = string.Empty;
+
+    public string Key { get; set; } = string.Empty;
+
+    public string Domain { get; set; } = string.Empty;
+
+    public string Code { get; set; } = string.Empty;
+
+    public string Mode { get; set; } = "draft";
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? ProvenAt { get; set; }
+
+    public DateTime? FetchedAt { get; set; }
+
+    public string Outcome { get; set; } = string.Empty;
 }
 
 /// <summary>The one table of this service.</summary>
 public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbContext(options)
 {
     public DbSet<JobRow> Jobs => Set<JobRow>();
+
+    public DbSet<JobSourceRow> Sources => Set<JobSourceRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,8 +118,37 @@ public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbC
 
             // Both are paths that are searched along: a company's list and the
             // public page.
+            row.Property(entry => entry.SourceId).HasColumnName("source_id");
+            row.Property(entry => entry.ExternalId).HasColumnName("external_id").HasMaxLength(200);
+            row.Property(entry => entry.ExternalUrl).HasColumnName("external_url").HasMaxLength(500);
+
             row.HasIndex(entry => entry.TenantId);
             row.HasIndex(entry => new { entry.Status, entry.PublishedAt });
+
+            // One advert per id per source: a second row would be the same
+            // advert twice, and the next fetch could not tell which to mirror.
+            row.HasIndex(entry => new { entry.SourceId, entry.ExternalId })
+                .IsUnique()
+                .HasDatabaseName("uq_jobs_source_external")
+                .HasFilter("source_id IS NOT NULL");
+        });
+
+        modelBuilder.Entity<JobSourceRow>(row =>
+        {
+            row.ToTable("job_sources");
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id").ValueGeneratedNever();
+            row.Property(entry => entry.TenantId).HasColumnName("tenant_id");
+            row.Property(entry => entry.Kind).HasColumnName("kind").HasMaxLength(16).IsRequired();
+            row.Property(entry => entry.Key).HasColumnName("key").HasMaxLength(300).IsRequired();
+            row.Property(entry => entry.Domain).HasColumnName("domain").HasMaxLength(253).IsRequired();
+            row.Property(entry => entry.Code).HasColumnName("code").HasMaxLength(32).IsRequired();
+            row.Property(entry => entry.Mode).HasColumnName("mode").HasMaxLength(8).IsRequired();
+            row.Property(entry => entry.CreatedAt).HasColumnName("created_at");
+            row.Property(entry => entry.ProvenAt).HasColumnName("proven_at");
+            row.Property(entry => entry.FetchedAt).HasColumnName("fetched_at");
+            row.Property(entry => entry.Outcome).HasColumnName("outcome").HasMaxLength(32).IsRequired();
+            row.HasIndex(entry => entry.TenantId);
         });
 
         base.OnModelCreating(modelBuilder);

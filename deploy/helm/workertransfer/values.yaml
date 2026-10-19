@@ -309,6 +309,11 @@ services:
       # table and not in the token. `Identity__Secret` hangs on this line in
       # _helpers.tpl.
       Identity__BaseUrl: http://identity-service:8001
+      # The ATS' official APIs (ADR-0052) — named so the egress boundary
+      # lets them through.
+      Sources__Greenhouse: https://boards-api.greenhouse.io
+      Sources__Lever: https://api.lever.co
+      Sources__Personio: jobs.personio.de
 
   - name: applications-service
     dir: applications

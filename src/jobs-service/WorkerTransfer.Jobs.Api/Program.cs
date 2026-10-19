@@ -27,7 +27,8 @@ builder.Services.AddWorkerTransferDefaults(
 builder.Services.AddAdminPermissions(
     builder.Configuration,
     JobPermissions.Publish,
-    JobPermissions.Close);
+    JobPermissions.Close,
+    JobPermissions.Sources);
 
 builder.Services.AddJobsInfrastructure(
     builder.Configuration,
@@ -41,6 +42,7 @@ await app.MigrateSchemaAsync<JobsDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
+app.MapSourceEndpoints();
 app.MapJobEndpoints();
 
 // No POST /erasure: this service holds nothing about a natural person

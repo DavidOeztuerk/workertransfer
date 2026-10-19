@@ -30,7 +30,18 @@ public sealed record JobV1(
     /// What the job pays — <c>null</c> means "not stated", and the UI says so
     /// (VISION-FRAGEN B5). A number about the job, never about a person.
     /// </summary>
-    [property: JsonPropertyName("salary")] SalaryV1? Salary = null);
+    [property: JsonPropertyName("salary")] SalaryV1? Salary = null,
+    /// <summary>
+    /// <c>true</c> for an advert fetched from the company's ATS or feed — it
+    /// is changed there, not here; absent for one written here (ADR-0052).
+    /// </summary>
+    [property: JsonPropertyName("mirrored")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    bool? Mirrored = null,
+    /// <summary>Where a fetched advert stands at its source, when the source gave an https link.</summary>
+    [property: JsonPropertyName("source_url")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? SourceUrl = null);
 
 /// <summary>A salary range: gross, whole euros, both ends.</summary>
 public sealed record SalaryV1(
@@ -84,3 +95,38 @@ public sealed record DraftV1(
     [property: JsonPropertyName("skills")] IReadOnlyList<string>? Skills = null,
     [property: JsonPropertyName("location")] string Location = "",
     [property: JsonPropertyName("wish")] string Wish = "");
+
+/// <summary>A company's source of adverts (ADR-0052).</summary>
+/// <remarks>
+/// <c>outcome</c> is a short word — <c>new</c>, <c>ok</c>, <c>cut</c>,
+/// <c>code_missing</c>, <c>not_found</c>, … — never text from the source.
+/// <c>code</c> stands only while a board is unproven: it is what the company
+/// writes into one advert at its ATS.
+/// </remarks>
+public sealed record SourceV1(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("key")] string Key,
+    [property: JsonPropertyName("mode")] string Mode,
+    [property: JsonPropertyName("proven_at")] DateTimeOffset? ProvenAt,
+    [property: JsonPropertyName("fetched_at")] DateTimeOffset? FetchedAt,
+    [property: JsonPropertyName("outcome")] string Outcome,
+    [property: JsonPropertyName("code")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Code = null);
+
+/// <summary>Setting a source up: a board's name, or a feed's address.</summary>
+public sealed record WriteSourceV1(
+    [property: JsonPropertyName("kind")] string? Kind = null,
+    [property: JsonPropertyName("key")] string? Key = null,
+    [property: JsonPropertyName("mode")] string? Mode = "draft");
+
+/// <summary>Switching a source between draft and direct.</summary>
+public sealed record SourceModeV1([property: JsonPropertyName("mode")] string? Mode = null);
+
+/// <summary>What a fetch came to — counts and a word.</summary>
+public sealed record FetchV1(
+    [property: JsonPropertyName("source")] SourceV1 Source,
+    [property: JsonPropertyName("added")] int Added,
+    [property: JsonPropertyName("changed")] int Changed,
+    [property: JsonPropertyName("closed")] int Closed);

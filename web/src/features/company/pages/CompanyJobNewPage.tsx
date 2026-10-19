@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -9,7 +9,7 @@ import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
 import { type ServerCase, failureKey } from "../../../shared/api/errors";
@@ -17,13 +17,16 @@ import { useActor } from "../lib/session";
 import {
   EMPLOYMENT_TYPES,
   type EmploymentType,
+  type Job,
   REMOTE_MODES,
   type RemoteMode,
   createJob,
   draftJobText,
   employmentLabel,
+  listOwnJobs,
   remoteLabel,
   type SalaryPeriod,
+  updateJob,
 } from "../../work/api/jobs";
 
 interface JobDraft {
@@ -66,6 +69,22 @@ function salaryOf(draft: JobDraft): { min: number; max: number; period: SalaryPe
   };
 }
 
+/** A stored advert as the form holds it. */
+function draftOf(job: Job): JobDraft {
+  return {
+    title: job.title,
+    description: job.description,
+    location: job.location,
+    postalCode: job.postal_code,
+    remote: job.remote,
+    employment: job.employment,
+    skills: job.skills.join(", "),
+    salaryMin: job.salary ? String(job.salary.min) : "",
+    salaryMax: job.salary ? String(job.salary.max) : "",
+    salaryPeriod: job.salary?.period ?? "year",
+  };
+}
+
 const skillsOf = (raw: string): string[] =>
   raw
     .split(",")
@@ -78,6 +97,9 @@ const skillsOf = (raw: string): string[] =>
  * a sentence in jobs-service (`Job.cs`, `SkillList.cs`) that points back here.
  */
 const CREATE_CASES: readonly ServerCase[] = [
+  // jobs-service `JobErrors.cs`: a fetched advert's text belongs to its source.
+  { status: 409, pattern: /mirrors a source/i, key: "companyJobs.mirroredConflict" },
+  { status: 409, key: "companyJobs.stateMovedOn" },
   { status: 422, pattern: /must not be empty/i, key: "companyJobs.fieldsRequired" },
   { status: 422, pattern: /is longer than \d+ characters/i, key: "companyJobs.fieldTooLong" },
   { status: 422, pattern: /skill may have at most/i, key: "companyJobs.skillTooLong" },
@@ -103,6 +125,23 @@ const HELP_CASES: readonly ServerCase[] = [
  * but the company.
  */
 export function CompanyJobNewPage() {
+  return <JobEditor />;
+}
+
+/**
+ * <c>/company/jobs/:id/edit</c> — change an advert, with the same form.
+ *
+ * <strong>A fetched advert keeps its text</strong> (ADR-0052): title, text,
+ * place, work mode and employment come from the company's ATS and are changed
+ * there; here the company adds what an ATS does not carry — skills, salary,
+ * postal code. Without skills the advert never gets a tick.
+ */
+export function CompanyJobEditPage() {
+  const { id } = useParams<{ id: string }>();
+  return <JobEditor jobId={id} />;
+}
+
+function JobEditor({ jobId }: { jobId?: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { forCompany } = useActor();
@@ -110,6 +149,31 @@ export function CompanyJobNewPage() {
   const [draft, setDraft] = useState<JobDraft>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  // Editing: the stored advert, from the company's own list — a draft is not
+  // public, so `GET /jobs/{id}` would not show it.
+  const [stored, setStored] = useState<Job | null | "missing">(null);
+
+  useEffect(() => {
+    if (jobId === undefined || !forCompany) return;
+    const controller = new AbortController();
+    void listOwnJobs(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      const found = result.ok ? result.jobs.find((job) => job.id === jobId) : undefined;
+      if (found === undefined) {
+        setStored("missing");
+        return;
+      }
+      setStored(found);
+      setDraft(draftOf(found));
+    });
+    return () => controller.abort();
+  }, [jobId, forCompany]);
+
+  const editing = jobId !== undefined;
+  const job = stored !== null && stored !== "missing" ? stored : null;
+  const mirrored = job?.mirrored === true;
+  const closed = job?.status === "closed";
+  const title = editing ? t("companyJobs.editTitle") : t("companyJobs.new");
 
   const back = (
     <Link component={RouterLink} to="/company/jobs" variant="body2">
@@ -119,7 +183,7 @@ export function CompanyJobNewPage() {
 
   if (!forCompany) {
     return (
-      <PageShell title={t("companyJobs.new")} narrow>
+      <PageShell title={title} narrow>
         <Box sx={{ mb: 2 }}>{back}</Box>
         <Card>
           <CardContent>
@@ -132,9 +196,24 @@ export function CompanyJobNewPage() {
     );
   }
 
-  async function create() {
+  if (editing && (stored === null || stored === "missing")) {
+    return (
+      <PageShell title={title} narrow>
+        <Box sx={{ mb: 2 }}>{back}</Box>
+        <Card>
+          <CardContent>
+            <Typography>
+              {stored === "missing" ? t("companyJobs.notFound") : t("companyJobs.loading")}
+            </Typography>
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  async function save() {
     setRunning(true);
-    const result = await createJob({
+    const input = {
       title: draft.title,
       description: draft.description,
       location: draft.location,
@@ -143,7 +222,8 @@ export function CompanyJobNewPage() {
       employment: draft.employment,
       skills: skillsOf(draft.skills),
       salary: salaryOf(draft),
-    });
+    };
+    const result = jobId === undefined ? await createJob(input) : await updateJob(jobId, input);
     setRunning(false);
 
     if (result.ok) void navigate("/company/jobs");
@@ -151,11 +231,21 @@ export function CompanyJobNewPage() {
   }
 
   return (
-    <PageShell title={t("companyJobs.new")} narrow>
+    <PageShell title={title} narrow>
       <Box sx={{ mb: 2 }}>{back}</Box>
 
       <Card>
         <CardContent>
+          {mirrored ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {t("companyJobs.mirroredFields")}
+            </Alert>
+          ) : null}
+          {closed ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {t("companyJobs.closedNoEdit")}
+            </Alert>
+          ) : null}
           {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -166,7 +256,7 @@ export function CompanyJobNewPage() {
             component="form"
             onSubmit={(event) => {
               event.preventDefault();
-              void create();
+              void save();
             }}
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
@@ -176,6 +266,7 @@ export function CompanyJobNewPage() {
               onChange={(e) =>
                 setDraft({ ...draft, title: e.target.value })
               }
+              disabled={mirrored || closed}
               required
             />
             <TextField
@@ -184,6 +275,7 @@ export function CompanyJobNewPage() {
               onChange={(e) =>
                 setDraft({ ...draft, description: e.target.value })
               }
+              disabled={mirrored || closed}
               multiline
               minRows={5}
             />
@@ -211,6 +303,7 @@ export function CompanyJobNewPage() {
                 onChange={(e) =>
                   setDraft({ ...draft, location: e.target.value })
                 }
+                disabled={mirrored || closed}
               />
             </Box>
             <TextField
@@ -220,6 +313,7 @@ export function CompanyJobNewPage() {
               onChange={(e) =>
                 setDraft({ ...draft, remote: e.target.value as RemoteMode })
               }
+              disabled={mirrored || closed}
             >
               {REMOTE_MODES.map((value) => (
                 <MenuItem key={value} value={value}>
@@ -231,6 +325,7 @@ export function CompanyJobNewPage() {
               select
               label={t("companyJobs.employment")}
               value={draft.employment}
+              disabled={mirrored || closed}
               onChange={(e) =>
                 setDraft({
                   ...draft,
@@ -282,18 +377,24 @@ export function CompanyJobNewPage() {
               }
             />
 
-            <DraftingHelp
-              draft={draft}
-              onSuggestion={(text) =>
-                setDraft({ ...draft, description: text })
-              }
-            />
+            {mirrored || closed ? null : (
+              <DraftingHelp
+                draft={draft}
+                onSuggestion={(text) =>
+                  setDraft({ ...draft, description: text })
+                }
+              />
+            )}
 
             <Box>
-              <Button type="submit" variant="contained" disabled={running}>
-                {running
-                  ? t("companyJobs.creating")
-                  : t("companyJobs.create")}
+              <Button type="submit" variant="contained" disabled={running || closed}>
+                {editing
+                  ? running
+                    ? t("companyJobs.saving")
+                    : t("companyJobs.save")
+                  : running
+                    ? t("companyJobs.creating")
+                    : t("companyJobs.create")}
               </Button>
             </Box>
           </Box>
