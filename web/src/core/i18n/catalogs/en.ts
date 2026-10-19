@@ -101,6 +101,9 @@ const en: Catalog = {
   overview: {
     title: "What needs you",
     lead: "Only things waiting on a decision from you. Whatever runs by itself is not here.",
+    startTitle: "Create your profile",
+    startText: "Without a profile nobody finds you. Even so, it becomes visible only once you release it — creating is not showing.",
+    startButton: "Create profile",
     incomplete: "Part of this could not be loaded. What you see here may therefore be incomplete.",
     emptyTitle: "Nothing is waiting for you right now.",
     emptyHint: "You can review and change your releases at any time.",

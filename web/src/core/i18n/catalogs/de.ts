@@ -104,6 +104,9 @@ const de = {
   overview: {
     title: "Was liegt an",
     lead: "Nur Dinge, die auf eine Entscheidung von dir warten. Was von selbst läuft, steht hier nicht.",
+    startTitle: "Leg dein Profil an",
+    startText: "Ohne Profil findet dich niemand. Sichtbar wird es trotzdem erst, wenn du es freigibst — anlegen heißt nicht zeigen.",
+    startButton: "Profil anlegen",
     incomplete: "Ein Teil konnte nicht geladen werden. Was hier steht, ist deshalb womöglich unvollständig.",
     emptyTitle: "Gerade wartet nichts auf dich.",
     emptyHint: "Deine Freigaben kannst du jederzeit nachsehen und ändern.",

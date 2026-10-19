@@ -101,6 +101,9 @@ const fr: Catalog = {
   overview: {
     title: "Ce qui vous attend",
     lead: "Uniquement ce qui attend une décision de votre part. Ce qui avance tout seul ne figure pas ici.",
+    startTitle: "Créez votre profil",
+    startText: "Sans profil, personne ne vous trouve. Il ne devient pourtant visible qu’une fois que vous l’autorisez — créer n’est pas montrer.",
+    startButton: "Créer le profil",
     incomplete: "Une partie n’a pas pu être chargée. Ce qui s’affiche ici est donc peut-être incomplet.",
     emptyTitle: "Rien ne vous attend pour le moment.",
     emptyHint: "Vous pouvez consulter et modifier vos autorisations à tout moment.",

@@ -16,6 +16,7 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { type PendingTasks, getPendingTasks } from "../api/pendingTasks";
+import { hasOwnProfile } from "../api/ownProfile";
 
 interface Entry {
   key: string;
@@ -124,6 +125,19 @@ export function OverviewPage() {
   const forCompany = session?.tenantId != null;
 
   const [current, setCurrent] = useState<PendingTasks | null>(null);
+  const [profile, setProfile] = useState<boolean | null>(null);
+
+  // The first step of a new account. Asked only of a person: a company has
+  // no profile of this kind, and its own start lies at the company profile.
+  useEffect(() => {
+    if (status !== "authenticated" || forCompany) return;
+
+    const abort = new AbortController();
+    void hasOwnProfile(abort.signal).then((exists) => {
+      if (!abort.signal.aborted) setProfile(exists);
+    });
+    return () => abort.abort();
+  }, [status, forCompany]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -161,6 +175,20 @@ export function OverviewPage() {
       narrow
       lead={t("overview.lead")}
     >
+      {!forCompany && profile === false ? (
+        <Card sx={{ mb: 3 }} component="section" aria-label={t("overview.startTitle")}>
+          <CardContent sx={{ display: "grid", gap: 1.5, justifyItems: "start" }}>
+            <Typography variant="h3" component="h2">
+              {t("overview.startTitle")}
+            </Typography>
+            <Typography color="text.secondary">{t("overview.startText")}</Typography>
+            <Button component={RouterLink} to="/profile" variant="contained">
+              {t("overview.startButton")}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {current === null ? <LoadingBlock /> : null}
 
       {current?.incomplete === true ? (

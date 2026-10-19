@@ -82,6 +82,24 @@ describe("the company profile form", () => {
     expect(await screen.findByLabelText(/Anzeigename/)).toHaveValue("");
   });
 
+  it("starts a new profile with the name the company registered under", async () => {
+    stubFetch(async () => json(200, null));
+    renderWithStore(<CompanyProfilePage />, {
+      auth: { ...FOR_COMPANY, memberships: [{ id: FOR_COMPANY.session.tenantId, name: "Muster GmbH", role: "admin" }] },
+    });
+
+    expect(await screen.findByLabelText(/Anzeigename/)).toHaveValue("Muster GmbH");
+  });
+
+  it("keeps a stored name over the registered one", async () => {
+    stubFetch(async () => json(200, STORED));
+    renderWithStore(<CompanyProfilePage />, {
+      auth: { ...FOR_COMPANY, memberships: [{ id: FOR_COMPANY.session.tenantId, name: "Muster GmbH", role: "admin" }] },
+    });
+
+    expect(await screen.findByLabelText(/Anzeigename/)).toHaveValue("Acme Schweißtechnik");
+  });
+
   it("offers no form when the stored profile cannot be read", async () => {
     stubFetch(async () => json(503, { title: "Request failed", detail: "unavailable" }));
     renderWithStore(<CompanyProfilePage />, { auth: FOR_COMPANY });
