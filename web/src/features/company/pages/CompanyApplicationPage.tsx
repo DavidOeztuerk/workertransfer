@@ -160,6 +160,7 @@ export function CompanyApplicationPage() {
               text={e.message}
               sender={senderFromContact(e.applicant_contact)}
               recipient={recipientFromCompany(company.data, job.data)}
+              template={cv?.template}
             />
           ) : null}
 

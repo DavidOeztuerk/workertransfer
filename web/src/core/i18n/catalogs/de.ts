@@ -745,6 +745,7 @@ const de = {
   },
 
   drafts: {
+    templateFollows: "Die Form folgt deiner Lebenslauf-Vorlage — ändern kannst du sie unter „Lebenslauf“.",
     title: "Meine Entwürfe",
     signInRequired: "Bitte <1>anmelden</1>, um deine Entwürfe zu sehen.",
     lead: "Entwürfe für deine Bewerbungen. Öffnen zeigt den Brief — Freigeben und Senden machen daraus eine Bewerbung.",

@@ -18,7 +18,7 @@ Größe: **S** = ein Tag, **M** = wenige Tage, **L** = eine Woche und mehr.
 | Lebenslauf-Vorlage, Bewerbung auf Inserat | B2 | gebaut |
 | **Nachrichten pro Vorgang** (Bewerbung) mit Entwurf und Freigabe | E1, D2 | gebaut 07.10.2026 (ADR-0047, `messages-service`) |
 | **Platzhalter-Schicht**, Anschreiben darauf umgestellt | E2 | gebaut 07.10.2026 (`ServiceDefaults/Ai/Placeholders.cs`) |
-| **Mistral als Standard-Anbieter**, Ollama bleibt | E2 | gebaut 07.10.2026 (`Draft__Provider`, `ModelWire`) |
+| ~~**Mistral als Standard-Anbieter**~~, Ollama bleibt | E2 | gebaut 07.10.2026 (`Draft__Provider`, `ModelWire`) — **abgelöst durch ADR-0051** (17.10.2026): bis zum Start das lokale Ollama, der Anbieter im Betrieb wird vor dem Start mit dem Geschäftsmodell entschieden |
 | Hinweis „keine Gesundheitsdaten" über jedem Nachrichtenfeld | E2 | gebaut 07.10.2026 — immer, nicht erst wenn ein Berater mitliest |
 
 ## Phase 1 — Grundlagen, ohne die kein Agent arbeiten kann
@@ -87,7 +87,7 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 | ~~**XING**: Link im Profil~~; Import aus dem eigenen Export nach Messung | N2 | S | **Link gebaut 18.10.2026** — er nennt die Person, das Formular sagt es vorher; der Import braucht einen echten Export zum Messen |
 | ~~**Anmelden mit Google / Microsoft / Apple**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0053) — identity-service selbst, verknüpft über die Kennung des Anbieters, nie über die Adresse; **aus**, bis der Betreiber die drei Apps registriert (`.env.example`) |
 | ~~**Dokumente aus Google Drive / Dropbox**~~ | N3 | M | **gebaut 18.10.2026** (ADR-0054): nur die gewählte Datei, im Browser geholt, über den bestehenden Upload; aus bis zur Registrierung; **OneDrive nicht** — sein Picker liest alle Dateien |
-| **Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen | P2 | M | |
+| ~~**Anschreiben-Vorlagen** passend zu den Lebenslauf-Vorlagen~~ | P2 | M | **gebaut 18.10.2026** — das Anschreiben trägt die Vorlage des Lebenslaufs (schlicht, klassisch, modern), bei der Person wie in der Mappe der Firma |
 
 ## Neue ADRs, die mit dem Bau nötig werden
 
