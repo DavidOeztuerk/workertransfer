@@ -93,7 +93,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("1 Gespräch wartet auf dich"),
+      await screen.findByText("1 Wechsel wartet auf dich"),
     ).toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("1 Gespräch wartet auf dich"),
+      await screen.findByText("1 Wechsel wartet auf dich"),
     ).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
 
     expect(
-      await screen.findByText("1 Transfer wartet auf euch"),
+      await screen.findByText("1 Wechsel wartet auf euch"),
     ).toBeInTheDocument();
     expect(screen.getByText("Für dein Unternehmen")).toBeInTheDocument();
     expect(screen.queryByText("Für dich")).toBeNull();
@@ -191,7 +191,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("2 Gespräche warten auf dich"),
+      await screen.findByText("2 Wechsel warten auf dich"),
     ).toBeInTheDocument();
   });
 
