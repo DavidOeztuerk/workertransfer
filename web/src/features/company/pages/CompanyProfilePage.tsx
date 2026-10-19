@@ -8,6 +8,7 @@ import CardContent from "@mui/material/CardContent";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+import { useAppSelector } from "../../../core/store/hooks";
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { ADMIN_CASES, type ServerCase, failureKey } from "../../../shared/api/errors";
 import { useActor } from "../lib/session";
@@ -106,6 +107,21 @@ export function CompanyProfilePage() {
     }
     setAdopted(true);
   }, [adopted, profile.data]);
+
+  // Without a profile yet, the name the company was registered under is the
+  // obvious start — a suggestion in the field, saved only with "Speichern".
+  // Once, and only into an empty field: the memberships may arrive after the
+  // profile, and nothing typed may be overwritten.
+  const registeredName = useAppSelector(
+    (state) => state.auth.memberships.find((company) => company.id === tenantId)?.name ?? "",
+  );
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (prefilled || !adopted || !profile.data?.ok || profile.data.profile !== null) return;
+    if (registeredName === "") return;
+    setDraft((current) => (current.display_name === "" ? { ...current, display_name: registeredName } : current));
+    setPrefilled(true);
+  }, [prefilled, adopted, profile.data, registeredName]);
 
   if (!forCompany) {
     return (

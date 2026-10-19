@@ -4,6 +4,12 @@ import { createAppThunk } from "../../../core/store/thunkHelpers";
 import { readOccupationalField } from "../../../shared/lib/occupationalFields";
 import type { Membership, Session, SessionWireState } from "../types/session";
 import { announceSignedOut } from "../lib/sessionBroadcast";
+import {
+  capacityRestoreReset,
+  companyToRestore,
+  forgetCapacity,
+  rememberCapacity,
+} from "../lib/capacityMemory";
 
 interface SessionBody {
   user_id: string;
@@ -111,7 +117,13 @@ export const login = createAppThunk<Session | null, { email: string; password: s
 
     // The token lies in the httpOnly cookie; who is signed in stands in /me.
     const session = await dispatch(loadSession()).unwrap();
-    return session;
+    if (session === null) return session;
+
+    // Restored before the page is drawn, so a founder does not see the
+    // person's overview flash past first.
+    capacityRestoreReset();
+    await dispatch(loadMemberships());
+    return await dispatch(restoreCapacity()).unwrap();
   }
 );
 
@@ -158,6 +170,59 @@ export const actForCompany = createAppThunk<Session | null, string>(
       "errors.switchFailed"
     );
     if (!answer.ok) return rejectWithValue(answer.error);
+    const session = await dispatch(loadSession()).unwrap();
+    if (session !== null) rememberCapacity(session.userId, session.tenantId);
+    return session;
+  }
+);
+
+/**
+ * Act as oneself again — without signing out.
+ *
+ * It only gives rights away, so the server asks no membership; it still issues
+ * the token, because a person token cannot be computed out of a company one.
+ */
+export const actAsSelf = createAppThunk<Session | null>(
+  "auth/actAsSelf",
+  async (_arg, { rejectWithValue, dispatch }) => {
+    const answer = await request<unknown>(
+      API_BASE_URL,
+      "/auth/self",
+      { method: "POST" },
+      "errors.switchFailed"
+    );
+    if (!answer.ok) return rejectWithValue(answer.error);
+    const session = await dispatch(loadSession()).unwrap();
+    if (session !== null) rememberCapacity(session.userId, session.tenantId);
+    return session;
+  }
+);
+
+/**
+ * After a sign-in: act as what this browser acted as last (`capacityMemory`).
+ *
+ * <strong>Silent.</strong> Nobody clicked anything, so a refusal shows no
+ * error — the stale choice is forgotten and the person stays themselves.
+ */
+export const restoreCapacity = createAppThunk<Session | null>(
+  "auth/restoreCapacity",
+  async (_arg, { getState, dispatch }) => {
+    const { session, memberships } = getState().auth;
+    if (session === null || session.tenantId !== null) return session;
+
+    const tenantId = companyToRestore(session.userId, memberships);
+    if (tenantId === null) return session;
+
+    const answer = await request<unknown>(
+      API_BASE_URL,
+      `/auth/company/${tenantId}`,
+      { method: "POST" },
+      "errors.switchFailed"
+    );
+    if (!answer.ok) {
+      forgetCapacity(session.userId);
+      return session;
+    }
     return await dispatch(loadSession()).unwrap();
   }
 );

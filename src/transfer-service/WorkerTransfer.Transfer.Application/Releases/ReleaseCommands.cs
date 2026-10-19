@@ -119,6 +119,7 @@ public sealed class ReleaseCommands(
     IEmployerRouteStore routes,
     IEmployerSettingStore settings,
     INoticeStore notices,
+    IMarketStore market,
     IConsentGate gate,
     IIdentityLookup identity,
     IOutbox outbox,
@@ -357,9 +358,12 @@ public sealed class ReleaseCommands(
                 ? await identity.PersonNameAsync(negotiation.Subject, cancellationToken)
                 : null);
 
+    // Only while she says she is employed, as everywhere the date is derived.
     private async Task<DateOnly?> RegularFromAsync(SubjectId subject, CancellationToken cancellationToken) =>
-        (await notices.GetAsync(subject, cancellationToken))
-            ?.EarliestStart(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime));
+        await market.GetAsync(subject, cancellationToken) is { IsEmployed: true }
+            ? (await notices.GetAsync(subject, cancellationToken))
+                ?.EarliestStart(DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime))
+            : null;
 
     /// <summary>The person and the OTHER company's members learn that something moved.</summary>
     /// <remarks>

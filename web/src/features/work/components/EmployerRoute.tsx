@@ -93,7 +93,7 @@ export function EmployerRouteOffer({ companyId, companyName }: { companyId: stri
  * one button that closes it. Opening happens on the employer's careers page,
  * where she can see which company she names.
  */
-export function EmployerRouteCard() {
+export function EmployerRouteCard({ employed = true }: { employed?: boolean }) {
   const { t, i18n } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -102,6 +102,8 @@ export function EmployerRouteCard() {
   const names = useCompanyProfiles(current?.employer_id ? [current.employer_id] : []);
 
   if (current === null) return null;
+  // Without an employer only an open route is worth showing — to close it.
+  if (!employed && !(current.employer_id !== null && current.open)) return null;
 
   const company =
     current.employer_id === null ? "" : (names[current.employer_id]?.display_name ?? t("release.noProfile"));

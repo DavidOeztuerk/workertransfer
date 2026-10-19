@@ -133,4 +133,45 @@ public class SwitchCompanyTests
         await _sessions.DidNotReceive().StartAsync(
             Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
     }
+
+    private Task<CompanySwitchResult> BackToSelf() =>
+        new SwitchToSelfHandler(
+            _users, _sessions, _token, _auditTrail,
+            new FixedCorrelation("abc-123"), TimeProvider.System)
+            .Handle(new SwitchToSelfCommand(Anna), CancellationToken.None);
+
+    /// <summary>
+    /// The way back gives rights away, so it asks no membership — and the new
+    /// sign-in records no company, which refresh reads as "oneself".
+    /// </summary>
+    [Fact]
+    public async Task Back_to_oneself_issues_a_token_without_a_company()
+    {
+        TheAccountExists();
+        ASessionComesIntoBeing();
+
+        var result = await BackToSelf();
+
+        result.Should().BeOfType<CompanySwitchResult.Switched>();
+        await _token.Received(1).IssueAsync(
+            Anna, "anna@example.com",
+            Arg.Is<Capacity>(c => c is Capacity.AsSelf),
+            Session, Arg.Any<CancellationToken>());
+        await _members.DidNotReceiveWithAnyArgs().IsMemberAsync(default!, default!, default);
+        await _capacity.DidNotReceiveWithAnyArgs().RememberAsync(default!, default!, default);
+    }
+
+    [Theory]
+    [InlineData(AccountStatus.Disabled)]
+    [InlineData(AccountStatus.Pending)]
+    public async Task An_account_that_may_not_act_does_not_go_back_either(AccountStatus status)
+    {
+        TheAccountExists(status);
+
+        var result = await BackToSelf();
+
+        result.Should().BeOfType<CompanySwitchResult.Refused>();
+        await _sessions.DidNotReceive().StartAsync(
+            Arg.Any<SubjectId>(), Arg.Any<CancellationToken>());
+    }
 }

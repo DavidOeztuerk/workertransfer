@@ -1,10 +1,9 @@
-import { useEffect } from "react";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import { useTranslation } from "react-i18next";
 
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { actForCompany, loadMemberships } from "../../../features/auth/store/authThunks";
+import { actAsSelf, actForCompany } from "../../../features/auth/store/authThunks";
 
 /**
  * "Acting as" — the person or one of the companies.
@@ -14,18 +13,15 @@ import { actForCompany, loadMemberships } from "../../../features/auth/store/aut
  * tenant written into the token (ADR-0018). What stands here is therefore never
  * a claim about rights, but a request.
  *
- * Back to "myself" goes only through signing out, and that is honest: a person
- * token cannot be computed out of a company token, it has to be issued anew.
+ * Back to "myself" is `POST /auth/self`: it only gives rights away, but it
+ * still needs a new token — a person token cannot be computed out of a company
+ * one.
  */
-export function CompanySwitcher() {
+export function CompanySwitcher({ fullWidth = false }: { fullWidth?: boolean }) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const memberships = useAppSelector((state) => state.auth.memberships);
   const tenantId = useAppSelector((state) => state.auth.session?.tenantId ?? null);
-
-  useEffect(() => {
-    void dispatch(loadMemberships());
-  }, [dispatch]);
 
   if (memberships.length === 0) return null;
 
@@ -41,13 +37,15 @@ export function CompanySwitcher() {
       value={tenantId ?? ""}
       onChange={(event) => {
         const chosen = event.target.value;
-        if (chosen !== "") void dispatch(actForCompany(chosen));
+        if (chosen === "") void dispatch(actAsSelf());
+        else void dispatch(actForCompany(chosen));
       }}
-      sx={{ minWidth: 200, display: { xs: "none", md: "block" } }}
+      fullWidth={fullWidth}
+      // In the bar from the width the navigation shows; below it the drawer
+      // carries the same switch.
+      sx={fullWidth ? undefined : { width: 200, flexShrink: 0, display: { xs: "none", lg: "block" } }}
     >
-      <MenuItem value="" disabled>
-        {t("header.myself")}
-      </MenuItem>
+      <MenuItem value="">{t("header.myself")}</MenuItem>
       {memberships.map((company) => (
         <MenuItem key={company.id} value={company.id}>
           {company.name}

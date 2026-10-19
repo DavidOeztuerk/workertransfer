@@ -132,6 +132,31 @@ describe("RegisterPage — person or company", () => {
     expect(screen.getByLabelText(/Name des Unternehmens/i)).toBeInTheDocument();
   });
 
+  it("asks a company for no civil name and no working world, and sends none typed before", async () => {
+    // A company is registered by its contact; name and working world belong to
+    // a person's own account.
+    const asked = answerInOrder({ status: 201 });
+    const user = userEvent.setup();
+    renderWithStore(<RegisterPage />, { route: "/register" });
+
+    await user.type(screen.getByLabelText(/^Vorname$/i), "Maximilian");
+    await user.click(screen.getByRole("radio", { name: "Für ein Unternehmen" }));
+
+    expect(screen.queryByLabelText(/^Vorname$/i)).toBeNull();
+    expect(screen.queryByLabelText(/^Nachname$/i)).toBeNull();
+    expect(screen.queryByLabelText(/Berufsfeld/i)).toBeNull();
+
+    await user.type(screen.getByLabelText(/E-Mail/i), "max@example-gmbh.de");
+    await user.type(screen.getByLabelText(/Name des Unternehmens/i), "Example GmbH");
+    await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
+    await user.click(screen.getByRole("button", { name: /Registrieren/i }));
+
+    expect(asked[0]?.body).toContain('"company_name":"Example GmbH"');
+    expect(asked[0]?.body).not.toContain("given_name");
+    expect(asked[0]?.body).not.toContain("occupational_field");
+  });
+
   it("preselects the company when the address says so", () => {
     // The hero buttons of the home page carry the intent along as ?as=company.
     renderWithStore(<RegisterPage />, { route: "/register?as=company" });
@@ -340,5 +365,13 @@ describe("RegisterPage — requesting the mail again", () => {
       "erneut unterwegs",
     );
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("tells a founder what happens next instead of the person's promise", async () => {
+    answerInOrder();
+    renderWithStore(<RegisterPage />, { route: "/register?as=company" });
+
+    expect(await screen.findByText(/sobald du deine Arbeitsadresse bestätigst/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sichtbar wirst du erst/)).not.toBeInTheDocument();
   });
 });

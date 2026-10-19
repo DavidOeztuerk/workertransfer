@@ -100,7 +100,7 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task An_offer_before_the_earliest_change_is_marked_for_the_person_only()
     {
         var company = Guid.CreateVersion7();
-        var anna = await Approachable(company);
+        var anna = await Approachable(company, isEmployed: true);
         var asAnna = AsPerson(anna);
         var asCompany = AsCompany(company);
 
@@ -126,6 +126,32 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
         theirs.TryGetProperty("starts_before_earliest", out _).Should().BeFalse("the company learns nothing of her notice");
     }
 
+    /// <summary>
+    /// A notice period binds somebody with a job. Stated before she left it, it
+    /// must not mark offers afterwards — and the dates go, the statement stays.
+    /// </summary>
+    [Fact]
+    public async Task Without_a_job_the_notice_period_marks_nothing()
+    {
+        var company = Guid.CreateVersion7();
+        var anna = await Approachable(company, isEmployed: false);
+        var asAnna = AsPerson(anna);
+        await asAnna.PutAsJsonAsync("/market/me/notice", new { length = 3, unit = "month", end = "quarter_end" });
+
+        var id = (await Json(await ShowInterest(company, anna))).GetProperty("id").GetGuid();
+        await asAnna.PostAsync($"/transfers/{id}/accept-talk", null);
+        var tooEarly = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1).ToString("yyyy-MM");
+        await AsCompany(company).PostAsJsonAsync($"/transfers/{id}/offer", new { note = "Soon.", start_on = tooEarly });
+
+        var hers = (await Json(await asAnna.GetAsync("/transfers/me"))).EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == id);
+        hers.TryGetProperty("starts_before_earliest", out _).Should().BeFalse(hers.ToString());
+
+        var notice = await Json(await asAnna.GetAsync("/market/me/notice"));
+        notice.GetProperty("length").GetInt32().Should().Be(3);
+        notice.GetProperty("earliest_start").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
     [Theory]
     [InlineData("Oktober 2026")]
     [InlineData("2026-10-15")]
@@ -144,6 +170,7 @@ public class CaseJourneyTests(Postgres postgres) : IAsyncLifetime
     public async Task The_notice_period_is_hers_to_state_read_and_withdraw()
     {
         var asAnna = AsPerson(Guid.CreateVersion7());
+        await asAnna.PutAsJsonAsync("/market/me", new { availability = "listening", employed = true, note = string.Empty });
 
         var empty = await Json(await asAnna.GetAsync("/market/me/notice"));
         empty.GetProperty("length").ValueKind.Should().Be(JsonValueKind.Null);

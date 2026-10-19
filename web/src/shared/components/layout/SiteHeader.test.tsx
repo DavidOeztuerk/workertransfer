@@ -154,3 +154,77 @@ describe("SiteHeader and the occupational field", () => {
     ).toBeInTheDocument();
   });
 });
+
+/**
+ * Two roles, two bars: acting as a person one looks for work, acting for a
+ * company one hires — and the account menu keeps the person's own pages to
+ * the person.
+ */
+describe("SiteHeader by context", () => {
+  const TENANT = "22222222-2222-4222-8222-222222222222";
+  const anna = (tenantId: string | null): Session => ({
+    userId: "11111111-1111-1111-1111-111111111111",
+    email: "anna@example.com",
+    tenantId,
+    language: "de",
+    displayName: "Anna Beispiel",
+    givenName: "",
+    familyName: "",
+    occupationalField: null,
+  });
+
+  const links = () =>
+    screen.getAllByRole("link", { hidden: true }).map((link) => link.textContent ?? "");
+
+  it("shows a person what a person does", () => {
+    renderWithStore(<SiteHeader />, { auth: { status: "authenticated", session: anna(null) } });
+
+    expect(links()).toEqual(
+      expect.arrayContaining(["Stellen", "Bewerbungen", "Nachrichten", "Marktstatus", "Wechsel", "Berater"]),
+    );
+    expect(links()).not.toContain("Unsere Stellen");
+    expect(screen.queryByRole("button", { name: "Unternehmen" })).not.toBeInTheDocument();
+  });
+
+  it("shows a company what a company does, and no Marktstatus", async () => {
+    const user = userEvent.setup();
+    renderWithStore(<SiteHeader />, {
+      auth: {
+        status: "authenticated",
+        session: anna(TENANT),
+        memberships: [{ id: TENANT, name: "Muster GmbH", role: "admin" }],
+      },
+    });
+
+    expect(links()).toEqual(
+      expect.arrayContaining(["Übersicht", "Unsere Stellen", "Bewerbungen", "Kandidatinnen", "Nachrichten", "Wechsel"]),
+    );
+    expect(links()).not.toContain("Marktstatus");
+
+    await user.click(screen.getByRole("button", { name: "Unternehmen" }));
+    expect(screen.getByRole("menuitem", { name: "Berater-Gespräche" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Team" })).toBeInTheDocument();
+  });
+
+  it("keeps the person's own pages out of the account menu while acting for a company", async () => {
+    const user = userEvent.setup();
+    renderWithStore(<SiteHeader />, { auth: { status: "authenticated", session: anna(TENANT) } });
+
+    await user.click(screen.getByRole("button", { name: "Mein Konto" }));
+
+    expect(screen.queryByRole("menuitem", { name: "Profil" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Freigaben" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Einstellungen" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Abmelden" })).toBeInTheDocument();
+  });
+
+  it("names the drafts what they are", async () => {
+    const user = userEvent.setup();
+    renderWithStore(<SiteHeader />, { auth: { status: "authenticated", session: anna(null) } });
+
+    await user.click(screen.getByRole("button", { name: "Mein Konto" }));
+
+    expect(screen.getByRole("menuitem", { name: "Bewerbungsentwürfe" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Arbeitsproben" })).toBeInTheDocument();
+  });
+});

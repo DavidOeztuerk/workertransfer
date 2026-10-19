@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import AppBar from "@mui/material/AppBar";
@@ -13,7 +13,8 @@ import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import { CompanySwitcher } from "./CompanySwitcher";
-import { useAppSelector } from "../../../core/store/hooks";
+import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
+import { loadMemberships, restoreCapacity } from "../../../features/auth/store/authThunks";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import MenuIcon from "@mui/icons-material/Menu";
 import Drawer from "@mui/material/Drawer";
@@ -27,8 +28,8 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import CollectionsOutlinedIcon from "@mui/icons-material/CollectionsOutlined";
 import GitHubIcon from "@mui/icons-material/GitHub";
-import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import FolderSharedOutlinedIcon from "@mui/icons-material/FolderSharedOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
@@ -45,23 +46,49 @@ import { ProfileAvatar } from "../ui";
 import { offersGitHub } from "../../lib/occupationalFields";
 
 /**
- * The routes of the header — described ONCE.
+ * The routes of the header — described ONCE per context.
  *
  * The header bar and the drawer show the same entries; written twice they
  * drift apart at the next new route, and at the place nobody looks at (the
  * narrow one).
+ *
+ * <strong>Two lists, because there are two roles.</strong> Acting as a person
+ * one looks for work; acting for a company one hires. Mixing both into one bar
+ * blurs exactly the boundary this application turns on, and showing a
+ * recruiter "Marktstatus" asks them about a job change nobody is making.
  */
-const ROUTES: { path: string; labelKey: string; always: boolean }[] = [
-  { path: "/jobs", labelKey: "header.jobs", always: true },
-  { path: "/overview", labelKey: "header.overview", always: false },
-  { path: "/market", labelKey: "header.marketStatus", always: false },
-  { path: "/transfers", labelKey: "header.conversations", always: false },
-  // The advisor (ADR-0037). It stands among the PERSON's routes: the mandate
-  // belongs to her, not to the company she is acting for right now.
-  { path: "/advisor", labelKey: "header.advisor", always: false },
-  // The work sample (ADR-0042). It too stands among the PERSON's routes: the
-  // evaluation belongs to the case, and whoever it is about may read it.
-  { path: "/assessments", labelKey: "header.assessments", always: false },
+type Route = { path: string; labelKey: string };
+
+const VISITOR_ROUTES: Route[] = [{ path: "/jobs", labelKey: "header.jobs" }];
+
+const PERSON_ROUTES: Route[] = [
+  { path: "/jobs", labelKey: "header.jobs" },
+  { path: "/overview", labelKey: "header.overview" },
+  { path: "/applications", labelKey: "header.applications" },
+  { path: "/messages", labelKey: "header.messages" },
+  { path: "/market", labelKey: "header.marketStatus" },
+  { path: "/transfers", labelKey: "header.transfers" },
+  // The advisor (ADR-0037): the mandate belongs to the person, not to the
+  // company she may act for.
+  { path: "/advisor", labelKey: "header.advisor" },
+];
+
+const COMPANY_ROUTES: Route[] = [
+  { path: "/overview", labelKey: "header.overview" },
+  { path: "/company/jobs", labelKey: "header.ourJobs" },
+  { path: "/company/applications", labelKey: "header.applications" },
+  { path: "/scout", labelKey: "header.candidates" },
+  { path: "/messages", labelKey: "header.messages" },
+  { path: "/company/transfers", labelKey: "header.ourTransfers" },
+];
+
+/** What is done for a company less often — behind the "Unternehmen" button. */
+const COMPANY_MENU: (Route | "divider")[] = [
+  { path: "/company/advisor", labelKey: "header.ourAdvisor" },
+  { path: "/company/assessments", labelKey: "header.ourAssessments" },
+  "divider",
+  { path: "/company/profile", labelKey: "header.companyProfile" },
+  { path: "/company/team", labelKey: "header.team" },
 ];
 
 /**
@@ -93,6 +120,16 @@ export function SiteHeader() {
 
   const signedIn = status === "authenticated";
   const actingForCompany = session?.tenantId != null;
+  const routes = !signedIn ? VISITOR_ROUTES : actingForCompany ? COMPANY_ROUTES : PERSON_ROUTES;
+
+  const dispatch = useAppDispatch();
+  const userId = session?.userId ?? null;
+  useEffect(() => {
+    if (userId === null) return;
+    // A sign-in that arrived by redirect (another provider, ADR-0053) never
+    // passed the login thunk; the restore runs once per sign-in either way.
+    void dispatch(loadMemberships()).then(() => dispatch(restoreCapacity()));
+  }, [dispatch, userId]);
 
   return (
     <AppBar
@@ -124,7 +161,7 @@ export function SiteHeader() {
             aria-label={t("header.openMenu")}
             size="small"
             edge="start"
-            sx={{ display: { xs: "inline-flex", md: "none" }, mr: 0.5 }}
+            sx={{ display: { xs: "inline-flex", lg: "none" }, mr: 0.5 }}
           >
             <MenuIcon fontSize="small" />
           </IconButton>
@@ -144,8 +181,8 @@ export function SiteHeader() {
             worker<Box component="span" sx={{ color: "primary.main" }}>transfer</Box>
           </Typography>
 
-          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
-            {ROUTES.filter((route) => route.always || signedIn).map((route) => (
+          <Box sx={{ display: { xs: "none", lg: "flex" }, gap: 0.25, minWidth: 0 }}>
+            {routes.map((route) => (
               <NavLink key={route.path} to={route.path} current={pathname}>
                 {t(route.labelKey)}
               </NavLink>
@@ -181,18 +218,29 @@ export function SiteHeader() {
             {t("header.navigation")}
           </Typography>
         </Box>
+        {signedIn ? (
+          // The switch belongs on narrow screens too: before, a phone could
+          // not act for a company at all.
+          <Box sx={{ px: 2, pb: 1 }}>
+            <CompanySwitcher fullWidth />
+          </Box>
+        ) : null}
         <List sx={{ px: 1 }}>
-          {ROUTES.filter((route) => route.always || signedIn).map((route) => (
-            <ListItemButton
-              key={route.path}
-              component={RouterLink}
-              to={route.path}
-              selected={pathname === route.path}
-              onClick={() => setDrawerOpen(false)}
-            >
-              <ListItemText primary={t(route.labelKey)} />
-            </ListItemButton>
-          ))}
+          {[...routes, ...(actingForCompany ? COMPANY_MENU : [])].map((route, index) =>
+            route === "divider" ? (
+              <Divider key={`divider-${index}`} sx={{ my: 0.5 }} />
+            ) : (
+              <ListItemButton
+                key={route.path}
+                component={RouterLink}
+                to={route.path}
+                selected={pathname === route.path}
+                onClick={() => setDrawerOpen(false)}
+              >
+                <ListItemText primary={t(route.labelKey)} />
+              </ListItemButton>
+            ),
+          )}
         </List>
       </Drawer>
     </AppBar>
@@ -269,6 +317,7 @@ function AccountMenu() {
   const github = offersGitHub(occupationalField);
 
   const email = useAppSelector((state) => state.auth.session?.email ?? "");
+  const actingForCompany = useAppSelector((state) => state.auth.session?.tenantId != null);
   const { preferences, level, setLevel, close } = usePreferenceView(setAnchor);
 
   return (
@@ -317,37 +366,39 @@ function AccountMenu() {
           </MenuList>
         ) : (
         <MenuList sx={{ py: 0.5 }}>
-        <MenuEntry to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onDone={close}>
-          {t("header.profile")}
-        </MenuEntry>
-        <MenuEntry to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.resume")}
-        </MenuEntry>
-        <MenuEntry to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.portfolio")}
-        </MenuEntry>
-        {github ? (
-          <MenuEntry to="/github" icon={<GitHubIcon fontSize="small" />} onDone={close}>
-            {t("header.github")}
-          </MenuEntry>
-        ) : null}
-        <MenuEntry to="/applications" icon={<SendOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.applications")}
-        </MenuEntry>
-        <MenuEntry to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.drafts")}
-        </MenuEntry>
-        <MenuEntry to="/messages" icon={<SendOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.messages")}
-        </MenuEntry>
+        {/* The person's own things only while acting as the person: for a
+            company they would be somebody else's page under the same name.
+            "Ich selbst" in the switch is one click away. */}
+        {actingForCompany ? null : [
+          <MenuEntry key="profile" to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onDone={close}>
+            {t("header.profile")}
+          </MenuEntry>,
+          <MenuEntry key="resume" to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.resume")}
+          </MenuEntry>,
+          <MenuEntry key="portfolio" to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.portfolio")}
+          </MenuEntry>,
+          github ? (
+            <MenuEntry key="github" to="/github" icon={<GitHubIcon fontSize="small" />} onDone={close}>
+              {t("header.github")}
+            </MenuEntry>
+          ) : null,
+          <MenuEntry key="drafts" to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.drafts")}
+          </MenuEntry>,
+          <MenuEntry key="assessments" to="/assessments" icon={<AssignmentOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.assessments")}
+          </MenuEntry>,
 
-        <Divider />
-        <MenuEntry to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.consents")}
-        </MenuEntry>
-        <MenuEntry to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onDone={close}>
-          {t("header.myData")}
-        </MenuEntry>
+          <Divider key="divider-own" />,
+          <MenuEntry key="consents" to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.consents")}
+          </MenuEntry>,
+          <MenuEntry key="my-data" to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onDone={close}>
+            {t("header.myData")}
+          </MenuEntry>,
+        ]}
         <MenuEntry to="/settings" icon={<SettingsOutlinedIcon fontSize="small" />} onDone={close}>
           {t("header.settings")}
         </MenuEntry>
@@ -484,16 +535,15 @@ function CompanyMenu() {
         onClick={() => setAnchor(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <MenuEntry to="/scout">{t("header.candidates")}</MenuEntry>
-        <MenuEntry to="/company/jobs">{t("header.ourJobs")}</MenuEntry>
-        <MenuEntry to="/company/applications">{t("header.receivedApplications")}</MenuEntry>
-        <MenuEntry to="/messages">{t("header.messages")}</MenuEntry>
-        <MenuEntry to="/company/transfers">{t("header.ourConversations")}</MenuEntry>
-        <MenuEntry to="/company/advisor">{t("header.ourAdvisor")}</MenuEntry>
-        <MenuEntry to="/company/assessments">{t("header.ourAssessments")}</MenuEntry>
-        <Divider />
-        <MenuEntry to="/company/profile">{t("header.companyProfile")}</MenuEntry>
-        <MenuEntry to="/company/team">{t("header.team")}</MenuEntry>
+        {COMPANY_MENU.map((route, index) =>
+          route === "divider" ? (
+            <Divider key={`divider-${index}`} />
+          ) : (
+            <MenuEntry key={route.path} to={route.path}>
+              {t(route.labelKey)}
+            </MenuEntry>
+          ),
+        )}
       </Menu>
     </>
   );

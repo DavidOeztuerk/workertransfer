@@ -78,8 +78,10 @@ public static class CaseEndpoints
 
             // Her own view, and only hers: an offer starting before she could
             // leave is marked (H2). The company's list carries no mark.
+            // Only while she says she is employed — see `Responses.ToWire(NoticePeriod?, …)`.
             var notice = await mediator.Send(new MyNoticeQuery(actor.Subject), cancellationToken);
-            var earliest = notice?.EarliestStart(Responses.Today(context));
+            var status = await mediator.Send(new MyMarketStatusQuery(actor.Subject), cancellationToken);
+            var earliest = status.IsEmployed ? notice?.EarliestStart(Responses.Today(context)) : null;
 
             await context.Response.WriteAsJsonAsync(
                 mine.Select(caseItem => Responses.ToWire(caseItem, earliest)), cancellationToken);

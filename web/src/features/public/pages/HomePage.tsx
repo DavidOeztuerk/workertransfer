@@ -38,7 +38,7 @@ export function HomePage() {
 
   const heroId = useId();
   const principlesId = useId();
-  const roadmapId = useId();
+  const companiesId = useId();
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
   if (status === "unknown") return null;
@@ -190,7 +190,7 @@ export function HomePage() {
         <Container maxWidth="lg" sx={{ py: { xs: 7, md: 11 } }}>
           <Box
             component="section"
-            aria-labelledby={roadmapId}
+            aria-labelledby={companiesId}
             sx={{
               display: "grid",
               gap: { xs: 2.5, md: 6 },
@@ -209,14 +209,14 @@ export function HomePage() {
                   mb: 1.5,
                 }}
               >
-                {t("home.roadmapEyebrow")}
+                {t("home.companyEyebrow")}
               </Typography>
-              <Typography id={roadmapId} variant="h2">
-                {t("home.roadmapTitle")}
+              <Typography id={companiesId} variant="h2">
+                {t("home.companyTitle")}
               </Typography>
             </Box>
             <Typography color="text.secondary" sx={{ maxWidth: "58ch" }}>
-              {t("home.roadmapText")}
+              {t("home.companyText")}
             </Typography>
           </Box>
         </Container>

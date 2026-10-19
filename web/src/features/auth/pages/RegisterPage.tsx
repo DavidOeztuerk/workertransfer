@@ -111,10 +111,14 @@ export function RegisterPage() {
       email,
       password,
       displayName,
-      ...(givenName.trim() ? { givenName: givenName.trim() } : {}),
-      ...(familyName.trim() ? { familyName: familyName.trim() } : {}),
+      // A company is registered by its contact, not described by a civil
+      // name or a working world: those belong to a person's own account and
+      // are neither asked nor sent here (a value typed before switching to
+      // "company" stays behind).
+      ...(kind === "person" && givenName.trim() ? { givenName: givenName.trim() } : {}),
+      ...(kind === "person" && familyName.trim() ? { familyName: familyName.trim() } : {}),
       ...(kind === "company" ? { companyName } : {}),
-      ...(occupationalField !== null ? { occupationalField } : {}),
+      ...(kind === "person" && occupationalField !== null ? { occupationalField } : {}),
     });
     setRunning(false);
     if (result.ok) setSubmitted(true);
@@ -124,7 +128,12 @@ export function RegisterPage() {
   if (submitted) return <AlmostDone email={email} />;
 
   return (
-    <AuthCard title={t("register.title")} lead={t("register.lead")}>
+    <AuthCard
+      title={t("register.title")}
+      // The person's promise ("visible only when you want") says nothing to
+      // somebody founding a company; they learn what happens next instead.
+      lead={kind === "company" ? t("register.leadCompany") : t("register.lead")}
+    >
       <AuthModeTabs current="register" />
 
       <Box
@@ -243,25 +252,29 @@ export function RegisterPage() {
           onChange={(event) => setDisplayName(event.target.value)}
           required
         />
-        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
-          <TextField
-            label={t("civilIdentity.firstName")}
-            autoComplete="given-name"
-            value={givenName}
-            onChange={(event) => setGivenName(event.target.value)}
-          />
-          <TextField
-            label={t("civilIdentity.lastName")}
-            autoComplete="family-name"
-            value={familyName}
-            onChange={(event) => setFamilyName(event.target.value)}
-          />
-        </Box>
-        <Typography variant="body2" color="text.secondary">
-          {t("civilIdentity.legalNameHint")}
-        </Typography>
+        {kind === "person" ? (
+          <>
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+              <TextField
+                label={t("civilIdentity.firstName")}
+                autoComplete="given-name"
+                value={givenName}
+                onChange={(event) => setGivenName(event.target.value)}
+              />
+              <TextField
+                label={t("civilIdentity.lastName")}
+                autoComplete="family-name"
+                value={familyName}
+                onChange={(event) => setFamilyName(event.target.value)}
+              />
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {t("civilIdentity.legalNameHint")}
+            </Typography>
 
-        <OccupationalFieldSelect value={occupationalField} onChange={setOccupationalField} />
+            <OccupationalFieldSelect value={occupationalField} onChange={setOccupationalField} />
+          </>
+        ) : null}
 
         {error !== null ? <Alert severity="error">{error}</Alert> : null}
 

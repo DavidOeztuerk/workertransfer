@@ -121,3 +121,57 @@ public sealed class SwitchCompanyHandler(
             accessToken, session.RefreshToken, session.ExpiresAt);
     }
 }
+
+/// <summary>Stop acting for a company and act as oneself again.</summary>
+/// <remarks>
+/// <para><strong>It only ever gives rights away</strong>, so no membership is
+/// checked: a person token is what signing in hands out anyway (ADR-0017). It
+/// replaces "sign out and in again", which was the only way back before.</para>
+///
+/// <para>A fresh sign-in, as the switch to a company is one: the company-bound
+/// refresh token is left to expire, and the new one carries no tenant.</para>
+/// </remarks>
+public sealed record SwitchToSelfCommand(SubjectId Subject) : ICommandMessage<CompanySwitchResult>;
+
+/// <summary>Issues a person token from a signed-in session.</summary>
+public sealed class SwitchToSelfHandler(
+    IUserRepository users,
+    ISessionService sessions,
+    IAccessTokenIssuer token,
+    IAuditTrail auditTrail,
+    ICorrelation correlation,
+    TimeProvider clock)
+    : IRequestHandler<SwitchToSelfCommand, CompanySwitchResult>
+{
+    /// <inheritdoc />
+    public async Task<CompanySwitchResult> Handle(SwitchToSelfCommand request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var account = await users.FindByIdAsync(request.Subject, cancellationToken);
+
+        if (account is null)
+        {
+            return new CompanySwitchResult.Refused();
+        }
+
+        try
+        {
+            account.AssertCanSignIn();
+        }
+        catch (Exception error) when (error is EmailNotConfirmedException or AccountDisabledException)
+        {
+            return new CompanySwitchResult.Refused();
+        }
+
+        var session = await sessions.StartAsync(account.Id, cancellationToken);
+        var accessToken = await token.IssueAsync(
+            account.Id, account.Email, Capacity.AsSelf.Instance, session.Session, cancellationToken);
+
+        await auditTrail.AppendAsync(
+            new AuditEvent(AuditAction.TenantSwitch, clock.GetUtcNow(), actor: account.Id, correlationId: correlation.Current),
+            cancellationToken);
+
+        return new CompanySwitchResult.Switched(accessToken, session.RefreshToken, session.ExpiresAt);
+    }
+}

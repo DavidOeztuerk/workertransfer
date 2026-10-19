@@ -232,15 +232,21 @@ public static class Responses
     }
 
     /// <summary>The notice period on the wire — all <c>null</c> when none is stated.</summary>
-    public static NoticeV1 ToWire(NoticePeriod? notice, DateOnly today) =>
+    /// <remarks>
+    /// The two dates only while she says she is employed (<see cref="MarketStatus.IsEmployed"/>):
+    /// a notice period binds somebody with a job, and one stated before she
+    /// left it must not hold the advisor back afterwards. The statement itself
+    /// stays hers to read and withdraw.
+    /// </remarks>
+    public static NoticeV1 ToWire(NoticePeriod? notice, DateOnly today, bool employed) =>
         notice is null
             ? new NoticeV1(null, null, null, null, null)
             : new NoticeV1(
                 notice.Length,
                 NoticeWords.Word(notice.Unit),
                 NoticeWords.Word(notice.End),
-                notice.LastDay(today),
-                notice.EarliestStart(today));
+                employed ? notice.LastDay(today) : null,
+                employed ? notice.EarliestStart(today) : null);
 
     /// <summary>Today, from the container's clock — so a test can move it.</summary>
     public static DateOnly Today(HttpContext context)

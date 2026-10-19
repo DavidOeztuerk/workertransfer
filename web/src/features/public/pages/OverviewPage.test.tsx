@@ -93,7 +93,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("1 Gespräch wartet auf dich"),
+      await screen.findByText("1 Wechsel wartet auf dich"),
     ).toBeInTheDocument();
   });
 
@@ -114,7 +114,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("1 Gespräch wartet auf dich"),
+      await screen.findByText("1 Wechsel wartet auf dich"),
     ).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
 
     expect(
-      await screen.findByText("1 Transfer wartet auf euch"),
+      await screen.findByText("1 Wechsel wartet auf euch"),
     ).toBeInTheDocument();
     expect(screen.getByText("Für dein Unternehmen")).toBeInTheDocument();
     expect(screen.queryByText("Für dich")).toBeNull();
@@ -191,7 +191,7 @@ describe("OverviewPage", () => {
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(
-      await screen.findByText("2 Gespräche warten auf dich"),
+      await screen.findByText("2 Wechsel warten auf dich"),
     ).toBeInTheDocument();
   });
 
@@ -207,5 +207,28 @@ describe("OverviewPage", () => {
     expect(screen.queryByText("Gerade wartet nichts auf dich.")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Was liegt an" })).toBeNull();
     expect(asked).toHaveLength(0);
+  });
+
+  it("points a new account at its first step: the profile", async () => {
+    answer({ "/profiles/me": { status: 404, body: { title: "Not found" } } });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
+
+    expect(await screen.findByRole("link", { name: "Profil anlegen" })).toHaveAttribute("href", "/profile");
+  });
+
+  it("says nothing about a profile it could not read", async () => {
+    answer({ "/profiles/me": { status: 503, body: { title: "Unavailable" } } });
+    renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
+
+    await screen.findByText("Gerade wartet nichts auf dich.");
+    expect(screen.queryByRole("link", { name: "Profil anlegen" })).not.toBeInTheDocument();
+  });
+
+  it("does not ask a company about a person's profile", async () => {
+    const asked = answer({ "/profiles/me": { status: 404, body: {} } });
+    renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
+
+    await screen.findByText("Gerade wartet nichts auf dich.");
+    expect(asked).not.toContain("/profiles/me");
   });
 });

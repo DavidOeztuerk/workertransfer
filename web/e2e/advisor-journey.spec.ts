@@ -54,10 +54,10 @@ test("three stages, and what is not released is not there", async ({ browser }) 
 
   // The mandate. FOUR values, and none of them is a visibility.
   await candidate.goto("/advisor");
-  await candidate.getByLabel(/Frühester Eintritt/i).fill("2026-11");
+  await candidate.getByLabel(/Eintritt ab/i).fill("2026-11");
   await candidate.getByLabel(/Gehalt ab/i).fill("4000");
   await candidate.getByLabel(/Gehalt bis/i).fill("5200");
-  await candidate.getByLabel(/Pensum/i).fill("80");
+  await candidate.getByLabel(/Stellenumfang/i).fill("80");
   await candidate.getByRole("button", { name: /Mandat speichern/i }).click();
   await expect(candidate.getByText(/^Gespeichert\.$/)).toBeVisible();
 

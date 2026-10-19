@@ -5,7 +5,15 @@ import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFi
 
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import type { Membership, Session, SessionStatus } from "../types/session";
-import { actForCompany, loadMemberships, loadSession, login, logout } from "./authThunks";
+import {
+  actAsSelf,
+  actForCompany,
+  loadMemberships,
+  loadSession,
+  login,
+  logout,
+  restoreCapacity,
+} from "./authThunks";
 
 interface AuthState {
   status: SessionStatus;
@@ -100,6 +108,18 @@ const authSlice = createSlice({
       })
       .addCase(actForCompany.rejected, (state, action) => {
         state.error = action.payload ?? null;
+      })
+
+      .addCase(actAsSelf.fulfilled, (state, action) => {
+        state.session = action.payload;
+      })
+      .addCase(actAsSelf.rejected, (state, action) => {
+        state.error = action.payload ?? null;
+      })
+
+      // Never an error: the restore runs without anybody asking for it.
+      .addCase(restoreCapacity.fulfilled, (state, action) => {
+        state.session = action.payload;
       });
   },
 });

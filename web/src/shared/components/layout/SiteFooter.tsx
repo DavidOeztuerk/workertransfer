@@ -22,7 +22,11 @@ import { useAppSelector } from "../../../core/store/hooks";
  */
 export function SiteFooter() {
   const { t } = useTranslation();
-  const signedIn = useAppSelector((state) => state.auth.status === "authenticated");
+  // The person's own pages only while acting as the person — for a company
+  // "Marktstatus" asks about a job change nobody in that role is making.
+  const asPerson = useAppSelector(
+    (state) => state.auth.status === "authenticated" && state.auth.session?.tenantId == null,
+  );
 
   return (
     <Box
@@ -59,7 +63,7 @@ export function SiteFooter() {
             <FooterLink to="/jobs">{t("footer.jobs")}</FooterLink>
             <FooterLink to="/checklists">{t("footer.checklists")}</FooterLink>
             <FooterLink to="/salaries">{t("footer.salaries")}</FooterLink>
-            {signedIn ? (
+            {asPerson ? (
               <>
                 <FooterLink to="/market">{t("footer.marketStatus")}</FooterLink>
                 <FooterLink to="/consents">{t("footer.consents")}</FooterLink>
