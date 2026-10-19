@@ -51,7 +51,8 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 
 | Anbieter | Stand | Bemerkung |
 |---|---|---|
-| Google, Microsoft, Apple | **gebaut** (ADR-0053), **aus** bis zur Registrierung | identity-service ist selbst Relying Party; verknüpft über die Kennung des Anbieters, nie über die Adresse. **Vor dem Start:** je eine App beim Anbieter (Google Cloud Console, Microsoft Entra, Apple Developer Program — kostenpflichtig, Apples Schlüssel alle sechs Monate neu signieren) |
+| Google, Microsoft | **gebaut** (ADR-0053), **jetzt einrichten** (20.10.2026) | identity-service ist selbst Relying Party; verknüpft über die Kennung des Anbieters, nie über die Adresse. Je eine App beim Anbieter (Google Cloud Console, Microsoft Entra) — beide kostenlos, und keins von beiden hängt am Hosting: es sind Konten beim *Anbieter der Anmeldung*, nicht beim Betreiber der Server. Eingerichtet über `/einrichten` (Agent `anbieter-einrichter`), Werte über `scripts/env-secret.sh` |
+| Apple | **gebaut** (ADR-0053), **aufgeschoben bis kurz vor dem Start** | „Mit Apple anmelden" ist dasselbe wie Google und Microsoft, nicht nur für eine iPhone-App. Es verlangt das Apple Developer Program (99 € im Jahr), eine Services ID, eine echte Domain mit https (kein localhost) und einen Schlüssel, dessen Geheimnis alle sechs Monate neu signiert wird. Ohne `WORKERTRANSFER_APPLE_*` ist der Knopf aus — der Code ist fertig und wartet. Gekauft wird erst mit der Domain, und vom Betreiber, nicht von einem Agenten |
 | LinkedIn | **nach dem MVP** (N1) | |
 | Keycloak (für die Noelia Control Plane) | **vor dem Start** (I2, Q4) | heute läuft sie nur lokal ohne Identitätsanbieter |
 
@@ -62,7 +63,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | GitHub | **gebaut** (ADR-0033) | eigene, bewiesene Verbindung; OAuth oder Gist |
 | XING | Link **gebaut** (N2), Import **MVP offen** | der Link nennt die Person und reist nur mit dem vollen Profil; der Import aus dem eigenen Export erst nach Messung an einem echten Export |
 | LinkedIn-Import aus dem eigenen Export | **nach dem MVP** (N1) | |
-| Google Drive, Dropbox | **gebaut** (ADR-0054), **aus** bis zur Registrierung | nur die gewählte Datei: Drive über `drive.file` und den Picker, Dropbox über den Chooser ohne OAuth; alles im Browser, kein Token erreicht den Server; aus, bis der Betreiber die Apps registriert |
+| Google Drive, Dropbox | **gebaut** (ADR-0054), **jetzt einrichten** (20.10.2026) | nur die gewählte Datei: Drive über `drive.file` und den Picker, Dropbox über den Chooser ohne OAuth; alles im Browser, kein Token erreicht den Server; aus, bis der Betreiber die Apps registriert |
 | OneDrive | **nicht gebaut** (ADR-0054) | der Picker v8 verlangt Lesezugriff auf **alle** Dateien (`Files.Read`) — das bricht „nur die gewählte Datei“ (N3); neu messen, wenn Microsoft Einzeldateien anbietet |
 | Open Badges / Credly, GitLab | **nach dem MVP** (N3) | |
 
