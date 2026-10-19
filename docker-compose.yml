@@ -47,6 +47,8 @@ x-service: &service
   depends_on:
     postgres:
       condition: service_healthy
+    valkey:
+      condition: service_healthy
   # ONE probe for all fourteen, and it asks what counts: /health/live, the same
   # address Kubernetes asks too.
   #
@@ -98,6 +100,10 @@ x-environment: &environment
   Jwt__KeyId: ${WORKERTRANSFER_JWT_KEY_ID:-k1}
   JwtSettings__Issuer: workertransfer
   JwtSettings__Audience: workertransfer
+  # THE SHARED REVOCATION STORE (docs/VISION-FRAGEN.md, I1). A sign-out or an
+  # erasure is written here by identity-service and refused by all fourteen.
+  # Without it each service honours an old token until it expires.
+  ConnectionStrings__valkey: valkey:6379
   # The shared secret of the erasure cascade (ADR-0027 4.4). EXPRESSLY A
   # DIFFERENT ONE from the notification's: "may trigger a mail" and "may erase
   # everything about a person" must not be the same paper. EMPTY would mean:
@@ -139,6 +145,23 @@ services:
       # waits in addition, because in Kubernetes there is no depends_on at
       # all.)
       test: ["CMD-SHELL", "psql -h 127.0.0.1 -U worker -d identity -c 'select 1' || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    # Redis left open source in 2024; Valkey is the BSD-licensed fork under the
+    # Linux Foundation, wire-compatible with the client Noelia uses.
+    image: valkey/valkey:8-alpine
+    container_name: workertransfer-valkey
+    restart: unless-stopped
+    # Append-only file, so a restart does not forget who was signed out. And
+    # noeviction: a revocation evicted for memory would bring a token back.
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -617,5 +640,6 @@ services:
 
 volumes:
   postgres-data:
+  valkey-data:
   portfolio-data:
   resume-document-store:

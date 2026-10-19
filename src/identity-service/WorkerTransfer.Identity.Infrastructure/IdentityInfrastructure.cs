@@ -113,6 +113,7 @@ public static class IdentityInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccessTokenIssuer, NoeliaAccessTokenIssuer>();
         services.AddScoped<ISessionService, NoeliaSessionService>();
+        services.AddScoped<IAccessRevocation, NoeliaAccessRevocation>();
         services.AddSingleton<ICorrelation, HttpCorrelation>();
 
         // The mediator, and the one behaviour Noelia does not bring. Registered

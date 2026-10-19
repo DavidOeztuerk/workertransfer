@@ -110,9 +110,13 @@ public static class ConsentInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
+        // True since 03.10.2026, and it was true before: ExecuteErasureHandler
+        // writes `ConsentDelete` into `audit_events` in the erasure's own
+        // transaction, and the free-text clearing empties its metadata but
+        // keeps the row. The flag had simply never been flipped.
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "consent",
             !string.IsNullOrEmpty(erasure.Secret),
-            auditTrailPresent: false));
+            auditTrailPresent: true));
     }
 }

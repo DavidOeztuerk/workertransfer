@@ -1,5 +1,6 @@
 using Noelia.Core.Identity;
 using MediatR;
+using WorkerTransfer.Applications.Domain.Audit;
 using WorkerTransfer.Applications.Application.Messages;
 using WorkerTransfer.Applications.Application.Ports;
 
@@ -19,15 +20,26 @@ public sealed record ErasePersonCommand(SubjectId Subject) : ICommandMessage<int
 /// something stays, the origin should learn it rather than guess
 /// (ADR-0027 §3.4).
 /// </remarks>
-public sealed class ErasePersonHandler(IErasureLedger ledger)
+public sealed class ErasePersonHandler(
+    IErasureLedger ledger,
+    IAuditTrail trail,
+    TimeProvider clock)
     : IRequestHandler<ErasePersonCommand, int>
 {
     /// <inheritdoc />
-    public Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
+    public async Task<int> Handle(ErasePersonCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return ledger.DeleteAsync(
+        var kept = await ledger.DeleteAsync(
             request.Subject, Retention.KeepHired, cancellationToken);
+
+        // In the same transaction as the erasure (the command runs in one):
+        // both commit, or neither. THAT it ran, never what it deleted.
+        await trail.AppendOnceAsync(
+            new AuditEntry(AuditAction.Erased, request.Subject, clock.GetUtcNow()),
+            cancellationToken);
+
+        return kept;
     }
 }

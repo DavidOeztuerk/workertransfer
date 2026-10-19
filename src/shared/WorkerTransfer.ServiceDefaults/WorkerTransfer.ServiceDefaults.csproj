@@ -15,6 +15,8 @@
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Noelia.Infrastructure" />
     <PackageReference Include="Noelia.Dashboard" />
+    <PackageReference Include="Noelia.InMemory" />
+    <PackageReference Include="Noelia.Redis" />
     <!--
       Only for `SchemaMigration`: every service owns a schema of its own and
       migrates it itself. Relational, not Npgsql — which database it is, the

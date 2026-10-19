@@ -80,7 +80,16 @@ public static class TokenShape
 
     private static string Build(Guid subject, Guid? company)
     {
-        List<Claim> claims = [new(JwtRegisteredClaimNames.Sub, subject.ToString())];
+        // Like a real token from identity-service: the revocation check refuses one
+        // without jti and iat.
+        List<Claim> claims =
+        [
+            new(JwtRegisteredClaimNames.Sub, subject.ToString()),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Iat,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ClaimValueTypes.Integer64)
+        ];
 
         if (company is { } tenant)
         {

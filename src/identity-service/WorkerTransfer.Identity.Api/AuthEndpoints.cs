@@ -223,7 +223,13 @@ public static class AuthEndpoints
             CancellationToken cancellationToken) =>
         {
             await mediator.Send(
-                new SignOutCommand(context.Request.Cookies[RefreshCookie]), cancellationToken);
+                new SignOutCommand(
+                    context.Request.Cookies[RefreshCookie],
+                    context.User.FindFirst("jti")?.Value,
+                    long.TryParse(context.User.FindFirst("exp")?.Value, out var expires)
+                        ? DateTimeOffset.FromUnixTimeSeconds(expires)
+                        : null),
+                cancellationToken);
 
             ClearRefreshCookie(context);
 
@@ -583,6 +589,18 @@ public static class AuthEndpoints
             Secure = secure,
             Path = RefreshPath
         });
+    }
+
+    /// <summary>Takes both sign-in cookies out of the browser.</summary>
+    /// <remarks>
+    /// Once a token is revoked the browser must not keep presenting it: every
+    /// page would then find a dead session and send the person away — the
+    /// confirmation page of a new account included.
+    /// </remarks>
+    internal static void ClearSignInCookies(HttpContext context)
+    {
+        ClearRefreshCookie(context);
+        context.Response.Cookies.Delete(AccessCookie, new CookieOptions { Path = "/" });
     }
 
     private static void ClearRefreshCookie(HttpContext context) =>

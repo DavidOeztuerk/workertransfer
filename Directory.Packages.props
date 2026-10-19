@@ -9,7 +9,7 @@
     -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
 
-    <NoeliaVersion>7.0.0</NoeliaVersion>
+    <NoeliaVersion>7.0.1</NoeliaVersion>
   </PropertyGroup>
 
   <ItemGroup Label="Noelia">
@@ -28,6 +28,7 @@
     <PackageVersion Include="Noelia.Data.EntityFrameworkCore" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Http" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.InMemory" Version="$(NoeliaVersion)" />
+    <PackageVersion Include="Noelia.Redis" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Infrastructure" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Passwords.BCrypt" Version="$(NoeliaVersion)" />
   </ItemGroup>

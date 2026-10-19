@@ -1,3 +1,4 @@
+using WorkerTransfer.Applications.Domain.Audit;
 using Noelia.Application.Extensions;
 using MediatR;
 using Microsoft.Extensions.Configuration;
@@ -191,9 +192,13 @@ public static class ApplicationsInfrastructure
         var erasure = new ErasureSettings();
         configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
+        // The erasure leaves one row behind: THAT it ran (ADR-0012). The flag
+        // below says so only because this line stands here.
+        services.AddScoped<IAuditTrail, EfAuditTrail>();
+
         services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "applications",
             !string.IsNullOrEmpty(erasure.Secret),
-            auditTrailPresent: false));
+            auditTrailPresent: true));
     }
 }

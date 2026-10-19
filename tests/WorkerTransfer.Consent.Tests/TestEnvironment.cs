@@ -91,7 +91,16 @@ public static class TokenShape
         var token = new JwtSecurityToken(
             issuer: Issuer,
             audience: Audience,
-            claims: [new Claim(JwtRegisteredClaimNames.Sub, subject.ToString())],
+            // Like a real token from identity-service: the revocation check refuses
+            // one without jti and iat.
+            claims:
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, subject.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat,
+                    DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ClaimValueTypes.Integer64)
+            ],
             expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: new SigningCredentials(
                 key, SecurityAlgorithms.EcdsaSha256));

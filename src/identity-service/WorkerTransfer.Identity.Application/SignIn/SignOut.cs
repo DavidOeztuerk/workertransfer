@@ -12,11 +12,15 @@ namespace WorkerTransfer.Identity.Application.SignIn;
 /// someone asking to be signed out is entitled to be signed out, and telling
 /// them their token was already dead helps nobody and says something.
 /// </param>
-public sealed record SignOutCommand(string? RefreshToken) : ICommandMessage<Unit>;
+public sealed record SignOutCommand(
+    string? RefreshToken,
+    string? AccessTokenId = null,
+    DateTimeOffset? AccessExpiresAt = null) : ICommandMessage<Unit>;
 
 /// <summary>Ends a sign-in.</summary>
 public sealed class SignOutHandler(
     ISessionService sessions,
+    IAccessRevocation revocation,
     ISessionCapacity sessionCapacity,
     IAuditTrail auditTrail,
     ICorrelation correlation,
@@ -27,6 +31,14 @@ public sealed class SignOutHandler(
     public async Task<Unit> Handle(SignOutCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        // The access token first, and even without a refresh token: ending
+        // the session only stops the next refresh, while the access token
+        // would stay good in every other service until it expires.
+        if (request is { AccessTokenId: { Length: > 0 } tokenId, AccessExpiresAt: { } expiresAt })
+        {
+            await revocation.RevokeTokenAsync(tokenId, expiresAt, cancellationToken);
+        }
 
         if (string.IsNullOrEmpty(request.RefreshToken))
         {

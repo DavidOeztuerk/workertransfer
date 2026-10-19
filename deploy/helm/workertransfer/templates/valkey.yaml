@@ -1,0 +1,71 @@
+{{- if .Values.valkey.enabled }}
+{{/*
+The shared revocation store (docs/VISION-FRAGEN.md, I1): identity-service
+writes a sign-out or an erasure here, all fourteen services refuse the token.
+In staging and production `valkey.enabled: false` and `valkey.host` points at a
+managed instance.
+
+StatefulSet with a volume and append-only persistence: a restart must not
+forget who was signed out. And noeviction: a revocation evicted for memory
+would bring a token back.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.valkey.host }}
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: valkey
+  ports:
+    - name: valkey
+      port: {{ .Values.valkey.port }}
+      targetPort: valkey
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: valkey
+  labels:
+    {{- include "workertransfer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+spec:
+  serviceName: {{ .Values.valkey.host }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: valkey
+  template:
+    metadata:
+      labels:
+        {{- include "workertransfer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: valkey
+    spec:
+      containers:
+        - name: valkey
+          image: {{ .Values.valkey.image }}
+          args: ["valkey-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+          ports:
+            - name: valkey
+              containerPort: {{ .Values.valkey.port }}
+          readinessProbe:
+            exec:
+              command: ["valkey-cli", "ping"]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.valkey.storage }}
+{{- end }}

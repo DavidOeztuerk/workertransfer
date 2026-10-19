@@ -42,7 +42,7 @@ public class AssessmentJourneyTests(Postgres postgres) : IAsyncLifetime
         // would depend on who ran before.
         await using (var setup = Context())
         {
-            await setup.Database.ExecuteSqlRawAsync("TRUNCATE TABLE assessments, outbox");
+            await setup.Database.ExecuteSqlRawAsync("TRUNCATE TABLE assessments, outbox, audit_events");
         }
 
         _ledger.Set(Anna, Company, true);
@@ -417,6 +417,35 @@ public class AssessmentJourneyTests(Postgres postgres) : IAsyncLifetime
         await using var context = Context();
 
         (await context.Cases.CountAsync()).Should().Be(1);
+    }
+
+    /// <summary>The erasure leaves exactly one row behind: THAT it ran.</summary>
+    /// <remarks>
+    /// Measured in the database, not in the answer: a receipt can say "done"
+    /// over an empty trail. Erased twice, because the cascade delivers at least
+    /// once — a second delivery must not record a second erasure (ADR-0012,
+    /// ADR-0027).
+    /// </remarks>
+    [Fact]
+    public async Task The_erasure_leaves_exactly_one_audit_row()
+    {
+        await SetTask();
+
+        var client = _service.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Erasure-Secret", ErasureSecret);
+
+        for (var delivery = 0; delivery < 2; delivery++)
+        {
+            (await client.PostAsJsonAsync(
+                    Url("/erasure"), new Dictionary<string, object?> { ["user_id"] = Anna }))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await using var context = Context();
+        (await context.Cases.CountAsync()).Should().Be(0);
+        (await context.AuditEntries.CountAsync(
+                row => row.TargetId == Anna && row.Action == "erased"))
+            .Should().Be(1, "the trail says once that the erasure ran, and nothing about what it deleted");
     }
 
     // ---------------------------------------------------------------------

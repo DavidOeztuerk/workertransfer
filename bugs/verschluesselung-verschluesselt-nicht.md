@@ -1,3 +1,24 @@
+# GESCHLOSSEN — `DataEncryptionService` verschlüsselte nicht (behoben in 4.4.2, nachgemessen an 7.0.0)
+
+> **Geschlossen am 07.10.2026.** Dieselbe Probe, übersetzt auf Noelia 7.0.0
+> (`Noelia.Infrastructure`, `Noelia.Redis` von nuget.org) gegen ein
+> Wegwerf-Valkey:
+>
+> ```
+> Success=True Algorithm=AES256GCM
+> envelope contains plaintext      : False
+> field AuthTag all zero         : False
+> field Data decodes to plaintext: False
+> own key decrypts                 : Success=True equal=True
+> FOREIGN key decrypts             : Success=False IntegrityVerified=False equal=False
+> ```
+>
+> Der fremde Schlüssel scheitert jetzt an `AuthenticationTagMismatchException`.
+> **Nicht nachgemessen** ist der Nebenbefund unten (`AddSecretStoreMasterKey`
+> ohne registrierten `ISecretProvider`); er bleibt offen, bis jemand ihn misst.
+> Am Verzicht auf `AddEncryption` ändert das nichts: die Schlüssel einer
+> Person verschlüsselt `SecretStore` (WORKERTRANSFER_SECRETS_KEY).
+
 # `DataEncryptionService` verschlüsselt nicht — es legt den Klartext ab und meldet `AES256GCM`
 
 - **Girder-Fassung:** 4.4.0
@@ -161,6 +182,6 @@ Ein Umweg ist nicht gebaut und wird nicht gebraucht.
 
 ## Stand
 
-- [ ] gemeldet
-- [ ] in Girder behoben, Fassung: <…>
-- [ ] Umweg hier entfernt — es gibt keinen
+- [x] gemeldet
+- [x] in Girder/Noelia behoben, Fassung: 4.4.2 (nachgemessen an 7.0.0 am 07.10.2026)
+- [x] Umweg hier entfernt — es gab keinen

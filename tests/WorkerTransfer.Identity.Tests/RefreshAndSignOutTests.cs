@@ -216,6 +216,7 @@ public class RefreshAndSignOutTests
     public class SignOut
     {
         private readonly ISessionService _sessions = Substitute.For<ISessionService>();
+        private readonly IAccessRevocation _revocation = Substitute.For<IAccessRevocation>();
         private readonly ISessionCapacity _capacity = Substitute.For<ISessionCapacity>();
         private readonly IAuditTrail _auditTrail = Substitute.For<IAuditTrail>();
 
@@ -223,7 +224,7 @@ public class RefreshAndSignOutTests
         private static readonly SessionId Session = SessionId.New();
 
         private SignOutHandler Handler() => new(
-            _sessions, _capacity, _auditTrail, new FixedCorrelation(null), TimeProvider.System);
+            _sessions, _revocation, _capacity, _auditTrail, new FixedCorrelation(null), TimeProvider.System);
 
         private Task SignOut_(string? token) =>
             Handler().Handle(new SignOutCommand(token), CancellationToken.None);

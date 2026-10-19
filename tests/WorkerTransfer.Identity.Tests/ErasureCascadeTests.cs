@@ -196,6 +196,38 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         rows.Select(row => row.Kind).Should().Contain(RequestErasureHandler.Intents);
     }
 
+    /// <summary>An erasure refuses every access token of the person at once.</summary>
+    /// <remarks>
+    /// Locking ended the sessions, but an access token already issued stayed
+    /// good in every service until it expired — someone who just deleted their
+    /// account could still be acted for.
+    /// </remarks>
+    [Fact]
+    public async Task The_request_refuses_every_access_token_of_the_person()
+    {
+        var (browser, _, email) = await Person();
+        var second = await Browser().PostAsJsonAsync("/auth/login", new { email, password = Password });
+        var access = second.Headers.GetValues("Set-Cookie")
+            .First(row => row.StartsWith("access=", StringComparison.Ordinal))
+            .Split(';')[0]["access=".Length..];
+
+        (await WithAccessCookie(access)).Should().Be(HttpStatusCode.OK, "the token is good before");
+
+        (await browser.PostAsync("/account/erasure", null))
+            .StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        (await WithAccessCookie(access)).Should().Be(
+            HttpStatusCode.Unauthorized, "a token from another sign-in of the same person too");
+    }
+
+    private async Task<HttpStatusCode> WithAccessCookie(string access)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/me");
+        request.Headers.Add("Cookie", $"access={access}");
+
+        return (await _service.CreateClient().SendAsync(request)).StatusCode;
+    }
+
     /// <summary>
     /// Who is a recipient is decided by one rule: does the service hold a row
     /// per person. github is gone with its service (ADR-0022 deleted
@@ -260,10 +292,15 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// Pressing twice is not an error, and the second press must not start a
-    /// second cascade: eight more rows would be eight more deliveries for a
-    /// thing that happens once.
+    /// The second press must not start a second cascade: thirteen more rows
+    /// would be thirteen more deliveries for a thing that happens once.
     /// </summary>
+    /// <remarks>
+    /// Since 06.10.2026 the second press does not even get in: the first one
+    /// revoked every access token of the person, the one it was made with
+    /// included. That is the point of the revocation, not a side effect — so
+    /// the answer is 401, and what this test guards stays the same.
+    /// </remarks>
     [Fact]
     public async Task Requesting_twice_produces_no_second_cascade()
     {
@@ -272,7 +309,7 @@ public class ErasureCascadeTests(Postgres postgres) : IAsyncLifetime
         await browser.PostAsync("/account/erasure", null);
         var second = await browser.PostAsync("/account/erasure", null);
 
-        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        second.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "the first press revoked this token");
         (await Rows(subject)).Should().HaveCount(13);
     }
 

@@ -34,6 +34,7 @@ public enum ErasureResult
 /// <summary>Takes the request, and makes it visible at once.</summary>
 public sealed class RequestErasureHandler(
     IErasureLedger erasureLedger,
+    IAccessRevocation revocation,
     IOutbox outbox,
     TimeProvider clock)
     : IRequestHandler<RequestErasureCommand, ErasureResult>
@@ -67,7 +68,14 @@ public sealed class RequestErasureHandler(
         // Immediately and visibly: every session revoked, the account disabled.
         // From this moment nothing happens under this name any more, even while
         // the cascade is still running (ADR-0027 §6).
-        await erasureLedger.LockAsync(request.Subject, clock.GetUtcNow(), cancellationToken);
+        var now = clock.GetUtcNow();
+        await erasureLedger.LockAsync(request.Subject, now, cancellationToken);
+
+        // Locking ends the sessions here; this ends the access tokens already
+        // out there, in every service. Outside the transaction, deliberately:
+        // a rollback leaves a person signed out of an account that still
+        // works — the safe side to err on.
+        await revocation.RevokeEverythingBeforeAsync(request.Subject, now, cancellationToken);
 
         // In the SAME transaction as that change (ADR-0025): if it goes
         // through, the intents stand; if it is rolled back, they are gone too.

@@ -30,6 +30,8 @@ import {
   login,
   registerAndConfirm,
   skipWithoutStack,
+  switchToCompany,
+  uniqueCompanyDomain,
   uniqueEmail,
 } from "./stack";
 
@@ -57,6 +59,34 @@ async function profileOf(
   });
   if (!res.ok()) return null;
   return (await res.json()) as Record<string, unknown> | null;
+}
+
+/** What the person's own token still opens — after an erasure: nothing (401). */
+async function ownProfileStatus(api: APIRequestContext, token: string): Promise<number> {
+  const res = await api.get(`${PROFILE_URL}/profiles/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.status();
+}
+
+/** A company's view of a released profile: 200 while it exists, 404 once it is gone. */
+async function observedProfileStatus(
+  api: APIRequestContext,
+  companyToken: string,
+  subject: string
+): Promise<number> {
+  const res = await api.get(`${PROFILE_URL}/profiles/${subject}`, {
+    headers: { Authorization: `Bearer ${companyToken}` },
+  });
+  return res.status();
+}
+
+async function subjectOf(api: APIRequestContext, token: string): Promise<string> {
+  const res = await api.get(`${IDENTITY_URL}/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(res.ok(), "the person's own account must answer before the erasure").toBeTruthy();
+  return ((await res.json()) as { user_id: string }).user_id;
 }
 
 async function ledgerOf(api: APIRequestContext, token: string): Promise<string[]> {
@@ -137,10 +167,25 @@ test("an erasure is requested, runs through — and the proof remains", async ({
   await expect(release).toBeChecked();
 
   const token = await accessTokenOf(page);
+  const subject = await subjectOf(request, token);
+
+  // AN OBSERVER FROM OUTSIDE. Since 07.10.2026 the erasure revokes the
+  // person's own tokens at once, so they can no longer be used to look whether
+  // the data is gone — a read with a dead token comes back empty whether or not
+  // anything was deleted. A company sees the released profile instead.
+  const observerContext = await browser.newContext();
+  const observer = await observerContext.newPage();
+  const companyName = `E2E Erasure observer ${Date.now()}`;
+  const observerEmail = uniqueEmail(uniqueCompanyDomain());
+  await registerAndConfirm(observer, observerEmail, "E2E Observer", companyName);
+  await login(observer, observerEmail);
+  await switchToCompany(observer, companyName);
+  const companyToken = await accessTokenOf(observer);
 
   // The state BEFORE the erasure — otherwise "is gone" says nothing at the end.
   expect(await profileOf(request, token)).not.toBeNull();
   expect(await ledgerOf(request, token)).toContain("GRANT");
+  expect(await observedProfileStatus(request, companyToken, subject)).toBe(200);
 
   const startedAt = Date.now();
 
@@ -174,31 +219,26 @@ test("an erasure is requested, runs through — and the proof remains", async ({
   // Signed out at once: from here on nothing happens under this name any more.
   await expect(page.getByRole("button", { name: /Einstellungen und Anmeldung/i })).toBeVisible();
 
-  // ---- The cascade runs ----------------------------------------------------
+  // And not only in this browser: the old token is refused by the services
+  // themselves, at once, before the cascade has deleted anything.
+  expect(await ownProfileStatus(request, token), "a revoked token must open nothing").toBe(401);
+
+  // ---- The cascade runs, seen from outside --------------------------------
 
   await expect
-    .poll(async () => await profileOf(request, token), {
+    .poll(async () => await observedProfileStatus(request, companyToken, subject), {
       timeout: CASCADE_TIMEOUT_MS,
-      message: "the profile is still there after the erasure",
+      message: "the company still sees the profile after the erasure",
     })
-    .toBeNull();
+    .toBe(404);
 
-  // ---- And now the proof ---------------------------------------------------
-
-  // The data is gone.
-  expect(await profileOf(request, token)).toBeNull();
-
-  // The evidence still stands: the chain of grant AND deletion.
-  await expect
-    .poll(async () => await ledgerOf(request, token), {
-      timeout: CASCADE_TIMEOUT_MS,
-      message: "the DELETE row is missing from the ledger",
-    })
-    .toContain("DELETE");
-  const actions = await ledgerOf(request, token);
-  expect(actions, "the grant must remain — otherwise nothing is provable").toContain(
-    "GRANT"
-  );
+  // A 404 here means "hidden or gone" — byte-identical on purpose (ADR-0020),
+  // so from outside it cannot say which. That the rows are really gone is
+  // measured in the database by each recipient's erasure test, and the
+  // ledger's DELETE rows with the kept GRANT chain (ADR-0027 §5) by consent's
+  // ErasureArrivalTests. The person's own history is no longer readable from
+  // outside, by design.
+  await observerContext.close();
 
   // Exactly one final message, and it says only THAT it is done.
   const mail = await lastMailFor(email, { after: startedAt });

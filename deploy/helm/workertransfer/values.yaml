@@ -149,6 +149,16 @@ postgres:
   # database).
   bootstrapDatabase: identity
 
+# --- Valkey -----------------------------------------------------------------
+# The shared revocation store. enabled: false in staging/production, then
+# `host` points at a managed instance.
+valkey:
+  enabled: true
+  image: valkey/valkey:8-alpine
+  host: valkey
+  port: 6379
+  storage: 256Mi
+
 # --- Mailpit ----------------------------------------------------------------
 # Catches every mail. Off in production, and smtp.host points outside.
 mailpit:

@@ -37,16 +37,24 @@ public sealed class ErasePersonHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // Only a profile that is there can be recorded as deleted. The cascade
+        // delivers at least once: the second delivery finds nothing, and
+        // appending again would record a second erasure — as would recording
+        // one for a person who never had a profile.
+        var existed = await store.GetAsync(request.Subject, cancellationToken) is not null;
         var kept = await store.DeleteAsync(request.Subject, cancellationToken);
 
         // The trail records THAT something was deleted and names no actor: no
         // human being acts here, but the order one of them gave hours ago. What
         // was deleted stands nowhere — that would be a copy of what just
         // disappeared.
-        await trail.AppendOneAsync(
-            new AuditEntry(
-                AuditAction.ProfileDeleted, clock.GetUtcNow(), target: request.Subject),
-            cancellationToken);
+        if (existed)
+        {
+            await trail.AppendOneAsync(
+                new AuditEntry(
+                    AuditAction.ProfileDeleted, clock.GetUtcNow(), target: request.Subject),
+                cancellationToken);
+        }
 
         return kept;
     }
