@@ -13,7 +13,8 @@ const string serviceName = "advisor-service";
 
 // No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 builder.Services.AddAdvisorInfrastructure(
     builder.Configuration,

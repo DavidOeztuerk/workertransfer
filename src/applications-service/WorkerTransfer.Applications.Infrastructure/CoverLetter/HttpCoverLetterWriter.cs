@@ -238,6 +238,18 @@ public sealed class HttpCoverLetterWriter(
 
         using (response)
         {
+            // A redirect is NOT followed, deliberately. The request carries the
+            // person's key and their profile text; a 307/308 would resend both
+            // to wherever the Location points. Since Noelia 7.0.0 the client
+            // hands the redirect back instead of following it, and the person
+            // enters the address it points to.
+            if ((int)response.StatusCode is 301 or 302 or 303 or 307 or 308)
+            {
+                throw new CoverLetterUnavailable(
+                    $"The draft provider redirects ({(int)response.StatusCode}); "
+                    + "the address has to be the one it redirects to.");
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 throw new CoverLetterUnavailable(

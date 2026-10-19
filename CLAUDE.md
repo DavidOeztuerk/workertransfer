@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 6.4.0** — a shared foundation library of this author's, from nuget.org — plus a React app.
+WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.0** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
 Fourteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
@@ -169,31 +169,44 @@ Adding a service is three steps and no new Dockerfile: its database in `scripts/
 
 **`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-service` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.
 
-### The Noelia Control Plane — an overlay, deliberately not part of `make up`
+### The Noelia Control Plane — on the host, deliberately not part of `make up`
 
 ```bash
-make control-plane        # http://localhost:8091
+make control-plane        # http://localhost:8091 — needs `make up`
+make control-plane-down
 ```
 
 It collects `/noelia/report.json` from all fourteen services and lays them side
 by side — egress, AI dependencies, obligations, findings, drift, attestation.
-It is pull-only: there is no path from it into a service.
+It is pull-only: there is no path from it into a service. The script does not
+stop at "it answers": it reads `/fleet.json` and goes red unless all fourteen
+were collected.
 
-**A separate compose file, and that is the decision.** The product lives in a
-neighbouring repository (`~/Projects/NoeliaControlPlane`, overridable with
+**A separate target, and that is the decision.** The product lives in a
+neighbouring repository (`../NoeliaControlPlane`, overridable with
 `NOELIA_CONTROL_PLANE_PFAD`). Putting it in `docker-compose.yml` would make
 `make up` fail for everyone who has not checked that repository out.
 
+**On the host and not in a container, since 02.10.2026 — measured, not
+chosen.** Since its PR #1 the product refuses to start without access control:
+OIDC, or `Access:AllowLocalDevelopment=true` in Development. The local mode
+accepts only a *loopback* peer with a local Host header and no forwarding
+headers, and through Docker Desktop's port forwarding the peer is the VM's
+gateway — in a container it started and refused every browser request. The
+vendor's own `run-everything.sh` runs it from source for that reason. The old
+compose overlay also named its container `workertransfer-control-plane`, the
+name of the kind node `scripts/k8s-up.sh` filters for. With an identity
+provider, the container path comes back — with OIDC, not with a relay in front
+of the local mode.
+
 Three things are easy to get wrong here:
 
-- **The fleet file mounts as `appsettings.Development.json`**, not under a
-  descriptive name. The application loads `appsettings.{ASPNETCORE_ENVIRONMENT}.json`
-  and no other file — an `appsettings.Flotte.json` would sit in the image and
-  never be read, and the fleet would be silently empty. The image ships the
-  vendor's demo fleet at that path, which has to go anyway or it collects seven
-  unreachable addresses.
-- **`docker/noelia-control-plane.json` belongs here and not there.** It
-  describes *this* stack, and its addresses are the compose service names.
+- **The fleet file becomes `appsettings.Development.json` in `.control-plane/`**,
+  which is the working directory and therefore the content root. The
+  application loads `appsettings.{ASPNETCORE_ENVIRONMENT}.json` and no other
+  file; the vendor's demo fleet beside its DLL is never read.
+- **`scripts/control-plane-fleet.json` belongs here and not there.** It
+  describes *this* stack, through the ports compose publishes.
 - **The licence comes from the environment** (`WORKERTRANSFER_NOELIA_LICENCE`),
   never from that file: it is a signed paper naming a customer. Empty means the
   free tier — one fleet, three services — and this fleet has fourteen.
@@ -201,6 +214,8 @@ Three things are easy to get wrong here:
 It presents the same paper as the dashboard it reads
 (`WORKERTRANSFER_EVIDENCE_SECRET`) and no second one. Empty means every service
 answers 404 and the fleet stays empty without anything being broken.
+`.control-plane/` holds its history, signing key and key ring and is
+git-ignored.
 
 ### Kubernetes — a staging environment on your own machine
 

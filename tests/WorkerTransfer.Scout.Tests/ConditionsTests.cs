@@ -286,6 +286,54 @@ public class ConditionsTests
         evidence.Asked.Should().Equal(visible);
     }
 
+    /// <summary>A silent github-service is asked once per page, not once per hit.</summary>
+    /// <remarks>
+    /// The fetches run one after the other on purpose, and each has its own time
+    /// limit. Measured 02.10.2026: with github-service slow, fourteen hits took
+    /// 30.9 s and the company looked at "Profile werden geladen…" all the while.
+    /// After the first "unavailable" the rest of the page says the same — the
+    /// honest state, "we do not know right now" — without waiting for it again.
+    /// </remarks>
+    [Fact]
+    public async Task A_silent_evidence_source_is_asked_once_per_page()
+    {
+        var (handler, search, ledger, evidence) = Setup();
+
+        var people = People(3);
+        foreach (var subject in people)
+        {
+            search.Stock.Add(Profile(subject, ["Go"]));
+            evidence.Stock[subject] = new EvidenceSheet([], EvidenceState.Unavailable);
+        }
+
+        Release(ledger, people);
+
+        var page = await handler.Handle(Question("Go"), default);
+
+        evidence.Asked.Should().ContainSingle("after the first silence nobody waits again");
+        page.Items.Should().HaveCount(3)
+            .And.OnlyContain(hit => hit.EvidenceState == EvidenceState.Unavailable);
+    }
+
+    /// <summary>The counter-probe: an answering source is asked for every hit.</summary>
+    [Fact]
+    public async Task An_answering_evidence_source_is_asked_for_every_hit()
+    {
+        var (handler, search, ledger, evidence) = Setup();
+
+        var people = People(3);
+        foreach (var subject in people)
+        {
+            search.Stock.Add(Profile(subject, ["Go"]));
+        }
+
+        Release(ledger, people);
+
+        await handler.Handle(Question("Go"), default);
+
+        evidence.Asked.Should().HaveCount(3);
+    }
+
     /// <summary>The filter that goes out carries only named words.</summary>
     /// <remarks>
     /// On the type and not on the behaviour: <see cref="SearchFilter"/> has no

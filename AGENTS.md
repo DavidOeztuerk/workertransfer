@@ -65,7 +65,7 @@ make k8s-up / k8s-down / k8s-lint
 Single suite: `dotnet test tests/WorkerTransfer.<X>.Tests/WorkerTransfer.<X>.Tests.csproj --no-build`
 Single frontend test: `cd web && pnpm exec vitest run src/app.test.tsx`. There is no workspace and no root `package.json` any more — `pnpm -r` and `--filter` fail with `ERR_PNPM_NO_PKG_MANIFEST`.
 
-Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pins source mapping so only Noelia may come from there.
+Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuGet.Config` still pins source mapping, so that exactly one source may answer those names and a mirror or local folder in a user-level config is not asked.
 
 ## Toolchain
 

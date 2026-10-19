@@ -58,8 +58,10 @@ public static class KeyRing
         services.TryAddSingleton<SecretStore>();
 
         services.AddSingleton<IXmlRepository, KeyRingStore<TContext>>();
-        services.AddSingleton<IXmlEncryptor, MasterKeyEnvelope>();
-        services.AddSingleton<IXmlDecryptor, MasterKeyEnvelope>();
+        // Only the encryptor comes from the container. The decryptor is rebuilt
+        // by the framework from the type name stored in each key — see
+        // `MasterKeyEnvelope`.
+        services.AddSingleton<IXmlEncryptor, MasterKeyEncryptor>();
         services.AddDataProtection().SetApplicationName(ApplicationName);
 
         // Out of the container and not through the builder: its
@@ -200,10 +202,10 @@ internal sealed class KeyRingStore<TContext>(IServiceProvider provider) : IXmlRe
 /// place where somebody would have to look for the master key.
 /// </remarks>
 /// <param name="store">This installation's master key.</param>
-internal sealed class MasterKeyEnvelope(SecretStore store)
-    : IXmlEncryptor, IXmlDecryptor
+internal sealed class MasterKeyEncryptor(SecretStore store) : IXmlEncryptor
 {
-    private const string Envelope = "wtProtectedKey";
+    /// <summary>The element that wraps an encrypted key.</summary>
+    internal const string Envelope = "wtProtectedKey";
 
     /// <inheritdoc />
     public EncryptedXmlInfo Encrypt(XElement plaintextElement)
@@ -216,7 +218,23 @@ internal sealed class MasterKeyEnvelope(SecretStore store)
 
         return new EncryptedXmlInfo(envelope, typeof(MasterKeyEnvelope));
     }
+}
 
+/// <summary>Opens a key of the ring again.</summary>
+/// <remarks>
+/// <para><strong>The framework builds this type itself, from the name stored in
+/// the key</strong>, and only through a constructor taking an
+/// <c>IServiceProvider</c> or nothing. A registration as <c>IXmlDecryptor</c> is
+/// never asked. With a <c>SecretStore</c> constructor every start logged
+/// <c>MissingMethodException</c>, discarded the stored keys and made new ones —
+/// the ring lay in the database and was never read back.</para>
+///
+/// <para>The name stays <c>MasterKeyEnvelope</c> because the keys already
+/// stored name it; renaming it would orphan them.</para>
+/// </remarks>
+/// <param name="services">The container the framework hands over.</param>
+internal sealed class MasterKeyEnvelope(IServiceProvider services) : IXmlDecryptor
+{
     /// <inheritdoc />
     /// <remarks>
     /// An unreadable ring throws here and is not passed over in silence: a
@@ -227,7 +245,7 @@ internal sealed class MasterKeyEnvelope(SecretStore store)
     {
         ArgumentNullException.ThrowIfNull(encryptedElement);
 
-        var plainText = store.Decrypt(encryptedElement.Value)
+        var plainText = services.GetRequiredService<SecretStore>().Decrypt(encryptedElement.Value)
             ?? throw new InvalidOperationException(
                 "A key of the ring cannot be decrypted. That happens when "
                 + $"{SecretStore.Variable} was changed.");

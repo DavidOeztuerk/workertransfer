@@ -6,7 +6,7 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  pickOption,
+  switchToCompany,
 } from "./stack";
 
 skipWithoutStack();
@@ -26,7 +26,7 @@ test("select several → drafts → comment → release → send → folder with
   const recruiter = await recruiterContext.newPage();
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await pickOption(recruiter, /Handeln als/i, companyName);
+  await switchToCompany(recruiter, companyName);
 
   for (const title of [jobTitle1, jobTitle2]) {
     await recruiter.goto("/company/jobs/new");

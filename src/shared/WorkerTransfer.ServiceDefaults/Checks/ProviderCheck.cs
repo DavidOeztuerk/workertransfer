@@ -82,6 +82,12 @@ public sealed class OperatorProviderSource(string label, string address, bool co
 /// it stands in <c>AiAccessV1</c>, per person, in a table. Noelia's directory
 /// is therefore rightly a lower bound; this one here can be complete.</para>
 ///
+/// <para>Since Noelia 7.0.0 Noelia says so itself: a service that declares
+/// model use (<see cref="ArtificialIntelligence.Used"/>) and names no
+/// recognisable host gets <c>Warning</c> — "declared … uses a model … not
+/// recognisable" — instead of the green, empty inventory 6.4.0 reported. That
+/// statement is honest and empty; the hosts are named only here.</para>
+///
 /// <para><strong>And exactly for that reason the finding is about
 /// people.</strong> It names provider and host and <em>counts</em>. Who uses
 /// which provider stands nowhere — neither here nor on the page nor in

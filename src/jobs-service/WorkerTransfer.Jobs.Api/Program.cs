@@ -14,7 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "jobs-service";
 
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.Used);
 
 // Two acts bind this company to the outside — putting an advert up and taking
 // it down. Who may do that is decided by identity-service's MEMBERSHIP TABLE,

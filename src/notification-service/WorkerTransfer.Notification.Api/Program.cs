@@ -13,7 +13,8 @@ const string serviceName = "notification-service";
 
 // No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 builder.Services.AddNotificationInfrastructure(
     builder.Configuration,

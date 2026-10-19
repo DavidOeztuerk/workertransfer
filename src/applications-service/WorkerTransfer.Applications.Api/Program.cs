@@ -13,7 +13,8 @@ const string serviceName = "applications-service";
 
 // No AsIssuer(): only identity-service holds the private half of the key.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.Used);
 
 builder.Services.AddApplicationsInfrastructure(
     builder.Configuration,

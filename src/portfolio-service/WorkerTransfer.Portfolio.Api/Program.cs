@@ -13,7 +13,8 @@ const string serviceName = "portfolio-service";
 
 // No AsIssuer(): this service verifies tokens and issues none.
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, serviceName);
+    builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.NotUsed);
 
 builder.Services.AddPortfolioInfrastructure(
     builder.Configuration,

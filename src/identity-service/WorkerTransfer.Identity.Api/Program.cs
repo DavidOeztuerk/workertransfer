@@ -18,6 +18,7 @@ const string serviceName = "identity-service";
 // nothing downstream could tell the two apart.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
+    ArtificialIntelligence.Used,
     girder => girder.AsIssuer());
 
 // Since Girder 4.0.2 the policy machinery comes out of the defaults:

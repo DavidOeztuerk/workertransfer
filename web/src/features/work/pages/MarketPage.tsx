@@ -219,8 +219,20 @@ export function MarketPage() {
             {t("market.approachable")}
           </Typography>
 
-          {current.pending ? (
+          {!adopted && current.pending ? (
             <LoadingBlock label={t("market.statusLoading")} />
+          ) : null}
+
+          {/* The form shows the STORED status or nothing. Drawn with its
+              defaults while the answer is out, a choice made in that gap was
+              overwritten when the answer came, and "Speichern" wrote "not right
+              now" for a person who had clicked "Ich höre zu". And with no
+              answer at all, saving would write the defaults over whatever is
+              stored. */}
+          {!adopted && current.data !== null && !current.data.ok ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {t(failureKey(current.data.error, "errors.marketStatusUnavailable"))}
+            </Alert>
           ) : null}
 
           {saved ? (
@@ -229,81 +241,83 @@ export function MarketPage() {
             </Alert>
           ) : null}
 
-          <Box
-            component="form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save();
-            }}
-          >
-            <FormControl sx={{ mb: 2 }}>
-              <FormLabel id="market-status">{t("market.status")}</FormLabel>
-              <RadioGroup
-                aria-labelledby="market-status"
-                // A shared `name` is what makes the arrow keys move the focus
-                // inside the group.
-                name="availability"
-                value={availability}
-                onChange={(event) => {
-                  setSaved(false);
-                  setAvailability(event.target.value as Availability);
-                }}
-              >
-                {CHOICES.map((choice) => (
-                  <Box key={choice.value} sx={{ mb: 0.5 }}>
-                    <FormControlLabel
-                      value={choice.value}
-                      control={<Radio />}
-                      label={t(choice.label)}
-                    />
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ ml: 4 }}
-                    >
-                      {t(choice.hint)}
-                    </Typography>
-                  </Box>
-                ))}
-              </RadioGroup>
-            </FormControl>
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  // A box and NOT a switch — the consent-switch rule read
-                  // backwards. A switch says: it holds at once. This field sits
-                  // in a form with "Save", so flipping it and leaving the page
-                  // changes nothing; a switch would promise an immediacy that
-                  // does not exist, at the platform's most delicate field.
-                  checked={employed}
+          {adopted ? (
+            <Box
+              component="form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save();
+              }}
+            >
+              <FormControl sx={{ mb: 2 }}>
+                <FormLabel id="market-status">{t("market.status")}</FormLabel>
+                <RadioGroup
+                  aria-labelledby="market-status"
+                  // A shared `name` is what makes the arrow keys move the focus
+                  // inside the group.
+                  name="availability"
+                  value={availability}
                   onChange={(event) => {
                     setSaved(false);
-                    setEmployed(event.target.checked);
+                    setAvailability(event.target.value as Availability);
                   }}
-                />
-              }
-              label={t("market.employed")}
-              sx={{ mb: 2, display: "block" }}
-            />
+                >
+                  {CHOICES.map((choice) => (
+                    <Box key={choice.value} sx={{ mb: 0.5 }}>
+                      <FormControlLabel
+                        value={choice.value}
+                        control={<Radio />}
+                        label={t(choice.label)}
+                      />
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ ml: 4 }}
+                      >
+                        {t(choice.hint)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </RadioGroup>
+              </FormControl>
 
-            <TextField
-              label={t("market.note")}
-              value={note}
-              onChange={(event) => {
-                setSaved(false);
-                setNote(event.target.value);
-              }}
-              helperText={t("market.noteHint")}
-              multiline
-              minRows={3}
-              sx={{ mb: 2 }}
-            />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    // A box and NOT a switch — the consent-switch rule read
+                    // backwards. A switch says: it holds at once. This field sits
+                    // in a form with "Save", so flipping it and leaving the page
+                    // changes nothing; a switch would promise an immediacy that
+                    // does not exist, at the platform's most delicate field.
+                    checked={employed}
+                    onChange={(event) => {
+                      setSaved(false);
+                      setEmployed(event.target.checked);
+                    }}
+                  />
+                }
+                label={t("market.employed")}
+                sx={{ mb: 2, display: "block" }}
+              />
 
-            <Button type="submit" variant="contained" disabled={running}>
-              {running ? t("market.saving") : t("market.save")}
-            </Button>
-          </Box>
+              <TextField
+                label={t("market.note")}
+                value={note}
+                onChange={(event) => {
+                  setSaved(false);
+                  setNote(event.target.value);
+                }}
+                helperText={t("market.noteHint")}
+                multiline
+                minRows={3}
+                sx={{ mb: 2 }}
+              />
+
+              <Button type="submit" variant="contained" disabled={running}>
+                {running ? t("market.saving") : t("market.save")}
+              </Button>
+            </Box>
+          ) : null}
         </CardContent>
       </Card>
     </PageShell>

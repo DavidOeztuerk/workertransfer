@@ -257,8 +257,7 @@ test("the radius search filters by distance — and says what it knows nothing a
   const recruiter = await recruiterContext.newPage();
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await recruiter.goto("/");
-  await pickOption(recruiter, /Handeln als/i, companyName);
+  await switchToCompany(recruiter, companyName);
 
   // Three adverts, three cases: near, far, and one whose place the place table
   // knows nothing about. The third is what is actually checked.

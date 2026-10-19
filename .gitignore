@@ -75,3 +75,7 @@ kon.txt
 # (`mv .nachweis/schluessel.pem .evidence/key.pem`) and these lines can go.
 /.nachweis/
 /nachweis/
+
+# The local control plane's state: history, signing key, operator journal,
+# its own key ring. Machine-local, and the signing key never belongs in git.
+.control-plane/

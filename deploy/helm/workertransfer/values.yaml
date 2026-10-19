@@ -326,6 +326,10 @@ services:
     database: github
     env:
       Consent__BaseUrl: http://consent-service:8002
+      # The two outside targets. The egress boundary allows only hosts that
+      # stand in the configuration; a default in the source does not count.
+      GitHub__BaseUrl: https://api.github.com
+      GitHub__OAuth__AuthorizeUrl: https://github.com
 
   - name: scout-service
     dir: scout
