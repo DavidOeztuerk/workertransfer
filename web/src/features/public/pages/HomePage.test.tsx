@@ -15,7 +15,7 @@ describe("HomePage", () => {
   // state: <Button> without onClick and without href. A click did nothing.
   //
   // And the second carries the INTENT along: without `?as=company` someone who
-  // clicks "Als Unternehmen entdecken" lands in the person form — and notices
+  // clicks "Als Unternehmen starten" lands in the person form — and notices
   // only after the confirmation mail, when no company is there.
   it("offers two ways in, and both carry their intent", () => {
     renderWithStore(<HomePage />);
@@ -24,7 +24,7 @@ describe("HomePage", () => {
       screen.getByRole("link", { name: "Als Arbeitnehmer starten" }),
     ).toHaveAttribute("href", "/register");
     expect(
-      screen.getByRole("link", { name: "Als Unternehmen entdecken" }),
+      screen.getByRole("link", { name: "Als Unternehmen starten" }),
     ).toHaveAttribute("href", "/register?as=company");
   });
 
@@ -38,7 +38,7 @@ describe("HomePage", () => {
       screen.getByRole("heading", { name: "Echte Nachweise" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Human in control" }),
+      screen.getByRole("heading", { name: "Der Mensch entscheidet" }),
     ).toBeInTheDocument();
   });
 
@@ -50,7 +50,7 @@ describe("HomePage", () => {
     for (const name of [
       "Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung anfühlen.",
       "Worauf die Plattform aufbaut.",
-      "Eine Plattform, die mit einer klaren ersten Grundlage wächst.",
+      "Die richtigen Leute finden – ohne sie in eine Zahl zu pressen.",
     ]) {
       expect(screen.getByRole("region", { name })).toBeInTheDocument();
     }

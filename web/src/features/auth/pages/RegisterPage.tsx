@@ -128,7 +128,12 @@ export function RegisterPage() {
   if (submitted) return <AlmostDone email={email} />;
 
   return (
-    <AuthCard title={t("register.title")} lead={t("register.lead")}>
+    <AuthCard
+      title={t("register.title")}
+      // The person's promise ("visible only when you want") says nothing to
+      // somebody founding a company; they learn what happens next instead.
+      lead={kind === "company" ? t("register.leadCompany") : t("register.lead")}
+    >
       <AuthModeTabs current="register" />
 
       <Box

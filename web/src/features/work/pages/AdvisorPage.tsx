@@ -201,7 +201,7 @@ export function AdvisorPage() {
             {t("advisor.mandateLead")}
           </Typography>
 
-          {mandate.pending && <LoadingBlock label={t("advisor.loading")} />}
+          {mandate.pending && <LoadingBlock label={t("advisor.mandateLoading")} />}
 
           {!mandate.pending && mandate.data !== null && !mandate.data.ok && (
             <Alert

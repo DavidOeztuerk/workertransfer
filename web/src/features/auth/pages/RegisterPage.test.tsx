@@ -366,4 +366,12 @@ describe("RegisterPage — requesting the mail again", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("tells a founder what happens next instead of the person's promise", async () => {
+    answerInOrder();
+    renderWithStore(<RegisterPage />, { route: "/register?as=company" });
+
+    expect(await screen.findByText(/sobald du deine Arbeitsadresse bestätigst/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sichtbar wirst du erst/)).not.toBeInTheDocument();
+  });
 });
