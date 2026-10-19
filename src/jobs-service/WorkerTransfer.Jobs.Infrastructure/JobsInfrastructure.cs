@@ -13,9 +13,9 @@ using WorkerTransfer.Jobs.Infrastructure.Entwurf;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.Jobs.Infrastructure.Rueckzug;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Jobs.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Jobs.Infrastructure;
 
@@ -48,6 +48,8 @@ public static class JobsInfrastructure
         services.AddDbContext<JobsDbContext>((anbieter, optionen) =>
             JobsDbContextFactory.Konfiguriere(
                 optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<JobsDbContext>("jobs");
+        services.AddSchluesselbund<JobsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
@@ -93,10 +95,10 @@ public static class JobsInfrastructure
     {
         var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
 
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Faehigkeitenliste).Assembly, typeof(StelleV1).Assembly]));
 
-        services.AddScoped<IPruefung>(_ => new Nahtpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
             typeof(Anzeigenentwurf),
             ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
             "für eine Stellenanzeige"));
@@ -104,19 +106,14 @@ public static class JobsInfrastructure
         // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
         // der Umgebung, einer fuer alle. Den Zugang je Person haelt
         // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddScoped<IAnbieterquelle>(_ => new Betreiberquelle(
+        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
             "anthropic", entwurf.Adresse, naht));
 
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        // KEINE AUFZEICHNUNG, und das ist eine Entscheidung (ADR-0024): weder
-        // Prompt noch Antwort noch ein Ledger-Eintrag. `null` ist hier die
-        // richtige Antwort und keine fehlende Verdrahtung.
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(
-            nahtVorhanden: true, anbieterEingerichtet: naht, null));
 
         // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Loeschung.
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.OhneZeilen("jobs"));
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.OhneZeilen("jobs"));
     }
 }

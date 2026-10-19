@@ -1,4 +1,8 @@
-namespace WorkerTransfer.Nachweis.Pruefungen;
+using Noelia.Abstractions.Compliance;
+using Noelia.Abstractions.Hosting;
+using Noelia.Abstractions.Security.Checks;
+
+namespace WorkerTransfer.ServiceDefaults.Pruefungen;
 
 /// <summary>Was ein Dienst in der Löschkaskade ist.</summary>
 /// <remarks>
@@ -37,7 +41,7 @@ public enum Loeschrolle
 /// Zweifel eingelöst“ auseinanderfallen: die Tür im Zweifel zu zu halten ist
 /// richtig entschieden — und genau dann ist die Zusage nicht eingelöst.</para>
 /// </remarks>
-public sealed class Loeschpruefung : IPruefung
+public sealed class Loeschpruefung : ISecurityCheck
 {
     private readonly string _dienstname;
     private readonly Loeschrolle _rolle;
@@ -100,17 +104,30 @@ public sealed class Loeschpruefung : IPruefung
     public string Id => "wt.loeschung.nachweis";
 
     /// <inheritdoc />
-    public Bereich Bereich => Bereich.Loeschung;
+    public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    public IReadOnlyList<Rechtsbezug> Bezuege =>
+    /// <remarks>Auswahlregel — siehe <c>Anbieterpruefung</c>.</remarks>
+    public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
+
+    /// <inheritdoc />
+    public SecurityCheckSeverity Severity => SecurityCheckSeverity.High;
+
+    /// <inheritdoc />
+    public string Remediation =>
+        "Erasure__Geheimnis setzen, beziehungsweise Erasure__Adressen__<dienst> "
+        + "beim Ursprung. Ohne sie bleibt jede Loeschung offen: die Kaskade "
+        + "wartet auf eine Quittung, die nie kommt.";
+
+    /// <inheritdoc />
+    public IReadOnlyList<RegulatoryReference> References =>
     [
         Rechtsbezuege.Loeschung,
         Rechtsbezuege.Rechenschaft
     ];
 
     /// <inheritdoc />
-    public Task<Befund> LaufenAsync(CancellationToken ct = default) =>
+    public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(_rolle switch
         {
             Loeschrolle.Unbeteiligt => Unbeteiligt(),
@@ -118,10 +135,9 @@ public sealed class Loeschpruefung : IPruefung
             _ => Empfaenger()
         });
 
-    private Befund Unbeteiligt() =>
-        new(Id,
-            Bereich,
-            Stand.NichtAnwendbar,
+    private SecurityCheckResult Unbeteiligt() =>
+        Ergebnis(
+            SecurityCheckStatus.NotApplicable,
             $"„{_dienstname}“ hält nichts über eine natürliche Person und steht "
             + "deshalb nicht in der Kaskade. Ein Löschauftrag an einen Dienst "
             + "ohne Zeilen wäre ein Endpunkt, der „erledigt“ sagt, ohne je etwas "
@@ -131,7 +147,7 @@ public sealed class Loeschpruefung : IPruefung
             + "LoeschempfaengerTests liest dafür das EF-Modell und nicht den "
             + "Quelltext.");
 
-    private Befund Ursprung()
+    private SecurityCheckResult Ursprung()
     {
         var fehlend = _erwartet
             .Where(dienst => !_bekannt.Contains(dienst, StringComparer.OrdinalIgnoreCase))
@@ -140,13 +156,11 @@ public sealed class Loeschpruefung : IPruefung
 
         if (fehlend.Count > 0)
         {
-            return new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
+            return Ergebnis(
+                SecurityCheckStatus.Fail,
                 $"„{_dienstname}“ stößt die Löschkaskade an, kennt aber für "
-                + $"{Zielkunde.Zahl(fehlend.Count)} von "
-                + $"{Zielkunde.Zahl(_erwartet.Count)} Empfängern keine Adresse: "
+                + $"{(fehlend.Count)} von "
+                + $"{(_erwartet.Count)} Empfängern keine Adresse: "
                 + $"{string.Join(", ", fehlend)}.",
                 "Erasure__Adressen__<dienst> setzen. Ohne Adresse bekommt der "
                 + "Empfänger keinen Auftrag, die Kaskade wartet auf eine "
@@ -154,12 +168,10 @@ public sealed class Loeschpruefung : IPruefung
                 + "das aus wie „läuft noch“.");
         }
 
-        return new Befund(
-            Id,
-            Bereich,
-            Stand.Erfuellt,
+        return Ergebnis(
+            SecurityCheckStatus.Pass,
             $"„{_dienstname}“ stößt die Löschkaskade an und kennt für alle "
-            + $"{Zielkunde.Zahl(_erwartet.Count)} Empfänger eine Adresse "
+            + $"{(_erwartet.Count)} Empfänger eine Adresse "
             + $"({string.Join(", ", _erwartet)}). Die eigenen Zeilen fallen "
             + "zuletzt, nach der Quittung jedes Empfängers.",
             "Ein zwölfter Dienst mit Zeilen über Menschen muss in derselben "
@@ -167,14 +179,12 @@ public sealed class Loeschpruefung : IPruefung
             + "geht diese Prüfung rot, und das ist ihr Zweck.");
     }
 
-    private Befund Empfaenger()
+    private SecurityCheckResult Empfaenger()
     {
         if (!_tuerEingerichtet)
         {
-            return new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
+            return Ergebnis(
+                SecurityCheckStatus.Fail,
                 $"„{_dienstname}“ steht in der Löschkaskade, aber seine Tür ist "
                 + "zu: das Löschgeheimnis ist in dieser Instanz nicht gesetzt. "
                 + "Ein Löschauftrag erreicht diesen Dienst damit nicht.",
@@ -188,10 +198,8 @@ public sealed class Loeschpruefung : IPruefung
 
         if (!_pruefspurVorhanden)
         {
-            return new Befund(
-                Id,
-                Bereich,
-                Stand.Hinweis,
+            return Ergebnis(
+                SecurityCheckStatus.Warning,
                 $"„{_dienstname}“ ist über die Kaskade erreichbar, hält aber "
                 + "keine eigene Prüfspur: was er gelöscht hat, kann er "
                 + "hinterher nur behaupten.",
@@ -202,14 +210,19 @@ public sealed class Loeschpruefung : IPruefung
                 + "selbst bestehen (ADR-0027).");
         }
 
-        return new Befund(
-            Id,
-            Bereich,
-            Stand.Erfuellt,
+        return Ergebnis(
+            SecurityCheckStatus.Pass,
             $"„{_dienstname}“ steht in der Löschkaskade, seine Tür ist "
             + "eingerichtet, und er schreibt eine Prüfspur in derselben "
             + "Transaktion wie die Löschung.",
             "Ein leeres Erasure__Geheimnis stößt diesen Befund um — und zwar in "
             + "genau der Umgebung, in der es leer ist, nicht im Baum.");
     }
+
+    private SecurityCheckResult Ergebnis(
+        SecurityCheckStatus stand, string zusammenfassung, string abhilfe) =>
+        new(Id, Module, Category, stand, Severity, zusammenfassung, abhilfe)
+        {
+            References = References
+        };
 }

@@ -331,7 +331,6 @@ export function JobsPage() {
         />
 
         <Box>
-      {/* Reihenfolge auf jeder Liste: lädt, dann Fehler, dann leer, dann Inhalt. */}
       {list.pending && list.items.length === 0 ? (
         <LoadingBlock label={t("stellen.wirdGesucht")} />
       ) : null}
@@ -468,7 +467,6 @@ export function JobsPage() {
             ))}
           </Box>
 
-          {/* Multi-Select Leiste */}
           {signedIn && selectedJobs.size > 0 && (
             <Box
               sx={{

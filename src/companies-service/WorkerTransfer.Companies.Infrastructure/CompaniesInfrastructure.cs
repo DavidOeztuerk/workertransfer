@@ -11,9 +11,9 @@ using WorkerTransfer.Companies.Application.Profile;
 using WorkerTransfer.Companies.Domain.Arbeitgeberprofile;
 using WorkerTransfer.Companies.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Companies.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Companies.Infrastructure;
 
@@ -43,6 +43,8 @@ public static class CompaniesInfrastructure
         services.AddDbContext<CompaniesDbContext>((provider, options) =>
             CompaniesDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<CompaniesDbContext>("companies");
+        services.AddSchluesselbund<CompaniesDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 
@@ -71,19 +73,18 @@ public static class CompaniesInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Arbeitgeberprofil).Assembly, typeof(ArbeitgeberprofilV1).Assembly]));
 
         // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Kein Empfaenger: ein Arbeitgeberprofil gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2).
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.OhneZeilen("companies"));
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.OhneZeilen("companies"));
     }
 }

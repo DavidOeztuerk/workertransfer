@@ -39,6 +39,7 @@ Sitzung misst — wer sie rot hinterlässt, nimmt ihn der nächsten weg.
 | 7 | ~~Girder auf nuget.org~~ ✅ erledigt 10.09.2026 | — | — |
 | 8 | ~~Nachweis und KI-Pflichten~~ ✅ erledigt 20.09.2026 (ADR-0044) | — | groß |
 | 9 | ~~Umstieg auf Noelia 6.4.0~~ ✅ Kern erledigt 20.09.2026 (ADR-0045) | 8 | groß |
+| 10 | ~~Die drei offenen Befunde, Control Plane, Oberfläche~~ ✅ 21.09.2026 (ADR-0046) | 9 | groß |
 
 ---
 
@@ -817,3 +818,82 @@ Nachweis-Oberfläche auf `ISecurityCheck`, `Noelia.Dashboard` und
 eigenen Prüfungen** bleiben dabei, weil sie in Noelia keine Entsprechung haben.
 **Was gelöscht wird, wird gelöscht** — zwei Wege zu einer Aussage laufen
 auseinander, und beim ersten Mal merkt es niemand.
+
+---
+
+## Sitzung 10 — Die drei offenen Befunde, die Control Plane und die Oberfläche ✅ 21.09.2026
+
+Nach dem Noelia-Umstieg standen drei Befunde offen, und die Oberfläche redete
+zu viel über sich selbst. Beides ist erledigt; **ADR-0046** hält den Teil, der
+eine Entscheidung ist.
+
+**`noelia.jwt.key-separation` — der eigentliche Gewinn.** Bis heute teilten
+sich **alle fünfzehn Prozesse ein HS256-Geheimnis**. Dass nur identity
+ausstellt, war eine *Verabredung*: ein symmetrisches Geheimnis kennt den
+Unterschied zwischen Prüfen und Prägen nicht. Ein kopiertes Konfigurationsblatt
+von portfolio-service — dem Dienst mit der kleinsten Angriffsfläche — hätte
+gereicht, um ein gültiges Token für jeden Menschen zu prägen. Jetzt ECDSA
+P-256: der private Schlüssel steht allein bei identity, und **die Konfiguration
+entscheidet, nicht eine Codezeile** — in `docker-compose.yml` und im Chart ist
+nachzulesen, wer prägen kann. Am Draht gemessen: `alg: ES256`, zwei prüfende
+Dienste nehmen das Token an, neun Ansprüche wie dokumentiert.
+
+**`noelia.health.readiness-coverage` — eine Probe, die für nichts antwortete.**
+`/health/ready` filtert nach dem Etikett `ready`; ohne eine einzige Eintragung
+ist die Menge leer, ein leerer Bericht gilt als gesund, und der Dienst meldet
+sich bereit — auch über einer unerreichbaren Datenbank. `BereitschaftsreiseTests`
+liest deshalb den **Rumpf** und nicht den Status: der Status ist genau dann
+grün, wenn nichts geprüft wird.
+
+**`noelia.dataprotection.key-ring` — und die Versuchung, sie zu belügen.**
+Der naheliegende Weg war `Noelia.InMemory`: die Prüfung wäre grün geworden,
+ohne dass sich etwas ändert. Genau davor warnt Noelias eigener Kommentar an der
+Stelle. Der Bund liegt jetzt in Postgres, verschlüsselt unter dem vorhandenen
+`WORKERTRANSFER_SECRETS_KEY`. **Niemand in diesem Baum liest ihn heute** — er
+wird trotzdem eingerichtet, weil das Gerüst ihn ohnehin registriert und ein Tor,
+das dauerhaft rot steht, nach der zweiten Woche ignoriert wird.
+
+**Die Falle, die das gekostet hat, ist die lehrreichste des Tages.** Der
+Schlüsselbund macht `WORKERTRANSFER_SECRETS_KEY` in **jedem** Dienst zur
+Pflicht. In compose steht er im gemeinsamen Anker — also hatten alle fünfzehn
+ihn sofort. Die Testwirte setzen jeden Wert **einzeln**, und es gibt rund fünfzig
+solcher Stellen: **14 von 14 Reihen rot, rund 500 Fehlschläge**, alle mit
+derselben Meldung, und der Build blieb dabei grün. Erst *eine* Reihe fahren,
+dann die Gesamtreihe — das spart fünfundzwanzig Minuten.
+
+**Die Control Plane läuft in compose** (`make control-plane`, `:8091`), als
+eigenes Overlay: das Produkt liegt in einem Nachbarrepositorium, und `make up`
+darf bei niemandem daran scheitern. Zwei Dinge waren nicht offensichtlich — die
+Flottendatei muss `appsettings.Development.json` heißen, weil die Anwendung
+keine andere lädt (ein sprechender Name läge still ungelesen im Bild), und der
+SQLite-Verlauf muss auf den Datenträger, weil das Bild als Nicht-Root läuft.
+Gemessen: **14 von 14 Diensten geantwortet**, 19 Ziele, 12 Pflichten.
+
+**Die Oberfläche redet nicht mehr über sich selbst.** 36 Katalogzeilen gekürzt,
+zwei Schlüssel gelöscht — darunter der Dreiklang in der Fußzeile. Behalten
+wurde, was eine Entscheidung trägt: die Löschseite unverändert, die leeren
+Zustände, „Freigabe schweigt", die Rechtstexte. **Zwei Sachfehler fielen dabei
+auf**, beide in derselben Familie: die Einstellungsseite behauptete, die
+Plattform falle „nicht unter die Pflichten für Hochrisiko-KI" — eine Einstufung
+nach Anhang III, die dieses Repositorium ausdrücklich nicht selbst trifft
+(`wt-nachweis`) —, und der Scout-Filter sagte „Es zählt, wer ALLE davon kann",
+obwohl die Suche seit ADR-0036 ein ODER ist. Beide korrigiert.
+
+**Und „Arbeitsproben" stand zweimal**, für zwei verschiedene Dinge: `/portfolio`
+heißt jetzt „Portfolio", `/assessments` behält den Namen (ADR-0042 heißt wörtlich
+so), `/company/assessments` wird „Gestellte Arbeitsproben".
+
+**Am laufenden Stapel durchgespielt**, Browser und echte Konten: Profil mit
+Freigabe → Scout findet sie (`Python ✓ · Kubernetes ✓ · Rust ✕`, kein
+Punktwert) → `profile_discovered` im Postfach, ohne Firmennamen → Gespräch auf
+Stufe 1 (die Firma sieht eine Kennung, keinen Namen) → Stufe 3 durch die Person
+→ die Firma sieht Name, Adresse, Eintritt, Pensum und Gehaltsspanne. Dazu der
+Anschreiben-Agent über ein **lokales** Ollama (`qwen2.5-coder:7b`), der Pfad,
+der am 10.09.2026 still an der Egress-Grenze starb.
+
+**Gemessen:** `dotnet build` 0 Warnungen · **1382 Tests grün, 0 rot, 0
+übersprungen** · `pnpm check`/`test`/`build` grün · `noelia analyze` keine
+Befunde · `make k8s-lint` rendert · 17 Dienste gesund · zwei von drei Befunden
+von `Fail` auf `Pass`, der dritte behoben und am Stapel nachzumessen.
+
+**Was aussteht:** `make k8s-up` ist auf diesem Baum weiterhin nicht gefahren.

@@ -18,9 +18,9 @@ using WorkerTransfer.Transfer.Infrastructure.Einwilligung;
 using WorkerTransfer.Transfer.Infrastructure.Loeschung;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 using WorkerTransfer.Transfer.Infrastructure.Security;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Transfer.Contracts;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Transfer.Infrastructure;
 
@@ -57,6 +57,8 @@ public static class TransferInfrastructure
         services.AddDbContext<TransferDbContext>((provider, options) =>
             TransferDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<TransferDbContext>("transfer");
+        services.AddSchluesselbund<TransferDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
@@ -122,7 +124,7 @@ public static class TransferInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(Anfragestand).Assembly, typeof(MarktstatusV1).Assembly],
             Wortausnahmen));
 
@@ -130,23 +132,22 @@ public static class TransferInfrastructure
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
         // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
         // Zwischenspeicher davor faellt niemandem auf, weil alles
         // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddScoped<IPruefung>(anbieter =>
+        services.AddSingleton<ISecurityCheck>(anbieter =>
             new Widerrufspruefung<IEinwilligungstor>(
                 anbieter, typeof(HttpEinwilligungstor)));
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "transfer",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));

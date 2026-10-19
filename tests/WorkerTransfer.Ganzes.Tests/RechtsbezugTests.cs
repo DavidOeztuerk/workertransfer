@@ -1,6 +1,8 @@
 using FluentAssertions;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using Microsoft.Extensions.DependencyInjection;
+using Noelia.Abstractions.Compliance;
+using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -46,19 +48,19 @@ public class RechtsbezugTests
     [Fact]
     public void Kein_Rechtsbezug_hat_einen_leeren_Leser()
     {
-        Rechtsbezuege.Alle.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+        Rechtsbezuege.Eigene.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        foreach (var bezug in Rechtsbezuege.Alle)
+        foreach (var bezug in Rechtsbezuege.Eigene)
         {
-            bezug.Leser.Should().NotBeNullOrWhiteSpace(
-                $"{bezug.Fundstelle} muss sagen, was ein Mensch danach noch "
+            bezug.Reader.Should().NotBeNullOrWhiteSpace(
+                $"{bezug.Citation} muss sagen, was ein Mensch danach noch "
                 + "entscheidet");
 
             // Nicht bloss „nicht leer": ein Punkt bestuende die erste
             // Behauptung und sagte nichts. Der kuerzeste echte Satz in der
             // Sammlung hat weit ueber vierzig Zeichen.
-            bezug.Leser.Length.Should().BeGreaterThan(
-                40, $"{bezug.Fundstelle}: ein Halbsatz ist keine Frage an einen Menschen");
+            bezug.Reader.Length.Should().BeGreaterThan(
+                40, $"{bezug.Citation}: ein Halbsatz ist keine Frage an einen Menschen");
         }
     }
 
@@ -66,14 +68,14 @@ public class RechtsbezugTests
     [Fact]
     public void Kein_Rechtsbezug_behauptet_Konformitaet()
     {
-        foreach (var bezug in Rechtsbezuege.Alle)
+        foreach (var bezug in Rechtsbezuege.Eigene)
         {
             foreach (var wort in Untersagt)
             {
-                $"{bezug.Pflicht} {bezug.Leser}".Contains(
+                $"{bezug.Obligation} {bezug.Reader}".Contains(
                         wort, StringComparison.OrdinalIgnoreCase)
                     .Should().BeFalse(
-                        $"{bezug.Fundstelle} trägt „{wort}“ — Belege, keine "
+                        $"{bezug.Citation} trägt „{wort}“ — Belege, keine "
                         + "Konformität");
             }
         }
@@ -95,24 +97,54 @@ public class RechtsbezugTests
         Untersagt.Any(wort => satz.Contains(wort, StringComparison.OrdinalIgnoreCase))
             .Should().Be(erwartet);
 
-    /// <summary>Wo eine Frist gilt, steht sie da.</summary>
+    /// <summary>Unsere fünf sind genau die, die Noelia nicht hat.</summary>
     /// <remarks>
-    /// <strong>Ein Dokument, das eine Pflicht von 2027 so darstellt, als binde
-    /// sie heute, lädt den Leser ein, zu früh Geld auszugeben.</strong> Die
-    /// KI-VO läuft gestaffelt an: Art. 50 gilt seit dem 02.08.2026, Art. 12 und
-    /// Art. 26 binden ab dem 02.12.2027. Anhang III ist die Einstufungsfrage
-    /// selbst und hat kein eigenes Anlaufdatum.
+    /// <strong>Zwei Fassungen desselben Artikels wären schlimmer als eine</strong>
+    /// — der Leser könnte dann nicht mehr sagen, ob zwei Befunde von einer
+    /// Pflicht handeln oder von zweien. Dieser Test hält fest, dass wir nichts
+    /// nachbauen, was aus dem Paket kommt.
     /// </remarks>
     [Fact]
-    public void Jede_KI_Pflicht_mit_Anlaufdatum_traegt_es_auch()
+    public void Kein_eigenes_Zitat_gibt_es_bei_Noelia_schon()
     {
-        Rechtsbezuege.Transparenz.Gilt.Should().Be("seit 02.08.2026");
-        Rechtsbezuege.Aufzeichnung.Gilt.Should().Be("ab 02.12.2027");
-        Rechtsbezuege.Betreiberpflichten.Gilt.Should().Be("ab 02.12.2027");
+        var vonNoelia = new[]
+        {
+            RegulatoryReferences.GdprRecordsOfProcessing,
+            RegulatoryReferences.GdprThirdCountryTransfer,
+            RegulatoryReferences.GdprProcessorContract,
+            RegulatoryReferences.AiActRecordKeeping,
+            RegulatoryReferences.AiActDeployerDuties,
+            RegulatoryReferences.AiActTransparency
+        }.Select(bezug => bezug.Citation).ToHashSet(StringComparer.Ordinal);
 
-        Rechtsbezuege.AnhangIII.Gilt.Should().BeEmpty(
-            "die Einstufungsfrage hat kein Anlaufdatum — sie ist die Frage, "
-            + "von der die Fristen der anderen abhängen");
+        Rechtsbezuege.Eigene.Should().NotBeEmpty("sonst prüft dieser Test nichts");
+
+        Rechtsbezuege.Eigene.Select(bezug => bezug.Citation)
+            .Should().NotIntersectWith(vonNoelia);
+    }
+
+    /// <summary>
+    /// § 87 Abs. 1 Nr. 6 BetrVG ist kein Zitat, weil er keines sein kann.
+    /// </summary>
+    /// <remarks>
+    /// <strong>Die Lücke steht sichtbar statt verschwiegen.</strong>
+    /// <c>RegulatoryRegime</c> kennt <c>Gdpr</c>, <c>AiAct</c>, <c>Nis2</c> und
+    /// <c>Dora</c> — kein nationales Arbeitsrecht. Gemeldet als
+    /// <c>bugs/betrvg-hat-kein-regelwerk.md</c>; dieser Test wird grün bleiben,
+    /// bis es ein Regelwerk dafür gibt, und dann fällt er und verlangt, dass die
+    /// Konstante ein Zitat wird.
+    /// </remarks>
+    [Fact]
+    public void Die_Mitbestimmung_ist_ein_Satz_und_kein_falsches_Zitat()
+    {
+        Rechtsbezuege.Mitbestimmung.Should().Contain("§ 87 Abs. 1 Nr. 6 BetrVG");
+
+        Enum.GetNames<RegulatoryRegime>().Should().NotContain(
+            name => name.Contains("Betr", StringComparison.OrdinalIgnoreCase)
+                    || name.Contains("National", StringComparison.OrdinalIgnoreCase),
+            "sobald es ein Regelwerk für nationales Arbeitsrecht gibt, gehört "
+            + "die Mitbestimmung als RegulatoryReference dahin — und dieser "
+            + "Test fällt und sagt es");
     }
 
     /// <summary>Anhang III stuft nicht ein, und sagt das.</summary>
@@ -124,10 +156,10 @@ public class RechtsbezugTests
     [Fact]
     public void Anhang_III_gibt_die_Frage_an_einen_Menschen_weiter()
     {
-        Rechtsbezuege.AnhangIII.Leser.Should()
+        Rechtsbezuege.AnhangIII.Reader.Should()
             .Contain("Mensch").And.Contain("juristischer Ausbildung");
 
-        Rechtsbezuege.AnhangIII.Leser.Should().NotContain(
+        Rechtsbezuege.AnhangIII.Reader.Should().NotContain(
             "nicht hochriskant",
             "die Einstufung gehört nicht uns — der Nachweis legt die Belege "
             + "daneben und stuft nichts ein");
@@ -145,13 +177,13 @@ public class RechtsbezugTests
     public void Kein_Zitat_steht_ohne_Pruefung_da()
     {
         var belegt = Pruefungen()
-            .SelectMany(pruefung => pruefung.Bezuege)
-            .Select(bezug => bezug.Fundstelle)
+            .SelectMany(pruefung => pruefung.References)
+            .Select(bezug => bezug.Citation)
             .ToHashSet(StringComparer.Ordinal);
 
         belegt.Should().NotBeEmpty("sonst prüft dieser Test nichts");
 
-        Rechtsbezuege.Alle.Select(bezug => bezug.Fundstelle)
+        Rechtsbezuege.Eigene.Select(bezug => bezug.Citation)
             .Should().OnlyContain(fundstelle => belegt.Contains(fundstelle));
     }
 
@@ -165,76 +197,69 @@ public class RechtsbezugTests
     [Fact]
     public void Keine_Pruefung_erfindet_ein_eigenes_Zitat()
     {
-        var sammlung = Rechtsbezuege.Alle.ToHashSet();
+        // Erlaubt ist BEIDES: was Noelia mitbringt und was wir ergaenzen. Der
+        // Punkt dieses Tests ist ein anderer — dass niemand einen Artikel
+        // NEBEN einer der beiden Sammlungen erfindet, denn dann stuenden zwei
+        // Fassungen desselben Zitats im selben Dokument.
+        var sammlung = Rechtsbezuege.Eigene
+            .Concat(
+            [
+                RegulatoryReferences.GdprRecordsOfProcessing,
+                RegulatoryReferences.GdprThirdCountryTransfer,
+                RegulatoryReferences.GdprProcessorContract,
+                RegulatoryReferences.GdprIntegrityOfProcessing,
+                RegulatoryReferences.AiActRecordKeeping,
+                RegulatoryReferences.AiActDeployerDuties,
+                RegulatoryReferences.AiActTransparency,
+                RegulatoryReferences.Nis2SupplyChain,
+                RegulatoryReferences.DoraAssetIdentification,
+                RegulatoryReferences.DoraThirdPartyRegister
+            ])
+            .ToHashSet();
 
         foreach (var pruefung in Pruefungen())
         {
-            pruefung.Bezuege.Should().OnlyContain(bezug => sammlung.Contains(bezug),
-                $"{pruefung.Id} nennt ein Zitat, das nicht in Rechtsbezuege.Alle steht");
+            pruefung.References.Should().OnlyContain(bezug => sammlung.Contains(bezug),
+                $"{pruefung.Id} nennt ein Zitat, das nicht in Rechtsbezuege.Eigene steht");
         }
     }
 
-    /// <summary>Die Bezüge reisen mit der Lesung, nicht mit dem Container.</summary>
+    /// <summary>Jede Prüfung trägt ihre Zitate selbst.</summary>
     /// <remarks>
-    /// Die Pflichtenseite liest sie aus der Lesung. Stünden sie nur an der
-    /// Prüfung, müsste die Seite ein zweites Mal in den Container sehen — zwei
-    /// Wege zu einer Aussage, und beim ersten Mal merkt es niemand.
+    /// <strong>Das ersetzt zwei Tests, die unseren eigenen Läufer prüften.</strong>
+    /// Bis ADR-0045 hängte <c>Nachweislauf</c> die Bezüge einer Prüfung an den
+    /// Befund, wenn sie es nicht selbst tat — und zwei Tests hielten das fest.
+    /// Noelias <c>SecurityCheckResult</c> trägt <c>References</c> direkt, also
+    /// hängt sie jede Prüfung selbst an, und geprüft wird genau das.
     /// </remarks>
     [Fact]
-    public async Task Ein_Befund_traegt_die_Bezuege_seiner_Pruefung()
+    public async Task Jeder_Befund_traegt_die_Zitate_seiner_Pruefung()
     {
-        var lesung = await new Nachweislauf(
-            "probe",
-            [new Aufzeichnungspruefung(nahtVorhanden: true, anbieterEingerichtet: true, null)],
-            TimeProvider.System).LeseAsync();
+        foreach (var pruefung in Pruefungen())
+        {
+            var befund = await pruefung.RunAsync();
 
-        lesung.Befunde.Single().Bezuege.Should()
-            .Contain(Rechtsbezuege.Aufzeichnung)
-            .And.Contain(Rechtsbezuege.AnhangIII);
+            befund.References.Should().BeEquivalentTo(
+                pruefung.References,
+                $"{pruefung.Id} muss seine Zitate an den Befund hängen — sonst "
+                + "steht die Pflichtenseite ohne sie da");
+        }
     }
 
-    /// <summary>Auch eine abgebrochene Prüfung nimmt ihre Bezüge mit.</summary>
+    /// <summary>Jede Prüfung dieses Baumes, die Zitate trägt.</summary>
     /// <remarks>
-    /// Sonst verschwände ausgerechnet dort, wo etwas unbelegt bleibt, auch noch
-    /// die Frage, für die es unbelegt bleibt.
+    /// Ohne Container gebaut: <c>Widerrufspruefung</c> und <c>Ledgerpruefung</c>
+    /// brauchen einen, und ihre Zitate sind dieselben wie die der anderen.
     /// </remarks>
-    [Fact]
-    public async Task Auch_eine_werfende_Pruefung_traegt_ihre_Bezuege()
-    {
-        var lesung = await new Nachweislauf(
-            "probe", [new WerferinMitBezug()], TimeProvider.System).LeseAsync();
-
-        var befund = lesung.Befunde.Single();
-
-        befund.Stand.Should().Be(Stand.Fehlt);
-        befund.Bezuege.Should().Contain(Rechtsbezuege.Verzeichnis);
-    }
-
-    /// <summary>Jede Prüfung dieses Baumes, einmal gebaut.</summary>
-    private static IReadOnlyList<IPruefung> Pruefungen() =>
+    private static IReadOnlyList<ISecurityCheck> Pruefungen() =>
     [
-        new Zielpruefung(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()),
         new Nahtpruefung(typeof(object), [], "probe"),
         new Zahlpruefung([]),
         new Anbieterpruefung([]),
-        new Aufzeichnungspruefung(false, false, null),
+        Loeschpruefung.OhneZeilen("probe"),
+        // Ohne registriertes Tor meldet sie NotApplicable — ihre Zitate traegt
+        // sie trotzdem, und genau die fehlten dieser Liste.
         new Widerrufspruefung<object>(
-            new Microsoft.Extensions.DependencyInjection.ServiceCollection()
-                .BuildServiceProvider(),
-            typeof(object)),
-        Loeschpruefung.OhneZeilen("probe")
+            new ServiceCollection().BuildServiceProvider(), typeof(object))
     ];
-
-    /// <summary>Eine Prüfung, die wirft und Bezüge trägt.</summary>
-    private sealed class WerferinMitBezug : IPruefung
-    {
-        public string Id => "wt.grenze.ziele";
-
-        public Bereich Bereich => Bereich.Grenze;
-
-        public IReadOnlyList<Rechtsbezug> Bezuege => [Rechtsbezuege.Verzeichnis];
-
-        public Task<Befund> LaufenAsync(CancellationToken ct = default) =>
-            throw new InvalidOperationException("im Test");
-    }
 }

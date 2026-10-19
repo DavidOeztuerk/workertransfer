@@ -85,11 +85,25 @@ ganze Secret: sonst bekäme JEDER Dienst auch den Schlüssel der
 Formulierungshilfe, und einer, den neun von zwölf nicht brauchen, gehört nicht
 in ihre Umgebung.
 */}}
-- name: JwtSettings__Secret
+- name: Jwt__PublicKey
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_JWT_SECRET
+      key: WORKER_JWT_PUBLIC_KEY
+- name: Jwt__KeyId
+  value: {{ $root.Values.secrets.jwtKeyId | quote }}
+{{/*
+Den privaten Schluessel bekommt NUR identity-service. Er steht deshalb hier in
+einer Bedingung und nicht im gemeinsamen Block: jeder weitere Traeger waere
+eine zweite Stelle, die einen Handelnden erschaffen kann.
+*/}}
+{{- if eq $svc.name "identity-service" }}
+- name: Jwt__PrivateKey
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: WORKER_JWT_PRIVATE_KEY
+{{- end }}
 - name: Erasure__Geheimnis
   valueFrom:
     secretKeyRef:

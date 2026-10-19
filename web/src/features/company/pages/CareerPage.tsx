@@ -190,7 +190,6 @@ export function CareerPage() {
             </Alert>
           ) : null}
 
-          {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. */}
           {stellen.pending ? (
             <LoadingBlock label={t("karriere.stellenLaden")} />
           ) : null}

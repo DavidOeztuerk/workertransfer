@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Noelia.Abstractions.Compliance;
+using Noelia.Abstractions.Hosting;
+using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
-using WorkerTransfer.Nachweis;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 
@@ -28,8 +32,14 @@ namespace WorkerTransfer.Consent.Infrastructure.Nachweis;
 /// Auch das ist eine Handlung, die es nicht gibt, und deshalb wird sie hier
 /// gezählt statt beschrieben.</para>
 /// </remarks>
-/// <param name="kontext">Die Ledger-Datenbank — nur ihr Modell, nie ihre Zeilen.</param>
-public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
+/// <param name="anbieter">
+/// Der Container. Der Kontext wird in einem EIGENEN BEREICH aufgeloest, und das
+/// ist kein Umstand, sondern Pflicht: Noelias Pruefungen sind Singletons, der
+/// <c>DbContext</c> ist bereichsgebunden. Ihn in ein Singleton zu ziehen waere
+/// eine gefangene Abhaengigkeit — ein Kontext, der ewig lebt, und der erste
+/// Fehler daran faellt Wochen spaeter an einer ganz anderen Stelle auf.
+/// </param>
+public sealed class Ledgerpruefung(IServiceProvider anbieter) : ISecurityCheck
 {
     /// <summary>Spaltennamen, die einen Mandanten bezeichnen.</summary>
     private static readonly string[] Mandantenworte =
@@ -39,18 +49,35 @@ public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
     public string Id => "wt.ledger.person";
 
     /// <inheritdoc />
-    public Bereich Bereich => Bereich.Ledger;
+    public NoeliaModule Module => NoeliaModule.Composition;
 
     /// <inheritdoc />
-    public IReadOnlyList<Rechtsbezug> Bezuege =>
+    /// <remarks>Auswahlregel — siehe <c>Anbieterpruefung</c>.</remarks>
+    public SecurityCheckCategory Category => SecurityCheckCategory.Composition;
+
+    /// <inheritdoc />
+    public SecurityCheckSeverity Severity => SecurityCheckSeverity.High;
+
+    /// <inheritdoc />
+    public string Remediation =>
+        "Eine Einwilligung gehoert der Person und folgt ihr ueber Arbeitgeber "
+        + "hinweg (ADR-0017). Eine Mandantenspalte bindet sie an ein "
+        + "Unternehmen — beim Wechsel waere sie weg, und niemand haette sie "
+        + "widerrufen.";
+
+    /// <inheritdoc />
+    public IReadOnlyList<RegulatoryReference> References =>
     [
         Rechtsbezuege.Widerruf,
         Rechtsbezuege.Rechenschaft
     ];
 
     /// <inheritdoc />
-    public Task<Befund> LaufenAsync(CancellationToken ct = default)
+    public Task<SecurityCheckResult> RunAsync(CancellationToken cancellationToken = default)
     {
+        using var bereich = anbieter.CreateScope();
+        var kontext = bereich.ServiceProvider.GetRequiredService<ConsentDbContext>();
+
         // NUR DER LEDGER, und das ist beim ersten Lauf gegen den echten Stapel
         // gemessen worden: ueber ALLE Entitaeten gelesen meldete diese Pruefung
         // `audit_events.TenantId` — und lag falsch. Die Pruefspur haelt fest,
@@ -74,10 +101,8 @@ public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
 
         if (spalten.Count == 0)
         {
-            return Task.FromResult(new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
                 "Das Datenmodell des Ledgers ist leer — diese Prüfung hat nichts "
                 + "angesehen und belegt damit nichts.",
                 "Nachsehen, ob der Kontext die Ledger-Zeile noch kennt: eine "
@@ -94,10 +119,8 @@ public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
 
         if (treffer.Count > 0)
         {
-            return Task.FromResult(new Befund(
-                Id,
-                Bereich,
-                Stand.Fehlt,
+            return Task.FromResult(Ergebnis(
+                SecurityCheckStatus.Fail,
                 $"Der Ledger trägt {treffer.Count} Spalte(n), die einen "
                 + $"Mandanten bezeichnen: {string.Join(", ", treffer)}.",
                 "Eine Einwilligung gehört der Person und folgt ihr über "
@@ -106,10 +129,8 @@ public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
                 + "niemand hätte es widerrufen."));
         }
 
-        return Task.FromResult(new Befund(
-            Id,
-            Bereich,
-            Stand.Erfuellt,
+        return Task.FromResult(Ergebnis(
+            SecurityCheckStatus.Pass,
             $"Keine der {spalten.Count} Spalten der Ledger-Tabelle bezeichnet einen "
             + "Mandanten: eine Einwilligung gehört der Person und folgt ihr über "
             + "Arbeitgeber hinweg. Der Ledger kennt außerdem nur Gewähren und "
@@ -120,4 +141,11 @@ public sealed class Ledgerpruefung(ConsentDbContext kontext) : IPruefung
             + "Zusage, dass eine Einwilligung einen Arbeitgeberwechsel "
             + "überlebt."));
     }
+
+    private SecurityCheckResult Ergebnis(
+        SecurityCheckStatus stand, string zusammenfassung, string abhilfe) =>
+        new(Id, Module, Category, stand, Severity, zusammenfassung, abhilfe)
+        {
+            References = References
+        };
 }

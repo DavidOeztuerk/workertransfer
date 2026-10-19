@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Tests;
 
@@ -34,7 +35,6 @@ namespace WorkerTransfer.Identity.Tests;
 [Collection(PostgresCollection.Name)]
 public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string Geheimnis = "test-secret-with-at-least-thirty-two-bytes-xx";
     private const string Passwort = "geheim-und-lang-genug";
 
     /// <summary>Written by <c>worker_auth.BcryptPasswordHasher</c>, verbatim.</summary>
@@ -49,7 +49,10 @@ public class KreuzbeweisTests(Postgres postgres) : IAsyncLifetime
         _dienst = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:identity", postgres.ConnectionString);
-            host.UseSetting("JwtSettings:Secret", Geheimnis);
+            host.UseSetting("Jwt:PublicKey", Tokenform.OeffentlichSchluessel);
+            host.UseSetting("Jwt:PrivateKey", Tokenform.PrivatSchluessel);
+            host.UseSetting("Jwt:KeyId", Tokenform.Kennung);
+            host.UseSetting(Geheimnisspeicher.Variable, "test-hauptschluessel-fuer-die-reihe");
             host.UseSetting("JwtSettings:Issuer", Tokenform.Issuer);
             host.UseSetting("JwtSettings:Audience", Tokenform.Audience);
             host.UseSetting("environment", "Development");

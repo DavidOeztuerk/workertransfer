@@ -117,7 +117,6 @@ export function CompanyTransfersPage() {
         </Alert>
       ) : null}
 
-      {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. */}
       {transfers.pending ? (
         <Card>
           <CardContent>

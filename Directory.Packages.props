@@ -18,6 +18,13 @@
     <PackageVersion Include="Noelia.Application" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Contracts" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Core" Version="$(NoeliaVersion)" />
+    <!--
+      Die Betriebsoberflaeche (ADR-0045). Sie ersetzt die sieben
+      `/nachweis/…`-Adressen, die ADR-0044 selbst gebaut hat: Abschnitte,
+      404 ohne Sichtbarkeit, `report.json` aus DERSELBEN Lesung. Was sie
+      liefert, wird hier geloescht und nicht danebengestellt.
+    -->
+    <PackageVersion Include="Noelia.Dashboard" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Data.EntityFrameworkCore" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.Http" Version="$(NoeliaVersion)" />
     <PackageVersion Include="Noelia.InMemory" Version="$(NoeliaVersion)" />

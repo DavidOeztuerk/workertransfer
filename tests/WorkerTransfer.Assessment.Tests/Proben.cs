@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
+using System.Security.Cryptography;
 using Noelia.Core.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -52,8 +52,27 @@ public sealed class PostgresCollection : ICollectionFixture<Postgres>
 /// <summary>Die Tokenform, die dieser Dienst prüft.</summary>
 public static class Tokenform
 {
-    /// <summary>Das Geheimnis, mit dem der Prüfstand unterschreibt.</summary>
-    public const string Geheimnis = "test-secret-with-at-least-thirty-two-bytes-xx";
+    /// <summary>Der private Testschlüssel, mit dem der Prüfstand unterschreibt.</summary>
+    /// <remarks>
+    /// Fest im Baum, weil er nur hier gilt. Gewürfelt machte er die Reise von
+    /// der Maschine abhängig, auf der sie läuft.
+    /// </remarks>
+    public const string PrivatSchluessel = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgJ3H3ErtgAxTOpVVLh08LeYAzp06ePuF5MOe37hEIpZehRANCAATsDC5wPWJV4/HRgf8P2JwSrTF3mFASKSK7RsgkpBN97pH87mRpgy/rmLIjBqFZhq2C/VrcyfvLR2iev4OwNO7s";
+
+    /// <summary>Der passende öffentliche Schlüssel, den der Dienst bekommt.</summary>
+    public const string OeffentlichSchluessel = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7AwucD1iVePx0YH/D9icEq0xd5hQEikiu0bIJKQTfe6R/O5kaYMv65iyIwahWYatgv1a3Mn7y0donr+DsDTu7A==";
+
+    /// <summary>Benennt den Schlüssel, damit ein Wechsel zwei nebeneinander erlaubt.</summary>
+    public const string Kennung = "test";
+
+    private static readonly ECDsa Kurve = Lies();
+
+    private static ECDsa Lies()
+    {
+        var kurve = ECDsa.Create();
+        kurve.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivatSchluessel), out _);
+        return kurve;
+    }
 
     /// <summary>Der Aussteller.</summary>
     public const string Issuer = "workertransfer";
@@ -82,8 +101,8 @@ public static class Tokenform
             claims: ansprueche,
             expires: DateTime.UtcNow.AddMinutes(15),
             signingCredentials: new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Geheimnis)),
-                SecurityAlgorithms.HmacSha256));
+                new ECDsaSecurityKey(Kurve) { KeyId = Kennung },
+                SecurityAlgorithms.EcdsaSha256));
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }

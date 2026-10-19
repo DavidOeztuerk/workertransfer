@@ -1,6 +1,6 @@
 using FluentAssertions;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using Noelia.Abstractions.Security.Checks;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.Ganzes.Tests;
 
@@ -96,11 +96,11 @@ public class WortschatzTests
         string dienst, Type domaene, Type vertraege)
     {
         var befund = await new Zahlpruefung(
-            [domaene.Assembly, vertraege.Assembly], Ausnahmen(dienst)).LaufenAsync();
+            [domaene.Assembly, vertraege.Assembly], Ausnahmen(dienst)).RunAsync();
 
-        befund.Stand.Should().Be(
-            Stand.Erfuellt,
-            $"{dienst}: {befund.Zusammenfassung}");
+        befund.Status.Should().Be(
+            SecurityCheckStatus.Pass,
+            $"{dienst}: {befund.Summary}");
     }
 
     /// <summary>Die Erkennung selbst stimmt — sonst wäre alles grün, weil nichts trifft.</summary>
@@ -176,10 +176,10 @@ public class WortschatzTests
         {
             var befund = await new Zahlpruefung(
                 [domaene.Assembly, vertraege.Assembly], Ausnahmen(dienst))
-                .LaufenAsync();
+                .RunAsync();
 
-            befund.Zusammenfassung.Should().NotContain(
-                "zeigen auf Namen", $"{dienst}: {befund.Zusammenfassung}");
+            befund.Summary.Should().NotContain(
+                "zeigen auf Namen", $"{dienst}: {befund.Summary}");
         }
     }
 

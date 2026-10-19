@@ -53,9 +53,6 @@ export function SiteFooter() {
             <Typography variant="h4" sx={{ mb: 1 }}>
               WorkerTransfer
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: "34ch" }}>
-              {t("fuss.anspruch")}
-            </Typography>
           </Box>
 
           <Spalte titel={t("fuss.plattform")}>
@@ -91,12 +88,6 @@ export function SiteFooter() {
         >
           <Typography variant="caption" color="text.secondary">
             {t("fuss.rechte", { jahr: new Date().getFullYear() })}
-          </Typography>
-          {/* Die drei Sätze, auf denen die Plattform steht — als Zusage und
-              nicht als Werbung. Sie stehen unter jeder Seite, weil sie unter
-              jeder Seite gelten. */}
-          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: "68ch" }}>
-            {t("fuss.zusage")}
           </Typography>
         </Box>
       </Container>

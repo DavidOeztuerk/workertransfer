@@ -267,8 +267,6 @@ export function ConsentsPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
             {t("freigaben.einzelnLead")}
           </Typography>
-          {/* Reihenfolge nach dem Muster: lädt, dann Fehler, dann leer, dann
-              Inhalt. */}
           {freigaben.laedt ? (
             <LoadingBlock label={t("freigaben.laden")} />
           ) : null}

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 
 namespace WorkerTransfer.Identity.Infrastructure.Nachweis;
 
@@ -26,12 +27,20 @@ namespace WorkerTransfer.Identity.Infrastructure.Nachweis;
 /// <para><c>none</c> fällt heraus: „kein Anbieter" ist kein Empfänger, und eine
 /// Zeile darüber wäre ein Eintrag über einen Empfänger, den es nicht gibt.</para>
 /// </remarks>
-/// <param name="kontext">Die Identitätsdatenbank.</param>
-public sealed class EfAnbieterquelle(IdentityDbContext kontext) : IAnbieterquelle
+/// <param name="anbieter">
+/// Der Container. Der Kontext wird in einem eigenen Bereich aufgelöst: Noelias
+/// Prüfungen sind Singletons, der <c>DbContext</c> ist bereichsgebunden — ihn
+/// direkt zu nehmen wäre eine gefangene Abhängigkeit, und der Container bricht
+/// dann beim Start ab.
+/// </param>
+public sealed class EfAnbieterquelle(IServiceProvider anbieter) : IAnbieterquelle
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<Anbieterzeile>> LeseAsync(CancellationToken ct = default)
     {
+        using var bereich = anbieter.CreateScope();
+        var kontext = bereich.ServiceProvider.GetRequiredService<IdentityDbContext>();
+
         var gruppen = await kontext.AccountSettings
             .Where(zeile => zeile.AiProvider != "none" && zeile.AiBaseUrl != "")
             .GroupBy(zeile => new { zeile.AiProvider, zeile.AiBaseUrl })

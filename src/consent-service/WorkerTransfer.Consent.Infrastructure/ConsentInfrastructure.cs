@@ -15,9 +15,9 @@ using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Consent.Infrastructure.Nachweis;
-using WorkerTransfer.Nachweis;
-using WorkerTransfer.Nachweis.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Pruefungen;
 using WorkerTransfer.Contracts.Consent;
+using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Consent.Infrastructure;
 
@@ -53,6 +53,8 @@ public static class ConsentInfrastructure
         services.AddDbContext<ConsentDbContext>((provider, options) =>
             ConsentDbContextFactory.Konfiguriere(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatenbankbereitschaft<ConsentDbContext>("consent");
+        services.AddSchluesselbund<ConsentDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 
@@ -89,28 +91,27 @@ public static class ConsentInfrastructure
     private static void Nachweis(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddScoped<IPruefung>(_ => new Zahlpruefung(
+        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
             [typeof(AuditAction).Assembly, typeof(EinwilligungsfrageV1).Assembly]));
 
         // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
         // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
         // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
         // durchschneiden soll.
-        services.AddScoped<IPruefung>(anbieter => new Anbieterpruefung(
+        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
             anbieter.GetServices<IAnbieterquelle>()));
 
-        services.AddScoped<IPruefung>(_ => new Aufzeichnungspruefung(false, false, null));
 
         // Der Ledger selbst — die eine Pruefung im Bereich `Ledger`, und der
         // Grund, dass es diesen Bereich gibt. Sie misst ein NICHT-Vorhandensein
         // (keine Mandantenspalte), und das sind die, die am leichtesten wieder
         // verschwinden.
-        services.AddScoped<IPruefung, Ledgerpruefung>();
+        services.AddSingleton<ISecurityCheck, Ledgerpruefung>();
 
         var loeschung = new Loescheinstellungen();
         configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
 
-        services.AddScoped<IPruefung>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
             "consent",
             !string.IsNullOrEmpty(loeschung.Geheimnis),
             pruefspurVorhanden: false));

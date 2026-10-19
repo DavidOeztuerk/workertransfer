@@ -46,7 +46,8 @@ cd web && pnpm e2e                 # the Playwright journeys (needs `make up`)
 ## Commands
 
 ```bash
-make env            # FIRST in a fresh clone: writes .env, rolls three secrets
+make env            # FIRST in a fresh clone: writes .env, rolls four secrets,
+                    #   and generates the ECDSA token key pair
 make check          # the gate, fail-fast
 make build / test   # .NET only, in that order
 make check-web      # pnpm check + test + build
@@ -104,12 +105,13 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 
 ## Configuration
 
-`make env` first, in a fresh clone. `.env.example` is complete with a comment per key; the three secrets ship **empty** and `make env` rolls them. `.env` is ignored.
+`make env` first, in a fresh clone. `.env.example` is complete with a comment per key; the secrets ship **empty** and `make env` rolls them. It also generates the **token key pair** (ECDSA P-256): `WORKERTRANSFER_JWT_PRIVATE_KEY` goes to identity-service alone, `…_PUBLIC_KEY` to all fifteen (ADR-0046). `.env` is ignored.
 
 - **No default for a secret.** `${X:?…}` in compose, never `${X:-wert}` — a built-in default *is* the secret and it lives in git. Without a value compose aborts and names the variable.
 - **`Umgebung.Laden()` is the first line of all fourteen `Program.cs`**, before `CreateBuilder`: the configuration builder reads the environment once, when it builds.
 - **A set variable wins.** In compose and in the cluster the environment comes from there; a file in the image must never override it.
-- Precedence: set environment > `.env` > `appsettings.json`. Noelia does the same for `JWT_SECRET` over `JwtSettings:Secret`.
+- Precedence: set environment > `.env` > `appsettings.json`.
+- `WORKERTRANSFER_SECRETS_KEY` is required in **every** service now — it encrypts the data-protection key ring as well as a person's AI key. A test host that forgets it fails at resolve time, not at build time.
 
 ## The route map
 

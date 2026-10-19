@@ -15,7 +15,18 @@ namespace WorkerTransfer.Identity.Tests;
 /// </summary>
 internal static class Tokenform
 {
-    internal const string Secret = "test-secret-with-at-least-thirty-two-bytes-xx";
+    /// <summary>Der private Testschlüssel (P-256, PKCS#8, base64).</summary>
+    /// <remarks>
+    /// Nur identity-service hält ihn — hier wie im Betrieb. Die anderen
+    /// dreizehn Dienste bekommen allein <see cref="OeffentlichSchluessel"/>.
+    /// </remarks>
+    internal const string PrivatSchluessel = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgJ3H3ErtgAxTOpVVLh08LeYAzp06ePuF5MOe37hEIpZehRANCAATsDC5wPWJV4/HRgf8P2JwSrTF3mFASKSK7RsgkpBN97pH87mRpgy/rmLIjBqFZhq2C/VrcyfvLR2iev4OwNO7s";
+
+    /// <summary>Der passende öffentliche Schlüssel (SPKI, base64).</summary>
+    internal const string OeffentlichSchluessel = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7AwucD1iVePx0YH/D9icEq0xd5hQEikiu0bIJKQTfe6R/O5kaYMv65iyIwahWYatgv1a3Mn7y0donr+DsDTu7A==";
+
+    /// <summary>Benennt den Schlüssel, damit ein Wechsel zwei nebeneinander erlaubt.</summary>
+    internal const string Kennung = "test";
     internal const string Issuer = "workertransfer-identity";
     internal const string Audience = "workertransfer";
 
@@ -23,16 +34,16 @@ internal static class Tokenform
     {
         var settings = new JwtSettings
         {
-            Secret = Secret,
+            Secret = string.Empty,
             Issuer = Issuer,
             Audience = Audience,
             ExpireMinutes = 15
         };
-        var shared = SigningKey.FromSharedSecret(Secret, kid: null);
+        var schluessel = SigningKey.FromEcdsaPrivateKey(PrivatSchluessel, Kennung);
 
         return new NoeliaAccessTokenIssuer(new JwtService(
             Options.Create(settings),
-            new KeyRing([shared], shared),
+            new KeyRing([schluessel], schluessel),
             NullLogger<JwtService>.Instance));
     }
 
