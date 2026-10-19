@@ -54,7 +54,7 @@ Legende: **gebaut** · **MVP offen** (Phase 6 der Bauliste) · **vor dem Start**
 | Google, Microsoft | **gebaut** (ADR-0053), **jetzt einrichten** (20.10.2026) | identity-service ist selbst Relying Party; verknüpft über die Kennung des Anbieters, nie über die Adresse. Je eine App beim Anbieter (Google Cloud Console, Microsoft Entra) — beide kostenlos, und keins von beiden hängt am Hosting: es sind Konten beim *Anbieter der Anmeldung*, nicht beim Betreiber der Server. Eingerichtet über `/einrichten` (Agent `anbieter-einrichter`), Werte über `scripts/env-secret.sh` |
 | Apple | **gebaut** (ADR-0053), **aufgeschoben bis kurz vor dem Start** | „Mit Apple anmelden" ist dasselbe wie Google und Microsoft, nicht nur für eine iPhone-App. Es verlangt das Apple Developer Program (99 € im Jahr), eine Services ID, eine echte Domain mit https (kein localhost) und einen Schlüssel, dessen Geheimnis alle sechs Monate neu signiert wird. Ohne `WORKERTRANSFER_APPLE_*` ist der Knopf aus — der Code ist fertig und wartet. Gekauft wird erst mit der Domain, und vom Betreiber, nicht von einem Agenten |
 | LinkedIn | **nach dem MVP** (N1) | |
-| Keycloak (für die Noelia Control Plane) | **vor dem Start** (I2, Q4) | heute läuft sie nur lokal ohne Identitätsanbieter |
+| Keycloak (für die Noelia Control Plane) | **lokal gebaut** (20.10.2026), Betrieb **vor dem Start** (I2, Q4) | `make keycloak && make control-plane-oidc`: eigener Container mit TLS, Gruppe `admins` → Rolle `admin`. Im Betrieb dazu: eine echte Domain mit Zertifikat, und die Lizenz an diese Authority gebunden (`--authority`) |
 
 ## 4. Profile, Nachweise, Dateien
 

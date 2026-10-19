@@ -447,6 +447,8 @@ Vorgemerkt: eigener Identitätsanbieter (z. B. Keycloak) und eine echte Lizenz.
 
 **Antwort:** **A, 17.10.2026.** Eigener Identitätsanbieter (z. B. Keycloak) und echte Lizenz, vor dem Start.
 
+**Lokal gebaut am 20.10.2026:** `make keycloak && make control-plane-oidc`. Offen bis zum Start: die Domain, ihr Zertifikat und die an diese Authority gebundene Lizenz.
+
 ### Q5. Ein Arbeitgeber gibt Personal aktiv ab (C1, eigener Fall)
 
 **Vorschlag aus Runde 1:** Der Arbeitgeber **lädt** seine Leute ein, sich

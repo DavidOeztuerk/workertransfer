@@ -9,7 +9,7 @@ DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e e2e ai-check \
         fix dev env up down images route-map analyze evidence evidence-check \
-        control-plane control-plane-down k8s-up k8s-down k8s-lint k8s-seed clean
+        control-plane control-plane-oidc control-plane-down keycloak keycloak-down k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # This list.
 	@# `0-9` in the pattern, otherwise k8s-up/-down/-seed/-lint are missing —
@@ -138,6 +138,15 @@ control-plane:  # The Noelia Control Plane over the running stack: http://localh
 	@# peers, and Docker's port forwarding never is one. The reason stands in
 	@# the script. The path can be redirected with NOELIA_CONTROL_PLANE_PFAD.
 	./scripts/control-plane.sh
+
+control-plane-oidc:  # The control plane with sign-in at the local Keycloak — needs `make up` and `make keycloak`
+	./scripts/control-plane.sh --oidc
+
+keycloak:  # Local identity provider for the control plane: https://localhost:8443
+	./scripts/keycloak.sh
+
+keycloak-down:  # Stop Keycloak; the realm stays in its volume
+	./scripts/keycloak.sh --down
 
 control-plane-down:  # Stop the control plane.
 	./scripts/control-plane.sh --down

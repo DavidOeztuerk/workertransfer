@@ -222,6 +222,12 @@ Three things are easy to get wrong here:
   never from that file: it is a signed paper naming a customer. Empty means the
   free tier — one fleet, three services — and this fleet has fourteen.
 
+**With sign-in, since 20.10.2026: `make keycloak && make control-plane-oidc`.** Keycloak runs in a container of its own on `https://localhost:8443` (realm `workertransfer`, client `noelia-control-plane`, group `admins` → role `admin`, a user `operator`), set up by `kcadm` on first start and kept in the volume `workertransfer-keycloak-data`. Three things are easy to get wrong:
+
+- **The control plane accepts only an https authority, in every environment** (`AccessOptions.Validate`), so Keycloak serves the .NET development certificate — and macOS must trust it, because the control plane fetches the discovery document from the host. Trusting it is the person's step (`dotnet dev-certs https --trust`), never a script's; `keycloak.sh` stops and names the command.
+- **The secrets and the realm belong together.** The admin password, the client secret and the operator's password are rolled once into `.control-plane/keycloak.env` (mode 600). Missing file over an existing volume means the script refuses rather than rolling new ones nothing in the realm knows.
+- **The OIDC start proves less than the local one, and says so.** Signed out every page redirects to Keycloak — and building that address needs the discovery document, so the redirect proves the control plane reached Keycloak and trusted it. Whether it *collects* needs a sign-in; the local mode measures that.
+
 It presents the same paper as the dashboard it reads
 (`WORKERTRANSFER_EVIDENCE_SECRET`) and no second one. Empty means every service
 answers 404 and the fleet stays empty without anything being broken.
