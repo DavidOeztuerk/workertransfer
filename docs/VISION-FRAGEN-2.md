@@ -383,6 +383,10 @@ schreibt der Agent als Text.
 
 ## Q. Vor dem Start — aus Runde 1 verschoben
 
+**Vorbereitet am 20.10.2026:** [`ENTSCHEIDUNG-VOR-DEM-START.md`](ENTSCHEIDUNG-VOR-DEM-START.md)
+legt Q1–Q3 mit Kosten, Folgen im Code und einer Messung des Stapels
+nebeneinander — entschieden ist damit nichts.
+
 ### Q1. Geschäftsmodell (G1, G2)
 
 In Runde 1 bewusst als letzter Punkt vor dem Start vorgemerkt. Du kannst die
