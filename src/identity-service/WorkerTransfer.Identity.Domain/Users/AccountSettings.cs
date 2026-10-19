@@ -2,30 +2,49 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Identity.Domain.Users;
 
-/// <summary>Which provider is asked for the drafting help.</summary>
+/// <summary>Which provider a person's own key is for (ADR-0051).</summary>
 /// <remarks>
-/// <strong>Two values for many providers.</strong> Ollama, OpenAI, vLLM,
-/// LM Studio and Mistral all speak the same shape
-/// (<c>/v1/chat/completions</c>); Anthropic speaks one of its own. So what
-/// stands here is not a list of company names but the question that
-/// distinguishes the code — a list of companies would be a migration at every
-/// new provider.
-/// <para>
-/// <strong><see cref="None"/> is the default and no embarrassment.</strong>
-/// Whoever sets nothing asks nobody, and the interface says so. Defaulting to
-/// an outside provider would be a consent nobody gave.
-/// </para>
+/// <para><strong><see cref="None"/> means the platform's model</strong>, not
+/// "off": whoever sets nothing writes with what the platform runs — until the
+/// start the operator's local Ollama. A key of one's own replaces it for
+/// everything the person drafts.</para>
+///
+/// <para><strong>Two cloud providers for now, more later</strong> (Gemini,
+/// Ollama Cloud, Hugging Face). The address belongs to the provider and is set
+/// by the platform, never typed by the person: a free address would be a way
+/// to send a person's texts to any server, and the egress boundary only knows
+/// the hosts the operator declared.</para>
 /// </remarks>
 public enum AiProvider
 {
-    /// <summary>None. Nothing is given outwards.</summary>
+    /// <summary>No own key — the platform's model.</summary>
     None,
 
-    /// <summary>Everything that speaks <c>/v1/chat/completions</c> — Ollama included.</summary>
-    OpenAiCompatible,
+    /// <summary>OpenAI, with the person's own key.</summary>
+    OpenAi,
 
-    /// <summary>Anthropic's own shape.</summary>
+    /// <summary>Anthropic, with the person's own key.</summary>
     Anthropic
+}
+
+/// <summary>What each provider's address and default model are.</summary>
+public static class AiProviders
+{
+    /// <summary>The endpoint the platform uses for a provider; empty for <see cref="AiProvider.None"/>.</summary>
+    public static string Address(AiProvider provider) => provider switch
+    {
+        AiProvider.OpenAi => "https://api.openai.com/v1/chat/completions",
+        AiProvider.Anthropic => "https://api.anthropic.com/v1/messages",
+        _ => string.Empty
+    };
+
+    /// <summary>The model taken when the person names none — empty where we name none.</summary>
+    /// <remarks>
+    /// Anthropic's current default model. For OpenAI the person names the model
+    /// from her own account; a guessed name would fail at the first call.
+    /// </remarks>
+    public static string DefaultModel(AiProvider provider) =>
+        provider == AiProvider.Anthropic ? "claude-opus-5-5" : string.Empty;
 }
 
 /// <summary>
@@ -70,8 +89,8 @@ public sealed class AccountSettings
     /// <summary>Which provider may be asked.</summary>
     public AiProvider Provider { get; private set; } = AiProvider.None;
 
-    /// <summary>The provider's address. With Ollama, one's own machine.</summary>
-    public string Address { get; private set; } = string.Empty;
+    /// <summary>The provider's address — set by the platform, never by the person.</summary>
+    public string Address => AiProviders.Address(Provider);
 
     /// <summary>Which model.</summary>
     public string Model { get; private set; } = string.Empty;
@@ -79,7 +98,7 @@ public sealed class AccountSettings
     /// <summary>The key, encrypted. Empty means: none stored.</summary>
     /// <remarks>
     /// Never leaves this service in the clear and never goes back to the
-    /// browser. With a local Ollama it stays empty — there is none there.
+    /// browser.
     /// </remarks>
     public string EncryptedKey { get; private set; } = string.Empty;
 
@@ -105,7 +124,6 @@ public sealed class AccountSettings
     /// <param name="subject">Whose.</param>
     /// <param name="deleteAfterMonths">The lapse, or <c>null</c>.</param>
     /// <param name="provider">Which AI provider.</param>
-    /// <param name="address">Its address.</param>
     /// <param name="model">Its model.</param>
     /// <param name="encryptedKey">The key, encrypted.</param>
     /// <param name="keyTail">The last four characters.</param>
@@ -115,7 +133,6 @@ public sealed class AccountSettings
         SubjectId subject,
         int? deleteAfterMonths,
         AiProvider provider,
-        string address,
         string model,
         string encryptedKey,
         string keyTail,
@@ -124,7 +141,6 @@ public sealed class AccountSettings
         {
             DeleteAfterMonths = deleteAfterMonths,
             Provider = provider,
-            Address = address,
             Model = model,
             EncryptedKey = encryptedKey,
             KeyTail = keyTail,
@@ -163,14 +179,16 @@ public sealed class AccountSettings
     /// wire at every save travels over the wire more often than it has to.
     /// </remarks>
     /// <param name="provider">Which one.</param>
-    /// <param name="address">Its address.</param>
-    /// <param name="model">Its model.</param>
+    /// <param name="model">Its model; empty takes the provider's default.</param>
     /// <param name="aiAuditLog">Whether requests are logged.</param>
-    public void SetAi(AiProvider provider, string address, string model, bool aiAuditLog)
+    public void SetAi(AiProvider provider, string model, bool aiAuditLog)
     {
+        var named = (model ?? string.Empty).Trim();
+
         Provider = provider;
-        Address = (address ?? string.Empty).Trim();
-        Model = (model ?? string.Empty).Trim();
+        Model = provider == AiProvider.None
+            ? string.Empty
+            : named.Length > 0 ? named : AiProviders.DefaultModel(provider);
         AiAuditLog = aiAuditLog;
 
         // No provider means no key. Leaving it standing would be a secret with

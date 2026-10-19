@@ -260,10 +260,10 @@ function PrivacyBlock() {
  * back, so it cannot stand in the form at all; saving it together with the
  * rest would mean sending it over the wire again at every save.
  *
- * <strong>An own server needs none</strong>, and then the field disappears —
- * instead of standing there empty and suggesting a duty that does not exist.
- * That is at the same time the only choice in which the text does not leave
- * the machine.
+ * <strong>No address field.</strong> The address belongs to the provider and
+ * is set by the platform (ADR-0051): a typed one would be a way to send a
+ * person's texts to any server. Without a stored key the platform's model
+ * keeps drafting, and the page says so instead of leaving her guessing.
  */
 function AiBlock() {
   const { t } = useTranslation();
@@ -290,8 +290,6 @@ function AiBlock() {
     }
   }
 
-  const ownServer = settings?.provider === "openai_compatible";
-
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
@@ -314,26 +312,15 @@ function AiBlock() {
               onChange={(event) => void apply({ provider: event.target.value as AiProvider })}
             >
               <MenuItem value="none">{t("settings.providerNone")}</MenuItem>
-              <MenuItem value="openai_compatible">
-                {t("settings.providerOllama")}
-              </MenuItem>
               <MenuItem value="anthropic">{t("settings.providerAnthropic")}</MenuItem>
+              <MenuItem value="openai">{t("settings.providerOpenAi")}</MenuItem>
             </TextField>
 
             {settings.provider !== "none" ? (
               <>
                 <TextField
-                  label={t("settings.address")}
-                  helperText={t("settings.addressHint")}
-                  value={settings.baseUrl ?? ""}
-                  onChange={(event) =>
-                    current.set({ ...settings, baseUrl: event.target.value })
-                  }
-                  onBlur={() => void apply({ baseUrl: settings.baseUrl ?? "" })}
-                />
-                <TextField
                   label={t("settings.model")}
-                  helperText={t("settings.modelHint")}
+                  helperText={t(settings.provider === "anthropic" ? "settings.modelHintAnthropic" : "settings.modelHintOpenAi")}
                   value={settings.model ?? ""}
                   onChange={(event) =>
                     current.set({ ...settings, model: event.target.value })
@@ -341,8 +328,7 @@ function AiBlock() {
                   onBlur={() => void apply({ model: settings.model ?? "" })}
                 />
 
-                {!ownServer ? (
-                  <Box>
+                <Box>
                     <TextField
                       label={t("settings.key")}
                       type="password"
@@ -362,7 +348,6 @@ function AiBlock() {
                       </Typography>
                     </Box>
                   </Box>
-                ) : null}
 
                 <ConsentSwitch
                   label={t("settings.aiLog")}

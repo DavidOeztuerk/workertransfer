@@ -28,7 +28,6 @@ public sealed class EfAccountSettingsStore(IdentityDbContext context, TimeProvid
                 subject,
                 row.DeleteAfterMonths,
                 Provider(row.AiProvider),
-                row.AiBaseUrl,
                 row.AiModel,
                 row.AiKeyEncrypted,
                 row.AiKeyTail,
@@ -71,7 +70,7 @@ public sealed class EfAccountSettingsStore(IdentityDbContext context, TimeProvid
     /// <summary>The label in the column — snake_case, as everywhere on the wire.</summary>
     private static string Label(AiProvider provider) => provider switch
     {
-        AiProvider.OpenAiCompatible => "openai_compatible",
+        AiProvider.OpenAi => "openai",
         AiProvider.Anthropic => "anthropic",
         _ => "none"
     };
@@ -81,11 +80,14 @@ public sealed class EfAccountSettingsStore(IdentityDbContext context, TimeProvid
     /// </summary>
     /// <remarks>
     /// That is the reticent direction: whoever finds a row after a rollback with
-    /// a provider that no longer exists should ask nobody and not crash.
+    /// a provider that no longer exists should ask nobody and not crash. A row
+    /// from before ADR-0051 saying <c>openai_compatible</c> pointed at a server
+    /// of the person's own; that choice no longer exists, and the row reads as
+    /// "the platform's model".
     /// </remarks>
     private static AiProvider Provider(string label) => label switch
     {
-        "openai_compatible" => AiProvider.OpenAiCompatible,
+        "openai" => AiProvider.OpenAi,
         "anthropic" => AiProvider.Anthropic,
         _ => AiProvider.None
     };

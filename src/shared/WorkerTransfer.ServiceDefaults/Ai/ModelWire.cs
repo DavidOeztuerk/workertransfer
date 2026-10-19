@@ -8,12 +8,12 @@ namespace WorkerTransfer.ServiceDefaults.Ai;
 /// Anthropic.
 /// </summary>
 /// <remarks>
-/// <para><strong>OpenAI-compatible is the default, because Mistral speaks
-/// it</strong> (VISION-FRAGEN E2: Mistral, EU, is the platform's provider;
-/// Ollama and anything else of that shape too). Anthropic stays selectable.
-/// The label is the same one a person's own access carries
-/// (<c>AiAccessV1.Provider</c>), so the evidence report counts both in one
-/// vocabulary.</para>
+/// <para><strong>OpenAI-compatible is the default, because the platform's
+/// model speaks it</strong> — until the start the operator's local Ollama
+/// (ADR-0051), and Mistral, OpenAI and anything else of that shape too.
+/// Anthropic has its own format. The label is the same one a person's own
+/// access carries (<c>AiAccessV1.Provider</c>), so the evidence report counts
+/// both in one vocabulary.</para>
 ///
 /// <para>Only the format lives here. What goes into the prompt is decided by
 /// each service's own context type (ADR-0024) and never by this class.</para>
@@ -26,11 +26,24 @@ public static class ModelWire
     /// <summary>The label for Anthropic's messages endpoint.</summary>
     public const string Anthropic = "anthropic";
 
-    /// <summary>The platform's default endpoint: Mistral, in the EU.</summary>
-    public const string DefaultAddress = "https://api.mistral.ai/v1/chat/completions";
+    /// <summary>The platform's default endpoint until the start: the operator's local Ollama (ADR-0051).</summary>
+    /// <remarks>Nothing leaves the machine. Compose sets it again from <c>WORKERTRANSFER_AI_URL</c>.</remarks>
+    public const string DefaultAddress = "http://host.docker.internal:11434/v1/chat/completions";
 
-    /// <summary>The platform's default model.</summary>
-    public const string DefaultModel = "mistral-medium-latest";
+    /// <summary>The platform's default model — one the operator has pulled into Ollama.</summary>
+    public const string DefaultModel = "qwen2.5-coder:7b";
+
+    /// <summary>The <c>max_tokens</c> an Anthropic request carries at least.</summary>
+    /// <remarks>
+    /// Current Claude models think before they write, and the thinking counts
+    /// against <c>max_tokens</c>. With the few hundred tokens a draft needs,
+    /// the thinking alone could use them up and the answer would carry no
+    /// text. Only what is generated is billed, so the room costs nothing.
+    /// </remarks>
+    public const int AnthropicRoom = 16_000;
+
+    /// <summary>How hard an Anthropic model thinks about a draft: a short text needs little.</summary>
+    public const string AnthropicEffort = "low";
 
     /// <summary>Whether the label is one this class can speak.</summary>
     public static bool IsKnown(string provider) =>
@@ -79,7 +92,8 @@ public static class ModelWire
                     Content = JsonContent.Create(new
                     {
                         model,
-                        max_tokens = maxTokens,
+                        max_tokens = Math.Max(maxTokens, AnthropicRoom),
+                        output_config = new { effort = AnthropicEffort },
                         system,
                         messages = new[] { new { role = "user", content = user } }
                     })
@@ -115,12 +129,33 @@ public static class ModelWire
                 : null;
         }
 
-        return root.TryGetProperty("content", out var blocks)
-               && blocks.ValueKind == JsonValueKind.Array
-               && blocks.GetArrayLength() > 0
-               && blocks[0].TryGetProperty("text", out var text)
-               && text.ValueKind == JsonValueKind.String
-            ? text.GetString()
-            : null;
+        // A refusal carries no draft, whatever else stands in the answer.
+        if (root.TryGetProperty("stop_reason", out var stop)
+            && stop.ValueKind == JsonValueKind.String
+            && stop.GetString() == "refusal")
+        {
+            return null;
+        }
+
+        if (!root.TryGetProperty("content", out var blocks) || blocks.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        // The first TEXT block, not the first block: current models put a
+        // thinking block in front, and its text field is empty or absent.
+        foreach (var block in blocks.EnumerateArray())
+        {
+            if (block.TryGetProperty("type", out var kind)
+                && kind.ValueKind == JsonValueKind.String
+                && kind.GetString() == "text"
+                && block.TryGetProperty("text", out var text)
+                && text.ValueKind == JsonValueKind.String)
+            {
+                return text.GetString();
+            }
+        }
+
+        return null;
     }
 }

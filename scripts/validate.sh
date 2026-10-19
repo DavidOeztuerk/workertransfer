@@ -93,7 +93,8 @@ fi
 
 # --- E2E (only on request, needs the running stack) ---------------------------
 if [[ $WITH_E2E -eq 1 ]]; then
-  step "playwright" sh -c "cd web && pnpm e2e"
+  # Without the platform model, as CI measures it (scripts/e2e.sh).
+  step "playwright" ./scripts/e2e.sh
 fi
 
 # --- What stayed unchecked? ---------------------------------------------------

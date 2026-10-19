@@ -9,13 +9,13 @@ using ScoutDraft = WorkerTransfer.Scout.Infrastructure.Draft.DraftSettings;
 namespace WorkerTransfer.CrossCutting.Tests;
 
 /// <summary>
-/// Mistral (EU) is the platform's default provider, and both wire formats are
-/// spoken correctly (VISION-FRAGEN E2).
+/// The operator's local Ollama is the platform's default until the start
+/// (ADR-0051), and both wire formats are spoken correctly.
 /// </summary>
 public sealed class ModelWireTests
 {
     [Fact]
-    public void Every_seam_defaults_to_Mistral()
+    public void Every_seam_defaults_to_the_local_model()
     {
         // Four settings types, four chances to keep a default abroad.
         var seams = new (string Provider, string Address, string Model)[]
@@ -29,8 +29,8 @@ public sealed class ModelWireTests
         seams.Should().AllSatisfy(seam =>
         {
             seam.Provider.Should().Be(ModelWire.OpenAiCompatible);
-            new Uri(seam.Address).Host.Should().Be("api.mistral.ai");
-            seam.Model.Should().StartWith("mistral");
+            new Uri(seam.Address).Host.Should().Be("host.docker.internal");
+            seam.Model.Should().Be(ModelWire.DefaultModel);
         });
     }
 
@@ -72,6 +72,11 @@ public sealed class ModelWireTests
 
         using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
         body.RootElement.GetProperty("system").GetString().Should().Be("RULES");
+
+        // Current models think first, and the thinking counts against
+        // max_tokens: 400 would leave no text.
+        body.RootElement.GetProperty("max_tokens").GetInt32().Should().BeGreaterThanOrEqualTo(ModelWire.AnthropicRoom);
+        body.RootElement.GetProperty("output_config").GetProperty("effort").GetString().Should().Be("low");
     }
 
     [Fact]
@@ -87,6 +92,8 @@ public sealed class ModelWireTests
     [InlineData(ModelWire.Anthropic, """{"content":[{"type":"text","text":"Hallo"}]}""", "Hallo")]
     [InlineData(ModelWire.OpenAiCompatible, """{"content":[{"text":"wrong shape"}]}""", null)]
     [InlineData(ModelWire.Anthropic, """{"choices":[]}""", null)]
+    [InlineData(ModelWire.Anthropic, """{"content":[{"type":"thinking","thinking":""},{"type":"text","text":"Hallo"}]}""", "Hallo")]
+    [InlineData(ModelWire.Anthropic, """{"stop_reason":"refusal","content":[{"type":"text","text":"no"}]}""", null)]
     public void The_text_is_read_in_the_providers_own_shape(string provider, string json, string? expected)
     {
         ModelWire.Text(provider, json).Should().Be(expected);

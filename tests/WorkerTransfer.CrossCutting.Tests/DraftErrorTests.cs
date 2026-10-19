@@ -176,9 +176,11 @@ public class DraftErrorTests
                 Timeout = timeLimit
             };
 
-            return new ProfileDraft.HttpDrafter(factory, Options.Create(settings))
+            return new ProfileDraft.HttpDrafter(
+                    factory, Options.Create(settings), Options.Create(new ProfileDraft.IdentitySettings()))
                 .DraftAsync(
-                    new ProfilePorts.DraftSituation("Title", Secret, ["Python"], Wish), token);
+                    new ProfilePorts.DraftSituation("Title", Secret, ["Python"], Wish),
+                    new Noelia.Core.Identity.SubjectId(Guid.CreateVersion7()), token);
         }
 
         if (page == "approach")

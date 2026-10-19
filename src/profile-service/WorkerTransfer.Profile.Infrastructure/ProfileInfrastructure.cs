@@ -73,20 +73,13 @@ public static class ProfileInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IConsentGate, HttpConsentGate>();
 
-        // The null drafter is the default, not the fallback: without a deposited
-        // key no foreign service is called, and the service says so instead of
-        // handing out a template that looks like a suggestion.
+        // Always the HTTP drafter: a person's own key drafts even when the
+        // platform has no model (ADR-0051). Without either it refuses with a
+        // sentence, never with a template that looks like a suggestion.
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
-
-        if (string.IsNullOrEmpty(draft.ApiKey))
-        {
-            services.AddScoped<IDrafter, NoDrafter>();
-        }
-        else
-        {
-            services.AddScoped<IDrafter, HttpDrafter>();
-        }
+        services.Configure<IdentitySettings>(configuration.GetSection(IdentitySettings.Section));
+        services.AddScoped<IDrafter, HttpDrafter>();
 
         services.AddCQRS(typeof(StoreProfileCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));

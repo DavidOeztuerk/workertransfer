@@ -44,6 +44,6 @@ public sealed class DraftHandler(IProfileStore store, IDrafter drafter)
             profile?.Skills.Values ?? [],
             request.Wish);
 
-        return await drafter.DraftAsync(situation, cancellationToken);
+        return await drafter.DraftAsync(situation, request.Subject, cancellationToken);
     }
 }

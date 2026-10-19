@@ -281,30 +281,77 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>Ollama needs no key, and the internal wire says so.</summary>
+    private HttpClient Internal()
+    {
+        var client = _service.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Notify-Secret", "notify-secret");
+        return client;
+    }
+
+    /// <summary>A provider without a key is no own access — the platform's model stays (ADR-0051).</summary>
     [Fact]
-    public async Task A_server_of_one_s_own_travels_without_a_key()
+    public async Task Without_a_key_there_is_no_own_access()
     {
         var (browser, subject) = await SignedIn();
 
         (await browser.PutAsJsonAsync("/account/settings", new
         {
-            delete_after_months = (int?)null,
-            ai_provider = "openai_compatible",
-            ai_base_url = "http://localhost:11434/v1/chat/completions",
-            ai_model = "qwen2.5-coder:7b",
-            ai_audit_log = false
+            delete_after_months = (int?)null, ai_provider = "anthropic", ai_model = "", ai_audit_log = false
         })).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var internalClient = _service.CreateClient();
-        internalClient.DefaultRequestHeaders.Add("X-Notify-Secret", "notify-secret");
+        var access = await Json(await Internal().GetAsync($"/internal/account/{subject}/ai"));
 
-        var access = await Json(await internalClient.GetAsync($"/internal/account/{subject}/ai"));
+        access.GetProperty("provider").GetString().Should().Be("none");
+        access.GetProperty("key").GetString().Should().BeEmpty();
+    }
+
+    /// <summary>With a key, Anthropic travels at Anthropic's address, with its default model.</summary>
+    [Fact]
+    public async Task An_own_Anthropic_key_travels_at_the_providers_address()
+    {
+        var (browser, subject) = await SignedIn();
+
+        await browser.PutAsJsonAsync("/account/settings", new
+        {
+            delete_after_months = (int?)null, ai_provider = "anthropic", ai_model = "", ai_audit_log = false
+        });
+        (await browser.PutAsJsonAsync("/account/ai-key", new { key = "sk-ant-own-key-1234" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var access = await Json(await Internal().GetAsync($"/internal/account/{subject}/ai"));
+
+        access.GetProperty("provider").GetString().Should().Be("anthropic");
+        access.GetProperty("base_url").GetString().Should().Be("https://api.anthropic.com/v1/messages");
+        access.GetProperty("model").GetString().Should().Be("claude-opus-5-5");
+        access.GetProperty("key").GetString().Should().Be("sk-ant-own-key-1234");
+    }
+
+    /// <summary>
+    /// OpenAI speaks the compatible format at OpenAI's address — and an address
+    /// the browser sends is not taken.
+    /// </summary>
+    /// <remarks>
+    /// A typed address would be a way to send a person's texts to any server.
+    /// </remarks>
+    [Fact]
+    public async Task OpenAI_travels_at_OpenAIs_address_whatever_the_browser_names()
+    {
+        var (browser, subject) = await SignedIn();
+
+        await browser.PutAsJsonAsync("/account/settings", new
+        {
+            delete_after_months = (int?)null,
+            ai_provider = "openai",
+            ai_base_url = "http://elsewhere.example/v1/chat/completions",
+            ai_model = "own-model",
+            ai_audit_log = false
+        });
+        await browser.PutAsJsonAsync("/account/ai-key", new { key = "sk-own-openai-5678" });
+
+        var access = await Json(await Internal().GetAsync($"/internal/account/{subject}/ai"));
 
         access.GetProperty("provider").GetString().Should().Be("openai_compatible");
-        access.GetProperty("base_url").GetString()
-            .Should().Be("http://localhost:11434/v1/chat/completions");
-        access.GetProperty("model").GetString().Should().Be("qwen2.5-coder:7b");
-        access.GetProperty("key").GetString().Should().BeEmpty();
+        access.GetProperty("base_url").GetString().Should().Be("https://api.openai.com/v1/chat/completions");
+        access.GetProperty("model").GetString().Should().Be("own-model");
     }
 }

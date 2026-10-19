@@ -12,6 +12,7 @@
     <ProjectReference Include="..\WorkerTransfer.Profile.Contracts\WorkerTransfer.Profile.Contracts.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Consent\WorkerTransfer.Contracts.Consent.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Erasure\WorkerTransfer.Contracts.Erasure.csproj" />
+    <ProjectReference Include="..\..\shared\WorkerTransfer.Contracts.Identity\WorkerTransfer.Contracts.Identity.csproj" />
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 

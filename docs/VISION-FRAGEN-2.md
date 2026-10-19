@@ -381,6 +381,13 @@ Arbeitsuchenden höchstens 2.000 €, von Firmen frei.
 der Person, für die der Berater arbeitet.
 
 **Antwort:** **D, 17.10.2026.** Weiter zurückgestellt — letzter Punkt vor dem Start.
+**Idee dazu, 17.10.2026 (zur KI, ADR-0051):** Die Plattform hat **einen**
+KI-Anbieter (z. B. Anthropic), und Person wie Firma nutzen ihn per **Abo** oder
+über ein **gekauftes Kontingent**. Harte Bedingung: ein Anschreiben darf nie
+mitten im Schreiben am leeren Kontingent scheitern — also den Bedarf vor dem
+Start reservieren, danach abrechnen. Der Preis muss die Kosten tragen, ohne
+dass jemand nicht mehr alles machen kann. Bis zum Start bleibt Ollama der
+Standard; wer einen eigenen Schlüssel (Anthropic, OpenAI) hinterlegt, nutzt den.
 
 ### Q2. Wer betreibt die Plattform?
 

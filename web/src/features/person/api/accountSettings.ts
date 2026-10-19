@@ -8,8 +8,12 @@ import { API_BASE_URL } from "../../../env";
  */
 const EMPTY_ANSWER: ApiError = { status: 500, title: "", detail: "" };
 
-/** Who may be asked. The server's labels, unchanged. */
-export type AiProvider = "none" | "openai_compatible" | "anthropic";
+/**
+ * Whose model drafts. `none` is the platform's model, not "off"; a provider
+ * with a stored key replaces it for everything the person drafts (ADR-0051).
+ * The server's labels, unchanged.
+ */
+export type AiProvider = "none" | "openai" | "anthropic";
 
 /**
  * What the server returns about the settings.
@@ -21,7 +25,6 @@ export type AiProvider = "none" | "openai_compatible" | "anthropic";
 export interface AccountSettings {
   deleteAfterMonths: number | null;
   provider: AiProvider;
-  baseUrl: string;
   model: string;
   keyPresent: boolean;
   keyTail: string;
@@ -41,7 +44,6 @@ interface AccountSettingsWire {
 const toView = (wire: AccountSettingsWire): AccountSettings => ({
   deleteAfterMonths: wire.delete_after_months ?? null,
   provider: (wire.ai_provider as AiProvider) ?? "none",
-  baseUrl: wire.ai_base_url ?? "",
   model: wire.ai_model ?? "",
   keyPresent: wire.ai_key_present === true,
   keyTail: wire.ai_key_tail ?? "",
@@ -77,7 +79,6 @@ export async function saveAccountSettings(
       body: {
         delete_after_months: choice.deleteAfterMonths,
         ai_provider: choice.provider,
-        ai_base_url: choice.baseUrl,
         ai_model: choice.model,
         ai_audit_log: choice.auditLog,
       },
