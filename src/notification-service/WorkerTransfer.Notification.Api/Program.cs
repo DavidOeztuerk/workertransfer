@@ -3,15 +3,15 @@ using WorkerTransfer.Notification.Infrastructure;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+// Configuration out of the .env file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "notification-service";
 
-// Kein AlsAussteller(): nur identity-service hält die private Hälfte.
+// No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
@@ -22,15 +22,15 @@ builder.Services.AddNotificationInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<NotificationDbContext>();
+// Migrate first, serve second (ADR-0010).
+await app.MigrateSchemaAsync<NotificationDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapBenachrichtigungsEndpoints();
-app.MapLoeschEndpoints();
+app.MapNotificationEndpoints();
+app.MapErasureEndpoints();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;

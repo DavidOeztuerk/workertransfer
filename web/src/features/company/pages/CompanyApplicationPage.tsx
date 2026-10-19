@@ -9,122 +9,125 @@ import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
 import { useParams } from "react-router-dom";
 
-import { Briefbogen } from "../../../shared/components/Briefbogen";
+import { LetterSheet } from "../../../shared/components/LetterSheet";
 import { getCompanyProfile } from "../api/companies";
-import { empfaengerAusFirma, kopfAusKontakt } from "../../work/lib/briefkopf";
+import { recipientFromCompany, senderFromContact } from "../../work/lib/letterHead";
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { Lebenslaufblatt } from "../../person/components/lebenslauf/Lebenslaufblatt";
-import { holeFremdenInhalt, ladeSichtbaren } from "../../person/api/resume";
-import { getCandidateProfile } from "../api/fremdprofil";
+import { failureKey } from "../../../shared/api/errors";
+import { CurriculumVitaeSheet } from "../../person/components/resume/CurriculumVitaeSheet";
+import { getVisibleCurriculumVitae, getVisibleDocumentContent } from "../../person/api/resume";
+import { getCandidateProfile } from "../api/candidateProfile";
 import { getCompanyApplication } from "../api/applications";
-import { useHandelnder } from "../lib/session";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import { getJob } from "../../work/api/jobs";
 
 export function CompanyApplicationPage() {
   const { t } = useTranslation();
-  const { fuerFirma } = useHandelnder();
+  const { forCompany } = useActor();
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState(0);
 
-  const bewerbung = useAsync(
+  const application = useAsync(
     (signal) => getCompanyApplication(id!, signal),
     [id],
-    fuerFirma && !!id,
+    forCompany && !!id,
   );
 
-  const e = bewerbung.data?.ok ? bewerbung.data.application : null;
+  const e = application.data?.ok ? application.data.application : null;
 
-  const stelle = useAsync(
+  const job = useAsync(
     (signal) => (e ? getJob(e.job_id, signal) : Promise.resolve(null)),
     [e?.job_id],
     e !== null,
   );
-  const firma = useAsync(
+  const company = useAsync(
     (signal) =>
-      stelle.data
-        ? getCompanyProfile(stelle.data.tenant_id, signal)
+      job.data
+        ? getCompanyProfile(job.data.tenant_id, signal)
         : Promise.resolve(null),
-    [stelle.data?.tenant_id],
-    stelle.data !== null,
+    [job.data?.tenant_id],
+    job.data !== null,
   );
 
-  const profil = useAsync(
+  const profile = useAsync(
     (signal) => (e ? getCandidateProfile(e.subject_id, signal) : Promise.resolve(null)),
     [e?.subject_id],
     e !== null,
   );
 
-  const lebenslauf = useAsync(
+  const curriculumVitae = useAsync(
     (signal) =>
       e?.shares_resume
-        ? ladeSichtbaren(e.subject_id, signal)
+        ? getVisibleCurriculumVitae(e.subject_id, signal)
         : Promise.resolve({ ok: true as const, value: null }),
     [e?.subject_id, e?.shares_resume],
     e !== null,
   );
 
-  if (!fuerFirma || !id) {
+  if (!forCompany || !id) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
+      <PageShell title={t("companyApplications.title")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("firmenbewerbung.nurFirma")}</Typography>
+            <Typography>{t("companyApplications.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
     );
   }
 
-  if (bewerbung.pending && e === null) {
+  if (application.pending && e === null) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
-        <LoadingBlock label={t("firmenbewerbung.laden")} />
+      <PageShell title={t("companyApplications.title")} narrow>
+        <LoadingBlock label={t("companyApplications.loading")} />
       </PageShell>
     );
   }
 
-  if (bewerbung.data !== null && !bewerbung.data.ok) {
+  if (application.data !== null && !application.data.ok) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
-        <Alert severity="error">{bewerbung.data.error.detail}</Alert>
+      <PageShell title={t("companyApplications.title")} narrow>
+        <Alert severity="error">
+          {t(failureKey(application.data.error, "errors.companyApplicationNotLoaded"))}
+        </Alert>
       </PageShell>
     );
   }
 
   if (!e) {
     return (
-      <PageShell title={t("firmenbewerbung.titel")} narrow>
+      <PageShell title={t("companyApplications.title")} narrow>
         <EmptyBlock
-          title={t("firmenbewerbung.nichtGefunden")}
-          hint={t("firmenbewerbung.nichtGefundenHinweis")}
+          title={t("companyApplications.notFound")}
+          hint={t("companyApplications.notFoundHint")}
         />
       </PageShell>
     );
   }
 
-  const cv = lebenslauf.data?.ok ? lebenslauf.data.value : null;
-  const reiter: { key: string; label: string }[] = [
-    { key: "letter", label: t("firmenbewerbung.tabAnschreiben") },
+  const cv = curriculumVitae.data?.ok ? curriculumVitae.data.value : null;
+  const tabs: { key: string; label: string }[] = [
+    { key: "letter", label: t("companyApplications.tabCoverLetter") },
   ];
   if (e.shares_resume && cv) {
-    reiter.push({ key: "resume", label: t("firmenbewerbung.tabLebenslauf") });
+    tabs.push({ key: "resume", label: t("companyApplications.tabResume") });
   }
   for (const docId of e.documents) {
-    reiter.push({ key: `doc-${docId}`, label: t("firmenbewerbung.tabUnterlage") });
+    tabs.push({ key: `doc-${docId}`, label: t("companyApplications.tabDocument") });
   }
 
-  const aktuell = reiter[tab] ?? reiter[0] ?? { key: "letter", label: t("firmenbewerbung.tabAnschreiben") };
+  const current = tabs[tab] ?? tabs[0] ?? { key: "letter", label: t("companyApplications.tabCoverLetter") };
 
   return (
-    <PageShell title={stelle.data?.title ?? t("firmenbewerbung.titel")}>
+    <PageShell title={job.data?.title ?? t("companyApplications.title")}>
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="h4" sx={{ mb: 0.5 }}>
-            {profil.data?.headline || t("firmenbewerbung.ohneUeberschrift")}
+            {profile.data?.headline || t("companyApplications.noHeadline")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {stelle.data?.title ?? t("firmenbewerbung.stelleUnbekannt")}
+            {job.data?.title ?? t("companyApplications.jobUnknown")}
           </Typography>
         </CardContent>
       </Card>
@@ -138,38 +141,38 @@ export function CompanyApplicationPage() {
             scrollButtons="auto"
             sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
           >
-            {reiter.map((r) => (
-              <Tab key={r.key} label={r.label} />
+            {tabs.map((entry) => (
+              <Tab key={entry.key} label={entry.label} />
             ))}
           </Tabs>
 
-          {aktuell.key === "letter" ? (
-            <Briefbogen
-              betreff={undefined}
+          {current.key === "letter" ? (
+            <LetterSheet
+              subject={undefined}
               text={e.message}
-              kopf={kopfAusKontakt(e.applicant_contact)}
-              empfaenger={empfaengerAusFirma(firma.data, stelle.data)}
+              sender={senderFromContact(e.applicant_contact)}
+              recipient={recipientFromCompany(company.data, job.data)}
             />
           ) : null}
 
-          {aktuell.key === "resume" && cv ? (
-            <Lebenslaufblatt
+          {current.key === "resume" && cv ? (
+            <CurriculumVitaeSheet
               template={cv.template}
-              daten={{
-                headline: profil.data?.headline ?? "",
-                bio: profil.data?.bio ?? "",
-                location: profil.data?.location ?? "",
-                skills: profil.data?.skills ?? [],
+              data={{
+                headline: profile.data?.headline ?? "",
+                bio: profile.data?.bio ?? "",
+                location: profile.data?.location ?? "",
+                skills: profile.data?.skills ?? [],
                 positions: cv.positions,
                 education: cv.education,
               }}
             />
           ) : null}
 
-          {aktuell.key.startsWith("doc-") ? (
-            <Unterlagenansicht
+          {current.key.startsWith("doc-") ? (
+            <DocumentView
               subjectId={e.subject_id}
-              documentId={aktuell.key.slice(4)}
+              documentId={current.key.slice(4)}
             />
           ) : null}
         </CardContent>
@@ -178,7 +181,7 @@ export function CompanyApplicationPage() {
   );
 }
 
-function Unterlagenansicht({
+function DocumentView({
   subjectId,
   documentId,
 }: {
@@ -187,28 +190,28 @@ function Unterlagenansicht({
 }) {
   const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
-  const [typ, setTyp] = useState<string>("");
+  const [type, setType] = useState<string>("");
 
   useEffect(() => {
-    let frei: string | null = null;
-    let weg = false;
-    void holeFremdenInhalt(subjectId, documentId).then((result) => {
-      if (weg || !result.ok) return;
-      frei = result.value.url;
+    let objectUrl: string | null = null;
+    let gone = false;
+    void getVisibleDocumentContent(subjectId, documentId).then((result) => {
+      if (gone || !result.ok) return;
+      objectUrl = result.value.url;
       setUrl(result.value.url);
-      setTyp(result.value.contentType);
+      setType(result.value.contentType);
     });
     return () => {
-      weg = true;
-      if (frei) URL.revokeObjectURL(frei);
+      gone = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [subjectId, documentId]);
 
   if (url === null) {
-    return <LoadingBlock label={t("firmenbewerbung.laden")} />;
+    return <LoadingBlock label={t("companyApplications.loading")} />;
   }
 
-  if (typ.startsWith("image/")) {
+  if (type.startsWith("image/")) {
     return (
       <Box
         component="img"
@@ -223,7 +226,7 @@ function Unterlagenansicht({
     <Box
       component="iframe"
       src={url}
-      title={t("firmenbewerbung.tabUnterlage")}
+      title={t("companyApplications.tabDocument")}
       sx={{ width: "100%", height: "70vh", border: 0 }}
     />
   );

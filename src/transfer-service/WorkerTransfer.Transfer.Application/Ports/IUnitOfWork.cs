@@ -1,10 +1,10 @@
 namespace WorkerTransfer.Transfer.Application.Ports;
 
-/// <summary>Eine Transaktion um einen Befehl.</summary>
+/// <summary>A transaction around a command.</summary>
 public interface IUnitOfWork
 {
-    /// <summary>Führt die Arbeit in einer Transaktion aus.</summary>
-    Task<T> InEinerTransaktionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+    /// <summary>Runs the work in a transaction.</summary>
+    Task<T> InTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default);
 }

@@ -1,13 +1,13 @@
 /**
- * Das Abstandsraster — eine 4px-Grundeinheit, wie MUI sie erwartet.
+ * The spacing grid — a 4px base unit, as MUI expects it.
  *
- * Warum eine Skala statt freier Werte: Abstände sind das, was eine Oberfläche
- * ruhig oder unruhig macht, und freie Werte werden beim zweiten Bildschirm
- * beliebig. Wer hier einen Wert braucht, der fehlt, ergänzt ihn HIER.
+ * Why a scale instead of free values: spacing is what makes a UI calm or
+ * restless, and free values become arbitrary by the second screen. Whoever
+ * needs a value that is missing adds it HERE.
  */
 export const spacingUnit = 4;
 
-/** Radien. Grosszügig, aber nicht verspielt — es bleibt ein Arbeitswerkzeug. */
+/** Radii. Generous but not playful — it remains a working tool. */
 export const radius = {
   sm: 6,
   md: 10,
@@ -17,12 +17,11 @@ export const radius = {
 } as const;
 
 /**
- * Schatten, sparsam und flach.
+ * Shadows, sparing and flat.
  *
- * MUI bringt 25 Stufen mit, von denen die meisten aus einer Zeit stammen, als
- * Tiefe modisch war. Wir benutzen drei, und der Grund ist nicht Geschmack: ein
- * Schatten soll sagen "das hier liegt darüber", und wenn alles Schatten hat,
- * sagt er nichts mehr.
+ * MUI brings 25 levels, most of them from a time when depth was fashionable.
+ * We use three, and the reason is not taste: a shadow should say "this lies
+ * above", and when everything has a shadow, it says nothing any more.
  */
 export const elevation = {
   light: {
@@ -33,11 +32,11 @@ export const elevation = {
     modal: "0 18px 44px -12px rgb(18 19 28 / 0.28)",
   },
   /**
-   * Im Dunkelmodus fast nichts.
+   * In dark mode almost nothing.
    *
-   * Ein Schatten auf dunklem Grund ist unsichtbar oder liest sich als Rahmen —
-   * die Tiefe trägt dort die Flächenleiter (`surfaces.dark`). Was bleibt, ist
-   * ein tiefer Schlagschatten für Dinge, die wirklich über allem liegen.
+   * A shadow on a dark ground is invisible or reads as a frame — there the
+   * surface ladder (`surfaces.dark`) carries depth. What remains is a deep drop
+   * shadow for things that really lie above everything.
    */
   dark: {
     none: "none",
@@ -49,11 +48,10 @@ export const elevation = {
 } as const;
 
 /**
- * Übergänge. Kurz, und für alle dasselbe.
+ * Transitions. Short, and the same for all.
  *
- * 140 ms ist die Grenze, unterhalb derer eine Bewegung als „sofort" gelesen
- * wird und trotzdem nicht ruckt. Alles Längere fühlt sich in einem
- * Arbeitswerkzeug nach Warten an.
+ * 140 ms is the limit below which a movement reads as "instant" and still does
+ * not jerk. Anything longer feels like waiting in a working tool.
  */
 export const motion = {
   fast: "120ms cubic-bezier(0.4, 0, 0.2, 1)",
@@ -62,8 +60,8 @@ export const motion = {
 } as const;
 
 /**
- * Die Ebenen. Ausgeschrieben, damit niemand `zIndex: 9999` schreibt — die Zahl
- * gewinnt nämlich genau so lange, bis jemand `10000` schreibt.
+ * The layers. Written out so that nobody writes `zIndex: 9999` — that number
+ * wins exactly until somebody writes `10000`.
  */
 export const layer = {
   base: 0,
@@ -74,7 +72,7 @@ export const layer = {
   toast: 1400,
 } as const;
 
-/** Feste Masse, die an mehreren Stellen gebraucht werden. */
+/** Fixed dimensions needed in several places. */
 export const size = {
   headerHeight: 64,
   filterSidebar: 264,

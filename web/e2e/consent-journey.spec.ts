@@ -1,13 +1,13 @@
-// Die Reise, um die es in diesem Slice geht — durch den Browser, über drei
-// Dienste, mit echten Mails.
+// The journey this slice is about — through the browser, across three
+// services, with real mails.
 //
-// Registrieren → bestätigen → Profil anlegen → freigeben → ein Unternehmen sieht
-// es → widerrufen → es ist weg. Ohne Wartezeit dazwischen, weil ADR-0013 einen
-// Cache ausdrücklich verworfen hat.
+// Register → confirm → create a profile → release it → a company sees it →
+// revoke → it is gone. With no wait in between, because ADR-0013 explicitly
+// rejected a cache.
 //
-// Der Integrationstest in apps/profile-service belegt dasselbe auf HTTP-Ebene.
-// Hier zählt, dass die Oberfläche es auch wirklich anbietet: ein Schalter, der
-// nicht schaltet, wäre auf beiden Ebenen darunter unsichtbar.
+// The integration tests in tests/WorkerTransfer.Profile.Tests prove the same at
+// the HTTP level. What counts here is that the UI really offers it: a switch
+// that does not switch would be invisible on both levels below.
 
 import { expect, test } from "@playwright/test";
 
@@ -17,27 +17,26 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort", async ({
+test("a released profile appears, a revoked one disappears immediately", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
-  // Keine Freemail-Domain: nur auf einer eigenen Domain lässt sich ein
-  // Unternehmen beanspruchen (ADR-0019). Und je Lauf eine neue, weil die
-  // Domain danach vergeben ist — mit einer festen bestünde der Test genau
-  // einmal.
+  const candidateEmail = uniqueEmail("candidate.example");
+  // No freemail domain: a company can only be claimed on a domain of its own
+  // (ADR-0019). And a new one per run, because the domain is taken afterwards —
+  // with a fixed one the test would pass exactly once.
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Arbeitgeber ${Date.now()}`;
-  const headline = `E2E Kandidat ${Date.now()}`;
+  const companyName = `E2E Employer ${Date.now()}`;
+  const headline = `E2E Candidate ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -47,7 +46,7 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
 
-  // Erst nach dem Speichern schaltbar: freigeben lässt sich nur, was es gibt.
+  // Switchable only after saving: only what exists can be released.
   const release = candidate.getByRole("switch");
   await expect(release).toBeEnabled();
   await release.click();
@@ -58,16 +57,16 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
 
-  // Ohne aktives Unternehmen zeigt die Seite nur einen Hinweis — der Wechsel
-  // ist der Punkt, an dem der Server den Tenant ins Token schreibt (ADR-0018).
+  // Without an active company the page shows only a notice — the switch is the
+  // point where the server writes the tenant into the token (ADR-0018).
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toBeVisible();
 
-  // Der eigentliche Beweis: Widerruf im einen Browser, Neuladen im anderen.
+  // The actual proof: revoke in one browser, reload in the other.
   await release.click();
   await expect(release).not.toBeChecked();
 
@@ -78,11 +77,11 @@ test("ein freigegebenes Profil erscheint, ein widerrufenes verschwindet sofort",
   await recruiterContext.close();
 });
 
-test("ohne aktives Unternehmen führt die Kandidatenliste ins Leere, nicht zu Daten", async ({
+test("without an active company the candidate list leads nowhere, not to data", async ({
   page,
 }) => {
-  const email = uniqueEmail("privat-e2e.example");
-  await registerAndConfirm(page, email, "E2E Privatperson");
+  const email = uniqueEmail("private-e2e.example");
+  await registerAndConfirm(page, email, "E2E Private Person");
   await login(page, email);
 
   await page.goto("/scout");

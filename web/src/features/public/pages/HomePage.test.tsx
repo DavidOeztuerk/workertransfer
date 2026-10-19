@@ -1,24 +1,24 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { renderMitStore } from "../test/render";
+import { renderWithStore } from "../test/render";
 import { HomePage } from "./HomePage";
 
 describe("HomePage", () => {
-  it("trägt genau eine Überschrift erster Ordnung", () => {
-    renderMitStore(<HomePage />);
+  it("carries exactly one first-level heading", () => {
+    renderWithStore(<HomePage />);
 
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  // Die beiden auffälligsten Elemente der Seite waren im alten Stand tote
-  // Knöpfe: <Button> ohne onClick und ohne href. Ein Klick tat nichts.
+  // The two most striking elements of the page were dead buttons in the old
+  // state: <Button> without onClick and without href. A click did nothing.
   //
-  // Und der zweite trägt die ABSICHT mit: ohne `?as=company` landet jemand, der
-  // „Als Unternehmen entdecken" klickt, im Personenformular — und merkt es erst
-  // nach der Bestätigungsmail, wenn kein Unternehmen da ist.
-  it("bietet zwei Wege hinein, und beide tragen ihre Absicht", () => {
-    renderMitStore(<HomePage />);
+  // And the second carries the INTENT along: without `?as=company` someone who
+  // clicks "Als Unternehmen entdecken" lands in the person form — and notices
+  // only after the confirmation mail, when no company is there.
+  it("offers two ways in, and both carry their intent", () => {
+    renderWithStore(<HomePage />);
 
     expect(
       screen.getByRole("link", { name: "Als Arbeitnehmer starten" }),
@@ -28,8 +28,8 @@ describe("HomePage", () => {
     ).toHaveAttribute("href", "/register?as=company");
   });
 
-  it("nennt seine drei Grundlagen", () => {
-    renderMitStore(<HomePage />);
+  it("names its three principles", () => {
+    renderWithStore(<HomePage />);
 
     expect(
       screen.getByRole("heading", { name: "Du entscheidest" }),
@@ -42,11 +42,10 @@ describe("HomePage", () => {
     ).toBeInTheDocument();
   });
 
-  // Die Abschnitte tragen Namen, damit ein Screenreader sie in der
-  // Regionenliste unterscheiden kann. Drei namenlose „region"-Einträge sind
-  // keine Navigation.
-  it("benennt jeden Abschnitt, den es anbietet", () => {
-    renderMitStore(<HomePage />);
+  // The sections carry names so a screen reader can tell them apart in the
+  // list of regions. Three nameless "region" entries are no navigation.
+  it("names every section it offers", () => {
+    renderWithStore(<HomePage />);
 
     for (const name of [
       "Neue Arbeit soll sich wie eine selbstbestimmte Entscheidung anfühlen.",
@@ -58,21 +57,21 @@ describe("HomePage", () => {
   });
 
   /**
-   * Die Trennung, wegen der es `/overview` überhaupt gibt.
+   * The separation `/overview` exists for at all.
    *
-   * Vorher bediente `/` beides. Die Übersicht war damit nicht verlinkbar, und
-   * ein Screenshot von `/` zeigte je nach Sitzung etwas anderes.
+   * Before, `/` served both. The overview was therefore not linkable, and a
+   * screenshot of `/` showed something different depending on the session.
    */
-  it("schickt eine angemeldete Besucherin auf die Übersicht", () => {
-    renderMitStore(<HomePage />, { auth: { status: "authenticated" } });
+  it("sends a signed-in visitor to the overview", () => {
+    renderWithStore(<HomePage />, { auth: { status: "authenticated" } });
 
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
   });
 
-  // Solange niemand weiss, wer da ist, wird NICHTS gezeichnet: der Sprung
-  // Werbung → Übersicht sieht nach einem Fehler aus.
-  it("zeichnet nichts, solange die Sitzung unbekannt ist", () => {
-    renderMitStore(<HomePage />, { auth: { status: "unknown" } });
+  // As long as nobody knows who is there, NOTHING is drawn: the jump
+  // advertising → overview looks like a defect.
+  it("draws nothing while the session is unknown", () => {
+    renderWithStore(<HomePage />, { auth: { status: "unknown" } });
 
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(

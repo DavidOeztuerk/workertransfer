@@ -7,31 +7,31 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.GitHub.Application.Behaviors;
 using WorkerTransfer.GitHub.Application.Ports;
-using WorkerTransfer.GitHub.Application.Verbindungen;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
-using WorkerTransfer.GitHub.Infrastructure.Einwilligung;
-using WorkerTransfer.GitHub.Infrastructure.Loeschung;
-using WorkerTransfer.GitHub.Infrastructure.Netz;
+using WorkerTransfer.GitHub.Application.Connections;
+using WorkerTransfer.GitHub.Domain.Connections;
+using WorkerTransfer.GitHub.Infrastructure.Consent;
+using WorkerTransfer.GitHub.Infrastructure.Erasure;
+using WorkerTransfer.GitHub.Infrastructure.Network;
 using WorkerTransfer.GitHub.Infrastructure.Persistence;
 using WorkerTransfer.GitHub.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.GitHub.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.GitHub.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Was hier <em>nicht</em> steht: kein Hintergrunddienst, keine Schleife, kein
-/// Zeitgeber. GitHub wird gefragt, wenn ein Mensch es verlangt — nie von allein
-/// (ADR-0004). Und keine Outbox: dieser Dienst verschickt nichts.
+/// What does <em>not</em> stand here: no background service, no loop, no timer.
+/// GitHub is asked when a human being demands it — never of its own accord
+/// (ADR-0004). And no outbox: this service sends nothing.
 /// </remarks>
 public static class GitHubInfrastructure
 {
-    /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger, GitHub und Geheimnisse kommen.</param>
-    /// <param name="connectionString">Wo die GitHub-Datenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, GitHub and secrets come from.</param>
+    /// <param name="connectionString">Where the GitHub database lies.</param>
     public static IServiceCollection AddGitHubInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -40,85 +40,84 @@ public static class GitHubInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<GitHubeinstellungen>(
-            configuration.GetSection(GitHubeinstellungen.Abschnitt));
-        services.Configure<GitHubAnmeldeeinstellungen>(
-            configuration.GetSection(GitHubAnmeldeeinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<GitHubSettings>(
+            configuration.GetSection(GitHubSettings.Section));
+        services.Configure<GitHubSignInSettings>(
+            configuration.GetSection(GitHubSignInSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
-        services.AddSingleton(_ => GitHubDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => GitHubDbContextFactory.DataSource(connectionString));
         services.AddDbContext<GitHubDbContext>((provider, options) =>
-            GitHubDbContextFactory.Konfiguriere(
+            GitHubDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<GitHubDbContext>("github");
-        services.AddSchluesselbund<GitHubDbContext>();
+        services.AddDatabaseReadiness<GitHubDbContext>("github");
+        services.AddKeyRing<GitHubDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IVerbindungsspeicher, EfVerbindungsspeicher>();
+        services.AddScoped<IConnectionStore, EfConnectionStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
         services.AddScoped<IGitHub, HttpGitHub>();
-        // Ohne Zugangsdaten meldet sie sich als „nicht eingerichtet", und der
-        // Gist bleibt der Weg. Registriert wird sie trotzdem — ein Dienst, der
-        // je nach Konfiguration andere Abhängigkeiten hat, fällt erst beim
-        // ersten Aufruf um statt beim Start.
-        services.AddScoped<IGitHubAnmeldung, HttpGitHubAnmeldung>();
+        // Without credentials it reports itself as "not configured", and the
+        // gist stays the path. It is registered all the same — a service
+        // whose dependencies differ by configuration falls over at the first
+        // call instead of at startup.
+        services.AddScoped<IGitHubSignIn, HttpGitHubSignIn>();
 
-        services.AddCQRS(typeof(VerbindenBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(ConnectCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in ServiceFoundation, for the same reason
+    /// the ledger, the audit trail and the store stand here: they are decisions
+    /// of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Loginfehler).Assembly, typeof(RepositoryV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(LoginError).Assembly, typeof(RepositoryV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        // No AI seam: a `ProviderCheck` without a source reports NotApplicable,
+        // and that is expressly NOT a green tick — a tick on something that
+        // does not apply here at all would be noise in the very document that
+        // exists to cut through noise.
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        // No further type stands between the question and the ledger — the
+        // precondition ADR-0013 fails on in practice. A cache in front of it is
+        // noticed by nobody, because everything keeps working, only with the
+        // state from a moment ago.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "github",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
-            pruefspurVorhanden: false));
+            !string.IsNullOrEmpty(erasure.Secret),
+            auditTrailPresent: false));
     }
 }

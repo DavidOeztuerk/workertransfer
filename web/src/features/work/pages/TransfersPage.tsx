@@ -14,7 +14,8 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { failureKey } from "../../../shared/api/errors";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type PersonAction,
@@ -25,36 +26,36 @@ import {
   personMove,
 } from "../api/transfers";
 
-/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
-const TITEL: Record<Transfer["status"], string> = {
-  interested: "gespraeche.standInterested",
-  talking: "gespraeche.standTalking",
-  offered: "gespraeche.standOffered",
-  accepted: "gespraeche.standAccepted",
-  completed: "gespraeche.standCompleted",
-  declined: "gespraeche.standDeclined",
-  withdrawn: "gespraeche.standWithdrawn",
+/** The status as a catalogue key — the wording lies in the catalogues. */
+const STATUS_KEY: Record<Transfer["status"], string> = {
+  interested: "transfers.statusInterested",
+  talking: "transfers.statusTalking",
+  offered: "transfers.statusOffered",
+  accepted: "transfers.statusAccepted",
+  completed: "transfers.statusCompleted",
+  declined: "transfers.statusDeclined",
+  withdrawn: "transfers.statusWithdrawn",
 };
 
 /**
- * <c>/transfers</c> — die eigenen Gespräche über einen Wechsel.
+ * <c>/transfers</c> — one's own conversations about a switch.
  *
- * <strong>Ein Unternehmen kann nur zugehen, wenn der Marktstatus freigegeben
- * ist</strong> und die Person gerade ansprechbar. Ablehnen geht jederzeit, in
- * jedem Schritt — das ist keine Höflichkeit, sondern die Bedingung dafür, dass
- * ein Gespräch überhaupt zumutbar ist.
+ * <strong>A company can only approach when the market status is
+ * released</strong> and the person approachable right now. Declining is
+ * possible at any time, in every step — that is no courtesy but the condition
+ * for a conversation being reasonable at all.
  *
- * <strong>Der letzte Schritt gehört der Person.</strong> Diese Plattform fragt
- * den jetzigen Arbeitgeber nicht: sie weiss nicht, wer er ist, und soll es nicht
- * wissen. Ob jemand gehen darf, bestätigt er selbst.
+ * <strong>The last step belongs to the person.</strong> This platform does not
+ * ask the current employer: it does not know who that is and should not know.
+ * Whether somebody may leave, they confirm themselves.
  */
 export function TransfersPage() {
   const { t } = useTranslation();
-  const { signedIn, subjectId } = useHandelnder();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const { signedIn, subjectId } = useActor();
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  const gespraeche = useAsync(
+  const transfers = useAsync(
     (signal) => listMyTransfers(signal),
     [subjectId],
     signedIn,
@@ -62,12 +63,12 @@ export function TransfersPage() {
 
   if (!signedIn) {
     return (
-      <PageShell title={t("gespraeche.titel")} narrow>
+      <PageShell title={t("transfers.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="gespraeche.anmelden"
+                i18nKey="transfers.signInRequired"
                 components={{ 1: <Link component={RouterLink} to="/login" /> }}
               />
             </Typography>
@@ -77,46 +78,57 @@ export function TransfersPage() {
     );
   }
 
-  async function ziehen(id: string, move: PersonAction) {
-    setLaeuft(true);
-    const result = await personMove(id, move);
-    setLaeuft(false);
-    if (!result.ok) setFehler(result.error.detail);
-    else setFehler(null);
-    gespraeche.reload();
+  async function move(id: string, action: PersonAction) {
+    setRunning(true);
+    const result = await personMove(id, action);
+    setRunning(false);
+    // A 409 means the case moved on meanwhile (the company withdrew, or a
+    // step was already taken) — a catalogue text, never the server's sentence.
+    if (!result.ok) {
+      setError(
+        t(
+          failureKey(result.error, "errors.stepFailed", [
+            { status: 409, key: "transfers.stepNotNow" },
+          ]),
+        ),
+      );
+    } else setError(null);
+    transfers.reload();
   }
 
-  const list = gespraeche.data?.ok ? gespraeche.data.transfers : [];
+  const list = transfers.data?.ok ? transfers.data.transfers : [];
 
   return (
-    <PageShell title={t("gespraeche.titel")} narrow lead="">
+    <PageShell title={t("transfers.title")} narrow lead="">
       <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "62ch" }}>
         <Trans
-          i18nKey="gespraeche.einleitung"
+          i18nKey="transfers.intro"
           components={{ 1: <Link component={RouterLink} to="/market" /> }}
         />
       </Typography>
 
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
-      {gespraeche.pending ? (
+      {transfers.pending ? (
         <Card>
           <CardContent>
-            <LoadingBlock label={t("gespraeche.laden")} />
+            <LoadingBlock label={t("transfers.loading")} />
           </CardContent>
         </Card>
       ) : null}
 
-      {gespraeche.data !== null && !gespraeche.data.ok ? (
-        <Alert severity="error">{gespraeche.data.error.detail}</Alert>
+      {transfers.data !== null && !transfers.data.ok ? (
+        <Alert severity="error">
+          {t(failureKey(transfers.data.error, "errors.listNotLoaded"))}
+        </Alert>
       ) : null}
 
-      {gespraeche.data?.ok && list.length === 0 ? (
-        <EmptyBlock title={t("gespraeche.leer")} />
+      {transfers.data?.ok && list.length === 0 ? (
+        <EmptyBlock title={t("transfers.empty")} />
       ) : null}
 
       <Box
@@ -130,12 +142,12 @@ export function TransfersPage() {
           m: 0,
         }}
       >
-        {list.map((gespraech: Transfer) => (
-          <Gespraechskarte
-            key={gespraech.id}
-            gespraech={gespraech}
+        {list.map((transfer: Transfer) => (
+          <TransferCard
+            key={transfer.id}
+            transfer={transfer}
             locked={running}
-            onZug={(move) => void ziehen(gespraech.id, move)}
+            onMove={(action) => void move(transfer.id, action)}
           />
         ))}
       </Box>
@@ -143,34 +155,32 @@ export function TransfersPage() {
   );
 }
 
-function Gespraechskarte({
-  gespraech,
+function TransferCard({
+  transfer,
   locked,
-  onZug,
+  onMove,
 }: {
-  gespraech: Transfer;
+  transfer: Transfer;
   locked: boolean;
-  onZug: (move: PersonAction) => void;
+  onMove: (action: PersonAction) => void;
 }) {
   const { t } = useTranslation();
-  const laeuftNoch = RUNNING.includes(gespraech.status);
-  const brauchtFreigabe =
-    gespraech.requires_release && !gespraech.release_confirmed;
-  const zeigtAngebot =
-    gespraech.status === "offered" || gespraech.status === "accepted";
+  const stillRunning = RUNNING.includes(transfer.status);
+  const needsRelease = transfer.requires_release && !transfer.release_confirmed;
+  const showsOffer = transfer.status === "offered" || transfer.status === "accepted";
 
   return (
     <Card component="li">
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          {t(TITEL[gespraech.status])}
+          {t(STATUS_KEY[transfer.status])}
         </Typography>
 
-        {gespraech.message !== "" ? (
-          <Typography sx={{ mb: 2 }}>{gespraech.message}</Typography>
+        {transfer.message !== "" ? (
+          <Typography sx={{ mb: 2 }}>{transfer.message}</Typography>
         ) : null}
 
-        {zeigtAngebot ? (
+        {showsOffer ? (
           <Box
             component="dl"
             sx={{
@@ -182,70 +192,70 @@ function Gespraechskarte({
             }}
           >
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.angebot")}
+              {t("transfers.offer")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
-              {gespraech.offer_note === "" ? "—" : gespraech.offer_note}
+              {transfer.offer_note === "" ? "—" : transfer.offer_note}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.start")}
+              {t("transfers.start")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
-              {gespraech.offer_start_on ?? "—"}
+              {transfer.offer_start_on ?? "—"}
             </Typography>
             <Typography component="dt" variant="body2" color="text.secondary">
-              {t("gespraeche.abloese")}
+              {t("transfers.fee")}
             </Typography>
             <Typography component="dd" sx={{ m: 0 }}>
-              {euro(gespraech.offer_fee_cents)}
+              {euro(transfer.offer_fee_cents)}
             </Typography>
           </Box>
         ) : null}
 
-        {gespraech.status === "accepted" && brauchtFreigabe ? (
+        {transfer.status === "accepted" && needsRelease ? (
           <Alert severity="info" sx={{ mb: 2 }}>
             <Trans
-              i18nKey="gespraeche.freigabeFehlt"
+              i18nKey="transfers.releaseMissing"
               components={{ 1: <strong /> }}
             />
           </Alert>
         ) : null}
 
         <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-          {gespraech.status === "interested" ? (
+          {transfer.status === "interested" ? (
             <Button
               variant="contained"
-              onClick={() => onZug("accept-talk")}
+              onClick={() => onMove("accept-talk")}
               disabled={locked}
             >
-              {t("gespraeche.gespraechAnnehmen")}
+              {t("transfers.acceptConversation")}
             </Button>
           ) : null}
-          {gespraech.status === "offered" ? (
+          {transfer.status === "offered" ? (
             <Button
               variant="contained"
-              onClick={() => onZug("accept-offer")}
+              onClick={() => onMove("accept-offer")}
               disabled={locked}
             >
-              {t("gespraeche.angebotAnnehmen")}
+              {t("transfers.acceptOffer")}
             </Button>
           ) : null}
-          {gespraech.status === "accepted" && brauchtFreigabe ? (
+          {transfer.status === "accepted" && needsRelease ? (
             <Button
               variant="contained"
-              onClick={() => onZug("confirm-release")}
+              onClick={() => onMove("confirm-release")}
               disabled={locked}
             >
-              {t("gespraeche.freigabeBestaetigen")}
+              {t("transfers.confirmRelease")}
             </Button>
           ) : null}
-          {laeuftNoch ? (
+          {stillRunning ? (
             <Button
               variant="text"
-              onClick={() => onZug("decline")}
+              onClick={() => onMove("decline")}
               disabled={locked}
             >
-              {t("allgemein.ablehnen")}
+              {t("common.decline")}
             </Button>
           ) : null}
         </Box>

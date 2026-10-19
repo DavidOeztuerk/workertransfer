@@ -16,7 +16,7 @@ public sealed class InvalidReasonException(string detail) : Exception(detail);
 public sealed record WithdrawalReason
 {
     /// <summary>As much as the boundary contract accepts.</summary>
-    public const int HoechsteLaenge = 500;
+    public const int MaxLength = 500;
 
     private WithdrawalReason(string value) => Value = value;
 
@@ -28,7 +28,7 @@ public sealed record WithdrawalReason
     {
         reason = null!;
 
-        if (string.IsNullOrWhiteSpace(value) || value.Length > HoechsteLaenge)
+        if (string.IsNullOrWhiteSpace(value) || value.Length > MaxLength)
         {
             return false;
         }
@@ -43,7 +43,7 @@ public sealed record WithdrawalReason
         TryParse(value, out var reason)
             ? reason
             : throw new InvalidReasonException(
-                $"A reason must not be empty and not exceed {HoechsteLaenge} characters.");
+                $"A reason must not be empty and not exceed {MaxLength} characters.");
 
     /// <inheritdoc />
     public override string ToString() => Value;

@@ -4,35 +4,35 @@ using Npgsql;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext über dem Schema dieses Dienstes.</summary>
+/// <summary>Builds the data source and the context over this service's schema.</summary>
 public static class GitHubDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>The data source.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Optionen über einer Datenquelle, die dem Aufrufer gehört.</summary>
-    public static DbContextOptionsBuilder<GitHubDbContext> Optionen(
-        NpgsqlDataSource datenquelle) =>
-        (DbContextOptionsBuilder<GitHubDbContext>)Konfiguriere(
-            new DbContextOptionsBuilder<GitHubDbContext>(), datenquelle);
+    /// <summary>Options over a data source that belongs to the caller.</summary>
+    public static DbContextOptionsBuilder<GitHubDbContext> Options(
+        NpgsqlDataSource dataSource) =>
+        (DbContextOptionsBuilder<GitHubDbContext>)Configure(
+            new DbContextOptionsBuilder<GitHubDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Stelle, an der die Nachverfolgung ausgeschaltet wird.
+    /// The one place where tracking is switched off.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
-        NpgsqlDataSource datenquelle)
+        NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         return options
-            .UseNpgsql(datenquelle)
+            .UseNpgsql(dataSource)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {
@@ -42,14 +42,14 @@ public static class GitHubDbContextFactory
     }
 }
 
-/// <summary>Baut einen Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>Builds a context for <c>dotnet ef</c>.</summary>
 public sealed class GitHubDesignTimeFactory : IDesignTimeDbContextFactory<GitHubDbContext>
 {
     /// <inheritdoc />
     public GitHubDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<GitHubDbContext>)GitHubDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<GitHubDbContext>(),
-                "Host=entwurfszeit;Database=github")
+                "Host=design-time;Database=github")
             .Options);
 }

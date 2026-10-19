@@ -1,53 +1,62 @@
 /**
- * Die Datenauskunft — als Datei, und ausschliesslich im Browser gebaut.
+ * The data export — as a file, and built exclusively in the browser.
  *
- * <strong>Sie wird nirgends abgelegt.</strong> Es gibt keinen Endpunkt, der sie
- * erzeugt, und keine Datei, die auf einem Server liegen bleibt — sonst hätte
- * eine Auskunft über die eigenen Daten selbst wieder Daten hinterlassen.
+ * <strong>It is stored nowhere.</strong> There is no endpoint that produces it
+ * and no file left lying on a server — otherwise an export of one's own data
+ * would itself have left data behind.
+ *
+ * <strong>The property names below are the FILE's keys and stay German</strong>
+ * (`erzeugt_am`, `unvollständig`, `abschnitte`, `daten`, `nicht_abrufbar`): the
+ * file is a format a person downloads and keeps, and it has carried these keys
+ * since the first export. Like a wire field name, renaming one here would change
+ * the file, not the code.
  */
-export type Abschnittsstand = "ok" | "nicht_abrufbar";
+export type SectionStatus = "ok" | "nicht_abrufbar";
 
-export interface Abschnitt {
-  status: Abschnittsstand;
+export interface ExportSection {
+  status: SectionStatus;
   daten?: unknown;
 }
 
-export interface Datenauskunft {
+export interface DataExport {
   erzeugt_am: string;
-  /** Welche Abschnitte fehlen. Leer heisst: nichts fehlt. */
+  /** Which sections are missing. Empty means: nothing is missing. */
   unvollständig: string[];
-  abschnitte: Record<string, Abschnitt>;
+  abschnitte: Record<string, ExportSection>;
 }
 
 /**
- * Ein Abschnitt, und ob er wirklich da ist.
+ * A section, and whether it is really there.
  *
- * <strong>Fehlt er, stehen auch keine Daten darin.</strong> Ein Abschnitt mit
- * `nicht_abrufbar` und trotzdem gefülltem Feld wäre die schlimmste Variante:
- * halb wahr, und niemand sieht, welche Hälfte.
+ * <strong>If it is missing, no data stands in it either.</strong> A section
+ * marked `nicht_abrufbar` with a filled field anyway would be the worst variant:
+ * half true, and nobody sees which half.
  */
-export const abschnitt = (ok: boolean, daten: unknown): Abschnitt =>
-  ok ? { status: "ok", daten } : { status: "nicht_abrufbar" };
+export const section = (ok: boolean, data: unknown): ExportSection =>
+  ok ? { status: "ok", daten: data } : { status: "nicht_abrufbar" };
 
 /**
- * Baut die Auskunft und sagt oben, was fehlt.
+ * Builds the export and states at the top what is missing.
  *
- * Die Liste der Lücken steht IN der Datei, nicht nur auf der Seite: wer sie
- * später öffnet, soll ohne die Seite erkennen, dass sie unvollständig ist.
+ * The list of gaps stands IN the file, not only on the page: whoever opens it
+ * later should see without the page that it is incomplete.
  */
-export function baueAuskunft(
-  abschnitte: Record<string, Abschnitt>,
+export function buildExport(
+  sections: Record<string, ExportSection>,
   now: Date = new Date()
-): Datenauskunft {
+): DataExport {
   return {
     erzeugt_am: now.toISOString(),
-    unvollständig: Object.entries(abschnitte)
+    unvollständig: Object.entries(sections)
       .filter(([, value]) => value.status !== "ok")
       .map(([name]) => name),
-    abschnitte,
+    abschnitte: sections,
   };
 }
 
-/** Ein Dateiname, der in einem Downloads-Ordner noch etwas sagt. */
-export const dateiname = (now: Date = new Date()): string =>
+/**
+ * A file name that still says something in a downloads folder. The name is
+ * pinned by the E2E journey (`consents-journey.spec.ts`) and stays as it is.
+ */
+export const fileName = (now: Date = new Date()): string =>
   `workertransfer-meine-daten-${now.toISOString().slice(0, 10)}.json`;

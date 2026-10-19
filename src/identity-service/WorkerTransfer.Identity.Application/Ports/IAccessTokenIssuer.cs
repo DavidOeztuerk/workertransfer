@@ -8,7 +8,7 @@ namespace WorkerTransfer.Identity.Application.Ports;
 /// <remarks>
 /// Names no signature algorithm and no claim layout. Both are the
 /// infrastructure's answer; the shape it has to produce is pinned as a COMPLETE
-/// SET by <c>TokenformTests</c> (at the issuer) and <c>TokenformAmDrahtTests</c>
+/// SET by <c>TokenShapeTests</c> (at the issuer) and <c>TokenShapeAtTheWireTests</c>
 /// (at the wire, out of the <c>Set-Cookie</c>). A membership check would have
 /// missed the ninth claim; a set comparison did not.
 /// </remarks>

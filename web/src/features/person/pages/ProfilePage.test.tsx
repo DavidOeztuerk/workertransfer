@@ -2,8 +2,8 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ANGEMELDET, PERSON, renderMitStore } from "../test/render";
-import { type Netz, netz } from "../test/netz";
+import { SIGNED_IN, PERSON, renderWithStore } from "../test/render";
+import { type Network, stubNetwork } from "../test/network";
 import { ProfilePage } from "./ProfilePage";
 
 function repo(name: string, topics: string[], languages: string[] = []) {
@@ -19,9 +19,9 @@ function repo(name: string, topics: string[], languages: string[] = []) {
   };
 }
 
-const PROFIL = {
+const PROFILE = {
   subject_id: PERSON.userId,
-  headline: "Backend-Entwicklung",
+  headline: "Backend development",
   bio: "",
   location: "Hamburg",
   remote_ok: false,
@@ -29,12 +29,12 @@ const PROFIL = {
   updated_at: "2026-09-01T10:00:00Z",
 };
 
-let draht: Netz;
+let wire: Network;
 
 beforeEach(() => {
-  draht = netz({
-    "GET /profiles/me": { body: PROFIL },
-    "PUT /profiles/me": { body: PROFIL },
+  wire = stubNetwork({
+    "GET /profiles/me": { body: PROFILE },
+    "PUT /profiles/me": { body: PROFILE },
     "POST /consent/check": { body: { granted: false } },
     "GET /github/me": { status: 404 },
     "GET /resumes/me": { status: 404 },
@@ -69,100 +69,99 @@ afterEach(() => {
 });
 
 /**
- * <strong>Aus Belegen werden Vorschläge — nie Nennungen.</strong>
+ * <strong>Evidence becomes suggestions — never namings.</strong>
  *
- * Diese Reihe hält die Naht fest, an der ADR-0022 hängt. Was in einem
- * Repository vorkommt, ist eine Tatsache über ein Repository; dass eine Person
- * etwas kann, ist eine Aussage über einen Menschen, und die darf nur sie selbst
- * treffen. Zwischen beidem liegen hier zwei Handlungen: ein Klick füllt das
- * Feld, und erst „Speichern" macht daraus eine Nennung.
+ * This suite pins the seam ADR-0022 hangs on. What occurs in a repository is a
+ * fact about a repository; that a person can do something is a statement about
+ * a human, and only they may make it. Between the two lie two acts here: a
+ * click fills the field, and only "Save" makes it a naming.
  */
-describe("ProfilePage — Vorschläge aus Belegen", () => {
-  it("übernimmt von allein nichts ins Profil", async () => {
-    draht.setze("GET /github/me", {
+describe("ProfilePage — suggestions from evidence", () => {
+  it("adopts nothing into the profile by itself", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "anna",
         verified: true,
         challenge_description: null,
         fetched_at: "2026-09-01T10:00:00Z",
-        repositories: [repo("dienst", ["kubernetes"], ["Go"])],
+        repositories: [repo("service", ["kubernetes"], ["Go"])],
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
-    // Die Vorschläge stehen da …
+    // The suggestions stand there …
     expect(await screen.findByRole("button", { name: /kubernetes/ })).toBeTruthy();
 
-    // … und das Feld trägt weiterhin nur, was die Person selbst gesagt hat.
+    // … and the field still carries only what the person said themselves.
     await waitFor(() =>
       expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#"),
     );
-    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+    expect(wire.last("PUT /profiles/me")).toBeUndefined();
   });
 
-  it("setzt einen Vorschlag ins Feld — und speichert dabei nicht", async () => {
-    draht.setze("GET /github/me", {
+  it("puts a suggestion into the field — and does not save while doing so", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "anna",
         verified: true,
         challenge_description: null,
         fetched_at: "2026-09-01T10:00:00Z",
-        repositories: [repo("dienst", ["kubernetes"], [])],
+        repositories: [repo("service", ["kubernetes"], [])],
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: /kubernetes/ }));
 
     expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#, kubernetes");
-    // Der Klick ist die eine Handlung, das Speichern die andere.
-    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+    // The click is the one act, saving the other.
+    expect(wire.last("PUT /profiles/me")).toBeUndefined();
   });
 
-  it("macht erst mit dem Speichern eine Nennung daraus", async () => {
-    draht.setze("GET /github/me", {
+  it("makes it a naming only on save", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "anna",
         verified: true,
         challenge_description: null,
         fetched_at: "2026-09-01T10:00:00Z",
-        repositories: [repo("dienst", ["kubernetes"], [])],
+        repositories: [repo("service", ["kubernetes"], [])],
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: /kubernetes/ }));
     await user.click(screen.getByRole("button", { name: /Speichern/ }));
 
     await waitFor(() =>
-      expect(draht.letzter("PUT /profiles/me")).toBeDefined(),
+      expect(wire.last("PUT /profiles/me")).toBeDefined(),
     );
-    expect(draht.letzter("PUT /profiles/me")?.body).toMatchObject({
+    expect(wire.last("PUT /profiles/me")?.body).toMatchObject({
       skills: ["C#", "kubernetes"],
     });
   });
 
   /**
-   * <strong>Die zweite Quelle: der Lebenslauf.</strong>
+   * <strong>The second source: the CV.</strong>
    *
-   * Technologien an einer Station sind Wörter, die ein Mensch selbst
-   * hingeschrieben hat — genau wie ein GitHub-Topic. Sie stehen deshalb
-   * gleichberechtigt in derselben Vorschlagsliste, und auch sie werden erst
-   * durch einen Klick und ein Speichern zu einer Aussage über ihn.
+   * Technologies at a position are words a human wrote themselves — just like
+   * a GitHub topic. They therefore stand on an equal footing in the same
+   * suggestion list, and they too become a statement about them only through a
+   * click and a save.
    *
-   * Sie machen die Station NICHT durchsuchbar: ein Lebenslauf ist einzeln
-   * freigegeben (ADR-0020). Suchbar wird eine Fähigkeit nur im Profil.
+   * They do NOT make the position searchable: a CV is released individually
+   * (ADR-0020). A skill becomes searchable only in the profile.
    */
-  it("schlägt auch die Technologien aus dem Lebenslauf vor", async () => {
-    draht.setze("GET /resumes/me", {
+  it("also suggests the technologies from the CV", async () => {
+    wire.set("GET /resumes/me", {
       body: {
         subject_id: PERSON.userId,
         positions: [
@@ -180,7 +179,7 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: /Kubernetes/ }));
@@ -189,19 +188,19 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
   });
 
   /**
-   * <strong>Die dritte Quelle: die eigenen Arbeiten.</strong>
+   * <strong>The third source: one's own portfolio.</strong>
    *
-   * „Damit habe ich das gebaut" ist derselbe Satz über die eigene Arbeit wie an
-   * einer Lebenslauf-Station — und steht deshalb gleichberechtigt vor den
-   * Wörtern, die nur an einem Repository kleben.
+   * "I built this with that" is the same sentence about one's own work as at a
+   * CV position — and therefore stands on an equal footing before the words
+   * that merely stick to a repository.
    */
-  it("schlägt auch die Technologien der eigenen Arbeiten vor", async () => {
-    draht.setze("GET /portfolios/me", {
+  it("also suggests the technologies of one's own portfolio items", async () => {
+    wire.set("GET /portfolios/me", {
       body: {
         subject_id: PERSON.userId,
         items: [
           {
-            title: "Lastprobe",
+            title: "Load test",
             summary: "",
             url: null,
             role: "",
@@ -214,7 +213,7 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: /Grafana/ }));
@@ -223,33 +222,33 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
   });
 
   /**
-   * Wer kein GitHub verknüpft hat, darf nicht wie ein leerer Eintrag aussehen.
+   * Whoever has not linked GitHub must not look like an empty entry.
    *
-   * ADR-0022 §3 nennt das ausdrücklich: „Wer nichts auf GitHub hat, ist nicht
-   * schlechter, sondern woanders." Ein ausgegrauter Kasten wäre die
-   * stillschweigende Behauptung, dort fehle etwas.
+   * ADR-0022 §3 says so explicitly: "Whoever has nothing on GitHub is not
+   * worse, but elsewhere." A greyed-out box would be the silent claim that
+   * something is missing there.
    */
-  it("zeigt ohne verbundenes Konto gar keinen Vorschlagsbereich", async () => {
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+  it("shows no suggestion area at all without a connected account", async () => {
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
     await screen.findByLabelText(/Fähigkeiten/);
 
     expect(screen.queryByText(/Aus deinen GitHub-Projekten/)).toBeNull();
   });
 
-  it("schlägt nichts vor, was schon im Profil steht", async () => {
-    draht.setze("GET /github/me", {
+  it("suggests nothing that already stands in the profile", async () => {
+    wire.set("GET /github/me", {
       body: {
         subject_id: PERSON.userId,
         login: "anna",
         verified: true,
         challenge_description: null,
         fetched_at: "2026-09-01T10:00:00Z",
-        repositories: [repo("dienst", ["c#"], [])],
+        repositories: [repo("service", ["c#"], [])],
       },
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
     await screen.findByLabelText(/Fähigkeiten/);
 
@@ -258,58 +257,59 @@ describe("ProfilePage — Vorschläge aus Belegen", () => {
 });
 
 /**
- * <strong>Die vierte Quelle: die eigenen hochgeladenen Unterlagen</strong>
+ * <strong>The fourth source: one's own uploaded documents</strong>
  * (PBI-7, ADR-0043).
  *
- * Sie hängt an derselben Naht wie die drei anderen und macht daraus keine
- * Ausnahme: aus einem Zeugnis wird ein Vorschlag, aus einem Vorschlag eine
- * Nennung erst durch zwei Handlungen. Was hier hinzukommt, ist die Auslösung —
- * ein Zeugnis wird nur gelesen, wenn jemand darum bittet.
+ * It hangs on the same seam as the other three and makes no exception of it:
+ * a reference becomes a suggestion, a suggestion becomes a naming only through
+ * two acts. What is added here is the trigger — a reference is read only when
+ * somebody asks for it.
  */
-describe("ProfilePage — Vorschläge aus den eigenen Unterlagen", () => {
-  const EIN_ZEUGNIS = {
+describe("ProfilePage — suggestions from one's own documents", () => {
+  const ONE_REFERENCE = {
     document_id: "d1",
-    name: "Arbeitszeugnis Nord",
+    name: "Job reference North",
     read_at: null,
     has_text: false,
     terms: [] as string[],
   };
 
-  const GELESEN = {
-    ...EIN_ZEUGNIS,
+  const READ = {
+    ...ONE_REFERENCE,
     read_at: "2026-09-12T10:00:00Z",
     has_text: true,
+    // Canonical vocabulary names — what resume-service's term finder returns.
     terms: ["Schweißfachmann", "CNC"],
   };
 
   /**
-   * <strong>Ohne Auslösung wird kein Dokument gelesen</strong> (ADR-0004).
+   * <strong>Without a trigger no document is read</strong> (ADR-0004).
    *
-   * Das Öffnen einer Seite darf kein Zeugnis öffnen. „Auf Auslösung" wäre sonst
-   * eine Formulierung statt einer Regel — ein Lesevorgang beim Seitenaufruf
-   * wäre formal auch ausgelöst, nämlich durch das Aufrufen.
+   * Opening a page must not open a reference. "On trigger" would otherwise be
+   * a phrasing instead of a rule — a read when the page is called would
+   * formally be triggered too, namely by the call.
    */
-  it("liest beim Laden der Seite keine Unterlage", async () => {
-    draht.setze("GET /resumes/me/documents/terms", { body: [EIN_ZEUGNIS] });
+  it("reads no document when the page loads", async () => {
+    wire.set("GET /resumes/me/documents/terms", { body: [ONE_REFERENCE] });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
     await screen.findByRole("button", { name: /Meine Unterlagen lesen/ });
 
-    expect(draht.letzter("POST /resumes/me/documents/read")).toBeUndefined();
+    expect(wire.last("POST /resumes/me/documents/read")).toBeUndefined();
   });
 
   /**
-   * <strong>Ein Klick, und im Zeugnis steht „Schweißfachmann".</strong>
+   * <strong>One click, and the reference says "Schweißfachmann".</strong>
    *
-   * Die Abnahme aus PBI-7: ein hochgeladenes PDF führt nach EINEM Klick zu
-   * einem Vorschlag im Profil — und zu keiner Nennung.
+   * The acceptance from PBI-7: an uploaded PDF leads after ONE click to a
+   * suggestion in the profile — and to no naming.
    */
-  it("liest auf Klick und schlägt die gefundenen Wörter vor", async () => {
-    draht.setze("GET /resumes/me/documents/terms", { body: [EIN_ZEUGNIS] });
-    draht.setze("POST /resumes/me/documents/read", { body: [GELESEN] });
+  it("reads on click and suggests the words found", async () => {
+    wire.set("GET /resumes/me/documents/terms", { body: [ONE_REFERENCE] });
+    wire.set("POST /resumes/me/documents/read", { body: [READ] });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
     await user.click(
@@ -320,62 +320,61 @@ describe("ProfilePage — Vorschläge aus den eigenen Unterlagen", () => {
       await screen.findByRole("button", { name: /Schweißfachmann/ }),
     ).toBeTruthy();
 
-    // Ein Vorschlag, keine Nennung: das Feld trägt weiterhin nur, was die
-    // Person selbst gesagt hat.
+    // A suggestion, no naming: the field still carries only what the person
+    // said themselves.
     expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#");
-    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+    expect(wire.last("PUT /profiles/me")).toBeUndefined();
   });
 
   /**
-   * <strong>Nichts davon ist durchsuchbar, bevor die Person gespeichert hat.</strong>
+   * <strong>None of it is searchable before the person has saved.</strong>
    *
-   * Der Suchindex dieser Plattform ist das PROFIL — der Scout findet Menschen
-   * über die Wörter, die sie selbst genannt haben, nie über einen erkannten
-   * Text (ADR-0033). Hinein kommt ein Wort ausschliesslich über
-   * <c>PUT /profiles/me</c>, und dieser Test hält den ganzen Weg fest: nach dem
-   * Lesen nicht, nach dem Klick nicht, erst nach dem Speichern.
+   * This platform's search index is the PROFILE — the scout finds people by
+   * the words they named themselves, never by a recognised text (ADR-0033). A
+   * word gets in exclusively over <c>PUT /profiles/me</c>, and this test pins
+   * the whole way: not after reading, not after the click, only after saving.
    *
-   * <strong>Die Gegenprobe fiel.</strong> Ein <c>uebernimm</c>, das nebenbei
-   * speichert, macht die mittlere Erwartung rot — und genau das wäre „ein
-   * erkanntes Wort landet ohne Speichern im Suchindex".
+   * <strong>The counter-probe fell.</strong> An <c>adopt</c> that saves on the
+   * side turns the middle expectation red — and that would be exactly "a
+   * recognised word lands in the search index without saving".
    */
-  it("macht aus einem erkannten Wort erst mit dem Speichern eine Nennung", async () => {
-    draht.setze("GET /resumes/me/documents/terms", { body: [GELESEN] });
+  it("makes a recognised word a naming only on save", async () => {
+    wire.set("GET /resumes/me/documents/terms", { body: [READ] });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
     const user = userEvent.setup();
 
-    // Gelesen ist schon — und trotzdem steht nichts im Index.
+    // Already read — and still nothing stands in the index.
     await screen.findByRole("button", { name: /Schweißfachmann/ });
-    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+    expect(wire.last("PUT /profiles/me")).toBeUndefined();
 
     await user.click(screen.getByRole("button", { name: /Schweißfachmann/ }));
 
-    // Der Klick füllt das Feld — und schickt nichts.
+    // The click fills the field — and sends nothing.
     expect(screen.getByLabelText(/Fähigkeiten/)).toHaveValue("C#, Schweißfachmann");
-    expect(draht.letzter("PUT /profiles/me")).toBeUndefined();
+    expect(wire.last("PUT /profiles/me")).toBeUndefined();
 
     await user.click(screen.getByRole("button", { name: /Speichern/ }));
 
-    await waitFor(() => expect(draht.letzter("PUT /profiles/me")).toBeDefined());
-    expect(draht.letzter("PUT /profiles/me")?.body).toMatchObject({
+    await waitFor(() => expect(wire.last("PUT /profiles/me")).toBeDefined());
+    expect(wire.last("PUT /profiles/me")?.body).toMatchObject({
       skills: ["C#", "Schweißfachmann"],
     });
   });
 
   /**
-   * <strong>„Kein Text zu lesen" wird gesagt, nicht verschwiegen.</strong>
+   * <strong>"No text to read" is said, not kept quiet.</strong>
    *
-   * Ein abfotografierter Meisterbrief ist ein Bild. Das als „keine Vorschläge"
-   * zu zeigen wäre die stillschweigende Behauptung, darin stehe nichts —
-   * ADR-0022 §3, Lüge durch Auslassung.
+   * A photographed master craftsman's certificate is a picture. Showing that as
+   * "no suggestions" would be the silent claim that nothing stands in it —
+   * ADR-0022 §3, a lie by omission.
    */
-  it("sagt, aus welcher Datei kein Text zu lesen war", async () => {
-    draht.setze("GET /resumes/me/documents/terms", {
+  it("says from which file no text could be read", async () => {
+    wire.set("GET /resumes/me/documents/terms", {
       body: [
         {
           document_id: "d2",
-          name: "Meisterbrief",
+          name: "Master certificate",
           read_at: "2026-09-12T10:00:00Z",
           has_text: false,
           terms: [],
@@ -383,21 +382,21 @@ describe("ProfilePage — Vorschläge aus den eigenen Unterlagen", () => {
       ],
     });
 
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
-    expect(await screen.findByText(/Meisterbrief/)).toBeTruthy();
+    expect(await screen.findByText(/Master certificate/)).toBeTruthy();
     expect(screen.getByText(/die Datei ist ein Bild/)).toBeTruthy();
   });
 
   /**
-   * Wer nichts hochgeladen hat, sieht den Abschnitt gar nicht.
+   * Whoever uploaded nothing does not see the section at all.
    *
-   * Kein leerer Kasten, kein ausgegrauter Knopf — dieselbe Regel wie beim
-   * fehlenden GitHub-Konto. Das ist die Zusage „nichts wird schlechter": ein
-   * Konto ohne Unterlagen sieht genau dieselbe Seite wie vorher.
+   * No empty box, no greyed-out button — the same rule as for a missing GitHub
+   * account. That is the promise "nothing gets worse": an account without
+   * documents sees exactly the same page as before.
    */
-  it("zeigt ohne Unterlagen keinen Knopf", async () => {
-    renderMitStore(<ProfilePage />, { auth: ANGEMELDET });
+  it("shows no button without documents", async () => {
+    renderWithStore(<ProfilePage />, { auth: SIGNED_IN });
 
     await screen.findByLabelText(/Fähigkeiten/);
 

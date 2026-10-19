@@ -11,7 +11,7 @@ public sealed class WeakPasswordException(string reason)
 /// <summary>The floor a password has to clear.</summary>
 /// <remarks>
 /// A length floor and a length ceiling, and no composition rules. Demanding a
-/// digit and a capital produces <c>Passwort1!</c>, which is shorter in practice
+/// digit and a capital produces <c>Password1!</c>, which is shorter in practice
 /// than what people choose when simply asked for length.
 /// </remarks>
 public static class PasswordPolicy
@@ -44,6 +44,7 @@ public static class PasswordPolicy
 
         if (System.Text.Encoding.UTF8.GetByteCount(password) > MaximumBytes)
         {
+            // web/src/features/auth/api/registration.ts (REGISTER_CASES) matches this sentence.
             throw new WeakPasswordException($"exceeds {MaximumBytes} bytes");
         }
     }

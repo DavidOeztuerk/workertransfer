@@ -77,46 +77,49 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("noelia_refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AnschriftRow", b =>
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AccountSettingsRow", b =>
                 {
                     b.Property<Guid>("SubjectId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("subject_id");
 
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("city");
+                    b.Property<bool>("AiAuditLog")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ai_audit_log");
 
-                    b.Property<string>("Country")
+                    b.Property<string>("AiBaseUrl")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("country");
+                        .HasColumnName("ai_base_url");
+
+                    b.Property<string>("AiKeyEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ai_key_encrypted");
+
+                    b.Property<string>("AiKeyTail")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ai_key_tail");
+
+                    b.Property<string>("AiModel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ai_model");
+
+                    b.Property<string>("AiProvider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ai_provider");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("Line1")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("line1");
-
-                    b.Property<string>("Line2")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("line2");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("PostalCode")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("postal_code");
+                    b.Property<int?>("DeleteAfterMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("delete_after_months");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -124,9 +127,9 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("SubjectId");
 
-                    b.ToTable("addresses", (string)null);
+                    b.ToTable("account_settings", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.AuditEventRow", b =>
@@ -232,61 +235,6 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("company_invitations", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.KontoeinstellungenRow", b =>
-                {
-                    b.Property<Guid>("SubjectId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("subject_id");
-
-                    b.Property<bool>("AiAuditLog")
-                        .HasColumnType("boolean")
-                        .HasColumnName("ai_audit_log");
-
-                    b.Property<string>("AiBaseUrl")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ai_base_url");
-
-                    b.Property<string>("AiKeyEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ai_key_encrypted");
-
-                    b.Property<string>("AiKeyTail")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ai_key_tail");
-
-                    b.Property<string>("AiModel")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ai_model");
-
-                    b.Property<string>("AiProvider")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("ai_provider");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<int?>("DeleteAfterMonths")
-                        .HasColumnType("integer")
-                        .HasColumnName("delete_after_months");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("SubjectId");
-
-                    b.ToTable("account_settings", (string)null);
-
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
-                });
-
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.MembershipRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -318,6 +266,58 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("user_tenant_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.PostalAddressRow", b =>
+                {
+                    b.Property<Guid>("SubjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("country");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("line1");
+
+                    b.Property<string>("Line2")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("line2");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("postal_code");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("SubjectId");
+
+                    b.ToTable("addresses", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.SessionCapacityRow", b =>
@@ -374,10 +374,6 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("Berufsfeld")
-                        .HasColumnType("text")
-                        .HasColumnName("berufsfeld");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -402,8 +398,14 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Language")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("text")
+                        .HasDefaultValue("de")
                         .HasColumnName("language");
+
+                    b.Property<string>("OccupationalField")
+                        .HasColumnType("text")
+                        .HasColumnName("berufsfeld");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -477,7 +479,7 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Outbox.OutboxRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

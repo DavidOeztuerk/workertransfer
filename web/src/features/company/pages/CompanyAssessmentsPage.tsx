@@ -17,63 +17,65 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../../work/lib/session";
+import { useActor } from "../../work/lib/session";
 import { useAsync } from "../../work/lib/useAsync";
 import {
-  type Ausgang,
-  HOECHSTER_UMFANG,
-  KLEINSTER_UMFANG,
-  MINDESTFRIST_TAGE,
-  type Vorgang,
-  bewerte,
-  ladeFirmenvorgaenge,
-  stelleAufgabe,
-} from "../../work/api/arbeitsproben";
+  type Outcome,
+  MAX_HOURS,
+  MIN_HOURS,
+  MIN_NOTICE_DAYS,
+  type Case,
+  evaluate,
+  getCompanyCases,
+  STEP_CASES,
+  setTask,
+} from "../../work/api/assessments";
+import { failureKey } from "../../../shared/api/errors";
 
 /**
- * `/company/assessments` — Arbeitsproben stellen und beantworten.
+ * `/company/assessments` — set work samples and answer them.
  *
- * <strong>Drei Zusagen, und alle drei sind hier sichtbar</strong> (ADR-0042):
+ * <strong>Three promises, and all three are visible here</strong> (ADR-0042):
  *
- * 1. Die Rückmeldung hat ein Textfeld und <em>keine Note</em>. Es gibt keinen
- *    Sternebalken, keine Skala und kein zweites, internes Feld — wo es zwei
- *    gäbe, stünde im zweiten die Wahrheit.
- * 2. <strong>Der Absageknopf ist gesperrt, solange kein Text dasteht.</strong>
- *    Der Server weist eine Absage ohne Begründung ohnehin ab; dieses Formular
- *    sagt es vorher, statt es jemanden ausprobieren zu lassen. Ablehnen und
- *    Begründen sind ein Schritt.
- * 3. Der Umfang ist ein Pflichtfeld mit einer Obergrenze von acht Stunden, und
- *    der Hinweis darunter sagt, warum.
+ * 1. The feedback has a text field and <em>no mark</em>. There is no star bar,
+ *    no scale and no second, internal field — where there were two, the truth
+ *    would stand in the second.
+ * 2. <strong>The reject button is locked as long as no text stands
+ *    there.</strong> The server refuses a rejection without a reason anyway;
+ *    this form says so beforehand instead of letting someone try it out.
+ *    Rejecting and giving a reason are one step.
+ * 3. The effort is a required field with an upper bound of eight hours, and the
+ *    hint below it says why.
  *
- * <strong>Diese Liste zeigt nur, wer gerade freigegeben hat.</strong> Wer
- * widerruft, fällt heraus — beim nächsten Aufruf, nicht beim übernächsten. Eine
- * Gesamtzahl gibt es deshalb nicht: sie verriete über die Differenz zur Länge,
- * wie viele Menschen die Sicht entzogen haben (ADR-0026).
+ * <strong>This list shows only who has released right now.</strong> Whoever
+ * revokes drops out — at the next call, not the one after. That is why there is
+ * no total: through the difference to the length it would reveal how many
+ * people withdrew the view (ADR-0026).
  */
 export function CompanyAssessmentsPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, fuerFirma, tenantId } = useHandelnder();
+  const { signedIn, loading, forCompany, tenantId } = useActor();
 
-  const vorgaenge = useAsync(
-    (signal) => ladeFirmenvorgaenge(signal),
+  const cases = useAsync(
+    (signal) => getCompanyCases(signal),
     [tenantId],
-    signedIn && fuerFirma
+    signedIn && forCompany
   );
 
-  if (laedt) {
+  if (loading) {
     return (
-      <PageShell title={t("probe.firmaTitel")} narrow>
-        <LoadingBlock label={t("probe.laden")} />
+      <PageShell title={t("assessments.companyTitle")} narrow>
+        <LoadingBlock label={t("assessments.loading")} />
       </PageShell>
     );
   }
 
-  if (!signedIn || !fuerFirma) {
+  if (!signedIn || !forCompany) {
     return (
-      <PageShell title={t("probe.firmaTitel")} narrow>
+      <PageShell title={t("assessments.companyTitle")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("probe.firmaNurFirma")}</Typography>
+            <Typography>{t("assessments.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
@@ -81,32 +83,32 @@ export function CompanyAssessmentsPage() {
   }
 
   return (
-    <PageShell title={t("probe.firmaTitel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("probe.firmaLead")}</Typography>
+    <PageShell title={t("assessments.companyTitle")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("assessments.companyLead")}</Typography>
 
-      <Stellformular fertig={() => vorgaenge.reload()} />
+      <TaskForm onDone={() => cases.reload()} />
 
-      {vorgaenge.pending && <LoadingBlock label={t("probe.laden")} />}
+      {cases.pending && <LoadingBlock label={t("assessments.loading")} />}
 
-      {vorgaenge.data?.ok === false && (
+      {cases.data?.ok === false && (
         <Alert severity="warning" sx={{ mt: 3 }}>
-          {vorgaenge.data.reason === "no-company"
-            ? t("probe.firmaNurFirma")
-            : t("fehler.ledgerSchweigt")}
+          {cases.data.reason === "no-company"
+            ? t("assessments.companyOnly")
+            : t("errors.ledgerSilent")}
         </Alert>
       )}
 
-      {vorgaenge.data?.ok === true && vorgaenge.data.items.length === 0 && (
-        <EmptyBlock title={t("probe.firmaLeer")} hint={t("probe.firmaLeerHinweis")} />
+      {cases.data?.ok === true && cases.data.items.length === 0 && (
+        <EmptyBlock title={t("assessments.companyEmpty")} hint={t("assessments.companyEmptyHint")} />
       )}
 
       <Stack spacing={2} sx={{ mt: 3 }}>
-        {vorgaenge.data?.ok === true &&
-          vorgaenge.data.items.map((vorgang) => (
-            <Firmenkarte
-              key={vorgang.id}
-              vorgang={vorgang}
-              fertig={() => vorgaenge.reload()}
+        {cases.data?.ok === true &&
+          cases.data.items.map((caseItem) => (
+            <CompanyCaseCard
+              key={caseItem.id}
+              caseItem={caseItem}
+              onDone={() => cases.reload()}
             />
           ))}
       </Stack>
@@ -114,104 +116,104 @@ export function CompanyAssessmentsPage() {
   );
 }
 
-/** Eine Aufgabe stellen — Umfang und Frist sind Pflicht. */
-function Stellformular({ fertig }: { fertig: () => void }) {
+/** Set a task — effort and deadline are required. */
+function TaskForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
-  const [wer, setWer] = useState("");
-  const [titel, setTitel] = useState("");
-  const [aufgabe, setAufgabe] = useState("");
-  const [stunden, setStunden] = useState("4");
-  const [frist, setFrist] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const [title, setTitle] = useState("");
+  const [task, setTaskText] = useState("");
+  const [hours, setHours] = useState("4");
+  const [deadline, setDeadline] = useState("");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function stellen() {
-    setLaeuft(true);
+  async function submitTask() {
+    setRunning(true);
 
-    const ergebnis = await stelleAufgabe({
-      subject_id: wer.trim(),
-      title: titel,
-      task: aufgabe,
-      hours: Number(stunden),
-      // Der Tag endet abends: eine Frist auf Mitternacht naehme der Person
-      // den letzten Tag, ohne es zu sagen.
-      due_at: new Date(`${frist}T23:59:00`).toISOString(),
+    const result = await setTask({
+      subject_id: recipient.trim(),
+      title,
+      task,
+      hours: Number(hours),
+      // The day ends in the evening: a deadline at midnight would take the
+      // last day from the person without saying so.
+      due_at: new Date(`${deadline}T23:59:00`).toISOString(),
     });
 
-    setLaeuft(false);
+    setRunning(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      setWer("");
-      setTitel("");
-      setAufgabe("");
-      setFrist("");
-      fertig();
+    if (result.ok) {
+      setError(null);
+      setRecipient("");
+      setTitle("");
+      setTaskText("");
+      setDeadline("");
+      onDone();
       return;
     }
 
-    setFehler(ergebnis.error.detail || ergebnis.error.title);
+    setError(t(failureKey(result.error, "errors.taskNotSet", STEP_CASES)));
   }
 
-  const vollstaendig =
-    wer.trim().length > 0 &&
-    titel.trim().length > 0 &&
-    aufgabe.trim().length > 0 &&
-    frist.length > 0;
+  const complete =
+    recipient.trim().length > 0 &&
+    title.trim().length > 0 &&
+    task.trim().length > 0 &&
+    deadline.length > 0;
 
   return (
     <Card>
       <CardContent>
         <Typography variant="h3" sx={{ mb: 2 }}>
-          {t("probe.stellen")}
+          {t("assessments.setTask")}
         </Typography>
 
-        {fehler !== null && (
+        {error !== null && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {fehler}
+            {error}
           </Alert>
         )}
 
         <Stack spacing={2}>
           <TextField
-            label={t("probe.wer")}
-            helperText={t("probe.werHinweis")}
-            value={wer}
-            onChange={(event) => setWer(event.target.value)}
+            label={t("assessments.recipient")}
+            helperText={t("assessments.recipientHint")}
+            value={recipient}
+            onChange={(event) => setRecipient(event.target.value)}
             fullWidth
           />
           <TextField
-            label={t("probe.ueberschrift")}
-            value={titel}
-            onChange={(event) => setTitel(event.target.value)}
+            label={t("assessments.headline")}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             fullWidth
           />
           <TextField
-            label={t("probe.aufgabe")}
-            value={aufgabe}
-            onChange={(event) => setAufgabe(event.target.value)}
+            label={t("assessments.task")}
+            value={task}
+            onChange={(event) => setTaskText(event.target.value)}
             multiline
             minRows={4}
             fullWidth
           />
-          {/* Pflichtfeld mit Obergrenze, und der Hinweis sagt WARUM — nicht
-              „bitte ausfuellen", sondern was acht Stunden bedeuten. */}
           <TextField
-            label={t("probe.umfangFeld")}
-            helperText={t("probe.umfangHinweis", { max: HOECHSTER_UMFANG })}
-            value={stunden}
-            onChange={(event) => setStunden(event.target.value)}
+            label={t("assessments.effortField")}
+            // Required, with an upper bound, and the hint says WHY — not "please
+            // fill in" but what eight hours mean.
+            helperText={t("assessments.effortHint", { max: MAX_HOURS })}
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
             type="number"
             slotProps={{
-              htmlInput: { min: KLEINSTER_UMFANG, max: HOECHSTER_UMFANG, step: 1 },
+              htmlInput: { min: MIN_HOURS, max: MAX_HOURS, step: 1 },
             }}
             fullWidth
           />
           <TextField
-            label={t("probe.fristFeld")}
-            helperText={t("probe.fristHinweis", { tage: MINDESTFRIST_TAGE })}
-            value={frist}
-            onChange={(event) => setFrist(event.target.value)}
+            label={t("assessments.deadlineField")}
+            helperText={t("assessments.deadlineHint", { tage: MIN_NOTICE_DAYS })}
+            value={deadline}
+            onChange={(event) => setDeadline(event.target.value)}
             type="date"
             slotProps={{ inputLabel: { shrink: true } }}
             fullWidth
@@ -219,10 +221,10 @@ function Stellformular({ fertig }: { fertig: () => void }) {
           <Stack direction="row">
             <Button
               variant="contained"
-              disabled={laeuft || !vollstaendig}
-              onClick={() => void stellen()}
+              disabled={running || !complete}
+              onClick={() => void submitTask()}
             >
-              {t("probe.stellenKnopf")}
+              {t("assessments.setTaskButton")}
             </Button>
           </Stack>
         </Stack>
@@ -231,113 +233,117 @@ function Stellformular({ fertig }: { fertig: () => void }) {
   );
 }
 
-/** Eine Karte je Vorgang — mit dem Bewertungsfeld, sobald etwas eingereicht ist. */
-function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void }) {
+/** One card per case — with the evaluation field as soon as something was submitted. */
+function CompanyCaseCard({ caseItem, onDone }: { caseItem: Case; onDone: () => void }) {
   const { t } = useTranslation();
-  const [ausgang, setAusgang] = useState<Ausgang>("accepted");
+  const [outcome, setOutcome] = useState<Outcome>("accepted");
   const [text, setText] = useState("");
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function bewerten() {
-    setLaeuft(true);
-    const ergebnis = await bewerte(vorgang.id, ausgang, text);
-    setLaeuft(false);
+  async function submitEvaluation() {
+    setRunning(true);
+    const result = await evaluate(caseItem.id, outcome, text);
+    setRunning(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      fertig();
+    if (result.ok) {
+      setError(null);
+      onDone();
       return;
     }
 
-    setFehler(ergebnis.error.detail || ergebnis.error.title);
+    setError(t(failureKey(result.error, "errors.evaluationNotSent", STEP_CASES)));
   }
 
   return (
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Chip label={t(`probe.stand_${vorgang.state}`)} size="small" />
+          <Chip label={t(`assessments.state_${caseItem.state}`)} size="small" />
           <Chip
-            label={t("probe.umfang", { stunden: vorgang.hours })}
+            label={t("assessments.effort", { stunden: caseItem.hours })}
             size="small"
             variant="outlined"
           />
         </Stack>
 
         <Typography variant="h3" sx={{ mb: 1 }}>
-          {vorgang.title}
+          {caseItem.title}
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 2 }}>
-          {vorgang.subject_id}
+          {caseItem.subject_id}
         </Typography>
 
-        {vorgang.submission !== undefined && (
+        {caseItem.submission !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2">{t("probe.eingereicht")}</Typography>
-            {vorgang.submission.text.length > 0 && (
+            <Typography variant="subtitle2">{t("assessments.submitted")}</Typography>
+            {caseItem.submission.text.length > 0 && (
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                {vorgang.submission.text}
+                {caseItem.submission.text}
               </Typography>
             )}
-            {/* Ein Verweis, kein eingebetteter Inhalt: die Adresse hat ein
-                Fremder gewaehlt, und weder Server noch Seite rufen sie ab. */}
-            {vorgang.submission.url !== null && (
-              <Link href={vorgang.submission.url} rel="noreferrer noopener" target="_blank">
-                {vorgang.submission.url}
+            {caseItem.submission.url !== null && (
+              <Link
+                // A reference, never embedded content: a stranger chose this
+                // address, and neither the server nor the page fetches it.
+                href={caseItem.submission.url}
+                rel="noreferrer noopener"
+                target="_blank"
+              >
+                {caseItem.submission.url}
               </Link>
             )}
           </>
         )}
 
-        {vorgang.evaluation !== undefined && (
+        {caseItem.evaluation !== undefined && (
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2">
-              {t(`probe.ausgang_${vorgang.evaluation.outcome}`)}
+              {t(`assessments.outcome_${caseItem.evaluation.outcome}`)}
             </Typography>
-            <Typography sx={{ whiteSpace: "pre-wrap" }}>{vorgang.evaluation.text}</Typography>
+            <Typography sx={{ whiteSpace: "pre-wrap" }}>{caseItem.evaluation.text}</Typography>
           </>
         )}
 
-        {vorgang.state === "submitted" && (
+        {caseItem.state === "submitted" && (
           <>
             <Divider sx={{ my: 2 }} />
 
-            {fehler !== null && (
+            {error !== null && (
               <Alert severity="error" sx={{ mb: 2 }}>
-                {fehler}
+                {error}
               </Alert>
             )}
 
             <Stack spacing={2}>
               <FormControl>
-                <FormLabel>{t("probe.ausgangFrage")}</FormLabel>
+                <FormLabel>{t("assessments.outcomeQuestion")}</FormLabel>
                 <RadioGroup
                   row
-                  value={ausgang}
-                  onChange={(event) => setAusgang(event.target.value as Ausgang)}
+                  value={outcome}
+                  onChange={(event) => setOutcome(event.target.value as Outcome)}
                 >
                   <FormControlLabel
                     value="accepted"
                     control={<Radio />}
-                    label={t("probe.ausgang_accepted")}
+                    label={t("assessments.outcome_accepted")}
                   />
                   <FormControlLabel
                     value="rejected"
                     control={<Radio />}
-                    label={t("probe.ausgang_rejected")}
+                    label={t("assessments.outcome_rejected")}
                   />
                 </RadioGroup>
               </FormControl>
 
-              {/* EIN Feld, und es ist dasselbe, das die Person liest. Kein
-                  internes daneben, keine Note, keine Skala. */}
               <TextField
-                label={t("probe.rueckmeldungFeld")}
-                helperText={t("probe.rueckmeldungHinweis")}
+                // ONE field, and it is the same one the person reads. No
+                // internal note beside it, no mark, no scale (ADR-0042 §1).
+                label={t("assessments.feedbackField")}
+                helperText={t("assessments.feedbackHint")}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 multiline
@@ -348,10 +354,10 @@ function Firmenkarte({ vorgang, fertig }: { vorgang: Vorgang; fertig: () => void
               <Stack direction="row">
                 <Button
                   variant="contained"
-                  disabled={laeuft || text.trim().length === 0}
-                  onClick={() => void bewerten()}
+                  disabled={running || text.trim().length === 0}
+                  onClick={() => void submitEvaluation()}
                 >
-                  {t("probe.bewerten")}
+                  {t("assessments.sendFeedback")}
                 </Button>
               </Stack>
             </Stack>

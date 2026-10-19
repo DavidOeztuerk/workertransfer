@@ -1,17 +1,17 @@
-// Der Berater durch den echten Stapel — und zwar an den zwei Stellen, an denen
-// er von allem anderen abweicht.
+// The advisor through the real stack — at exactly the two places where it
+// differs from everything else.
 //
-// ERSTENS: das Mandat ist eine SICHT. Was eine Firma sieht, steht im Ledger und
-// nicht in einer Spalte dieses Dienstes. Diese Reise gibt Stufe für Stufe frei
-// und liest jedes Mal auf der Firmenseite nach — und sie prüft, dass das, was
-// nicht freigegeben ist, gar nicht erst dasteht.
+// FIRST: the mandate is a VIEW. What a company sees stands in the ledger and not
+// in a column of this service. This journey releases stage by stage and reads
+// back on the company side each time — and it checks that what is not released
+// is not there at all.
 //
-// ZWEITENS: ein Rückzug wirkt bei der nächsten Anfrage. Dieselbe Firmenseite,
-// dieselbe Person, nichts mehr.
+// SECOND: a withdrawal takes effect on the next request. The same company page,
+// the same person, nothing any more.
 //
-// Der Draht ist der Grund, warum es diese Reise geben muss: `salary_min` als
-// `salaryMin` gebunden käme nie an, und jede Handler- und Komponentenreihe
-// bliebe grün.
+// The wire is the reason this journey has to exist: `salary_min` bound as
+// `salaryMin` would never arrive, and every handler and component suite would
+// stay green.
 
 import { expect, test } from "@playwright/test";
 
@@ -21,37 +21,38 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ browser }) => {
+test("three stages, and what is not released is not there", async ({ browser }) => {
   const stamp = Date.now();
-  const candidateEmail = uniqueEmail("berater.example");
+  const candidateEmail = uniqueEmail("advisor.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Berater ${stamp}`;
-  const headline = `E2E Berater-Kandidat ${stamp}`;
+  const companyName = `E2E Advisory ${stamp}`;
+  const headline = `E2E Advisory candidate ${stamp}`;
 
-  // --- Die Person: Profil, Freigabe, Mandat -------------------------------
+  // --- The person: profile, release, mandate ------------------------------
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Beraterin");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Advisee");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByLabel(/Fähigkeiten/i).fill(`Beraten${stamp}`);
+  await candidate.getByLabel(/Fähigkeiten/i).fill(`Advising${stamp}`);
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
 
-  // „Fuer alle Unternehmen" — sonst findet der Scout sie gar nicht.
+  // "Für alle Unternehmen" (for all companies) — otherwise the scout does not
+  // find her at all.
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  // Das Mandat. VIER Werte, und keiner davon ist eine Sichtbarkeit.
+  // The mandate. FOUR values, and none of them is a visibility.
   await candidate.goto("/advisor");
   await candidate.getByLabel(/Frühester Eintritt/i).fill("2026-11");
   await candidate.getByLabel(/Gehalt ab/i).fill("4000");
@@ -60,47 +61,47 @@ test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ brow
   await candidate.getByRole("button", { name: /Mandat speichern/i }).click();
   await expect(candidate.getByText(/^Gespeichert\.$/)).toBeVisible();
 
-  // --- Das Unternehmen eröffnet ein Gespräch ------------------------------
+  // --- The company opens a conversation ----------------------------------
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
-  await registerAndConfirm(recruiter, recruiterEmail, "E2E Werber", companyName);
+  await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   await recruiter.goto("/scout");
-  await recruiter.getByLabel("Fähigkeiten").fill(`Beraten${stamp}`);
+  await recruiter.getByLabel("Fähigkeiten").fill(`Advising${stamp}`);
   await recruiter.getByRole("button", { name: "Suchen" }).click();
 
-  const karte = recruiter.locator("li").filter({ hasText: headline });
-  await expect(karte).toBeVisible();
+  const card = recruiter.locator("li").filter({ hasText: headline });
+  await expect(card).toBeVisible();
 
-  await karte.getByRole("button", { name: /Gespräch eröffnen/i }).click();
-  await expect(karte.getByText(/Gespräch eröffnet/i)).toBeVisible();
+  await card.getByRole("button", { name: /Gespräch eröffnen/i }).click();
+  await expect(card.getByText(/Gespräch eröffnet/i)).toBeVisible();
 
-  // --- Stufe 1: Eintritt und Pensum, sonst nichts -------------------------
+  // --- Stage 1: entry and workload, nothing else --------------------------
 
   await recruiter.goto("/company/advisor");
   await expect(recruiter.getByText(/2026-11/)).toBeVisible();
 
-  // DIE ZUSAGE: die Gehaltsspanne ist nicht da. Nicht leer, nicht gesperrt,
-  // nicht „noch nicht freigegeben" — gar nicht.
+  // THE PROMISE: the salary range is not there. Not empty, not locked, not "not
+  // released yet" — not at all.
   await expect(recruiter.getByText(/4000/)).toHaveCount(0);
-  await expect(recruiter.getByText(/E2E Beraterin/)).toHaveCount(0);
+  await expect(recruiter.getByText(/E2E Advisee/)).toHaveCount(0);
   await expect(recruiter.getByText(/gesperrt|noch nicht freigegeben/i)).toHaveCount(0);
 
-  // --- Stufe 2: die Spanne kommt dazu ------------------------------------
+  // --- Stage 2: the range is added --------------------------------------
 
   await candidate.goto("/advisor");
   await candidate.getByRole("button", { name: /Stufe 2 freigeben/i }).click();
 
   await recruiter.reload();
   await expect(recruiter.getByText(/4000–5200/)).toBeVisible();
-  await expect(recruiter.getByText(/E2E Beraterin/)).toHaveCount(0);
+  await expect(recruiter.getByText(/E2E Advisee/)).toHaveCount(0);
 
-  // --- Stufe 3: Klarname und Adresse -------------------------------------
+  // --- Stage 3: civil name and address -----------------------------------
 
   await candidate.goto("/advisor");
   await candidate.getByRole("button", { name: /Stufe 3 freigeben/i }).click();
@@ -108,11 +109,11 @@ test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ brow
   await recruiter.reload();
   await expect(recruiter.getByText(candidateEmail)).toBeVisible();
 
-  // --- Eine Rücknahme wirkt bei der nächsten Anfrage ----------------------
+  // --- A withdrawal takes effect on the next request ----------------------
   //
-  // ZURÜCK AUF STUFE 2: Klarname und Adresse verschwinden, die Spanne bleibt.
-  // Das ist der scharfe Fall — nicht „alles weg", sondern genau die eine
-  // Freigabe, die zurückgenommen wurde, und sofort.
+  // BACK TO STAGE 2: civil name and address disappear, the range stays. That is
+  // the sharp case — not "everything gone", but exactly the one release that was
+  // withdrawn, and immediately.
 
   await candidate.goto("/advisor");
   await candidate.getByRole("button", { name: /Auf Stufe 2 zurück/i }).click();
@@ -121,12 +122,12 @@ test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ brow
   await expect(recruiter.getByText(/4000–5200/)).toBeVisible();
   await expect(recruiter.getByText(candidateEmail)).toHaveCount(0);
 
-  // --- Und ganz zurück: das Gespräch fällt aus der Liste -------------------
+  // --- And all the way back: the conversation drops out of the list -------
   //
-  // ERST DAS ÖFFENTLICHE PROFIL AUS. Das ist keine Umständlichkeit, sondern
-  // die Zusage selbst: ein Knopf in EINEM Gespräch legt keinen plattformweiten
-  // Schalter um. Solange „für alle Unternehmen" steht, steht auch Stufe 1 —
-  // und das ist richtig, denn sichtbar ist die Person dann wirklich.
+  // FIRST THE PUBLIC PROFILE OFF. That is not fussiness but the promise itself:
+  // a button in ONE conversation does not flip a platform-wide switch. As long
+  // as "for all companies" stands, stage 1 stands too — and that is right,
+  // because then the person really is visible.
 
   await candidate.goto("/profile");
   await candidate.getByRole("switch").click();
@@ -137,13 +138,13 @@ test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ brow
   await candidate.getByRole("button", { name: /Freigabe zurücknehmen/i }).click();
 
   await recruiter.reload();
-  // Auf Stufe 0 gibt es das Gespraech fuer die Gegenseite nicht. Eine leere
-  // Zeile waere der „gesperrt"-Hinweis in Listenform.
+  // At stage 0 the conversation does not exist for the other side. An empty row
+  // would be the "locked" hint in list form.
   await expect(recruiter.getByText(/Es läuft gerade kein Gespräch/)).toBeVisible();
   await expect(recruiter.getByText(/2026-11/)).toHaveCount(0);
 
-  // Die Person behaelt es und kann wieder freigeben — eine Ruecknahme, die die
-  // Zeile mit wegnaehme, waere eine Einbahnstrasse.
+  // The person keeps it and can release again — a withdrawal that took the row
+  // with it would be a one-way street.
   await candidate.goto("/advisor");
   await expect(candidate.getByRole("button", { name: /Stufe 1 freigeben/i })).toBeVisible();
 
@@ -151,16 +152,16 @@ test("drei Stufen, und was nicht freigegeben ist, steht nicht da", async ({ brow
   await recruiterContext.close();
 });
 
-test("wer ein Unternehmen ausschliesst, verliert „für alle Unternehmen“", async ({
+test("whoever excludes a company loses \"for all companies\"", async ({
   browser,
 }) => {
   const stamp = Date.now();
-  const candidateEmail = uniqueEmail("ausschluss.example");
-  const headline = `E2E Ausschluss ${stamp}`;
+  const candidateEmail = uniqueEmail("exclusion.example");
+  const headline = `E2E Exclusion ${stamp}`;
 
   const context = await browser.newContext();
   const candidate = await context.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Ausschliessende");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Excluder");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -171,18 +172,17 @@ test("wer ein Unternehmen ausschliesst, verliert „für alle Unternehmen“", a
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  // DIE ABNAHME AUS PBI-4, sichtbar gemacht: der Ledger kennt keine
-  // Verneinung, also gibt es den Modus „alle" nicht mehr, sobald jemand ein
-  // Unternehmen nennt. Danach ist die Person nur noch fuer Unternehmen
-  // sichtbar, denen sie einzeln freigibt — und der jetzige Arbeitgeber ist
-  // keines davon.
+  // THE ACCEPTANCE FROM PBI-4, made visible: the ledger knows no negation, so
+  // the mode "everyone" stops existing as soon as somebody names a company.
+  // Afterwards the person is visible only to companies she releases to one by
+  // one — and the current employer is none of them.
   await candidate.goto("/advisor");
-  await candidate.getByLabel(/Diese Unternehmen nicht/i).fill("arbeitgeber.test");
+  await candidate.getByLabel(/Diese Unternehmen nicht/i).fill("employer.test");
   await candidate.getByRole("button", { name: /Mandat speichern/i }).click();
   await expect(candidate.getByText(/^Gespeichert\.$/)).toBeVisible();
 
-  // Der Schalter auf der Profilseite steht danach AUS — im Ledger, nicht nur
-  // in der Anzeige.
+  // The switch on the profile page is OFF afterwards — in the ledger, not only
+  // in the display.
   await candidate.goto("/profile");
   await expect(candidate.getByRole("switch")).not.toBeChecked();
 

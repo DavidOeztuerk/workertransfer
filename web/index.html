@@ -10,14 +10,14 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>WorkerTransfer</title>
     <!--
-      Laufzeitkonfiguration. Bewusst KEIN type="module": ein klassisches Skript
-      läuft sofort und damit garantiert vor dem Bündel darunter, das als Modul
-      ohnehin verzögert ausgeführt wird. src/env.ts liest die Werte beim Import,
-      und dieser Import darf nicht der Erste sein.
+      Runtime configuration. Deliberately NOT type="module": a classic script
+      runs at once and therefore certainly before the bundle below, which as a
+      module is deferred anyway. src/env.ts reads the values on import, and
+      that import must not come first.
 
-      Sie wird nicht gebündelt (sie liegt in public/), bleibt also eine eigene
-      Datei — und genau das erlaubt es dem Helm-Chart, sie im Container zu
-      ersetzen, statt für jede Umgebung ein neues Image zu bauen.
+      It is not bundled (it lives in public/), so it stays a file of its own —
+      and exactly that lets the Helm chart replace it in the container instead
+      of building a new image for every environment.
     -->
     <script src="/config.js"></script>
   </head>

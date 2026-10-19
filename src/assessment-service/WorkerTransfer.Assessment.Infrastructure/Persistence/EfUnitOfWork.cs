@@ -3,35 +3,35 @@ using WorkerTransfer.Assessment.Application.Ports;
 
 namespace WorkerTransfer.Assessment.Infrastructure.Persistence;
 
-/// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
+/// <summary>A database transaction around a command.</summary>
 /// <remarks>
-/// Sie umschliesst auch den Postausgang: der Vermerk, dass die Person ihre
-/// Bewertung lesen soll, entsteht in derselben Klammer wie die Bewertung, oder
-/// gar nicht (ADR-0025, ADR-0042 §2).
+/// It encloses the outbox too: the entry telling the person to read their
+/// evaluation comes into being in the same transaction as the evaluation, or
+/// not at all (ADR-0025, ADR-0042 §2).
 /// </remarks>
-public sealed class EfUnitOfWork(AssessmentDbContext kontext) : IUnitOfWork
+public sealed class EfUnitOfWork(AssessmentDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+    public async Task<T> InTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arbeit);
+        ArgumentNullException.ThrowIfNull(work);
 
-        if (kontext.Database.CurrentTransaction is not null)
+        if (context.Database.CurrentTransaction is not null)
         {
-            // Schon in einer. Eine zweite zu öffnen würde entweder werfen oder
-            // die halbe Arbeit früh committen.
-            return await arbeit(cancellationToken);
+            // Already in one. Opening a second would either throw or commit half
+            // the work early.
+            return await work(cancellationToken);
         }
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
+        await using var scope = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await work(cancellationToken);
 
-        await kontext.SaveChangesAsync(cancellationToken);
-        await klammer.CommitAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await scope.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }

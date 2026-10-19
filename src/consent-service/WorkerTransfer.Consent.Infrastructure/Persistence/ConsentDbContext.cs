@@ -95,18 +95,18 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
     /// the one that appears on the wire, so a row can be read without the
     /// mapping beside it.
     /// </remarks>
-    private static readonly ValueConverter<ConsentAction, string> Handlungswert = new(
-        wert => wert == ConsentAction.Grant
+    private static readonly ValueConverter<ConsentAction, string> ActionConverter = new(
+        value => value == ConsentAction.Grant
             ? "GRANT"
-            : wert == ConsentAction.Revoke ? "REVOKE" : "DELETE",
+            : value == ConsentAction.Revoke ? "REVOKE" : "DELETE",
         text => text == "GRANT"
             ? ConsentAction.Grant
             : text == "REVOKE" ? ConsentAction.Revoke : ConsentAction.Delete);
 
-    private static readonly ValueConverter<AuditAction, string> Pruefhandlungswert = new(
-        wert => wert == AuditAction.ConsentGrant
+    private static readonly ValueConverter<AuditAction, string> AuditActionConverter = new(
+        value => value == AuditAction.ConsentGrant
             ? "consent_grant"
-            : wert == AuditAction.ConsentRevoke ? "consent_revoke" : "consent_delete",
+            : value == AuditAction.ConsentRevoke ? "consent_revoke" : "consent_delete",
         text => text == "consent_grant"
             ? AuditAction.ConsentGrant
             : text == "consent_revoke" ? AuditAction.ConsentRevoke : AuditAction.ConsentDelete);
@@ -118,7 +118,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
 
         modelBuilder.Entity<ConsentEventRow>(entity =>
         {
-            entity.ToTable("consent_events", tabelle => tabelle.HasCheckConstraint(
+            entity.ToTable("consent_events", table => table.HasCheckConstraint(
                 "ck_consent_events_action", "action IN ('GRANT','REVOKE','DELETE')"));
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedOnAdd();
@@ -126,7 +126,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.Capability).HasColumnName("capability");
             entity.Property(row => row.Action).HasColumnName("action")
-                .HasConversion(Handlungswert).HasMaxLength(16);
+                .HasConversion(ActionConverter).HasMaxLength(16);
             entity.Property(row => row.ActorId).HasColumnName("actor_id");
             entity.Property(row => row.Reason).HasColumnName("reason");
             entity.Property(row => row.Metadata).HasColumnName("metadata")
@@ -146,7 +146,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
 
         modelBuilder.Entity<AuditEventRow>(entity =>
         {
-            entity.ToTable("audit_events", tabelle => tabelle.HasCheckConstraint(
+            entity.ToTable("audit_events", table => table.HasCheckConstraint(
                 "ck_audit_events_action",
                 "action IN ('consent_grant','consent_revoke','consent_delete')"));
             entity.HasKey(row => row.Id);
@@ -154,7 +154,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
             entity.Property(row => row.ActorId).HasColumnName("actor_id");
             entity.Property(row => row.TenantId).HasColumnName("tenant_id");
             entity.Property(row => row.Action).HasColumnName("action")
-                .HasConversion(Pruefhandlungswert).HasMaxLength(32);
+                .HasConversion(AuditActionConverter).HasMaxLength(32);
             entity.Property(row => row.TargetId).HasColumnName("target_id");
             entity.Property(row => row.CorrelationId).HasColumnName("correlation_id")
                 .HasMaxLength(64);

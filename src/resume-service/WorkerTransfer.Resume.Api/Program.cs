@@ -3,15 +3,15 @@ using WorkerTransfer.Resume.Infrastructure;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "resume-service";
 
-// No AlsAussteller(): only identity-service holds the private half of the key.
+// No AsIssuer(): only identity-service holds the private half of the key.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName);
 
@@ -22,13 +22,13 @@ builder.Services.AddResumeInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<ResumeDbContext>();
+// Migrate first, then serve (ADR-0010).
+await app.MigrateSchemaAsync<ResumeDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapLebenslaufEndpoints();
-app.MapLoeschEndpoints();
+app.MapResumeEndpoints();
+app.MapErasureEndpoint();
 
 await app.RunAsync();
 

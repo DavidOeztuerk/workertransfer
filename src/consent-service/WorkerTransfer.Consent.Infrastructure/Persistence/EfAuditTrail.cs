@@ -10,27 +10,27 @@ namespace WorkerTransfer.Consent.Infrastructure.Persistence;
 /// not have: the entry commits with the change it records, or it records
 /// nothing.
 /// </remarks>
-public sealed class EfAuditTrail(ConsentDbContext kontext) : IAuditTrail
+public sealed class EfAuditTrail(ConsentDbContext context) : IAuditTrail
 {
     /// <inheritdoc />
-    public Task AnhaengenAsync(AuditEvent eintrag, CancellationToken cancellationToken = default)
+    public Task AttachAsync(AuditEvent entry, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(eintrag);
+        ArgumentNullException.ThrowIfNull(entry);
 
-        var jetzt = eintrag.OccurredAt.UtcDateTime;
+        var now = entry.OccurredAt.UtcDateTime;
 
-        kontext.AuditEvents.Add(new AuditEventRow
+        context.AuditEvents.Add(new AuditEventRow
         {
             Id = Guid.CreateVersion7(),
-            ActorId = eintrag.Actor?.Value,
-            TenantId = eintrag.Tenant?.Value,
-            Action = eintrag.Action,
-            TargetId = eintrag.Target?.Value,
-            CorrelationId = eintrag.CorrelationId,
-            OccurredAt = jetzt,
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt,
-            Metadata = JsonSerializer.Serialize(eintrag.Metadata)
+            ActorId = entry.Actor?.Value,
+            TenantId = entry.Tenant?.Value,
+            Action = entry.Action,
+            TargetId = entry.Target?.Value,
+            CorrelationId = entry.CorrelationId,
+            OccurredAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Metadata = JsonSerializer.Serialize(entry.Metadata)
         });
 
         return Task.CompletedTask;

@@ -3,30 +3,30 @@ using WorkerTransfer.Portfolio.Application.Ports;
 
 namespace WorkerTransfer.Portfolio.Infrastructure.Persistence;
 
-/// <summary>Eine Datenbanktransaktion um einen Befehl.</summary>
-public sealed class EfUnitOfWork(PortfolioDbContext kontext) : IUnitOfWork
+/// <summary>A database transaction around a command.</summary>
+public sealed class EfUnitOfWork(PortfolioDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+    public async Task<T> InTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arbeit);
+        ArgumentNullException.ThrowIfNull(work);
 
-        if (kontext.Database.CurrentTransaction is not null)
+        if (context.Database.CurrentTransaction is not null)
         {
-            // Schon in einer. Eine zweite zu öffnen würde entweder werfen oder
-            // die halbe Arbeit früh committen.
-            return await arbeit(cancellationToken);
+            // Already inside one. Opening a second would either throw or commit
+            // half the work early.
+            return await work(cancellationToken);
         }
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
+        await using var scope = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await work(cancellationToken);
 
-        await kontext.SaveChangesAsync(cancellationToken);
-        await klammer.CommitAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await scope.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }

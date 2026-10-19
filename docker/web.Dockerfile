@@ -6,37 +6,33 @@
 
 FROM node:25-bookworm-slim
 
-# corepack picks the pnpm version pinned in the root package.json
+# corepack picks the pnpm version pinned in web/package.json
 # ("packageManager": "pnpm@…"), so the container cannot drift from CI.
 #
-# Ab node 25 ist corepack NICHT mehr im Image enthalten — Node hat es aus der
-# Distribution genommen. Ein blankes `corepack enable` bricht dort mit
-# `corepack: not found` (exit 127) ab, und zwar erst beim Bauen des Images:
-# weder `make check` noch die CI fangen das, weil dort kein Image gebaut wird.
+# From node 25 on, corepack is NO LONGER in the image — Node took it out of the
+# distribution. A bare `corepack enable` aborts there with `corepack: not
+# found` (exit 127), and only when the image is built: neither `make check` nor
+# CI catch that, because no image is built there.
 #
-# Nachinstalliert statt ersetzt: pnpm direkt über `npm i -g pnpm@x.y.z` zu
-# holen wäre kürzer, würde die Version aber ein ZWEITES Mal festschreiben —
-# neben `packageManager` in der package.json. Zwei Orte für dieselbe Zahl
-# laufen auseinander, und genau davor schützt die Zeile hier.
+# Installed afterwards instead of replaced: fetching pnpm directly via
+# `npm i -g pnpm@x.y.z` would be shorter, but would pin the version a SECOND
+# time — beside `packageManager` in package.json. Two places for the same
+# number drift apart, and that is exactly what this line protects against.
 #
-# `--force` ist hier kein Draufhauen, sondern nötig: das node-Image bringt
-# weiterhin yarn-Shims mit (`/usr/local/bin/yarnpkg`), und corepack legt
-# dieselben Namen an. Ohne `--force` bricht die Installation mit `EEXIST` ab.
-# Überschrieben werden ausschließlich diese Shims — die pnpm-Version kommt
-# unverändert aus `packageManager`.
+# `--force` is no brute force here but necessary: the node image still ships
+# yarn shims (`/usr/local/bin/yarnpkg`), and corepack creates the same names.
+# Without `--force` the installation aborts with `EEXIST`. Only these shims are
+# overwritten — the pnpm version comes unchanged from `packageManager`.
 RUN npm install --global --force corepack@latest && corepack enable
 
 WORKDIR /app
 
-# Manifests first: this layer only rebuilds when a dependency actually changes,
-# not on every source edit.
-# Nur das Manifest: diese Schicht baut neu, wenn sich eine Abhaengigkeit
-# aendert, nicht bei jeder Quelltextaenderung.
+# Only the manifest first: this layer only rebuilds when a dependency actually
+# changes, not on every source edit.
 #
-# Frueher standen hier drei Dateien, weil ein pnpm-Workspace zwei Pakete
-# koordinierte. Es gibt nur noch dieses eine — der Workspace ist damit weg, und
-# mit ihm turbo, die Wurzel-package.json und ein 400 MB grosses node_modules an
-# der Wurzel.
+# Three files used to stand here, because a pnpm workspace coordinated two
+# packages. There is only this one left — the workspace is gone with that, and
+# with it turbo, the root package.json and a 400 MB node_modules at the root.
 COPY web/package.json web/pnpm-lock.yaml ./
 
 RUN pnpm install --frozen-lockfile

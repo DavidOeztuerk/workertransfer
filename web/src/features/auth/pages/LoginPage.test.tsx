@@ -3,44 +3,44 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
-import { renderMitStore } from "../test/render";
+import { renderWithStore } from "../test/render";
 import { LoginPage } from "./LoginPage";
 
-type Antwort = { status?: number; body?: unknown };
+type Answer = { status?: number; body?: unknown };
 
-/** Antwortet je Pfad. `new URL(...).pathname` statt `includes` — exakt. */
-function antworten(karte: Record<string, Antwort>) {
+/** Answers per path. `new URL(...).pathname` instead of `includes` — exact. */
+function answer(byPath: Record<string, Answer>) {
   const asked: { path: string; body: string }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const path = new URL(url).pathname;
       asked.push({ path, body: String(init?.body ?? "") });
-      const answer = karte[path] ?? { body: {} };
-      return new Response(JSON.stringify(answer.body ?? {}), {
-        status: answer.status ?? 200,
+      const reply = byPath[path] ?? { body: {} };
+      return new Response(JSON.stringify(reply.body ?? {}), {
+        status: reply.status ?? 200,
       });
     }),
   );
   return asked;
 }
 
-const SITZUNG = {
+const SESSION = {
   body: { user: { user_id: "u-1", email: "a@b.com", tenant_id: null } },
 };
 
-/** Die Seite mit einem Ziel, an dem sich eine Weiterleitung zeigen lässt. */
-function seite() {
+/** The page with a target at which a redirect can show itself. */
+function page() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/overview" element={<p>Übersicht</p>} />
+      <Route path="/overview" element={<p>Overview target</p>} />
     </Routes>
   );
 }
 
 beforeEach(() => {
-  antworten({});
+  answer({});
 });
 
 afterEach(() => {
@@ -48,18 +48,18 @@ afterEach(() => {
 });
 
 describe("LoginPage", () => {
-  it("trägt die deutsche Überschrift", () => {
-    renderMitStore(seite(), { route: "/login" });
+  it("carries the German heading", () => {
+    renderWithStore(page(), { route: "/login" });
 
     expect(
       screen.getByRole("heading", { name: "Anmelden" }),
     ).toBeInTheDocument();
   });
 
-  it("fragt nicht nach einem Unternehmen", () => {
-    // Ein Mandant ist ein Unternehmen, und eine Person hat keines (ADR-0017).
-    // Jemanden eine Mandanten-UUID tippen zu lassen war falsch und unbenutzbar.
-    renderMitStore(seite(), { route: "/login" });
+  it("does not ask for a company", () => {
+    // A tenant is a company, and a person has none (ADR-0017). Making someone
+    // type a tenant UUID was wrong and unusable.
+    renderWithStore(page(), { route: "/login" });
 
     expect(screen.queryByLabelText(/Mandant/i)).toBeNull();
     expect(screen.queryByLabelText(/Unternehmen/i)).toBeNull();
@@ -67,71 +67,80 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText(/Passwort/i)).toBeInTheDocument();
   });
 
-  it("meldet an und führt danach auf die Übersicht", async () => {
-    antworten({ "/auth/login": {}, "/auth/session": SITZUNG });
+  it("signs in and then leads to the overview", async () => {
+    answer({ "/auth/login": {}, "/auth/session": SESSION });
     const user = userEvent.setup();
-    renderMitStore(seite(), { route: "/login" });
+    renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
-    expect(await screen.findByText("Übersicht")).toBeInTheDocument();
+    expect(await screen.findByText("Overview target")).toBeInTheDocument();
   });
 
-  it("schickt E-Mail und Passwort, und sonst nichts", async () => {
-    const asked = antworten({ "/auth/login": {}, "/auth/session": SITZUNG });
+  it("sends email and password, and nothing else", async () => {
+    const asked = answer({ "/auth/login": {}, "/auth/session": SESSION });
     const user = userEvent.setup();
-    renderMitStore(seite(), { route: "/login" });
+    renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
-    await screen.findByText("Übersicht");
+    await screen.findByText("Overview target");
     const signIn = asked.find((entry) => entry.path === "/auth/login");
     expect(signIn?.body).toContain('"email"');
     expect(signIn?.body).toContain('"password"');
-    // Der Mandant kommt nie vom Client — er entsteht erst beim Wechsel in ein
-    // Unternehmen, und dort entscheidet ihn der Server (ADR-0018).
+    // The tenant never comes from the client — it only comes into being on the
+    // switch into a company, and there the server decides it (ADR-0018).
     expect(signIn?.body).not.toContain("tenant");
   });
 
-  it("zeigt den Fehlschlag als Meldung und leitet nicht weiter", async () => {
-    antworten({
+  /*
+   * The message is the CATALOGUE's, chosen by status — not the server's.
+   *
+   * Until 26.09.2026 this test fed the server a German sentence and expected
+   * exactly that sentence back, i.e. it pinned that the page draws `detail`
+   * raw. identity-service answers "invalid credentials" (English, a shape on
+   * the wire); a German person must read German all the same.
+   */
+  it("shows the failure as a message and does not redirect", async () => {
+    answer({
       "/auth/login": {
         status: 401,
-        body: { detail: "E-Mail oder Passwort stimmen nicht." },
+        body: { title: "Request failed", detail: "invalid credentials" },
       },
     });
     const user = userEvent.setup();
-    renderMitStore(seite(), { route: "/login" });
+    renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
-    await user.type(screen.getByLabelText(/Passwort/i), "falsch");
+    await user.type(screen.getByLabelText(/Passwort/i), "wrong-password");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
-    // E2E wartet auf genau diese Rolle.
+    // E2E waits for exactly this role.
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "E-Mail oder Passwort stimmen nicht.",
     );
-    expect(screen.queryByText("Übersicht")).toBeNull();
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/invalid credentials|Request failed/);
+    expect(screen.queryByText("Overview target")).toBeNull();
   });
 
   /**
-   * Der Fehlschlag OHNE `ApiError`, und der gefährlichste: der `login`-Thunk
-   * `unwrap()`t intern `loadSession`. Scheitert der Teil, ist `action.payload`
-   * undefiniert, der Slice setzt `error = null` — und der Knopf tut sichtbar
-   * nichts. Ohne den eigenen Rückfalltext bliebe die Seite an genau der Stelle
-   * stumm, an der jemand nicht weiterkommt.
+   * The failure WITHOUT an `ApiError`, and the most dangerous one: the `login`
+   * thunk `unwrap()`s `loadSession` internally. If that part fails,
+   * `action.payload` is undefined, the slice sets `error = null` — and the
+   * button visibly does nothing. Without its own fallback text the page would
+   * stay silent at exactly the place where someone cannot get on.
    */
-  it("bleibt nicht stumm, wenn die Sitzung nach dem Anmelden nicht zu lesen ist", async () => {
-    antworten({
+  it("does not stay silent when the session cannot be read after signing in", async () => {
+    answer({
       "/auth/login": {},
       "/auth/session": { status: 500, body: {} },
     });
     const user = userEvent.setup();
-    renderMitStore(seite(), { route: "/login" });
+    renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
@@ -140,26 +149,26 @@ describe("LoginPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Anmeldung fehlgeschlagen",
     );
-    expect(screen.queryByText("Übersicht")).toBeNull();
+    expect(screen.queryByText("Overview target")).toBeNull();
   });
 
-  it("sagt es, wenn die Anmeldung durchging und trotzdem niemand da ist", async () => {
-    // 200 auf die Anmeldung, aber `/auth/session` kennt niemanden. Das ist kein
-    // Erfolg — und wortlos auf dem Formular stehen zu bleiben erklärt es nicht.
-    antworten({ "/auth/login": {}, "/auth/session": { body: { user: null } } });
+  it("says so when the sign-in went through and still nobody is there", async () => {
+    // 200 on the sign-in, but `/auth/session` knows nobody. That is no success —
+    // and staying on the form without a word does not explain it.
+    answer({ "/auth/login": {}, "/auth/session": { body: { user: null } } });
     const user = userEvent.setup();
-    renderMitStore(seite(), { route: "/login" });
+    renderWithStore(page(), { route: "/login" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
     await user.click(screen.getByRole("button", { name: /Anmelden/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Sitzung");
-    expect(screen.queryByText("Übersicht")).toBeNull();
+    expect(screen.queryByText("Overview target")).toBeNull();
   });
 
-  it("bietet den anderen Weg auf der Seite an, nicht in der Kopfzeile", () => {
-    renderMitStore(seite(), { route: "/login" });
+  it("offers the other path on the page, not in the header", () => {
+    renderWithStore(page(), { route: "/login" });
 
     expect(screen.getByRole("tab", { name: "Konto anlegen" })).toHaveAttribute(
       "href",

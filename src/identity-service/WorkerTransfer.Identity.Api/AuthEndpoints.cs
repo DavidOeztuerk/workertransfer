@@ -1,56 +1,56 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Identity.Application.Anmelden;
+using WorkerTransfer.Identity.Application.SignIn;
 
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Identity.Domain.Users;
 using System.Text.Json.Serialization;
-using WorkerTransfer.Identity.Application.Konto;
+using WorkerTransfer.Identity.Application.Account;
 
 namespace WorkerTransfer.Identity.Api;
 
 /// <summary>What a caller sends to sign in.</summary>
 public sealed record LoginBody(string Email, string Password);
 
-/// <summary>Was ein Aufrufer schickt, um seine Einstellungen zu ändern.</summary>
-/// <param name="DeleteAfterMonths">Verfall in Monaten, oder <c>null</c>.</param>
-/// <param name="AiProvider">none, openai_compatible oder anthropic.</param>
-/// <param name="AiBaseUrl">Die Adresse des Anbieters.</param>
-/// <param name="AiModel">Das Modell.</param>
-/// <param name="AiAuditLog">Ob Anfragen protokolliert werden.</param>
-public sealed record EinstellungenBody(
+/// <summary>What a caller sends to change their settings.</summary>
+/// <param name="DeleteAfterMonths">The lapse in months, or <c>null</c>.</param>
+/// <param name="AiProvider">none, openai_compatible or anthropic.</param>
+/// <param name="AiBaseUrl">The provider's address.</param>
+/// <param name="AiModel">The model.</param>
+/// <param name="AiAuditLog">Whether requests are logged.</param>
+public sealed record SettingsBody(
     [property: JsonPropertyName("delete_after_months")] int? DeleteAfterMonths,
     [property: JsonPropertyName("ai_provider")] string AiProvider = "none",
     [property: JsonPropertyName("ai_base_url")] string AiBaseUrl = "",
     [property: JsonPropertyName("ai_model")] string AiModel = "",
     [property: JsonPropertyName("ai_audit_log")] bool AiAuditLog = false);
 
-/// <summary>Was ein Aufrufer schickt, um einen Schlüssel zu hinterlegen.</summary>
+/// <summary>What a caller sends to store a key.</summary>
 /// <param name="Key">
-/// Der Schlüssel im Klartext. Leer heisst ENTFERNEN — ein Feld, das bei leer
-/// nichts tut, hat keinen Weg zurück zu „keiner".
+/// The key in the clear. Empty means REMOVE — a field that does nothing when
+/// empty has no way back to "none".
 /// </param>
-public sealed record SchluesselBody(
+public sealed record AiKeyBody(
     [property: JsonPropertyName("key")] string? Key);
 
 /// <summary>What a caller sends to change their language.</summary>
 /// <param name="Language">A tag this platform has texts for: de, en or fr.</param>
-public sealed record SprachwahlBody(string Language);
+public sealed record LanguageBody(string Language);
 
-/// <summary>Was ein Aufrufer schickt, um sein Berufsfeld zu wählen.</summary>
+/// <summary>What a caller sends to choose their occupational field.</summary>
 /// <param name="OccupationalField">
-/// Eines der Etiketten aus <see cref="Berufsfeldwahl"/>. Leer heisst entfernen.
+/// One of the labels from <see cref="OccupationalFieldChoice"/>. Empty means remove.
 /// </param>
-public sealed record BerufsfeldBody(
+public sealed record OccupationalFieldBody(
     [property: JsonPropertyName("occupational_field")] string? OccupationalField);
 
-/// <summary>Bürgerlicher Vor- und Nachname. Leer heisst entfernen.</summary>
-public sealed record KlarnameBody(
+/// <summary>The civil given and family name. Empty means remove.</summary>
+public sealed record FullNameBody(
     [property: JsonPropertyName("given_name")] string? GivenName,
     [property: JsonPropertyName("family_name")] string? FamilyName);
 
-/// <summary>Bewerbungsanschrift. Nie an ein Modell, nie ins Token.</summary>
-public sealed record AnschriftBody(
+/// <summary>The application address. Never to a model, never into the token.</summary>
+public sealed record PostalAddressBody(
     [property: JsonPropertyName("line1")] string? Line1,
     [property: JsonPropertyName("line2")] string? Line2,
     [property: JsonPropertyName("postal_code")] string? PostalCode,
@@ -68,9 +68,9 @@ public sealed record AnschriftBody(
 /// </remarks>
 public static class AuthEndpoints
 {
-    private const string ZugriffsCookie = "access";
-    private const string ErneuerungsCookie = "refresh";
-    private const string ErneuerungsPfad = "/auth";
+    private const string AccessCookie = "access";
+    private const string RefreshCookie = "refresh";
+    private const string RefreshPath = "/auth";
 
     /// <summary>Maps the sign-in endpoints.</summary>
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
@@ -85,32 +85,32 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            // Die Pruefung steht NICHT mehr hier, sondern in `AnmeldenPruefung`
-            // — Noelias ValidationBehavior fuehrt sie aus, bevor der Handler
-            // laeuft. Bis D2 stand sie hier, weil die Pipeline-Stufe fuer tot
-            // gehalten wurde; sie ist es nicht, sie war nur leer.
+            // The check does NOT stand here any more but in `SignInValidator`
+            // — Noelia's ValidationBehavior runs it before the handler runs.
+            // Until D2 it stood here, because the pipeline stage was held to be
+            // dead; it is not, it was only empty.
             //
-            // Die Antwort bleibt 422: der Rumpf war lesbar, sein Inhalt nicht
-            // brauchbar. 401 hiesse "die Zugangsdaten stimmen nicht", und das
-            // waere eine Aussage ueber ein Konto, die hier niemand geprueft hat.
-            var ergebnis = await mediator.Send(
-                new AnmeldenBefehl(body.Email, body.Password), cancellationToken);
+            // The answer stays 422: the body was readable, its content was not
+            // usable. 401 would mean "the credentials are wrong", and that
+            // would be a statement about an account nobody checked here.
+            var result = await mediator.Send(
+                new SignInCommand(body.Email, body.Password), cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Anmeldeergebnis.Angemeldet angemeldet:
-                    SetzeCookies(context, angemeldet.Zugriffstoken, angemeldet.Erneuerungstoken);
-                    await SchreibeOk(context, cancellationToken);
+                case SignInResult.SignedIn signedIn:
+                    SetCookies(context, signedIn.AccessToken, signedIn.RefreshToken);
+                    await WriteOk(context, cancellationToken);
                     return;
 
-                case Anmeldeergebnis.NichtBestaetigt:
-                    await ProblemDetailsMiddleware.Schreibe(
+                case SignInResult.NotConfirmed:
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status403Forbidden,
                         "Request failed", "email not confirmed");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status401Unauthorized,
                         "Request failed", "invalid credentials");
                     return;
@@ -122,16 +122,16 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            var stand = await mediator.Send(
-                new SitzungsstandAbfrage(
-                    !string.IsNullOrEmpty(context.Request.Cookies[ErneuerungsCookie])),
+            var state = await mediator.Send(
+                new SessionStateQuery(
+                    !string.IsNullOrEmpty(context.Request.Cookies[RefreshCookie])),
                 cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 new Dictionary<string, object?>
                 {
-                    ["user"] = stand.Benutzer is { } konto ? Antwort(konto) : null,
-                    ["state"] = stand.Zustand
+                    ["user"] = state.Account is { } account ? AccountJson(account) : null,
+                    ["state"] = state.State
                 },
                 cancellationToken);
         });
@@ -141,31 +141,31 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            var vorgelegt = context.Request.Cookies[ErneuerungsCookie];
+            var presented = context.Request.Cookies[RefreshCookie];
 
-            if (string.IsNullOrEmpty(vorgelegt))
+            if (string.IsNullOrEmpty(presented))
             {
                 // No cookie to clear, and no cookie is not a dead cookie.
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "invalid credentials");
                 return;
             }
 
-            var ergebnis = await mediator.Send(new ErneuernBefehl(vorgelegt), cancellationToken);
+            var result = await mediator.Send(new RefreshCommand(presented), cancellationToken);
 
-            if (ergebnis is Erneuerungsergebnis.Erneuert erneuert)
+            if (result is RefreshResult.Refreshed refreshed)
             {
-                SetzeCookies(context, erneuert.Zugriffstoken, erneuert.Erneuerungstoken);
-                await SchreibeOk(context, cancellationToken);
+                SetCookies(context, refreshed.AccessToken, refreshed.RefreshToken);
+                await WriteOk(context, cancellationToken);
                 return;
             }
 
             // Clearing it breaks the loop: /auth/session reports "renewable"
             // while the cookie is there, the app refreshes, the token does not
             // carry, and the next page load starts over.
-            LoescheErneuerungsCookie(context);
-            await ProblemDetailsMiddleware.Schreibe(
+            ClearRefreshCookie(context);
+            await ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status401Unauthorized,
                 "Request failed", "invalid credentials");
         });
@@ -173,26 +173,26 @@ public static class AuthEndpoints
         auth.MapPost("/company/{tenantId:guid}", async (
             Guid tenantId,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var ergebnis = await mediator.Send(
-                new FirmaWechselnBefehl(handelnder.Subject, new TenantId(tenantId)),
+            var result = await mediator.Send(
+                new SwitchCompanyCommand(actor.Subject, new TenantId(tenantId)),
                 cancellationToken);
 
-            switch (ergebnis)
+            switch (result)
             {
-                case Firmenwechselergebnis.Gewechselt gewechselt:
-                    SetzeCookies(context, gewechselt.Zugriffstoken, gewechselt.Erneuerungstoken);
+                case CompanySwitchResult.Switched switched:
+                    SetCookies(context, switched.AccessToken, switched.RefreshToken);
                     await context.Response.WriteAsJsonAsync(
                         new Dictionary<string, string>
                         {
@@ -202,15 +202,15 @@ public static class AuthEndpoints
                         cancellationToken);
                     return;
 
-                case Firmenwechselergebnis.KeinMitglied:
+                case CompanySwitchResult.NoMember:
                     // 403 and not 404: never reveal whether the company exists.
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status403Forbidden,
                         "Request failed", "not a member of this tenant");
                     return;
 
                 default:
-                    await ProblemDetailsMiddleware.Schreibe(
+                    await ProblemDetailsMiddleware.Write(
                         context, StatusCodes.Status401Unauthorized,
                         "Request failed", "invalid credentials");
                     return;
@@ -223,173 +223,174 @@ public static class AuthEndpoints
             CancellationToken cancellationToken) =>
         {
             await mediator.Send(
-                new AbmeldenBefehl(context.Request.Cookies[ErneuerungsCookie]), cancellationToken);
+                new SignOutCommand(context.Request.Cookies[RefreshCookie]), cancellationToken);
 
-            LoescheErneuerungsCookie(context);
+            ClearRefreshCookie(context);
 
             // The access cookie goes too. Nothing checks it against the session
             // table, so leaving it would keep someone signed in for its whole
             // lifetime — on a shared machine that is the whole problem.
-            context.Response.Cookies.Delete(ZugriffsCookie, new CookieOptions { Path = "/" });
+            context.Response.Cookies.Delete(AccessCookie, new CookieOptions { Path = "/" });
 
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
 
-        // Die Sprache ist eine Entscheidung über das eigene Konto und liegt
-        // deshalb unter `/account`, nicht unter `/auth`: sie hat mit dem
-        // Anmelden nichts zu tun, und die fünf Auth-Pfade tragen eine Bremse,
-        // die hier nur im Weg stünde.
+        // The language is a decision about one's own account and therefore
+        // lives under `/account`, not under `/auth`: it has nothing to do with
+        // signing in, and the five auth paths carry a brake that would only be
+        // in the way here.
         app.MapPut("/account/language", async (
-            SprachwahlBody body,
+            LanguageBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            // `Sprachwahl.Aus` beantwortet Unbekanntes mit der Vorgabe statt mit
-            // einem Fehler. Hier ist das falsch: wer „is" schickt, bekäme
-            // stillschweigend Deutsch gespeichert und wüsste nicht, warum seine
-            // Wahl nicht hielt. Eine Wahl, die nicht wirkt, muss das sagen.
-            if (!Sprachwahl.Kennen(body.Language))
+            // `LanguageChoice.From` answers anything unknown with the default
+            // instead of with an error. Here that is wrong: whoever sends "is"
+            // would silently get German stored and would not know why their
+            // choice did not hold. A choice that does not take effect has to
+            // say so.
+            if (!LanguageChoice.Known(body.Language))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "unsupported language");
                 return;
             }
 
-            var erledigt = await mediator.Send(
-                new SpracheWaehlenBefehl(
-                    handelnder.Subject, Sprachwahl.Aus(body.Language)),
+            var done = await mediator.Send(
+                new ChooseLanguageCommand(
+                    actor.Subject, LanguageChoice.From(body.Language)),
                 cancellationToken);
 
-            if (!erledigt)
+            if (!done)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
             }
 
-            await SchreibeOk(context, cancellationToken);
+            await WriteOk(context, cancellationToken);
         });
 
-        // Neben der Sprache: eine Entscheidung über das eigene Konto.
+        // Beside the language: a decision about one's own account.
         app.MapPut("/account/occupational-field", async (
-            BerufsfeldBody body,
+            OccupationalFieldBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            // Unbekanntes wird abgesagt, nicht still zu „keins" gemacht.
-            if (!Berufsfeldwahl.Kennen(body.OccupationalField))
+            // Anything unknown is refused, not quietly turned into "none".
+            if (!OccupationalFieldChoice.Known(body.OccupationalField))
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: occupational_field");
                 return;
             }
 
-            var erledigt = await mediator.Send(
-                new BerufsfeldWaehlenBefehl(
-                    handelnder.Subject, Berufsfeldwahl.Aus(body.OccupationalField)),
+            var done = await mediator.Send(
+                new ChooseOccupationalFieldCommand(
+                    actor.Subject, OccupationalFieldChoice.From(body.OccupationalField)),
                 cancellationToken);
 
-            if (!erledigt)
+            if (!done)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
             }
 
-            await SchreibeOk(context, cancellationToken);
+            await WriteOk(context, cancellationToken);
         });
 
         app.MapPut("/account/name", async (
-            KlarnameBody body,
+            FullNameBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var erledigt = await mediator.Send(
-                new KlarnameSetzenBefehl(handelnder.Subject, body.GivenName, body.FamilyName),
+            var done = await mediator.Send(
+                new SetFullNameCommand(actor.Subject, body.GivenName, body.FamilyName),
                 cancellationToken);
 
-            if (!erledigt)
+            if (!done)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound,
                     "Request failed", "no such account");
                 return;
             }
 
-            await SchreibeOk(context, cancellationToken);
+            await WriteOk(context, cancellationToken);
         });
 
         app.MapGet("/account/address", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new AnschriftAbfrage(handelnder.Subject), cancellationToken);
-            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+            var state = await mediator.Send(
+                new PostalAddressQuery(actor.Subject), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AddressJson(state), cancellationToken);
         });
 
         app.MapPut("/account/address", async (
-            AnschriftBody body,
+            PostalAddressBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new AnschriftSetzenBefehl(
-                    handelnder.Subject,
+            var state = await mediator.Send(
+                new SetPostalAddressCommand(
+                    actor.Subject,
                     body.Line1,
                     body.Line2,
                     body.PostalCode,
@@ -398,41 +399,41 @@ public static class AuthEndpoints
                     body.Phone),
                 cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(AnschriftAntwort(stand), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AddressJson(state), cancellationToken);
         });
 
-        // Die eigenen Einstellungen. Unter `/account`, wie die Sprache und die
-        // Löschung — es geht um das Konto, nicht um das Anmelden.
+        // One's own settings. Under `/account`, like the language and the
+        // erasure — this is about the account, not about signing in.
         app.MapGet("/account/settings", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            var stand = await mediator.Send(
-                new EinstellungenAbfrage(handelnder.Subject), cancellationToken);
+            var state = await mediator.Send(
+                new SettingsQuery(actor.Subject), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+            await context.Response.WriteAsJsonAsync(SettingsJson(state), cancellationToken);
         });
 
         app.MapPut("/account/settings", async (
-            EinstellungenBody body,
+            SettingsBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
@@ -440,9 +441,9 @@ public static class AuthEndpoints
 
             try
             {
-                var stand = await mediator.Send(
-                    new EinstellungenSetzenBefehl(
-                        handelnder.Subject,
+                var state = await mediator.Send(
+                    new SetSettingsCommand(
+                        actor.Subject,
                         body.DeleteAfterMonths,
                         body.AiProvider,
                         body.AiBaseUrl,
@@ -450,39 +451,39 @@ public static class AuthEndpoints
                         body.AiAuditLog),
                     cancellationToken);
 
-                await context.Response.WriteAsJsonAsync(Einstellungen(stand), cancellationToken);
+                await context.Response.WriteAsJsonAsync(SettingsJson(state), cancellationToken);
             }
             catch (ArgumentOutOfRangeException)
             {
-                // Der Verfall liegt ausserhalb der Grenzen. 422 und nicht 400:
-                // der Rumpf war lesbar, sein Inhalt ist es nicht.
-                await ProblemDetailsMiddleware.Schreibe(
+                // The lapse lies outside the bounds. 422 and not 400: the body
+                // was readable, its content is not.
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
                     "Request failed", "invalid: delete_after_months");
             }
         });
 
-        // Der Schlüssel getrennt, und ohne Rückgabe. Er geht in eine Richtung.
+        // The key separately, and with nothing returned. It travels one way.
         app.MapPut("/account/ai-key", async (
-            SchluesselBody body,
+            AiKeyBody body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal principal,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (akteur.Current is not { } handelnder)
+            if (principal.Current is not { } actor)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
             await mediator.Send(
-                new SchluesselSetzenBefehl(handelnder.Subject, body.Key ?? string.Empty),
+                new SetAiKeyCommand(actor.Subject, body.Key ?? string.Empty),
                 cancellationToken);
 
-            await SchreibeOk(context, cancellationToken);
+            await WriteOk(context, cancellationToken);
         });
 
         app.MapGet("/me", async (
@@ -490,105 +491,105 @@ public static class AuthEndpoints
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            var konto = await mediator.Send(new MeinKontoAbfrage(), cancellationToken);
+            var account = await mediator.Send(new MyAccountQuery(), cancellationToken);
 
-            if (konto is null)
+            if (account is null)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status401Unauthorized,
                     "Request failed", "not authenticated");
                 return;
             }
 
-            await context.Response.WriteAsJsonAsync(Antwort(konto), cancellationToken);
+            await context.Response.WriteAsJsonAsync(AccountJson(account), cancellationToken);
         });
 
         return app;
     }
 
-    private static Dictionary<string, string?> Antwort(Kontoansicht konto) => new()
+    private static Dictionary<string, string?> AccountJson(AccountView account) => new()
     {
-        ["user_id"] = konto.Wer.ToString(),
+        ["user_id"] = account.Subject.ToString(),
         // The address is read from the account rather than carried in the
         // token, and it goes back only to the signed-in person themselves.
-        ["email"] = konto.Email,
+        ["email"] = account.Email,
         // null while acting as a person; a company is only active after
         // POST /auth/company/{id} (ADR-0017).
-        ["tenant_id"] = konto.Firma?.ToString(),
-        // Damit die Oberfläche der GEWÄHLTEN Sprache folgt und nicht dem Gerät.
-        // Wer auf einem englischen Rechner Deutsch gewählt hat, soll nach dem
-        // Anmelden Deutsch sehen — sonst wäre die Wahl nur so lange gültig, wie
-        // derselbe Browser sie sich merkt.
-        ["language"] = Sprachwahl.Etikett(konto.Sprache),
-        // Fuer das Bild im Kopf: aus dem Namen werden die Initialen, und die
-        // Farbe daneben folgt ihm. Aus einer Adresse liesse sich beides auch
-        // ableiten — es waere nur falsch, denn `max.werber@…` ergibt „M" und
-        // nicht „MW".
-        ["display_name"] = konto.Anzeigename,
-        // Klarname für Signatur und Briefkopf. Keine Anschrift hier: die
-        // Bewerberauskunft liest die Session, und Anschrift darf nicht ins Modell.
-        ["given_name"] = konto.Vorname,
-        ["family_name"] = konto.Nachname,
-        // Damit die Oberfläche weiss, was sie anbieten soll (ADR-0039).
-        ["occupational_field"] = Berufsfeldwahl.Etikett(konto.Berufsfeld)
+        ["tenant_id"] = account.Company?.ToString(),
+        // So the interface follows the CHOSEN language and not the device.
+        // Whoever picked German on an English machine should see German after
+        // signing in — otherwise the choice would hold only for as long as the
+        // same browser remembers it.
+        ["language"] = LanguageChoice.Label(account.Language),
+        // For the picture in the header: the initials come from the name, and
+        // the colour beside it follows it. Both could be derived from an address
+        // too — it would only be wrong, because `max.werber@…` gives "M" and
+        // not "MW".
+        ["display_name"] = account.DisplayName,
+        // The civil name for a signature and a letterhead. No postal address
+        // here: the candidate view reads the session, and the postal address
+        // must not go to a model.
+        ["given_name"] = account.GivenName,
+        ["family_name"] = account.FamilyName,
+        // So the interface knows what to offer (ADR-0039).
+        ["occupational_field"] = OccupationalFieldChoice.Label(account.OccupationalField)
     };
 
-    private static Dictionary<string, string> AnschriftAntwort(Anschriftansicht stand) => new()
+    private static Dictionary<string, string> AddressJson(PostalAddressView state) => new()
     {
-        ["line1"] = stand.Zeile1,
-        ["line2"] = stand.Zeile2,
-        ["postal_code"] = stand.Postleitzahl,
-        ["city"] = stand.Ort,
-        ["country"] = stand.Land,
-        ["phone"] = stand.Telefon
+        ["line1"] = state.Line1,
+        ["line2"] = state.Line2,
+        ["postal_code"] = state.PostalCode,
+        ["city"] = state.City,
+        ["country"] = state.Country,
+        ["phone"] = state.Phone
     };
 
-    /// <summary>Die Einstellungen auf dem Draht — snake_case, wie überall.</summary>
-    private static Dictionary<string, object?> Einstellungen(Einstellungsansicht stand) => new()
+    /// <summary>The settings on the wire — snake_case, as everywhere.</summary>
+    private static Dictionary<string, object?> SettingsJson(SettingsView state) => new()
     {
-        ["delete_after_months"] = stand.LoeschungNachMonaten,
-        ["ai_provider"] = stand.Anbieter,
-        ["ai_base_url"] = stand.Adresse,
-        ["ai_model"] = stand.Modell,
-        // NICHT der Schlüssel — nur, dass es einen gibt, und seine letzten vier
-        // Zeichen. Ein Geheimnis, das man abrufen kann, ist eines, das man
-        // abziehen kann.
-        ["ai_key_present"] = stand.SchluesselDa,
-        ["ai_key_tail"] = stand.SchluesselEndung,
-        ["ai_audit_log"] = stand.KiProtokoll
+        ["delete_after_months"] = state.DeleteAfterMonths,
+        ["ai_provider"] = state.Provider,
+        ["ai_base_url"] = state.Address,
+        ["ai_model"] = state.Model,
+        // NOT the key — only that there is one, and its last four characters.
+        // A secret you can retrieve is one you can siphon off.
+        ["ai_key_present"] = state.KeyPresent,
+        ["ai_key_tail"] = state.KeyTail,
+        ["ai_audit_log"] = state.AiAuditLog
     };
 
-    private static Task SchreibeOk(HttpContext context, CancellationToken cancellationToken) =>
+    private static Task WriteOk(HttpContext context, CancellationToken cancellationToken) =>
         context.Response.WriteAsJsonAsync(
             new Dictionary<string, string> { ["status"] = "ok" }, cancellationToken);
 
-    private static void SetzeCookies(HttpContext context, string zugriff, string erneuerung)
+    private static void SetCookies(HttpContext context, string access, string refresh)
     {
-        var sicher = !context.RequestServices
+        var secure = !context.RequestServices
             .GetRequiredService<IHostEnvironment>().IsDevelopment();
 
-        context.Response.Cookies.Append(ZugriffsCookie, zugriff, new CookieOptions
+        context.Response.Cookies.Append(AccessCookie, access, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
-            Secure = sicher,
+            Secure = secure,
             Path = "/"
         });
 
-        context.Response.Cookies.Append(ErneuerungsCookie, erneuerung, new CookieOptions
+        context.Response.Cookies.Append(RefreshCookie, refresh, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
-            Secure = sicher,
-            Path = ErneuerungsPfad
+            Secure = secure,
+            Path = RefreshPath
         });
     }
 
-    private static void LoescheErneuerungsCookie(HttpContext context) =>
-        context.Response.Cookies.Delete(ErneuerungsCookie, new CookieOptions
+    private static void ClearRefreshCookie(HttpContext context) =>
+        context.Response.Cookies.Delete(RefreshCookie, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
-            Path = ErneuerungsPfad
+            Path = RefreshPath
         });
 }

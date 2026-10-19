@@ -7,32 +7,31 @@ import { Link as RouterLink, useSearchParams } from "react-router-dom";
 
 import { LoadingBlock } from "../../../shared/components/ui";
 import { AuthCard } from "../components/AuthCard";
-import { type Einladungsergebnis, nimmAn } from "../api/einladung";
+import { type InvitationResult, acceptInvitation } from "../api/invitation";
 import { Trans, useTranslation } from "react-i18next";
 
-type Lage =
-  | { art: "laeuft" }
-  | { art: "dabei"; name: string; rolle: string }
-  | { art: "abgelehnt"; brauchtKonto: boolean; meldung: string };
+type InvitationState =
+  | { kind: "running" }
+  | { kind: "joined"; name: string; role: string }
+  | { kind: "declined"; needsAccount: boolean; message: string };
 
 /**
- * <c>/invitation</c> — einen Einladungslink einlösen.
+ * <c>/invitation</c> — redeem an invitation link.
  *
- * <strong>Genau einmal.</strong> Ein Einladungstoken ist einmalig; wird er
- * zweimal eingelöst, scheitert der zweite Versuch und die Seite zeigte einen
- * Fehler für etwas, das gerade erfolgreich war. React 19 ruft Effekte im
- * StrictMode doppelt — ohne die Sperre wäre das der Normalfall, nicht die
- * Ausnahme.
+ * <strong>Exactly once.</strong> An invitation token is single-use; redeemed
+ * twice, the second attempt fails and the page showed an error for something
+ * that had just succeeded. React 19 calls effects twice in StrictMode — without
+ * the lock that would be the normal case, not the exception.
  *
- * <strong>Es wird NICHT von selbst umgeschaltet.</strong> Wer beitritt, handelt
- * danach weiter als er selbst und wählt das Unternehmen bewusst oben aus. Von
- * selbst zu wechseln hiesse, jemanden ungefragt aus dem Unternehmen
- * herauszuholen, in dem er gerade arbeitet.
+ * <strong>There is NO automatic switch.</strong> Whoever joins keeps acting as
+ * themselves afterwards and picks the company deliberately at the top.
+ * Switching by itself would mean pulling someone, unasked, out of the company
+ * they are working in right now.
  */
 export function InvitationPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const [state, setLage] = useState<Lage>({ art: "laeuft" });
+  const [state, setState] = useState<InvitationState>({ kind: "running" });
   const started = useRef(false);
 
   useEffect(() => {
@@ -42,58 +41,58 @@ export function InvitationPage() {
     const token = searchParams.get("token") ?? "";
 
     if (token === "") {
-      setLage({
-        art: "abgelehnt",
-        brauchtKonto: false,
-        meldung: t("einladung.fehltLink"),
+      setState({
+        kind: "declined",
+        needsAccount: false,
+        message: t("invitation.linkMissing"),
       });
       return;
     }
 
-    void nimmAn(token).then((result: Einladungsergebnis) => {
-      setLage(
+    void acceptInvitation(token).then((result: InvitationResult) => {
+      setState(
         result.ok
           ? {
-              art: "dabei",
-              name: result.mitgliedschaft.name,
-              rolle: result.mitgliedschaft.role,
+              kind: "joined",
+              name: result.membership.name,
+              role: result.membership.role,
             }
           : {
-              art: "abgelehnt",
-              brauchtKonto: result.brauchtKonto,
-              meldung: result.meldung,
+              kind: "declined",
+              needsAccount: result.needsAccount,
+              message: result.message,
             },
       );
     });
   }, [searchParams, t]);
 
-  if (state.art === "laeuft") {
+  if (state.kind === "running") {
     return (
       <AuthCard
-        title={t("einladung.laeuftTitel")}
-        lead={t("einladung.zusage")}
+        title={t("invitation.inProgressTitle")}
+        lead={t("invitation.promise")}
       >
-        <LoadingBlock label={t("einladung.laeuftText")} />
+        <LoadingBlock label={t("invitation.inProgressText")} />
       </AuthCard>
     );
   }
 
-  if (state.art === "dabei") {
+  if (state.kind === "joined") {
     return (
       <AuthCard
-        title={t("einladung.willkommen", { name: state.name })}
-        lead={t("einladung.zusage")}
+        title={t("invitation.welcome", { name: state.name })}
+        lead={t("invitation.promise")}
       >
         <Typography sx={{ mb: 2 }}>
           {t(
-            state.rolle === "admin"
-              ? "einladung.alsAdmin"
-              : "einladung.alsMitglied",
+            state.role === "admin"
+              ? "invitation.asAdmin"
+              : "invitation.asMember",
           )}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="einladung.wechselHinweis"
+            i18nKey="invitation.switchHint"
             components={{ 1: <Link component={RouterLink} to="/" /> }}
           />
         </Typography>
@@ -103,17 +102,17 @@ export function InvitationPage() {
 
   return (
     <AuthCard
-      title={t("einladung.abgelehntTitel")}
-      lead={t("einladung.zusage")}
+      title={t("invitation.declinedTitle")}
+      lead={t("invitation.promise")}
     >
       <Alert severity="error" sx={{ mb: 2 }}>
-        {state.meldung}
+        {state.message}
       </Alert>
       <Box>
-        {state.brauchtKonto ? (
+        {state.needsAccount ? (
           <Typography variant="body2">
             <Trans
-              i18nKey="einladung.brauchtKonto"
+              i18nKey="invitation.needsAccount"
               components={{
                 1: <Link component={RouterLink} to="/login" />,
                 3: <Link component={RouterLink} to="/register" />,
@@ -122,7 +121,7 @@ export function InvitationPage() {
           </Typography>
         ) : (
           <Link component={RouterLink} to="/" variant="body2">
-            {t("einladung.zurStartseite")}
+            {t("invitation.toHome")}
           </Link>
         )}
       </Box>

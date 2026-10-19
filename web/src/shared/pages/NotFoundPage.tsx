@@ -5,19 +5,19 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 
-/** Was bei einer unbekannten Adresse steht. */
+/** What stands at an unknown address. */
 export function NotFoundPage() {
   const { t } = useTranslation();
 
   return (
     <Container maxWidth="sm" sx={{ py: { xs: 8, md: 14 }, textAlign: "center" }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
-        <Typography variant="h1">{t("nichtGefunden.titel")}</Typography>
+        <Typography variant="h1">{t("notFound.title")}</Typography>
         <Typography color="text.secondary">
-          {t("nichtGefunden.text")}
+          {t("notFound.text")}
         </Typography>
         <Button component={RouterLink} to="/" variant="contained" sx={{ mt: 1 }}>
-          {t("allgemein.zurStartseite")}
+          {t("common.toHome")}
         </Button>
       </Box>
     </Container>

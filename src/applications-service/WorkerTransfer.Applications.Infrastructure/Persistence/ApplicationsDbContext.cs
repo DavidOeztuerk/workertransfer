@@ -1,80 +1,80 @@
 using Microsoft.EntityFrameworkCore;
-using WorkerTransfer.Applications.Domain.Bewerbungen;
+using WorkerTransfer.Applications.Domain.Applications;
 using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>applications</c>.</summary>
+/// <summary>A row of <c>applications</c>.</summary>
 /// <remarks>
-/// Nicht das Aggregat. <see cref="EfBewerbungsspeicher"/> baut daraus eine
-/// <c>Bewerbung</c>, damit nichts, was am Aggregat geschieht, von allein in der
-/// Tabelle landet.
+/// Not the aggregate. <see cref="EfApplicationStore"/> builds a
+/// <c>JobApplication</c> from it, so nothing that happens to the aggregate lands
+/// in the table on its own.
 /// </remarks>
-public sealed class BewerbungsZeile
+public sealed class ApplicationRow
 {
-    /// <summary>Welche Bewerbung.</summary>
+    /// <summary>Which application.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>Auf welche Stelle.</summary>
+    /// <summary>For which job.</summary>
     public Guid JobId { get; set; }
 
     /// <summary>
-    /// Welches Unternehmen — aus der Stelle kopiert.
+    /// Which company — copied from the job.
     /// </summary>
     /// <remarks>
-    /// Ein Fremdschlüssel geht nicht: die Stellen liegen in einer anderen
-    /// Datenbank (ADR-0004). Eine Kopie ist nur gefährlich, wenn das Original
-    /// sich ändern kann, und eine Stelle wechselt nicht das Unternehmen.
+    /// A foreign key is impossible: the jobs live in another database
+    /// (ADR-0004). A copy is only dangerous when the original can change, and a
+    /// job does not change its company.
     /// </remarks>
     public Guid TenantId { get; set; }
 
-    /// <summary>Wer sich beworben hat.</summary>
+    /// <summary>Who applied.</summary>
     public Guid SubjectId { get; set; }
 
-    /// <summary>Was die Person geschrieben hat.</summary>
+    /// <summary>What the person wrote.</summary>
     public string Message { get; set; } = string.Empty;
 
-    /// <summary>Ob der Lebenslauf mitging.</summary>
+    /// <summary>Whether the résumé went along.</summary>
     public bool SharesResume { get; set; }
 
-    /// <summary>Ob das Portfolio mitging.</summary>
+    /// <summary>Whether the portfolio went along.</summary>
     public bool SharesPortfolio { get; set; }
 
-    /// <summary>Welche Unterlagen beilagen, als jsonb-Liste von Kennungen.</summary>
+    /// <summary>Which documents were enclosed, as a jsonb list of ids.</summary>
     public string Documents { get; set; } = "[]";
 
-    /// <summary>Der Stand, als Wort.</summary>
+    /// <summary>The state, as a word.</summary>
     /// <remarks>
-    /// Als <c>varchar</c> und nicht als Postgres-Enum: der Stand steht so auch
-    /// im Vertrag und in der Oberfläche, und ein Typ, der bei jeder Erweiterung
-    /// eine eigene Wanderung braucht, kauft hier nichts.
+    /// As <c>varchar</c> and not as a Postgres enum: the state stands like this
+    /// in the contract and in the interface too, and a type that needs a schema
+    /// migration of its own for every extension buys nothing here.
     /// </remarks>
     public string Status { get; set; } = string.Empty;
 
-    /// <summary>Wann sie abgeschickt wurde.</summary>
+    /// <summary>When it was sent.</summary>
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>Wann sich zuletzt etwas änderte.</summary>
+    /// <summary>When something last changed.</summary>
     public DateTime UpdatedAt { get; set; }
 
-    /// <summary><c>null</c>, solange nicht entschieden.</summary>
+    /// <summary><c>null</c> as long as nothing is decided.</summary>
     public DateTime? AnsweredAt { get; set; }
 
     /// <summary>
-    /// Snapshot des Briefkopfs (ADR-0038). jsonb, weil er als Ganzes geschrieben
-    /// und gelesen wird und nie der Suchschlüssel ist.
+    /// Snapshot of the letterhead (ADR-0038). jsonb, because it is written and
+    /// read as a whole and is never the search key.
     /// </summary>
     public string ApplicantContact { get; set; } = "{}";
 }
 
-/// <summary>Eine Zeile von <c>application_drafts</c>.</summary>
+/// <summary>A row of <c>application_drafts</c>.</summary>
 /// <remarks>
-/// Der Entwurf ist das FRUEHERE LEBEN derselben Sache — er wird zur Bewerbung,
-/// wenn ein Mensch zweimal geklickt hat. Deshalb liegt er in diesem Dienst und
-/// nicht in einem eigenen: es ist derselbe fachliche Zusammenhang, nur eine
-/// Stufe davor.
+/// The draft is the EARLIER LIFE of the same thing — it becomes the application
+/// once a human being has clicked twice. That is why it lives in this service
+/// and not in one of its own: it is the same subject matter, only one stage
+/// before.
 /// </remarks>
-public sealed class EntwurfsZeile
+public sealed class DraftRow
 {
     public Guid Id { get; set; }
 
@@ -88,21 +88,21 @@ public sealed class EntwurfsZeile
 
     public string Body { get; set; } = string.Empty;
 
-    /// <summary>Der Stand, als Wort — wie bei der Bewerbung, aus demselben Grund.</summary>
+    /// <summary>The state, as a word — like the application's, for the same reason.</summary>
     public string Status { get; set; } = string.Empty;
 
     public int Version { get; set; } = 1;
 
-    /// <summary>Die ART eines Fehlschlags, nie sein Inhalt.</summary>
+    /// <summary>The KIND of a failure, never its content.</summary>
     public string Error { get; set; } = string.Empty;
 
     public bool SharesResume { get; set; }
 
-    /// <summary>Welche Unterlagen mitgehen, als jsonb-Liste von Kennungen.</summary>
+    /// <summary>Which documents go along, as a jsonb list of ids.</summary>
     /// <remarks>
-    /// Eine Liste und keine Verbundtabelle: sie wird immer als Ganzes
-    /// geschrieben und als Ganzes gelesen, und eine Zeile je Beilage waere die
-    /// Einladung, danach zu sortieren oder zu zaehlen.
+    /// A list and not a join table: it is always written as a whole and read as
+    /// a whole, and one row per attachment would be the invitation to sort or
+    /// count by it.
     /// </remarks>
     public string Documents { get; set; } = "[]";
 
@@ -110,17 +110,17 @@ public sealed class EntwurfsZeile
 
     public DateTime UpdatedAt { get; set; }
 
-    /// <summary>Start dieses Schreibens. Null, sobald es nicht mehr Entsteht.</summary>
+    /// <summary>Start of this writing. Null as soon as it is no longer Generating.</summary>
     public DateTime? WritingStartedAt { get; set; }
 }
 
-/// <summary>Eine Zeile von <c>application_draft_comments</c>.</summary>
+/// <summary>A row of <c>application_draft_comments</c>.</summary>
 /// <remarks>
-/// EIGENE Tabelle, anders als die Beilagen: Anmerkungen entstehen einzeln,
-/// werden einzeln abgehakt und einzeln gelesen. Sie als jsonb zu halten hiesse,
-/// bei jeder Anmerkung die ganze Liste neu zu schreiben.
+/// A table OF ITS OWN, unlike the attachments: comments come about one by one,
+/// are ticked off one by one and read one by one. Keeping them as jsonb would
+/// mean writing the whole list anew with every comment.
 /// </remarks>
-public sealed class AnmerkungsZeile
+public sealed class CommentRow
 {
     public Guid Id { get; set; }
 
@@ -128,7 +128,7 @@ public sealed class AnmerkungsZeile
 
     public string Body { get; set; } = string.Empty;
 
-    /// <summary>Die markierte Stelle, oder leer.</summary>
+    /// <summary>The marked passage, or empty.</summary>
     public string Quote { get; set; } = string.Empty;
 
     public bool Resolved { get; set; }
@@ -136,129 +136,127 @@ public sealed class AnmerkungsZeile
     public DateTime CreatedAt { get; set; }
 }
 
-/// <summary>Die Tabellen, die dieser Dienst besitzt.</summary>
+/// <summary>The tables this service owns.</summary>
 /// <remarks>
-/// Es gibt keine gemeinsame Datenbank und deshalb auch keine gemeinsame Outbox
-/// (ADR-0004/0025) — sie hängt in <em>diesen</em> Kontext, damit die Absicht mit
-/// der Änderung committet, die sie ausgelöst hat.
+/// There is no shared database and therefore no shared outbox either
+/// (ADR-0004/0025) — it hangs in <em>this</em> context, so the intent commits
+/// with the change that triggered it.
 /// <para>
-/// Nachverfolgung ist für den ganzen Kontext aus statt je Abfrage. Je Abfrage
-/// ist es Disziplin, und die nächste Abfrage, die jemand hinzufügt, vergisst
-/// sie; der Speicher führt gelesene Werte ohnehin durch die Domäne zurück, die
-/// sie normalisiert, sodass ein nachverfolgter Lesezugriff Zeilen als geändert
-/// markieren und der nächste Commit Zeilen zurückschreiben würde, die niemand
-/// angefasst hat.
+/// Tracking is off for the whole context instead of per query. Per query it is
+/// discipline, and the next query somebody adds forgets it; the store leads read
+/// values back through the domain anyway, which normalises them, so a tracked
+/// read would mark rows as changed and the next commit would write back rows
+/// nobody touched.
 /// </para>
 /// </remarks>
 public sealed class ApplicationsDbContext(DbContextOptions<ApplicationsDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Bewerbungen.</summary>
-    public DbSet<BewerbungsZeile> Bewerbungen => Set<BewerbungsZeile>();
+    /// <summary>The applications.</summary>
+    public DbSet<ApplicationRow> Applications => Set<ApplicationRow>();
 
-    /// <summary>Die Entwürfe.</summary>
-    public DbSet<EntwurfsZeile> Entwuerfe => Set<EntwurfsZeile>();
+    /// <summary>The drafts.</summary>
+    public DbSet<DraftRow> Drafts => Set<DraftRow>();
 
-    /// <summary>Die Anmerkungen an den Entwürfen.</summary>
-    public DbSet<AnmerkungsZeile> Anmerkungen => Set<AnmerkungsZeile>();
+    /// <summary>The comments on the drafts.</summary>
+    public DbSet<CommentRow> Comments => Set<CommentRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<BewerbungsZeile>(entity =>
+        modelBuilder.Entity<ApplicationRow>(entity =>
         {
             entity.ToTable("applications");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.JobId).HasColumnName("job_id").IsRequired();
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id").IsRequired();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.Message)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.JobId).HasColumnName("job_id").IsRequired();
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.Message)
                 .HasColumnName("message").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.SharesResume)
+            entity.Property(row => row.SharesResume)
                 .HasColumnName("shares_resume").IsRequired();
-            entity.Property(zeile => zeile.SharesPortfolio)
+            entity.Property(row => row.SharesPortfolio)
                 .HasColumnName("shares_portfolio").IsRequired();
-            entity.Property(zeile => zeile.Documents)
+            entity.Property(row => row.Documents)
                 .HasColumnName("documents").HasColumnType("jsonb")
                 .HasDefaultValue("[]").IsRequired();
-            entity.Property(zeile => zeile.Status)
+            entity.Property(row => row.Status)
                 .HasColumnName("status").HasMaxLength(16).IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            entity.Property(zeile => zeile.AnsweredAt).HasColumnName("answered_at");
-            entity.Property(zeile => zeile.ApplicantContact)
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.AnsweredAt).HasColumnName("answered_at");
+            entity.Property(row => row.ApplicantContact)
                 .HasColumnName("applicant_contact")
                 .HasColumnType("jsonb")
                 .HasDefaultValue("{}")
                 .IsRequired();
 
-            entity.HasIndex(zeile => zeile.JobId);
-            entity.HasIndex(zeile => zeile.TenantId);
-            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.HasIndex(row => row.JobId);
+            entity.HasIndex(row => row.TenantId);
+            entity.HasIndex(row => row.SubjectId);
 
-            // Genau eine je (Person, Stelle) — in der Datenbank und nicht nur
-            // im Handler, denn zwei gleichzeitige Absendungen kämen beide durch
-            // eine Prüfung im Code. Zweimal auf dieselbe Stelle zu bewerben ist
-            // kein Ausdruck von Interesse, sondern ein Versehen.
-            entity.HasIndex(zeile => new { zeile.JobId, zeile.SubjectId })
+            // Exactly one per (person, job) — in the database and not only in
+            // the handler, because two simultaneous submissions would both get
+            // through a check in code. Applying twice for the same job is no
+            // expression of interest but an oversight.
+            entity.HasIndex(row => new { row.JobId, row.SubjectId })
                 .IsUnique()
                 .HasDatabaseName("uq_application_job_subject");
         });
 
-        modelBuilder.Entity<EntwurfsZeile>(entity =>
+        modelBuilder.Entity<DraftRow>(entity =>
         {
             entity.ToTable("application_drafts");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.JobId).HasColumnName("job_id").IsRequired();
-            entity.Property(zeile => zeile.TenantId).HasColumnName("tenant_id").IsRequired();
-            entity.Property(zeile => zeile.SubjectId).HasColumnName("subject_id").IsRequired();
-            entity.Property(zeile => zeile.Subject)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.JobId).HasColumnName("job_id").IsRequired();
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id").IsRequired();
+            entity.Property(row => row.SubjectId).HasColumnName("subject_id").IsRequired();
+            entity.Property(row => row.Subject)
                 .HasColumnName("subject")
-                .HasMaxLength(Bewerbungsentwurf.HoechstlaengeBetreff).IsRequired();
-            entity.Property(zeile => zeile.Body)
+                .HasMaxLength(ApplicationDraft.MaxSubjectLineLength).IsRequired();
+            entity.Property(row => row.Body)
                 .HasColumnName("body").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.Status)
+            entity.Property(row => row.Status)
                 .HasColumnName("status").HasMaxLength(16).IsRequired();
-            entity.Property(zeile => zeile.Version).HasColumnName("version").IsRequired();
-            entity.Property(zeile => zeile.Error)
+            entity.Property(row => row.Version).HasColumnName("version").IsRequired();
+            entity.Property(row => row.Error)
                 .HasColumnName("error").HasColumnType("text").IsRequired();
-            entity.Property(zeile => zeile.SharesResume)
+            entity.Property(row => row.SharesResume)
                 .HasColumnName("shares_resume").IsRequired();
-            entity.Property(zeile => zeile.Documents)
+            entity.Property(row => row.Documents)
                 .HasColumnName("documents").HasColumnType("jsonb").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            entity.Property(zeile => zeile.WritingStartedAt).HasColumnName("writing_started_at");
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.WritingStartedAt).HasColumnName("writing_started_at");
 
-            entity.HasIndex(zeile => zeile.SubjectId);
+            entity.HasIndex(row => row.SubjectId);
 
-            // KEIN eindeutiger Index auf (Stelle, Person): ein gesendeter
-            // Entwurf bleibt als Beleg stehen, und danach darf ein neuer
-            // entstehen. Die Eindeutigkeit sitzt an der BEWERBUNG, wo sie
-            // hingehoert — zweimal zu bewerben ist das Versehen, zweimal zu
-            // entwerfen nicht.
+            // NO unique index on (job, person): a sent draft stays as evidence,
+            // and afterwards a new one may come about. The uniqueness sits on the
+            // APPLICATION, where it belongs — applying twice is the oversight,
+            // drafting twice is not.
         });
 
-        modelBuilder.Entity<AnmerkungsZeile>(entity =>
+        modelBuilder.Entity<CommentRow>(entity =>
         {
             entity.ToTable("application_draft_comments");
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            entity.Property(zeile => zeile.DraftId).HasColumnName("draft_id").IsRequired();
-            entity.Property(zeile => zeile.Body)
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(row => row.DraftId).HasColumnName("draft_id").IsRequired();
+            entity.Property(row => row.Body)
                 .HasColumnName("body")
-                .HasMaxLength(Anmerkung.HoechstlaengeText).IsRequired();
-            entity.Property(zeile => zeile.Quote)
+                .HasMaxLength(Comment.MaxTextLength).IsRequired();
+            entity.Property(row => row.Quote)
                 .HasColumnName("quote")
-                .HasMaxLength(Anmerkung.HoechstlaengeZitat).IsRequired();
-            entity.Property(zeile => zeile.Resolved).HasColumnName("resolved").IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
+                .HasMaxLength(Comment.MaxPassageLength).IsRequired();
+            entity.Property(row => row.Resolved).HasColumnName("resolved").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
 
-            entity.HasIndex(zeile => zeile.DraftId);
+            entity.HasIndex(row => row.DraftId);
         });
 
         modelBuilder.ConfigureOutbox();

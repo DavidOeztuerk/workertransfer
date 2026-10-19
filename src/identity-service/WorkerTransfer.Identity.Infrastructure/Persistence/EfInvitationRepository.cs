@@ -38,9 +38,9 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
         CancellationToken cancellationToken = default)
     {
         var row = await context.Invitations
-            .FirstOrDefaultAsync(kandidat => kandidat.TokenHash == tokenHash, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.TokenHash == tokenHash, cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
@@ -50,10 +50,10 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
         CancellationToken cancellationToken = default)
     {
         var row = await context.Invitations.FirstOrDefaultAsync(
-            kandidat => kandidat.Id == id && kandidat.TenantId == tenant.Value,
+            candidate => candidate.Id == id && candidate.TenantId == tenant.Value,
             cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
@@ -61,14 +61,14 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
         TenantId tenant,
         CancellationToken cancellationToken = default)
     {
-        var offen = InvitationStatusNames.ToDatabase(InvitationStatus.Pending);
+        var open = InvitationStatusNames.ToDatabase(InvitationStatus.Pending);
 
-        var zeilen = await context.Invitations
-            .Where(kandidat => kandidat.TenantId == tenant.Value && kandidat.Status == offen)
-            .OrderBy(kandidat => kandidat.CreatedAt)
+        var rows = await context.Invitations
+            .Where(candidate => candidate.TenantId == tenant.Value && candidate.Status == open)
+            .OrderBy(candidate => candidate.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZumAggregat)];
+        return [.. rows.Select(ToAggregate)];
     }
 
     /// <inheritdoc />
@@ -86,22 +86,22 @@ public sealed class EfInvitationRepository(IdentityDbContext context) : IInvitat
 
         var row = await context.Invitations
             .AsTracking()
-            .FirstOrDefaultAsync(kandidat => kandidat.Id == invitation.Id, cancellationToken)
+            .FirstOrDefaultAsync(candidate => candidate.Id == invitation.Id, cancellationToken)
             ?? throw new InvalidOperationException(
-                $"Keine Einladung {invitation.Id} zum Speichern.");
+                $"No invitation {invitation.Id} to save.");
 
         row.Status = InvitationStatusNames.ToDatabase(invitation.Status);
         row.AcceptedAt = invitation.AcceptedAt?.UtcDateTime;
     }
 
-    private static Invitation ZumAggregat(InvitationRow row) => Invitation.Restore(
+    private static Invitation ToAggregate(InvitationRow row) => Invitation.Restore(
         row.Id,
         new TenantId(row.TenantId),
         row.Email,
         MembershipRoleNames.FromDatabase(row.Role),
-        row.InvitedBy is { } wer ? new SubjectId(wer) : null,
+        row.InvitedBy is { } subject ? new SubjectId(subject) : null,
         InvitationStatusNames.FromDatabase(row.Status),
         new DateTimeOffset(row.CreatedAt, TimeSpan.Zero),
         new DateTimeOffset(row.ExpiresAt, TimeSpan.Zero),
-        row.AcceptedAt is { } angenommen ? new DateTimeOffset(angenommen, TimeSpan.Zero) : null);
+        row.AcceptedAt is { } acceptedAt ? new DateTimeOffset(acceptedAt, TimeSpan.Zero) : null);
 }

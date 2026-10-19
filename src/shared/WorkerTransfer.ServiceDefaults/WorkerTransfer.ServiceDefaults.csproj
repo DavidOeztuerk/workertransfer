@@ -11,14 +11,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Nur fuer `Umgebung.Laden()`: eine .env-Datei in die Prozessumgebung. -->
+    <!-- Only for `EnvironmentFile.Load()`: a .env file into the process environment. -->
     <PackageReference Include="DotNetEnv" />
     <PackageReference Include="Noelia.Infrastructure" />
     <PackageReference Include="Noelia.Dashboard" />
     <!--
-      Nur fuer `Wanderung`: jeder der zehn Dienste besitzt ein eigenes Schema
-      und wandert es selbst. Relational, nicht Npgsql — welche Datenbank es
-      ist, entscheidet der Dienst.
+      Only for `SchemaMigration`: every service owns a schema of its own and
+      migrates it itself. Relational, not Npgsql — which database it is, the
+      service decides.
     -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
   </ItemGroup>
@@ -28,10 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Die Ortstabelle reist IM Bild mit. Sie ist der Grund, warum kein
-         Geokodierdienst gerufen wird (ADR-0032), und ohne sie kennt die
-         Umkreissuche keinen einzigen Ort. -->
-    <EmbeddedResource Include="Postleitzahlen.txt" />
+    <!-- The place table travels IN the image. It is the reason no geocoding
+         service is called (ADR-0032), and without it the radius search knows
+         not a single place. -->
+    <EmbeddedResource Include="PostalCodes.txt" />
   </ItemGroup>
 
 </Project>

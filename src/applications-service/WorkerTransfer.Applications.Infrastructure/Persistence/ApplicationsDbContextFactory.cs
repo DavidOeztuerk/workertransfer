@@ -3,42 +3,41 @@ using Npgsql;
 
 namespace WorkerTransfer.Applications.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext über dem Schema dieses Dienstes.</summary>
+/// <summary>Builds data source and context over this service's schema.</summary>
 /// <remarks>
-/// Ohne <c>MapEnum</c> — dieser Dienst legt keinen Postgres-Enumtyp an. Der
-/// Stand steht als Wort in einer <c>varchar</c>-Spalte, genau so, wie er im
-/// Vertrag und in der Oberfläche steht.
+/// Without <c>MapEnum</c> — this service creates no Postgres enum type. The
+/// state stands as a word in a <c>varchar</c> column, exactly as it stands in
+/// the contract and in the interface.
 /// </remarks>
 public static class ApplicationsDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>The data source.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Optionen über einer Datenquelle, die dem Aufrufer gehört.</summary>
-    public static DbContextOptionsBuilder<ApplicationsDbContext> Optionen(
-        NpgsqlDataSource datenquelle) =>
-        (DbContextOptionsBuilder<ApplicationsDbContext>)Konfiguriere(
-            new DbContextOptionsBuilder<ApplicationsDbContext>(), datenquelle);
+    /// <summary>Options over a data source that belongs to the caller.</summary>
+    public static DbContextOptionsBuilder<ApplicationsDbContext> OptionsFor(
+        NpgsqlDataSource dataSource) =>
+        (DbContextOptionsBuilder<ApplicationsDbContext>)Configure(
+            new DbContextOptionsBuilder<ApplicationsDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Stelle, an der die Nachverfolgung ausgeschaltet wird, damit
-    /// Behälter, Tests und <c>dotnet ef</c> nicht mit verschiedenen Modellen
-    /// enden.
+    /// The one place where tracking is switched off, so container, tests and
+    /// <c>dotnet ef</c> do not end up with different models.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
-        NpgsqlDataSource datenquelle)
+        NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         return options
-            .UseNpgsql(datenquelle)
+            .UseNpgsql(dataSource)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Verbindung braucht.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
+    public static DbContextOptionsBuilder ForDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {

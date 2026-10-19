@@ -1,6 +1,5 @@
 using Noelia.Application.Extensions;
 using MediatR;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,39 +7,39 @@ using Npgsql;
 using WorkerTransfer.Profile.Application.Behaviors;
 using WorkerTransfer.Profile.Application.Ports;
 using WorkerTransfer.Profile.Application.Profile;
+using WorkerTransfer.Profile.Domain.Audit;
 using WorkerTransfer.Profile.Domain.Profile;
-using WorkerTransfer.Profile.Domain.Pruefspur;
-using WorkerTransfer.Profile.Infrastructure.Einwilligung;
-using WorkerTransfer.Profile.Infrastructure.Entwurf;
-using WorkerTransfer.Profile.Infrastructure.Intern;
-using WorkerTransfer.Profile.Infrastructure.Loeschung;
+using WorkerTransfer.Profile.Infrastructure.Consent;
+using WorkerTransfer.Profile.Infrastructure.Draft;
+using WorkerTransfer.Profile.Infrastructure.Erasure;
+using WorkerTransfer.Profile.Infrastructure.Internal;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Profile.Contracts;
 using WorkerTransfer.ServiceDefaults;
 using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Profile.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Alles, was dieser Dienst für sich entscheidet, steht hier in einem Aufruf —
-/// und genauso laut, was <em>nicht</em> hier steht. Es gibt keinen Cache und
-/// keinen zu registrieren: nichts implementiert Noelias
-/// <c>ICacheableQuery</c>, also lässt <c>AddCQRS</c> beide Cache-Behaviors ganz
-/// aus der Pipeline. Das ist keine Sparsamkeit, das ist ADR-0013 — ein Widerruf
-/// muss beim nächsten Lesen wirken.
+/// Everything this service decides for itself stands here in one call — and
+/// just as loudly what does <em>not</em> stand here. There is no cache and none
+/// to register: nothing implements Noelia's <c>ICacheableQuery</c>, so
+/// <c>AddCQRS</c> leaves both cache behaviors out of the pipeline entirely. That
+/// is no thrift, that is ADR-0013 — a revocation must take effect at the next
+/// read.
 /// <para>
-/// Und es gibt <strong>keinen Entwurfsanbieter</strong>, solange keiner
-/// eingerichtet ist. Ohne Schlüssel verlässt kein Wort dieses Systems das
-/// System, und die Oberfläche sagt das, statt es zu verschweigen.
+/// And there is <strong>no draft provider</strong> as long as none is set up.
+/// Without a key not a word of this system leaves the system, and the interface
+/// says so instead of keeping quiet about it.
 /// </para>
 /// </remarks>
 public static class ProfileInfrastructure
 {
-    /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Woher Ledger, Entwurf und Geheimnis kommen.</param>
-    /// <param name="connectionString">Wo die Profildatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger, draft and secret come from.</param>
+    /// <param name="connectionString">Where the profile database lies.</param>
     public static IServiceCollection AddProfileInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -49,117 +48,114 @@ public static class ProfileInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Entwurfseinstellungen>(
-            configuration.GetSection(Entwurfseinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
-        // Die interne Tuer, durch die scout-service sucht. Leer heisst: zu.
-        services.Configure<Meldeeinstellungen>(
-            configuration.GetSection(Meldeeinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<DraftSettings>(
+            configuration.GetSection(DraftSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
+        // The internal door through which scout-service searches. Empty means: shut.
+        services.Configure<NotifySettings>(
+            configuration.GetSection(NotifySettings.Section));
 
-
-        services.AddSingleton(_ => ProfileDbContextFactory.Datenquelle(connectionString));
-        services.AddDbContext<ProfileDbContext>((anbieter, optionen) =>
-            ProfileDbContextFactory.Konfiguriere(
-                optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<ProfileDbContext>("profile");
-        services.AddSchluesselbund<ProfileDbContext>();
+        services.AddSingleton(_ => ProfileDbContextFactory.DataSource(connectionString));
+        services.AddDbContext<ProfileDbContext>((provider, options) =>
+            ProfileDbContextFactory.Configure(
+                options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatabaseReadiness<ProfileDbContext>("profile");
+        services.AddKeyRing<ProfileDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IProfilspeicher, EfProfilspeicher>();
-        services.AddScoped<IPruefspur, EfPruefspur>();
+        services.AddScoped<IProfileStore, EfProfileStore>();
+        services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
 
-        // Der Nullentwerfer ist die Voreinstellung, nicht der Rückfall: ohne
-        // hinterlegten Schlüssel wird kein Fremddienst gerufen, und der Dienst
-        // sagt das, statt eine Vorlage auszugeben, die wie ein Vorschlag
-        // aussieht.
-        var entwurf = new Entwurfseinstellungen();
-        configuration.GetSection(Entwurfseinstellungen.Abschnitt).Bind(entwurf);
+        // The null drafter is the default, not the fallback: without a deposited
+        // key no foreign service is called, and the service says so instead of
+        // handing out a template that looks like a suggestion.
+        var draft = new DraftSettings();
+        configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(entwurf.Schluessel))
+        if (string.IsNullOrEmpty(draft.ApiKey))
         {
-            services.AddScoped<IEntwerfer, KeinEntwerfer>();
+            services.AddScoped<IDrafter, NoDrafter>();
         }
         else
         {
-            services.AddScoped<IEntwerfer, HttpEntwerfer>();
+            services.AddScoped<IDrafter, HttpDrafter>();
         }
 
-        services.AddCQRS(typeof(ProfilSpeichernBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(StoreProfileCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration, entwurf);
+        Evidence(services, configuration, draft);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para><strong>Sie stehen hier und nicht in der Dienstgrundlage</strong>,
-    /// aus demselben Grund, aus dem der Ledger, die Prüfspur und der Entwerfer
-    /// hier stehen: es sind Entscheidungen dieses Dienstes. <em>Welche</em>
-    /// vier Felder zum Modell hinausgehen dürfen, ist ADR-0024 §3 für genau
-    /// diesen Verbraucher; eine gemeinsame Menge wäre der erste Schritt zu
-    /// einem gemeinsamen Prompt mit einem <c>if</c>.</para>
+    /// <para><strong>They stand here and not in the ServiceFoundation</strong>,
+    /// for the same reason the ledger, the audit trail and the drafter stand
+    /// here: they are this service's decisions. <em>Which</em> four fields may
+    /// go out to the model is ADR-0024 §3 for exactly this consumer; a shared
+    /// set would be the first step towards a shared prompt with an
+    /// <c>if</c>.</para>
     ///
-    /// <para><strong><c>wt.grenze.ziele</c> fehlt hier absichtlich.</strong> Sie
-    /// liest nur die Konfiguration, ist damit für jeden Dienst dieselbe, und
-    /// steht deshalb in <c>AddNachweis</c> — sie ist die eine, die ein neuer
-    /// Dienst nicht vergessen kann.</para>
+    /// <para><strong><c>wt.grenze.ziele</c> is missing here on purpose.</strong>
+    /// It reads only the configuration, is therefore the same for every service,
+    /// and so stands in <c>AddEvidence</c> — it is the one a new service cannot
+    /// forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services,
         IConfiguration configuration,
-        Entwurfseinstellungen entwurf)
+        DraftSettings draft)
     {
-        var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.ApiKey);
 
-        // DIE FELDMENGE, festgenagelt — und zwar an dem, was laeuft.
+        // THE FIELD SET, pinned — and pinned at what runs.
         //
-        // `EntwurfsgrenzeTests` nagelt dieselbe Menge am BAUM fest und ist
-        // damit der schaerfere Waechter: er faellt, bevor etwas ausgeliefert
-        // wird. Was er nicht kann, ist im Nachweis STEHEN. Der Mensch, der die
-        // Anhang-III-Frage beantworten muss, bekommt hier aufgeschrieben, was
-        // dieses System zum Modell hinausschickt — datiert, statt in einem
-        // Testprojekt gesucht.
-        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
-            typeof(Entwurfslage),
-            ["Ueberschrift", "Text", "Faehigkeiten", "Wunsch", "Prompt"],
+        // `DraftBoundaryTests` pins the same set at the TREE and is therefore
+        // the sharper guard: it falls before anything ships. What it cannot do
+        // is STAND in the evidence. The human who has to answer the Annex III
+        // question gets written down here what this system sends out to the
+        // model — dated, instead of searched for in a test project. The
+        // description stays German: it goes into the German evidence document.
+        services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
+            typeof(DraftSituation),
+            ["Headline", "Text", "Skills", "Wish", "Prompt"],
             "für einen Profiltext"));
 
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Profil).Assembly, typeof(ProfilfundV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(PersonProfile).Assembly, typeof(ProfileHitV1).Assembly]));
 
-        // Der KI-Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*`
-        // aus der Umgebung, einer fuer alle. Der Zugang je Person steht in
-        // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
-            "anthropic", entwurf.Adresse, naht));
+        // This service's AI provider is the OPERATOR's: `Draft__*` from the
+        // environment file, one for everybody. Access per person stands in
+        // identity-service, and there it is counted instead of named.
+        services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
+            "anthropic", draft.BaseUrl, seam));
 
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
+        // Between the question and the ledger stands no further type. That is
+        // the precondition at which ADR-0013 fails in practice — a cache in
+        // front of it strikes nobody, because everything keeps working, only
+        // with the state from before.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ. Das ist
-        // die Vorbedingung, an der ADR-0013 in der Praxis scheitert — ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
-
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "profile",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
-            pruefspurVorhanden: true));
+            !string.IsNullOrEmpty(erasure.Secret),
+            auditTrailPresent: true));
     }
 }

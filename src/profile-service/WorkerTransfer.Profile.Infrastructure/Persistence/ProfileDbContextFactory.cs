@@ -1,88 +1,91 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
-using WorkerTransfer.Profile.Domain.Pruefspur;
+using WorkerTransfer.Profile.Domain.Audit;
 
 namespace WorkerTransfer.Profile.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext.</summary>
+/// <summary>Builds data source and context.</summary>
 /// <remarks>
-/// Die eine Stelle, an der die Verfolgung abgeschaltet und die Aufzählung
-/// erklärt wird — damit Container, Tests und <c>dotnet ef</c> nicht mit drei
-/// verschiedenen Modellen enden.
+/// The one place where tracking is switched off and the enum is declared — so
+/// that container, tests and <c>dotnet ef</c> do not end up with three
+/// different models.
 /// </remarks>
 public static class ProfileDbContextFactory
 {
-    /// <summary>Die Postgres-Aufzählung hinter <c>audit_events.action</c>.</summary>
-    public const string HandlungsTyp = "pruef_handlung";
-
-    /// <summary>Eine Datenquelle, die die Aufzählung kennt.</summary>
+    /// <summary>The Postgres enum behind <c>audit_events.action</c>.</summary>
     /// <remarks>
-    /// Sie wird geschrieben, nicht nur gelesen, und Postgres nimmt in einer
-    /// Aufzählungsspalte keinen Text an — der Parameter muss den Typ tragen.
+    /// The value is schema: the migration created the type under this name.
+    /// The members of <see cref="AuditAction"/> are its labels.
     /// </remarks>
-    /// <param name="connectionString">Wo die Profildatenbank liegt.</param>
-    public static NpgsqlDataSource Datenquelle(string connectionString)
+    public const string AuditActionType = "audit_action";
+
+    /// <summary>A data source that knows the enum.</summary>
+    /// <remarks>
+    /// It is written, not only read, and Postgres accepts no text in an enum
+    /// column — the parameter has to carry the type.
+    /// </remarks>
+    /// <param name="connectionString">Where the profile database lies.</param>
+    public static NpgsqlDataSource DataSource(string connectionString)
     {
-        var erbauer = new NpgsqlDataSourceBuilder(connectionString);
-        erbauer.MapEnum<Pruefhandlung>(HandlungsTyp);
-        return erbauer.Build();
+        var builder = new NpgsqlDataSourceBuilder(connectionString);
+        builder.MapEnum<AuditAction>(AuditActionType);
+        return builder.Build();
     }
 
-    /// <summary>Einstellungen für eine Datenquelle, die dem Aufrufer gehört.</summary>
-    /// <param name="options">Der zu füllende Erbauer.</param>
-    /// <param name="datenquelle">Wo die Daten liegen.</param>
-    public static DbContextOptionsBuilder Konfiguriere(
+    /// <summary>Options for a data source that belongs to the caller.</summary>
+    /// <param name="options">The builder to fill.</param>
+    /// <param name="dataSource">Where the data lies.</param>
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
-        NpgsqlDataSource datenquelle)
+        NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         return options
-            .UseNpgsql(datenquelle, Gemeinsam)
+            .UseNpgsql(dataSource, Shared)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Verbindung braucht.</summary>
+    /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
     /// <remarks>
-    /// Muss genau das einstellen, was <see cref="Konfiguriere"/> einstellt. Ein
-    /// Entwurfszeitmodell, das vom laufenden abweicht, erzeugt Migrationen für
-    /// Änderungen, die niemand gemacht hat — und, schlimmer, keine für die, die
-    /// jemand gemacht hat.
+    /// Must set exactly what <see cref="Configure"/> sets. A design-time model
+    /// that differs from the running one produces migrations for changes nobody
+    /// made — and, worse, none for those somebody made.
     /// </remarks>
-    /// <param name="options">Der zu füllende Erbauer.</param>
-    /// <param name="connectionString">Eine Zeichenkette, die nie geöffnet wird.</param>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <param name="options">The builder to fill.</param>
+    /// <param name="connectionString">A string that is never opened.</param>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return options.UseNpgsql(connectionString, Gemeinsam);
+        return options.UseNpgsql(connectionString, Shared);
     }
 
     /// <summary>
-    /// Beide Hälften der Aufzählung werden gebraucht: die Datenquelle bringt
-    /// Npgsql den Typ bei, das hier bringt EF bei, dass die Spalte er ist.
+    /// Both halves of the enum are needed: the data source teaches Npgsql the
+    /// type, this teaches EF that the column is it.
     /// </summary>
-    private static void Gemeinsam(NpgsqlDbContextOptionsBuilder npgsql) =>
-        npgsql.MapEnum<Pruefhandlung>(HandlungsTyp);
+    private static void Shared(NpgsqlDbContextOptionsBuilder npgsql) =>
+        npgsql.MapEnum<AuditAction>(AuditActionType);
 }
 
-/// <summary>Baut einen Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>Builds a context for <c>dotnet ef</c>.</summary>
 /// <remarks>
-/// Hier statt im API-Projekt: eine Migration gehört der Schicht, die das Schema
-/// besitzt, und sie zu erzeugen darf nicht verlangen, dass der Dienst
-/// eingerichtet ist.
+/// Here instead of in the API project: a migration belongs to the layer that
+/// owns the schema, and generating it must not require the service to be set
+/// up.
 /// </remarks>
-public sealed class ProfileEntwurfszeitFabrik
+public sealed class ProfileDesignTimeFactory
     : Microsoft.EntityFrameworkCore.Design.IDesignTimeDbContextFactory<ProfileDbContext>
 {
     /// <inheritdoc />
     public ProfileDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<ProfileDbContext>)ProfileDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<ProfileDbContext>(),
-                "Host=entwurfszeit;Database=profile")
+                "Host=design-time;Database=profile")
             .Options);
 }

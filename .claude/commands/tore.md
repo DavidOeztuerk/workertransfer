@@ -15,7 +15,7 @@ cd web && pnpm check && pnpm test && pnpm build
 Danach, nur wenn der Stapel läuft (`docker compose ps`):
 
 ```bash
-make routenkarte
+make route-map
 cd web && pnpm exec playwright test
 ```
 

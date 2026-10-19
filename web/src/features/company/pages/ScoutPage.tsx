@@ -16,14 +16,15 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { TrefferKarte } from "../components/TrefferKarte";
-import { useHandelnder } from "../lib/session";
-import { useAsync, useSeiten } from "../lib/useAsync";
+import { HitCard } from "../components/HitCard";
+import { type MessageKey, failureKey } from "../../../shared/api/errors";
+import { useActor } from "../lib/session";
+import { useAsync, usePages } from "../lib/useAsync";
 import {
-  OHNE_FILTER,
-  type Suchfilter,
-  type Treffer,
-  sucheKandidaten,
+  NO_FILTER,
+  type SearchFilter,
+  type Hit,
+  searchCandidates,
 } from "../api/scout";
 import {
   type MarketRequest,
@@ -32,97 +33,97 @@ import {
 import { listOwnJobs } from "../../work/api/jobs";
 
 /**
- * <c>/scout</c> — wer sein Profil freigegeben hat, mit Häkchen und Belegen.
+ * <c>/scout</c> — who released their profile, with ticks and evidence.
  *
- * <strong>Nachfolger von <c>/candidates</c></strong> (ADR-0036). Der alte Pfad
- * ist am 11.09.2026 gefallen; zwei Suchen nebeneinander wären zwei Wahrheiten
- * gewesen.
+ * <strong>Successor of <c>/candidates</c></strong> (ADR-0036). The old path
+ * fell on 11.09.2026; two searches side by side would have been two truths.
  *
- * <strong>Die Worte sind ein ODER.</strong> Wer drei eingibt, sucht nicht
- * jemanden, der alle drei kann — sondern sieht an den Häkchen, wer welches
- * genannt hat. Unter UND wäre jedes Häkchen gesetzt und die Liste nutzlos.
+ * <strong>The words are an OR.</strong> Whoever enters three is not looking
+ * for someone who knows all three — but sees from the ticks who named which.
+ * Under AND every tick would be set and the list useless.
  *
- * <strong>Hier steht ausschliesslich, wer freigegeben hat.</strong> Wer die
- * Freigabe zurückzieht, verschwindet beim nächsten Laden — ohne Umweg über uns,
- * weil die Liste den Ledger bei jeder Anfrage neu fragt.
+ * <strong>Only who released stands here.</strong> Whoever withdraws the release
+ * disappears at the next load — without a detour through us, because the list
+ * asks the ledger anew on every request.
  *
- * <strong>Keine Gesamtzahl.</strong> Sie verriete, wie viele Profile es gibt,
- * die gerade NICHT freigegeben sind — eine Auskunft über Menschen, die
- * ausdrücklich nichts gesagt haben.
+ * <strong>No total.</strong> It would reveal how many profiles exist that are
+ * NOT released right now — a statement about people who explicitly said
+ * nothing.
  *
- * <strong>„Leer" heisst nicht dasselbe wie „schweigt".</strong> Antwortet der
- * Ledger nicht, steht hier ein Fehler und keine leere Liste: eine leere Liste
- * wäre die Behauptung, niemand habe freigegeben, und das weiss in dem Moment
- * niemand.
+ * <strong>"Empty" does not mean the same as "silent".</strong> If the ledger
+ * does not answer, an error stands here and not an empty list: an empty list
+ * would be the claim that nobody released anything, and at that moment nobody
+ * knows that.
  */
 export function ScoutPage() {
   const { t } = useTranslation();
-  const { fuerFirma } = useHandelnder();
+  const { forCompany } = useActor();
 
-  const [draft, setEntwurf] = useState({
+  const [draft, setDraft] = useState({
     skills: "",
     location: "",
     remoteOnly: false,
   });
-  const [filter, setFilter] = useState<Suchfilter>(OHNE_FILTER);
+  const [filter, setFilter] = useState<SearchFilter>(NO_FILTER);
 
-  // Die Stelle steht NEBEN den Filtern, nicht unter ihnen: sie nimmt keinen
-  // Treffer weg, sie erklaert jeden (ADR-0041). Deshalb wirkt sie auch sofort
-  // und wartet nicht auf „Suchen" — sie aendert die Menge ja nicht.
-  const [stelle, setStelle] = useState("");
+  // The job stands BESIDE the filters, not among them: it takes no hit away, it
+  // explains each one (ADR-0041). That is why it takes effect at once and does
+  // not wait for "search" — it does not change the set after all.
+  const [jobId, setJobId] = useState("");
 
-  const hatFilter =
+  const hasFilter =
     filter.skills.length > 0 || filter.location !== "" || filter.remoteOnly;
 
-  const eigeneStellen = useAsync(
+  const ownJobs = useAsync(
     (signal) => listOwnJobs(signal),
-    [fuerFirma],
-    fuerFirma,
+    [forCompany],
+    forCompany,
   );
 
-  const stellen =
-    eigeneStellen.data?.ok === true ? eigeneStellen.data.jobs : [];
+  const jobs =
+    ownJobs.data?.ok === true ? ownJobs.data.jobs : [];
 
-  const seiten = useSeiten<Treffer, string>(
+  const pages = usePages<Hit, MessageKey>(
     (cursor, signal) =>
-      sucheKandidaten(cursor, filter, signal, stelle).then((result) =>
+      searchCandidates(cursor, filter, signal, jobId).then((result) =>
         result.ok
           ? {
               ok: true as const,
               items: result.items,
               nextCursor: result.nextCursor,
             }
-          : { ok: false as const, fehler: result.error.detail },
+          : // A key, never scout-service's sentence (English on the wire).
+            { ok: false as const, error: failureKey(result.error, "errors.searchFailed") },
       ),
-    JSON.stringify({ filter, stelle }),
-    fuerFirma,
+    JSON.stringify({ filter, jobId }),
+    forCompany,
   );
 
-  const anfragen = useAsync(
+  const requests = useAsync(
     (signal) => listCompanyMarketRequests(signal),
-    [fuerFirma],
-    fuerFirma,
+    [forCompany],
+    forCompany,
   );
 
-  const marktanfragen = new Map<string, MarketRequest>(
-    anfragen.data?.ok === true
-      ? anfragen.data.requests.map((anfrage: MarketRequest) => [
-          anfrage.subject_id,
-          anfrage,
+  const marketRequests = new Map<string, MarketRequest>(
+    requests.data?.ok === true
+      ? requests.data.requests.map((requestRecord: MarketRequest) => [
+          requestRecord.subject_id,
+          requestRecord,
         ])
       : [],
   );
 
-  // Ohne aktives Unternehmen wird gar nicht erst gefragt. Der Server antwortete
-  // 403 — aber eine Anfrage, deren Ergebnis feststeht, ist nur Rauschen in den
-  // Protokollen des Ledgers.
-  if (!fuerFirma) {
+  // Without an active company nothing is asked at all. The server would answer
+  // 403 — but a request whose result is certain is only noise in the ledger's
+  // logs.
+  if (!forCompany) {
     return (
-      <PageShell title={t("kandidaten.titel")} narrow>
+      <PageShell title={t("scout.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("kandidaten.nurFirma")}
+              {t("scout.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -132,12 +133,12 @@ export function ScoutPage() {
 
   return (
     <PageShell
-      title={t("kandidaten.titel")}
-      lead={t("kandidaten.lead")}
+      title={t("scout.title")}
+      lead={t("scout.lead")}
     >
-      {seiten.fehler !== null ? (
+      {pages.error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {seiten.fehler}
+          {t(pages.error)}
         </Alert>
       ) : null}
 
@@ -164,61 +165,61 @@ export function ScoutPage() {
             }}
           >
             <TextField
-              label={t("kandidaten.faehigkeiten")}
-              helperText={t("kandidaten.faehigkeitenHinweis")}
-              placeholder={t("kandidaten.faehigkeitenBeispiel")}
+              label={t("scout.skills")}
+              helperText={t("scout.skillsHint")}
+              placeholder={t("scout.skillsExample")}
               value={draft.skills}
               onChange={(e) =>
-                setEntwurf((now) => ({ ...now, skills: e.target.value }))
+                setDraft((now) => ({ ...now, skills: e.target.value }))
               }
             />
             <TextField
-              label={t("kandidaten.ort")}
-              helperText={t("kandidaten.ortHinweis")}
-              placeholder={t("kandidaten.ortBeispiel")}
+              label={t("scout.location")}
+              helperText={t("scout.locationHint")}
+              placeholder={t("scout.locationExample")}
               value={draft.location}
               onChange={(e) =>
-                setEntwurf((now) => ({ ...now, location: e.target.value }))
+                setDraft((now) => ({ ...now, location: e.target.value }))
               }
             />
 
-            {/* Ein Kästchen, kein Schalter: der Filter gilt mit dem Absenden,
-                und genau das versprechen die beiden Elemente unterschiedlich. */}
             <Box>
               <FormControlLabel
                 control={
                   <Checkbox
+                    // A box, not a switch: the filter takes effect on submit,
+                    // and the two elements promise that differently.
                     checked={draft.remoteOnly}
                     onChange={(e) =>
-                      setEntwurf((now) => ({
+                      setDraft((now) => ({
                         ...now,
                         remoteOnly: e.target.checked,
                       }))
                     }
                   />
                 }
-                label={t("kandidaten.nurRemote")}
+                label={t("scout.remoteOnly")}
               />
               <Typography variant="body2" color="text.secondary">
-                {t("kandidaten.nurRemoteHinweis")}
+                {t("scout.remoteOnlyHint")}
               </Typography>
             </Box>
 
-            {/* ADR-0041: Anwesenheit und Ort der Stelle treffen auf die
-                Pendelbereitschaft der Person — daraus wird ein Häkchen je
-                Treffer. KEIN Filter: die Liste wird dadurch nicht kürzer. */}
-            {stellen.length > 0 ? (
+            {jobs.length > 0 ? (
               <TextField
                 select
-                label={t("kandidaten.gegenStelle")}
-                helperText={t("kandidaten.gegenStelleHinweis")}
-                value={stelle}
-                onChange={(event) => setStelle(event.target.value)}
+                // ADR-0041: the advert's attendance and place meet the person's
+                // willingness to commute, and that becomes a TICK per hit. NOT a
+                // filter — the list never gets shorter from it.
+                label={t("scout.againstJob")}
+                helperText={t("scout.againstJobHint")}
+                value={jobId}
+                onChange={(event) => setJobId(event.target.value)}
                 >
-                <MenuItem value="">{t("kandidaten.ohneStelle")}</MenuItem>
-                {stellen.map((anzeige) => (
-                  <MenuItem key={anzeige.id} value={anzeige.id}>
-                    {anzeige.title}
+                <MenuItem value="">{t("scout.noJob")}</MenuItem>
+                {jobs.map((advert) => (
+                  <MenuItem key={advert.id} value={advert.id}>
+                    {advert.title}
                   </MenuItem>
                 ))}
               </TextField>
@@ -226,17 +227,17 @@ export function ScoutPage() {
 
             <Box sx={{ display: "flex", gap: 1.5 }}>
               <Button type="submit" variant="contained">
-                {t("kandidaten.suchen")}
+                {t("scout.search")}
               </Button>
-              {hatFilter ? (
+              {hasFilter ? (
                 <Button
                   variant="text"
                   onClick={() => {
-                    setEntwurf({ skills: "", location: "", remoteOnly: false });
-                    setFilter(OHNE_FILTER);
+                    setDraft({ skills: "", location: "", remoteOnly: false });
+                    setFilter(NO_FILTER);
                   }}
                 >
-                  {t("kandidaten.filterZuruecksetzen")}
+                  {t("scout.filterReset")}
                 </Button>
               ) : null}
             </Box>
@@ -244,15 +245,15 @@ export function ScoutPage() {
         </CardContent>
       </Card>
 
-      {seiten.pending && seiten.items.length === 0 ? (
+      {pages.pending && pages.items.length === 0 ? (
         <Card>
           <CardContent>
-            <LoadingBlock label={t("kandidaten.laden")} />
+            <LoadingBlock label={t("scout.loading")} />
           </CardContent>
         </Card>
       ) : null}
 
-      {seiten.items.length > 0 ? (
+      {pages.items.length > 0 ? (
         <Box
           component="ul"
           sx={{
@@ -264,39 +265,38 @@ export function ScoutPage() {
             m: 0,
           }}
         >
-          {seiten.items.map((treffer: Treffer) => (
-            <TrefferKarte
-              key={treffer.subject_id}
-              treffer={treffer}
-              marketRequest={marktanfragen.get(treffer.subject_id)}
-              onGeaendert={() => anfragen.reload()}
+          {pages.items.map((hit: Hit) => (
+            <HitCard
+              key={hit.subject_id}
+              hit={hit}
+              marketRequest={marketRequests.get(hit.subject_id)}
+              onChanged={() => requests.reload()}
             />
           ))}
         </Box>
       ) : null}
 
-      {!seiten.pending &&
-      seiten.fehler === null &&
-      seiten.items.length === 0 ? (
-        hatFilter ? (
-          <EmptyBlock title={t("kandidaten.leerMitFilter")} />
+      {!pages.pending &&
+      pages.error === null &&
+      pages.items.length === 0 ? (
+        hasFilter ? (
+          <EmptyBlock title={t("scout.emptyWithFilter")} />
         ) : (
           <EmptyBlock
-            title={t("kandidaten.leerTitel")}
-            hint={t("kandidaten.leerHinweis")}
+            title={t("scout.emptyTitle")}
+            hint={t("scout.emptyHint")}
           />
         )
       ) : null}
 
-      {/* Bewusst keine Gesamtzahl. */}
-      {seiten.mehr ? (
+      {pages.hasMore ? (
         <Box sx={{ mt: 3 }}>
           <Button
             variant="outlined"
-            onClick={seiten.weiter}
-            disabled={seiten.pending}
+            onClick={pages.loadMore}
+            disabled={pages.pending}
           >
-            {seiten.pending ? t("allgemein.laden") : t("kandidaten.mehrLaden")}
+            {pages.pending ? t("common.loading") : t("scout.loadMore")}
           </Button>
         </Box>
       ) : null}

@@ -4,20 +4,19 @@ import { lazyRoute } from "../../shared/components/routing/lazyRoute";
 
 
 /**
- * Die Routen dessen, was eine Person tut.
+ * The routes of what a person does.
  *
- * `/careers/<slug>` liegt in `features/company`: sie zeigt ein
- * Unternehmensprofil samt seiner Stellen und gehoert sachlich dorthin.
+ * `/careers/<slug>` lives in `features/company`: it shows a company profile with
+ * its jobs and belongs there by subject.
  *
- * `/jobs/:jobId/apply` stand hier und ist gefallen. Sie war zuletzt eine
- * WEICHE: fuer eine angemeldete Person legte sie einen Entwurf an und leitete
- * nach `/applications/drafts/:id` weiter. Alles darunter — das Formular mit
- * Anschreiben und den zwei Freigabekaestchen — war seit dieser Weiche
- * unerreichbar, weil der Umleitungszweig davorstand. Toter Code mit
- * Einwilligungsschaltern ist das, was spaeter falsch wiederbelebt wird, und
- * eine Adresse ohne eigene Ansicht ist ein Zwischenhalt, den niemand sehen
- * soll. Beide Aufrufer — Stellenliste und Karriereseite — rufen jetzt
- * `lib/entwuerfe` und landen direkt beim Anschreiben.
+ * `/jobs/:jobId/apply` stood here and has fallen. In the end it was a SWITCH:
+ * for a signed-in person it created a draft and redirected to
+ * `/applications/drafts/:id`. Everything below it — the form with the cover
+ * letter and the two release boxes — was unreachable since that switch, because
+ * the redirect branch stood in front of it. Dead code with consent switches is
+ * what later gets revived wrongly, and an address without a view of its own is
+ * a stopover nobody is meant to see. Both callers — job list and career page —
+ * now call `lib/startDrafts` and land directly at the cover letter.
  */
 export const workRoutes: RouteObject[] = [
   { path: "/jobs", element: lazyRoute(() => import("./pages/JobsPage"), "JobsPage") },

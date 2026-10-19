@@ -1,16 +1,15 @@
-import { request } from "../../../core/api/client";
-import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type ApiResult, request } from "../../../core/api/client";
 import { GITHUB_BASE_URL } from "../../../env";
-import type { Fehlerschluessel } from "../../../shared/api/fehler";
+import type { ErrorKey } from "../../../shared/api/errors";
 
 /**
- * Die eigene, nachgewiesene GitHub-Verbindung.
+ * One's own, verified GitHub connection.
  *
- * <strong>Belege, keine Noten.</strong> Was von hier kommt, sind öffentliche
- * Repositories mit Link — nachprüfbar, mit Herkunft, ohne Zwischenrechnung. Es
- * gibt keine Punktzahl und keine Rangfolge, und es darf auch keine geben:
- * „Anforderung rein, Belege raus" ist die Richtung, „Mensch rein, Zahl raus"
- * wäre die verbotene.
+ * <strong>Evidence, not marks.</strong> What comes from here are public
+ * repositories with a link — checkable, with provenance, without an
+ * intermediate calculation. There is no score and no ranking, and there must
+ * not be one either: "requirement in, evidence out" is the direction, "person
+ * in, number out" would be the forbidden one.
  */
 export interface Repository {
   name: string;
@@ -20,57 +19,56 @@ export interface Repository {
   url: string;
   pushed_at: string | null;
   /**
-   * Welche Sprachen im Repository vorkommen — die MENGE, nie ihr Anteil.
+   * Which languages occur in the repository — the SET, never their share.
    *
-   * Ohne Bytes und ohne Prozente: genau daraus rechnete das gelöschte Paket
-   * sein „Können" (ADR-0022 §2). Leer, wenn der Dienst ohne GitHub-Token läuft
-   * — dann steht nur die Hauptsprache zur Verfügung.
+   * Without bytes and without percentages: exactly that is what the deleted
+   * package computed its "skill" from (ADR-0022 §2). Empty when the service
+   * runs without a GitHub token — then only the main language is available.
    */
   languages: string[];
   /**
-   * Die Topics, die der Besitzer selbst am Repository gesetzt hat.
+   * The topics the owner set on the repository themselves.
    *
-   * Der stärkste Beleg von allen, weil er eine NENNUNG ist: „kubernetes" hat
-   * ein Mensch dorthin geschrieben, kein Zähler abgeleitet.
+   * The strongest evidence of all, because it is a NAMING: a human wrote
+   * "kubernetes" there, no counter derived it.
    */
   topics: string[];
 }
 
-export interface Verbindung {
+export interface Connection {
   subject_id: string;
   /**
-   * `null`: noch kein Konto genannt.
+   * `null`: no account named yet.
    *
-   * Wer über GitHub anmeldet, nennt keins — GitHub meldet es. Bis der
-   * Rücksprung da ist, gibt es hier nichts zu zeigen.
+   * Whoever signs in over GitHub names none — GitHub reports it. Until the
+   * redirect is back there is nothing to show here.
    */
   login: string | null;
   verified: boolean;
-  /** Nur in der eigenen Ansicht gefüllt: die Zeile für den Gist. */
+  /** Filled only in one's own view: the line for the gist. */
   challenge_description: string | null;
   fetched_at: string | null;
   repositories: Repository[];
   /**
-   * Konnten fuer JEDES Repository die Sprachen geholt werden?
+   * Could the languages be fetched for EVERY repository?
    *
-   * `false` heisst: bei einigen steht nur die Hauptsprache, weil GitHubs
-   * Ratenlimit den Aufruf je Repository begrenzt. Die Seite MUSS das sagen —
-   * eine unvollstaendige Menge, die sich nicht als solche zu erkennen gibt,
-   * ist die stillschweigende Vollstaendigkeit aus ADR-0022 §3: „Python" laese
-   * sich dann wie „nur Python".
+   * `false` means: for some only the main language stands, because GitHub's
+   * rate limit caps the per-repository call. The page MUST say so — an
+   * incomplete set that does not identify itself as such is the silent
+   * completeness of ADR-0022 §3: "Python" would then read like "only Python".
    */
   languages_complete: boolean;
 }
 
-export type Antwort<T> = { ok: true; value: T } | { ok: false; error: ApiError };
-
-/** Die eigene Verbindung. `null` heisst: noch keine genannt. */
-export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindung | null>> {
-  const answer = await request<Verbindung>(
+/** One's own connection. `null` means: none named yet. */
+export async function getMyConnection(
+  signal?: AbortSignal
+): Promise<ApiResult<Connection | null>> {
+  const answer = await request<Connection>(
     GITHUB_BASE_URL,
     "/github/me",
     { signal },
-    "fehler.verbindungNichtAbrufbar"
+    "errors.connectionUnavailable"
   );
 
   if (answer.ok) return { ok: true, value: answer.value ?? null };
@@ -78,56 +76,49 @@ export async function ladeMeine(signal?: AbortSignal): Promise<Antwort<Verbindun
   return { ok: false, error: answer.error };
 }
 
-async function handeln(
+async function act(
   path: string,
-  optionen: Parameters<typeof request>[2],
-  fallback: Fehlerschluessel
-): Promise<Antwort<Verbindung>> {
-  const answer = await request<Verbindung>(GITHUB_BASE_URL, path, optionen, fallback);
+  options: Parameters<typeof request>[2],
+  fallback: ErrorKey
+): Promise<ApiResult<Connection>> {
+  const answer = await request<Connection>(GITHUB_BASE_URL, path, options, fallback);
 
   return answer.ok
-    ? { ok: true, value: answer.value as Verbindung }
+    ? { ok: true, value: answer.value as Connection }
     : { ok: false, error: answer.error };
 }
 
-/** Ein Konto NENNEN — verbunden ist es damit noch nicht. */
-export const nenneKonto = (login: string, signal?: AbortSignal) =>
-  handeln(
+/** NAME an account — that does not connect it yet. */
+export const nameAccount = (login: string, signal?: AbortSignal) =>
+  act(
     "/github/me",
     { method: "POST", body: { login }, signal },
-    "fehler.kontoNichtAngenommen"
+    "errors.accountNotAccepted"
   );
 
 /**
- * Den Nachweis prüfen.
+ * Check the proof of ownership.
  *
- * Ohne Nachweis wäre ein Feld „mein GitHub-Name" eine Einladung, sich mit
- * fremder Arbeit zu schmücken. Der Beweis läuft über einen öffentlichen Gist —
- * dieselbe Form wie der Domain-Nachweis bei Unternehmen.
+ * Without it a field "my GitHub name" would be an invitation to adorn oneself
+ * with somebody else's work. The proof runs over a public gist — the same
+ * shape as the domain proof for companies.
  */
-export const pruefeNachweis = (signal?: AbortSignal) =>
-  handeln(
+export const verifyConnection = (signal?: AbortSignal) =>
+  act(
     "/github/me/verify",
     { method: "POST", signal },
-    "fehler.nachweisNichtGeprueft"
+    "errors.proofNotChecked"
   );
 
 /**
- * Die Repositories neu holen.
+ * Does this server offer signing in over GitHub?
  *
- * <strong>Nur auf Auslösung.</strong> Es läuft kein Abgleich im Hintergrund:
- * eine Plattform, die dauerhaft hinterhersieht, tut etwas anderes als eine, die
- * einmal auf Bitte hinsieht.
+ * A statement about the SETUP, not about a person. It is fetched while the
+ * page is viewed, because the page does not know beforehand whether to show a
+ * button or the gist instructions — and because, unlike `startOAuth`, it
+ * creates nothing.
  */
-/**
- * Bietet dieser Server die Anmeldung über GitHub an?
- *
- * Eine Aussage über die EINRICHTUNG, nicht über einen Menschen. Sie wird beim
- * Betrachten der Seite geholt, weil die Seite vorher nicht weiss, ob sie einen
- * Knopf oder die Gist-Anleitung zeigen soll — und weil sie, anders als
- * `anmeldungBeginnen`, nichts anlegt.
- */
-export async function anmeldungMoeglich(signal?: AbortSignal): Promise<boolean> {
+export async function isOAuthAvailable(signal?: AbortSignal): Promise<boolean> {
   const answer = await request<{ available?: boolean }>(
     GITHUB_BASE_URL,
     "/github/oauth",
@@ -138,15 +129,14 @@ export async function anmeldungMoeglich(signal?: AbortSignal): Promise<boolean> 
 }
 
 /**
- * Wohin der Browser für die Anmeldung bei GitHub geht.
+ * Where the browser goes to sign in at GitHub.
  *
- * NUR AUF KLICK. Der Aufruf legt eine Verbindung an, wenn es noch keine gibt —
- * beim blossen Betrachten der Seite entstünde sonst eine Zeile für jeden, der
- * einmal hereingeschaut hat.
+ * ON CLICK ONLY. The call creates a connection if there is none yet — merely
+ * viewing the page would otherwise leave a row for everyone who once looked in.
  *
- * `null` heisst: keine Anmeldung eingerichtet. Dann bleibt der Gist der Weg.
+ * `null` means: no sign-in configured. The gist then stays the way.
  */
-export async function anmeldungBeginnen(
+export async function startOAuth(
   signal?: AbortSignal
 ): Promise<string | null> {
   const answer = await request<{ url?: string | null }>(
@@ -158,28 +148,35 @@ export async function anmeldungBeginnen(
   return answer.ok ? (answer.value?.url ?? null) : null;
 }
 
-/** Die Rückkehr von GitHub: Einmalcode und Zustand einlösen. */
-export const anmeldungAbschliessen = (
+/** The return from GitHub: redeem the one-time code and the state. */
+export const finishOAuth = (
   code: string,
   state: string,
   signal?: AbortSignal
 ) =>
-  handeln(
+  act(
     "/github/me/oauth/finish",
     { method: "POST", body: { code, state }, signal },
-    "fehler.nachweisNichtGeprueft"
+    "errors.proofNotChecked"
   );
 
-export const holeNeu = (signal?: AbortSignal) =>
-  handeln("/github/me/refresh", { method: "POST", signal }, "fehler.nichtsGeholt");
+/**
+ * Fetch the repositories anew.
+ *
+ * <strong>Only when triggered.</strong> No reconciliation runs in the
+ * background: a platform that permanently watches does something different from
+ * one that looks once when asked.
+ */
+export const refreshRepositories = (signal?: AbortSignal) =>
+  act("/github/me/refresh", { method: "POST", signal }, "errors.nothingFetched");
 
-/** Die Verbindung trennen. */
-export async function trenne(signal?: AbortSignal): Promise<boolean> {
+/** Disconnect. */
+export async function disconnect(signal?: AbortSignal): Promise<boolean> {
   const answer = await request<void>(
     GITHUB_BASE_URL,
     "/github/me",
     { method: "DELETE", signal },
-    "fehler.verbindungNichtGetrennt"
+    "errors.disconnectFailed"
   );
 
   return answer.ok;

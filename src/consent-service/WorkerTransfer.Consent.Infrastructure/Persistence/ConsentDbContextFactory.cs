@@ -14,7 +14,7 @@ public static class ConsentDbContextFactory
     /// The one place tracking is switched off, so the container, the tests and
     /// <c>dotnet ef</c> cannot end up with different models.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource dataSource)
     {
@@ -27,11 +27,11 @@ public static class ConsentDbContextFactory
 
     /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
     /// <remarks>
-    /// Must configure exactly what <see cref="Konfiguriere"/> configures. A
+    /// Must configure exactly what <see cref="Configure"/> configures. A
     /// design-time model that differs from the running one produces migrations
     /// for changes nobody made — and, worse, none for changes somebody did.
     /// </remarks>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {

@@ -1,23 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>github_connections</c>.</summary>
+/// <summary>One row of <c>github_connections</c>.</summary>
 /// <remarks>
-/// Der Abzug liegt als jsonb daneben, nicht in einer eigenen Tabelle: er wird
-/// immer als Ganzes geschrieben und als Ganzes gelesen, nie einzeln abgefragt.
-/// Eine zweite Tabelle wäre ein Verbund für einen Wert, der nur zusammen Sinn
-/// ergibt — und eine Zeile je Repository wäre die Einladung, danach zu
-/// sortieren.
+/// The snapshot lies beside it as jsonb, not in a table of its own: it is
+/// always written as a whole and read as a whole, never queried individually. A
+/// second table would be a join for a value that only makes sense together —
+/// and one row per repository would be the invitation to sort by it.
 /// </remarks>
-public sealed class VerbindungsZeile
+public sealed class ConnectionRow
 {
-    /// <summary>Die Subjekt-Kennung. Sie <em>ist</em> der Schlüssel.</summary>
+    /// <summary>The subject id. It <em>is</em> the key.</summary>
     public Guid Id { get; set; }
 
-    /// <summary><c>null</c>: noch kein Konto genannt.</summary>
+    /// <summary><c>null</c>: no account named yet.</summary>
     public string? Login { get; set; }
 
     public string Challenge { get; set; } = string.Empty;
@@ -26,10 +25,10 @@ public sealed class VerbindungsZeile
 
     public DateTime? FetchedAt { get; set; }
 
-    /// <summary>Der Abzug, als jsonb.</summary>
+    /// <summary>The snapshot, as jsonb.</summary>
     public string Repositories { get; set; } = "[]";
 
-    /// <summary>Konnten fuer jedes Repository die Sprachen geholt werden?</summary>
+    /// <summary>Could the languages be fetched for every repository?</summary>
     public bool LanguagesComplete { get; set; } = true;
 
     public DateTime CreatedAt { get; set; }
@@ -37,52 +36,51 @@ public sealed class VerbindungsZeile
     public DateTime UpdatedAt { get; set; }
 }
 
-/// <summary>Die eine Tabelle, die dieser Dienst besitzt.</summary>
+/// <summary>The one table this service owns.</summary>
 /// <remarks>
-/// Keine Outbox: dieser Dienst verschickt nichts. Und keine Spalte, die einen
-/// Menschen zusammenfasst — kein Punktwert, kein Rang, keine abgeleitete
-/// Fähigkeit (ADR-0022).
+/// No outbox: this service sends nothing. And no column that summarises a human
+/// being — no score, no rank, no derived skill (ADR-0022).
 /// </remarks>
 public sealed class GitHubDbContext(DbContextOptions<GitHubDbContext> options)
     : DbContext(options)
 {
-    /// <summary>Die Verbindungen.</summary>
-    public DbSet<VerbindungsZeile> Verbindungen => Set<VerbindungsZeile>();
+    /// <summary>The connections.</summary>
+    public DbSet<ConnectionRow> Connections => Set<ConnectionRow>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<VerbindungsZeile>(entity =>
+        modelBuilder.Entity<ConnectionRow>(entity =>
         {
             entity.ToTable("github_connections");
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
-            entity.HasKey(zeile => zeile.Id);
-            entity.Property(zeile => zeile.Id).HasColumnName("id").ValueGeneratedNever();
-            // OHNE `IsRequired`: eine Verbindung, die über GitHubs Anmeldung
-            // entsteht, kennt ihr Konto noch nicht — den Namen meldet GitHub.
-            // Eine leere Zeichenkette statt `null` wäre ein Name, den es nicht
-            // gibt, und würde in jeder Abfrage mitgezählt.
-            entity.Property(zeile => zeile.Login)
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
+            entity.HasKey(row => row.Id);
+            entity.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+            // WITHOUT `IsRequired`: a connection that comes into being over
+            // GitHub's sign-in does not know its account yet — GitHub reports
+            // the name. An empty string instead of `null` would be a name that
+            // does not exist, and it would be counted in every query.
+            entity.Property(row => row.Login)
                 .HasColumnName("login")
-                .HasMaxLength(Verbindung.HoechstlaengeLogin);
-            entity.Property(zeile => zeile.Challenge)
+                .HasMaxLength(Connection.MaxLoginLength);
+            entity.Property(row => row.Challenge)
                 .HasColumnName("challenge").HasMaxLength(64).IsRequired();
-            entity.Property(zeile => zeile.VerifiedAt).HasColumnName("verified_at");
-            entity.Property(zeile => zeile.FetchedAt).HasColumnName("fetched_at");
-            entity.Property(zeile => zeile.Repositories)
+            entity.Property(row => row.VerifiedAt).HasColumnName("verified_at");
+            entity.Property(row => row.FetchedAt).HasColumnName("fetched_at");
+            entity.Property(row => row.Repositories)
                 .HasColumnName("repositories").HasColumnType("jsonb").IsRequired();
-            // Vorgabe `true`: bestehende Zeilen stammen aus einer Zeit, in der
-            // ohne Token gar keine Sprachen geholt wurden. `false` zu setzen
-            // waere ehrlicher fuer die Vergangenheit und laestiger fuer die
-            // Gegenwart — der naechste Abruf schreibt ohnehin den wahren Wert,
-            // und bis dahin behauptet die Zeile nichts, was sie nicht belegen
-            // koennte: sie zeigt schlicht, was sie hat.
-            entity.Property(zeile => zeile.LanguagesComplete)
+            // Default `true`: existing rows stem from a time in which no
+            // languages were fetched at all without a token. Setting `false`
+            // would be more honest about the past and more tiresome for the
+            // present — the next fetch writes the true value anyway, and until
+            // then the row asserts nothing it could not back up: it simply
+            // shows what it has.
+            entity.Property(row => row.LanguagesComplete)
                 .HasColumnName("languages_complete").HasDefaultValue(true).IsRequired();
-            entity.Property(zeile => zeile.CreatedAt).HasColumnName("created_at").IsRequired();
-            entity.Property(zeile => zeile.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            entity.Property(row => row.CreatedAt).HasColumnName("created_at").IsRequired();
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at").IsRequired();
         });
 
         base.OnModelCreating(modelBuilder);

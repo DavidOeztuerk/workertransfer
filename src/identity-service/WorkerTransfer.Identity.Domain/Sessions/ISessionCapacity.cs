@@ -15,18 +15,18 @@ namespace WorkerTransfer.Identity.Domain.Sessions;
 /// person's sign-in writes nothing here at all.
 /// </para>
 /// <para>
-/// <strong>Eine eigene Tabelle, weil Noelias Erneuerungstoken keine
-/// Mandantenspalte hat.</strong> Sie stand einmal als Übergangsschuld notiert;
-/// sie ist keine. Solange <c>NoeliaRefreshToken</c> die Spalte nicht bekommt,
-/// ist dies der Ort, an dem diese Frage beantwortet wird — und bekäme er sie,
-/// wäre das eine Entscheidung mit eigenem Commit, kein Aufräumen.
+/// <strong>A table of its own, because Noelia's refresh token has no tenant
+/// column.</strong> It once stood noted down as a migration debt; it is none.
+/// For as long as <c>NoeliaRefreshToken</c> does not get the column, this is
+/// the place where that question is answered — and were it to get one, that
+/// would be a decision with a commit of its own, not a tidy-up.
 /// </para>
 /// <para>
-/// <strong>Nicht wegzukürzen:</strong> die Mitgliedschaft wird bei
-/// <em>jeder</em> Erneuerung neu geprüft und nie aus dieser Zeile geglaubt.
-/// Einmal geprüft ist ein Nachweis genau einmal gut; wer hineingelassen wurde,
-/// bliebe sonst drin, solange er weiter erneuert — lange nachdem das
-/// Unternehmen ihn entfernt hat.
+/// <strong>Not to be shortened away:</strong> the membership is checked afresh
+/// at <em>every</em> refresh and never believed out of this row. Checked once
+/// is a proof that is good exactly once; whoever was let in would otherwise
+/// stay in for as long as they keep refreshing — long after the company
+/// removed them.
 /// </para>
 /// </remarks>
 public interface ISessionCapacity

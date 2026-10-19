@@ -1,59 +1,60 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { PaletteMode } from "@mui/material";
 
-const SPEICHER = "wt.colorMode";
-const SPRACHSPEICHER = "wt.language";
+// Stored in real browsers: renaming either string loses a visitor's choice.
+const COLOR_MODE_STORAGE_KEY = "wt.colorMode";
+const LANGUAGE_STORAGE_KEY = "wt.language";
 
 /**
- * Was die BESUCHERIN eingestellt hat — nicht, was das System vorgibt.
+ * What the VISITOR set — not what the system prescribes.
  *
- * `system` ist ein eigener Wert und nicht "hell": nur so lässt sich später
- * unterscheiden, ob jemand hell GEWÄHLT hat oder ob wir seinem Gerät folgen.
- * Wer das zusammenlegt, kann die Wahl nie wieder zurücknehmen.
+ * `system` is a value of its own and not "light": only that way can we later
+ * tell whether somebody CHOSE light or whether we follow their device. Whoever
+ * merges the two can never take the choice back again.
  */
 export type ColorPreference = PaletteMode | "system";
 
-/** Die Sprachen, die es gibt. Deutsch ist die Quelle, aus der übersetzt wurde. */
-export const SPRACHEN = ["de", "en", "fr"] as const;
+/** The languages there are. German is the source everything was translated from. */
+export const LANGUAGES = ["de", "en", "fr"] as const;
 
-export type Sprache = (typeof SPRACHEN)[number];
+export type Language = (typeof LANGUAGES)[number];
 
 /**
- * Was die BESUCHERIN gewählt hat — nicht, was ihr Gerät sagt.
+ * What the VISITOR chose — not what their device says.
  *
- * `system` ist ein eigener Wert, aus genau dem Grund, der oben beim Farbmodus
- * steht: wer es beim Start zu `de` zusammenfaltet, weil das Gerät gerade Deutsch
- * sagt, kann danach nie mehr unterscheiden, ob jemand Deutsch GEWÄHLT hat oder
- * ob wir nur folgen — und die Oberfläche folgt einem Wechsel der Systemsprache
- * nicht mehr (ADR-0031).
+ * `system` is a value of its own, for exactly the reason given above for the
+ * colour mode: whoever folds it into `de` at startup because the device happens
+ * to say German can never again tell whether somebody CHOSE German or whether
+ * we only follow — and the UI no longer follows a change of the system
+ * language (ADR-0031).
  */
-export type Sprachvorliebe = Sprache | "system";
+export type LanguagePreference = Language | "system";
 
 interface PreferencesState {
   colorMode: ColorPreference;
-  language: Sprachvorliebe;
+  language: LanguagePreference;
 }
 
 /**
- * `localStorage` kann werfen — im privaten Fenster, bei blockierten
- * Seitendaten, in einer Vorschau. Ein Fehler beim LESEN einer Vorliebe darf die
- * Anwendung nicht am Start hindern.
+ * `localStorage` can throw — in a private window, with blocked site data, in a
+ * preview. An error while READING a preference must not stop the application
+ * from starting.
  */
-function saved(): ColorPreference {
+function savedColorMode(): ColorPreference {
   try {
-    const value = localStorage.getItem(SPEICHER);
+    const value = localStorage.getItem(COLOR_MODE_STORAGE_KEY);
     return value === "light" || value === "dark" || value === "system" ? value : "system";
   } catch {
     return "system";
   }
 }
 
-/** Wie <see cref="gespeichert"/>, und aus denselben Gründen fehlertolerant. */
-function gespeicherteSprache(): Sprachvorliebe {
+/** Like `savedColorMode()`, and fault-tolerant for the same reasons. */
+function savedLanguage(): LanguagePreference {
   try {
-    const value = localStorage.getItem(SPRACHSPEICHER);
-    return value === "system" || SPRACHEN.includes(value as Sprache)
-      ? (value as Sprachvorliebe)
+    const value = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return value === "system" || LANGUAGES.includes(value as Language)
+      ? (value as LanguagePreference)
       : "system";
   } catch {
     return "system";
@@ -61,66 +62,66 @@ function gespeicherteSprache(): Sprachvorliebe {
 }
 
 /**
- * Was das Gerät sagt, auf eine Sprache abgebildet, die es hier gibt.
+ * What the device says, mapped onto a language that exists here.
  *
- * `navigator.language` liefert `de-AT`, `fr-CA`, `en-GB` — die Region
- * interessiert hier nicht, nur die Sprache. Was nicht dabei ist, wird Deutsch:
- * das ist die Quellsprache, und ein Text in der Quelle ist besser als einer, der
- * gar nicht da ist.
+ * `navigator.language` yields `de-AT`, `fr-CA`, `en-GB` — the region does not
+ * matter here, only the language. Whatever is not among them becomes German:
+ * that is the source language, and a text in the source is better than one
+ * that is not there at all.
  */
-export function spracheDesGeraets(): Sprache {
+export function deviceLanguage(): Language {
   const raw = typeof navigator === "undefined" ? "" : (navigator.language ?? "");
-  const nur = raw.toLowerCase().split("-")[0];
+  const bare = raw.toLowerCase().split("-")[0];
 
-  return SPRACHEN.includes(nur as Sprache) ? (nur as Sprache) : "de";
+  return LANGUAGES.includes(bare as Language) ? (bare as Language) : "de";
 }
 
 /**
- * Hat dieses GERÄT schon einmal eine Sprache gewählt?
+ * Has this DEVICE ever chosen a language?
  *
- * Der Unterschied zu <c>gespeicherteSprache()</c> ist der ganze Punkt: die gibt
- * „system" zurück, wenn nichts gespeichert ist UND wenn jemand „Wie mein Gerät"
- * gewählt hat. Für die Frage „darf die Kontosprache das hier überschreiben?"
- * sind das zwei verschiedene Fälle, und nur `null` heisst „nie gewählt".
+ * The difference to `savedLanguage()` is the whole point: that one returns
+ * "system" when nothing is stored AND when somebody chose "like my device".
+ * For the question "may the account language override this?" those are two
+ * different cases, and only `null` means "never chosen".
  */
-export function hatEigeneSprachwahl(): boolean {
+export function hasOwnLanguageChoice(): boolean {
   try {
-    return localStorage.getItem(SPRACHSPEICHER) !== null;
+    return localStorage.getItem(LANGUAGE_STORAGE_KEY) !== null;
   } catch {
-    // Nicht lesen zu können heisst nicht „nie gewählt": in dem Fall ist gar
-    // nichts bekannt, und die Kontosprache ist die bessere Auskunft.
+    // Not being able to read does not mean "never chosen": in that case
+    // nothing is known at all, and the account language is the better answer.
     return false;
   }
 }
 
-/** Welche Sprache wirklich gezeichnet wird. */
-export function aufgeloest(vorliebe: Sprachvorliebe): Sprache {
-  return vorliebe === "system" ? spracheDesGeraets() : vorliebe;
+/** Which language is actually drawn. */
+export function resolveLanguage(preference: LanguagePreference): Language {
+  return preference === "system" ? deviceLanguage() : preference;
 }
 
 const preferencesSlice = createSlice({
   name: "preferences",
   initialState: {
-    colorMode: saved(),
-    language: gespeicherteSprache(),
+    colorMode: savedColorMode(),
+    language: savedLanguage(),
   } as PreferencesState,
   reducers: {
     colorModeSet(state, action: PayloadAction<ColorPreference>) {
       state.colorMode = action.payload;
       try {
-        localStorage.setItem(SPEICHER, action.payload);
+        localStorage.setItem(COLOR_MODE_STORAGE_KEY, action.payload);
       } catch {
-        // Nicht schreiben zu können ist unangenehm, aber kein Grund, die
-        // Umschaltung für diese Sitzung zu verweigern.
+        // Not being able to write is unpleasant, but no reason to refuse the
+        // switch for this session.
       }
     },
 
-    languageSet(state, action: PayloadAction<Sprachvorliebe>) {
+    languageSet(state, action: PayloadAction<LanguagePreference>) {
       state.language = action.payload;
       try {
-        localStorage.setItem(SPRACHSPEICHER, action.payload);
+        localStorage.setItem(LANGUAGE_STORAGE_KEY, action.payload);
       } catch {
-        // Siehe oben.
+        // See above.
       }
     },
   },

@@ -6,20 +6,20 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace WorkerTransfer.Outbox.Tests;
 
 /// <summary>A delivery a test can steer.</summary>
-public sealed class Probezustellung : IZustellung
+public sealed class ProbeDelivery : IDelivery
 {
-    private readonly Func<SubjectId, string, Task> _verhalten;
+    private readonly Func<SubjectId, string, Task> _behavior;
 
-    public Probezustellung(Func<SubjectId, string, Task>? verhalten = null) =>
-        _verhalten = verhalten ?? ((_, _) => Task.CompletedTask);
+    public ProbeDelivery(Func<SubjectId, string, Task>? behavior = null) =>
+        _behavior = behavior ?? ((_, _) => Task.CompletedTask);
 
-    public List<(SubjectId Empfaenger, string Art)> Zugestellt { get; } = [];
+    public List<(SubjectId Recipient, string Kind)> Delivered { get; } = [];
 
-    public async Task ZustelleAsync(
-        SubjectId empfaenger, string art, CancellationToken cancellationToken = default)
+    public async Task DeliverAsync(
+        SubjectId recipient, string kind, CancellationToken cancellationToken = default)
     {
-        await _verhalten(empfaenger, art);
-        Zugestellt.Add((empfaenger, art));
+        await _behavior(recipient, kind);
+        Delivered.Add((recipient, kind));
     }
 }
 
@@ -27,46 +27,46 @@ public sealed class Probezustellung : IZustellung
 [Collection(PostgresCollection.Name)]
 public class OutboxTests(Postgres postgres)
 {
-    private Kontextfabrik Fabrik() => new(postgres.ConnectionString);
+    private ContextFactory Factory() => new(postgres.ConnectionString);
 
     /// <summary>
     /// A dispatcher with a context of its own — the way the loop builds one per
     /// pass, from a scope of its own.
     /// </summary>
-    private OutboxZusteller<ProbeKontext> Zusteller(
-        ProbeKontext kontext,
-        IZustellung zustellung,
-        OutboxEinstellungen? einstellungen = null) =>
-        new(kontext, zustellung, TimeProvider.System,
-            NullLogger<OutboxZusteller<ProbeKontext>>.Instance, einstellungen);
+    private OutboxDispatcher<ProbeContext> Dispatcher(
+        ProbeContext context,
+        IDelivery delivery,
+        OutboxSettings? settings = null) =>
+        new(context, delivery, TimeProvider.System,
+            NullLogger<OutboxDispatcher<ProbeContext>>.Instance, settings);
 
-    private async Task<(int Faellig, int Zugestellt)> Durchlauf(
-        IZustellung zustellung, OutboxEinstellungen? einstellungen = null)
+    private async Task<(int Due, int Delivered)> Pass(
+        IDelivery delivery, OutboxSettings? settings = null)
     {
-        await using var kontext = Fabrik().CreateDbContext();
-        return await Zusteller(kontext, zustellung, einstellungen).DurchlaufAsync();
+        await using var context = Factory().CreateDbContext();
+        return await Dispatcher(context, delivery, settings).PassAsync();
     }
 
-    private async Task<SubjectId> Vermerke(string art, int wie_viele = 1)
+    private async Task<SubjectId> RecordIntent(string kind, int howMany = 1)
     {
-        var wer = SubjectId.New();
+        var subject = SubjectId.New();
 
-        await using var kontext = Fabrik().CreateDbContext();
-        var outbox = new EfOutbox<ProbeKontext>(kontext, TimeProvider.System);
+        await using var context = Factory().CreateDbContext();
+        var outbox = new EfOutbox<ProbeContext>(context, TimeProvider.System);
 
-        for (var i = 0; i < wie_viele; i++)
+        for (var i = 0; i < howMany; i++)
         {
-            await outbox.VermerkeAsync(wer, art);
+            await outbox.NoteAsync(subject, kind);
         }
 
-        await kontext.SaveChangesAsync();
-        return wer;
+        await context.SaveChangesAsync();
+        return subject;
     }
 
-    private async Task<OutboxZeile> Zeile(SubjectId wer)
+    private async Task<OutboxRow> Row(SubjectId subject)
     {
-        await using var kontext = Fabrik().CreateDbContext();
-        return await kontext.Set<OutboxZeile>().SingleAsync(z => z.UserId == wer.Value);
+        await using var context = Factory().CreateDbContext();
+        return await context.Set<OutboxRow>().SingleAsync(row => row.UserId == subject.Value);
     }
 
     /// <summary>
@@ -75,36 +75,36 @@ public class OutboxTests(Postgres postgres)
     /// database would hold nothing of the sort.
     /// </summary>
     [Fact]
-    public async Task Ein_Rollback_nimmt_die_Absicht_mit()
+    public async Task A_rollback_takes_the_intent_with_it()
     {
-        var wer = SubjectId.New();
+        var subject = SubjectId.New();
 
-        await using (var kontext = Fabrik().CreateDbContext())
+        await using (var context = Factory().CreateDbContext())
         {
-            await using var klammer = await kontext.Database.BeginTransactionAsync();
-            await new EfOutbox<ProbeKontext>(kontext, TimeProvider.System)
-                .VermerkeAsync(wer, "transfer.accepted");
-            await kontext.SaveChangesAsync();
-            await klammer.RollbackAsync();
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await new EfOutbox<ProbeContext>(context, TimeProvider.System)
+                .NoteAsync(subject, "transfer.accepted");
+            await context.SaveChangesAsync();
+            await transaction.RollbackAsync();
         }
 
-        await using var gelesen = Fabrik().CreateDbContext();
-        (await gelesen.Set<OutboxZeile>().CountAsync(z => z.UserId == wer.Value))
+        await using var readBack = Factory().CreateDbContext();
+        (await readBack.Set<OutboxRow>().CountAsync(row => row.UserId == subject.Value))
             .Should().Be(0);
     }
 
     [Fact]
-    public async Task Eine_vermerkte_Absicht_wird_zugestellt_und_abgehakt()
+    public async Task A_recorded_intent_is_delivered_and_ticked_off()
     {
-        var wer = await Vermerke("transfer.accepted");
-        var zustellung = new Probezustellung();
+        var subject = await RecordIntent("transfer.accepted");
+        var delivery = new ProbeDelivery();
 
-        var (faellig, zugestellt) = await Durchlauf(zustellung);
+        var (due, delivered) = await Pass(delivery);
 
-        faellig.Should().BeGreaterThan(0);
-        zugestellt.Should().BeGreaterThan(0);
-        zustellung.Zugestellt.Should().Contain((wer, "transfer.accepted"));
-        (await Zeile(wer)).DeliveredAt.Should().NotBeNull();
+        due.Should().BeGreaterThan(0);
+        delivered.Should().BeGreaterThan(0);
+        delivery.Delivered.Should().Contain((subject, "transfer.accepted"));
+        (await Row(subject)).DeliveredAt.Should().NotBeNull();
     }
 
     /// <summary>
@@ -113,19 +113,19 @@ public class OutboxTests(Postgres postgres)
     /// ends up in every backup.
     /// </summary>
     [Fact]
-    public async Task Ein_Fehlschlag_zaehlt_hoch_und_speichert_nur_die_Fehlerart()
+    public async Task A_failure_counts_up_and_stores_only_the_kind_of_failure()
     {
-        var wer = await Vermerke("transfer.accepted");
-        var zustellung = new Probezustellung((_, _) =>
-            throw new HttpRequestException("Anna Müller, geboren 1984, wohnhaft ..."));
+        var subject = await RecordIntent("transfer.accepted");
+        var delivery = new ProbeDelivery((_, _) =>
+            throw new HttpRequestException("Anna Example, born 1984, living at ..."));
 
-        await Durchlauf(zustellung);
+        await Pass(delivery);
 
-        var zeile = await Zeile(wer);
-        zeile.Attempts.Should().Be(1);
-        zeile.DeliveredAt.Should().BeNull();
-        zeile.LastError.Should().Be("HttpRequestException");
-        zeile.LastError.Should().NotContain("Anna");
+        var row = await Row(subject);
+        row.Attempts.Should().Be(1);
+        row.DeliveredAt.Should().BeNull();
+        row.LastError.Should().Be("HttpRequestException");
+        row.LastError.Should().NotContain("Anna");
     }
 
     /// <summary>
@@ -133,21 +133,21 @@ public class OutboxTests(Postgres postgres)
     /// next tick IS how the order of ADR-0027 §6 is kept.
     /// </summary>
     [Fact]
-    public async Task Noch_nicht_verbraucht_keinen_Versuch()
+    public async Task Not_yet_spends_no_attempt()
     {
-        var wer = await Vermerke("erasure:final");
-        var zustellung = new Probezustellung(
-            (_, _) => throw new NochNichtException("erst quittieren lassen"));
+        var subject = await RecordIntent("erasure:final");
+        var delivery = new ProbeDelivery(
+            (_, _) => throw new NotYetException("acknowledge first"));
 
-        var (faellig, zugestellt) = await Durchlauf(zustellung);
+        var (due, delivered) = await Pass(delivery);
 
-        faellig.Should().BeGreaterThan(0);
-        zugestellt.Should().Be(0);
+        due.Should().BeGreaterThan(0);
+        delivered.Should().Be(0);
 
-        var zeile = await Zeile(wer);
-        zeile.Attempts.Should().Be(0, "geordnetes Warten ist kein Fehlschlag");
-        zeile.LastError.Should().BeEmpty();
-        zeile.DeliveredAt.Should().BeNull();
+        var row = await Row(subject);
+        row.Attempts.Should().Be(0, "waiting one's turn is not a failure");
+        row.LastError.Should().BeEmpty();
+        row.DeliveredAt.Should().BeNull();
     }
 
     /// <summary>
@@ -155,20 +155,20 @@ public class OutboxTests(Postgres postgres)
     /// state this table abolishes.
     /// </summary>
     [Fact]
-    public async Task Nach_der_Obergrenze_bleibt_die_Zeile_liegen_statt_zu_verschwinden()
+    public async Task After_the_ceiling_the_row_stays_lying_instead_of_vanishing()
     {
-        var wer = await Vermerke("transfer.accepted");
-        var zustellung = new Probezustellung((_, _) => throw new HttpRequestException("weg"));
-        var einstellungen = new OutboxEinstellungen { HoechsteVersuche = 2 };
+        var subject = await RecordIntent("transfer.accepted");
+        var delivery = new ProbeDelivery((_, _) => throw new HttpRequestException("gone"));
+        var settings = new OutboxSettings { MaxAttempts = 2 };
 
         for (var i = 0; i < 5; i++)
         {
-            await Durchlauf(zustellung, einstellungen);
+            await Pass(delivery, settings);
         }
 
-        var zeile = await Zeile(wer);
-        zeile.Attempts.Should().Be(2, "danach ist sie nicht mehr fällig");
-        zeile.DeliveredAt.Should().BeNull();
+        var row = await Row(subject);
+        row.Attempts.Should().Be(2, "after that it is no longer due");
+        row.DeliveredAt.Should().BeNull();
     }
 
     /// <summary>
@@ -176,20 +176,20 @@ public class OutboxTests(Postgres postgres)
     /// exists against: a promise nobody redeems, and nobody sees it.
     /// </summary>
     [Fact]
-    public async Task Ohne_Obergrenze_bleibt_die_Zeile_faellig()
+    public async Task Without_a_ceiling_the_row_stays_due()
     {
-        var wer = await Vermerke("erasure:consent");
-        var zustellung = new Probezustellung((_, _) => throw new HttpRequestException("tot"));
-        var einstellungen = new OutboxEinstellungen { HoechsteVersuche = null };
+        var subject = await RecordIntent("erasure:consent");
+        var delivery = new ProbeDelivery((_, _) => throw new HttpRequestException("dead"));
+        var settings = new OutboxSettings { MaxAttempts = null };
 
         for (var i = 0; i < 12; i++)
         {
-            await Durchlauf(zustellung, einstellungen);
+            await Pass(delivery, settings);
         }
 
-        var zeile = await Zeile(wer);
-        zeile.Attempts.Should().Be(12, "wer nie aufgibt, bleibt fällig");
-        zeile.DeliveredAt.Should().BeNull();
+        var row = await Row(subject);
+        row.Attempts.Should().Be(12, "whoever never gives up stays due");
+        row.DeliveredAt.Should().BeNull();
     }
 
     /// <summary>
@@ -203,28 +203,28 @@ public class OutboxTests(Postgres postgres)
     /// passes can hang instead of failing, and a hanging test says nothing.
     /// </remarks>
     [Fact]
-    public async Task Gesperrte_Zeilen_werden_uebersprungen_statt_doppelt_zugestellt()
+    public async Task Locked_rows_are_skipped_instead_of_delivered_twice()
     {
-        await Vermerke("transfer.accepted", wie_viele: 5);
+        await RecordIntent("transfer.accepted", howMany: 5);
 
-        await using var konkurrent = Fabrik().CreateDbContext();
-        await using var klammer = await konkurrent.Database.BeginTransactionAsync();
+        await using var competitor = Factory().CreateDbContext();
+        await using var transaction = await competitor.Database.BeginTransactionAsync();
 
-        var gesperrt = await konkurrent.Set<OutboxZeile>()
+        var locked = await competitor.Set<OutboxRow>()
             .FromSqlRaw(
                 "SELECT * FROM \"outbox\" WHERE delivered_at IS NULL "
                 + "ORDER BY created_at FOR UPDATE SKIP LOCKED")
             .ToListAsync();
 
-        gesperrt.Should().NotBeEmpty("sonst prüft der Test nichts");
+        locked.Should().NotBeEmpty("otherwise the test checks nothing");
 
-        var zustellung = new Probezustellung();
-        var (faellig, zugestellt) = await Durchlauf(zustellung);
+        var delivery = new ProbeDelivery();
+        var (due, delivered) = await Pass(delivery);
 
-        faellig.Should().Be(0, "die gesperrten Zeilen gehören dem anderen Durchlauf");
-        zugestellt.Should().Be(0);
-        zustellung.Zugestellt.Should().BeEmpty();
+        due.Should().Be(0, "the locked rows belong to the other pass");
+        delivered.Should().Be(0);
+        delivery.Delivered.Should().BeEmpty();
 
-        await klammer.RollbackAsync();
+        await transaction.RollbackAsync();
     }
 }

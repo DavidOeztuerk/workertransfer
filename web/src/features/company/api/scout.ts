@@ -1,33 +1,33 @@
-// Die Suche nach Menschen — scout-service, nicht mehr profile-service.
+// The search for people — scout-service, no longer profile-service.
 //
-// <strong>`GET /scout/candidates`.</strong> Der Vorgänger war `GET /candidates`
-// bei profile-service; er ist am 11.09.2026 mit dieser Datei gefallen
-// (ADR-0036). Zwei Suchen nebeneinander wären zwei Wahrheiten gewesen.
+// <strong>`GET /scout/candidates`.</strong> The predecessor was
+// `GET /candidates` at profile-service; it fell with this file on 11.09.2026
+// (ADR-0036). Two searches side by side would have been two truths.
 //
-// <strong>Die Häkchen und die Belege kommen VOM SERVER</strong>, nicht aus einer
-// Rechnung hier. Das ist Entscheidung 3 des ADR und keine Geschmacksfrage: läge
-// die Liste nur in der Oberfläche, rechnete der Browser sich aus den Rohdaten
-// eine Zahl — und ADR-0022 wäre durch die Hintertür da.
+// <strong>The ticks and the evidence come FROM THE SERVER</strong>, not from a
+// calculation here. That is decision 3 of the ADR and no matter of taste: if
+// the list lay only in the UI, the browser would compute a number from the raw
+// data — and ADR-0022 would be back through the back door.
 
 import { request } from "../../../core/api/client";
 import { SCOUT_BASE_URL } from "../../../env";
-import { type Fehlschlag, deuten } from "../../../shared/api/fehler";
+import { type Failure, interpretError } from "../../../shared/api/errors";
 
-/** Ein Haken: ein gesuchtes Wort und ein Ja oder Nein. */
-export interface Haken {
+/** A tick: a searched word and a yes or no. */
+export interface Tick {
   word: string;
-  /** Ob die Person dieses Wort selbst genannt hat. */
+  /** Whether the person named this word themselves. */
   named: boolean;
 }
 
 /**
- * Ein Beleg mit Herkunft und Link.
+ * A piece of evidence with origin and link.
  *
- * `origin` ist `topic` oder `language`: ein Topic hat ein Mensch an das
- * Repository geschrieben, einen Sprachnamen hat GitHub erkannt. Ohne die
- * Angabe läse sich beides wie eine Aussage über die Person.
+ * `origin` is `topic` or `language`: a topic was written onto the repository by
+ * a human, a language name was recognised by GitHub. Without the statement both
+ * would read like a statement about the person.
  */
-export interface Beleg {
+export interface Evidence {
   word: string;
   origin: "topic" | "language";
   project: string;
@@ -35,119 +35,119 @@ export interface Beleg {
 }
 
 /**
- * Was der Server über die Vollständigkeit der Belege sagt.
+ * What the server says about the completeness of the evidence.
  *
- * Ein Wort und kein Satz — die Oberfläche formuliert in der Sprache der
- * lesenden Person (ADR-0031). `none_released` und `unavailable` sind
- * ausdrücklich verschieden: „hier steht nichts" ist kein Urteil, „wir wissen es
- * gerade nicht" ist überhaupt keine Aussage über die Person.
+ * A word and not a sentence — the UI phrases it in the reading person's
+ * language (ADR-0031). `none_released` and `unavailable` are explicitly
+ * different: "nothing stands here" is no judgement, "we do not know right now"
+ * is no statement about the person at all.
  */
-export type Belegstand = "complete" | "none_released" | "partial" | "unavailable";
+export type EvidenceState = "complete" | "none_released" | "partial" | "unavailable";
 
 /**
- * Das Häkchen zur Entfernung (ADR-0041).
+ * The tick for the distance (ADR-0041).
  *
- * `unsaid` ist KEIN Nein. Es heisst: die Person hat nichts gesagt, oder es
- * wurde keine Stelle gewählt, oder ein Ort ist dem Server unbekannt. Wer nichts
- * gesagt hat, bekommt kein Kreuz.
+ * `unsaid` is NOT a no. It means: the person said nothing, or no job was
+ * chosen, or a place is unknown to the server. Whoever said nothing gets no
+ * cross.
  */
-export type Erreichbarkeit = "reachable" | "further" | "unsaid";
+export type AvailabilityState = "reachable" | "further" | "unsaid";
 
-/** Ein Mensch, der gefunden wurde. Ohne Punktwert, ohne Rang, ohne Prozent. */
-export interface Treffer {
+/** A person who was found. Without a score, without a rank, without a percentage. */
+export interface Hit {
   subject_id: string;
   headline: string;
   bio: string;
   location: string;
   remote_ok: boolean;
-  /** Was die Person selbst genannt hat. */
+  /** What the person named themselves. */
   named: string[];
-  /** Ein Haken je gesuchtem Wort — nie eine Summe darüber. */
-  checks: Haken[];
-  evidence: Beleg[];
-  evidence_state: Belegstand;
-  /** Drei Worte, nie eine Kilometerzahl — die reist gar nicht erst mit. */
-  reach: Erreichbarkeit;
-  /** Was die Person gesagt hat, oder `null`. */
+  /** One tick per searched word — never a sum over them. */
+  checks: Tick[];
+  evidence: Evidence[];
+  evidence_state: EvidenceState;
+  /** Three words, never a kilometre figure — that does not even travel along. */
+  reach: AvailabilityState;
+  /** What the person said, or `null`. */
   reach_commute: string | null;
-  /** Was die Stelle verlangt, oder `null`. */
+  /** What the job demands, or `null`. */
   reach_attendance: string | null;
 }
 
-export interface Suchfilter {
+export interface SearchFilter {
   /**
-   * Mit ODER verknüpft, und das ist der Grund, warum die Häkchen etwas sagen:
-   * unter UND erfüllte jeder Treffer alles Gesuchte, jeder Haken wäre gesetzt,
-   * und „welche Fähigkeit fehlt" hätte keine Antwort.
+   * Joined with OR, and that is the reason the ticks say something: under AND
+   * every hit would satisfy everything searched, every tick would be set, and
+   * "which skill is missing" would have no answer.
    */
   skills: string[];
   location: string;
-  /** Nur `true` filtert. Es gibt kein „nur ohne Remote" — siehe Server. */
+  /** Only `true` filters. There is no "only without remote" — see the server. */
   remoteOnly: boolean;
 }
 
-export const OHNE_FILTER: Suchfilter = { skills: [], location: "", remoteOnly: false };
+export const NO_FILTER: SearchFilter = { skills: [], location: "", remoteOnly: false };
 
-export type ScoutFehler = "no-company" | "unauthenticated" | "consent-unavailable" | "offline";
+export type ScoutError = "no-company" | "unauthenticated" | "consent-unavailable" | "offline";
 
-export type Trefferseite =
-  | { ok: true; items: Treffer[]; nextCursor: string | null }
-  | Fehlschlag<ScoutFehler>;
+export type HitPage =
+  | { ok: true; items: Hit[]; nextCursor: string | null }
+  | Failure<ScoutError>;
 
 /**
- * Die Filter wandern in die URL, nicht in den Cursor.
+ * The filters travel into the URL, not into the cursor.
  *
- * Ein Cursor, der Suchbedingungen einpackt, ist ein zweiter Ort, an dem die
- * Abfrage steht — und beim ersten Mal, wenn beide auseinanderlaufen, blättert
- * jemand still durch die falsche Menge.
+ * A cursor that packs search conditions is a second place where the query
+ * stands — and the first time both drift apart, someone silently pages through
+ * the wrong set.
  */
 export function scoutQuery(
   cursor?: string,
-  filter: Suchfilter = OHNE_FILTER,
-  stelle?: string
+  filter: SearchFilter = NO_FILTER,
+  jobId?: string
 ): string {
   const params = new URLSearchParams();
   if (cursor !== undefined && cursor !== "") params.set("cursor", cursor);
-  // Die Stelle FILTERT NICHT (ADR-0041): sie fuegt jedem Treffer eine Auskunft
-  // hinzu und nimmt keinen weg. Sie steht deshalb neben den Filtern und nicht
-  // unter ihnen.
-  if (stelle !== undefined && stelle !== "") params.set("stelle", stelle);
+  // The job DOES NOT FILTER (ADR-0041): it adds a statement to every hit and
+  // takes none away. That is why it stands beside the filters and not among
+  // them. The query key `stelle` is the wire contract with scout-service.
+  if (jobId !== undefined && jobId !== "") params.set("stelle", jobId);
   for (const skill of filter.skills) {
     const trimmed = skill.trim();
     if (trimmed !== "") params.append("skill", trimmed);
   }
   if (filter.location.trim() !== "") params.set("location", filter.location.trim());
-  // `remote=false` wird gar nicht erst gesendet: es wäre kein Filter, sondern
-  // Rauschen in der URL.
+  // `remote=false` is not even sent: it would be no filter but noise in the
+  // URL.
   if (filter.remoteOnly) params.set("remote", "true");
   const query = params.toString();
   return query === "" ? "" : `?${query}`;
 }
 
 /**
- * Eine Seite Treffer — nur für Unternehmen.
+ * A page of hits — for companies only.
  *
- * <strong>`next` und nicht `next_cursor`.</strong> Der Vorgänger las
- * `next_cursor`, der Server schrieb `next`: der Zeiger war damit IMMER `null`,
- * der Knopf „mehr laden" erschien nie, und die Kandidatenliste hatte keinen Weg
- * auf Seite 2. Gemessen und in `SCOUT-UND-BERATER-BESTAND.md` als offene Lücke
- * notiert — die Ursache war ein Feldname.
+ * <strong>`next` and not `next_cursor`.</strong> The predecessor read
+ * `next_cursor`, the server wrote `next`: the cursor was therefore ALWAYS
+ * `null`, the "load more" button never appeared, and the candidate list had no
+ * way to page 2. Measured and noted as an open gap in
+ * `SCOUT-UND-BERATER-BESTAND.md` — the cause was a field name.
  *
- * Die Gründe sind unterscheidbar, weil die Seite auf jeden davon anders
- * antwortet: „kein Unternehmen aktiv" ist behebbar (umschalten), „Ledger
- * schweigt" ist es nicht, und eine leere Seite ist überhaupt kein Fehler.
+ * The reasons can be told apart because the page answers each of them
+ * differently: "no company active" can be fixed (switch), "ledger silent"
+ * cannot, and an empty page is no error at all.
  */
-export async function sucheKandidaten(
+export async function searchCandidates(
   cursor?: string,
-  filter: Suchfilter = OHNE_FILTER,
+  filter: SearchFilter = NO_FILTER,
   signal?: AbortSignal,
-  stelle?: string
-): Promise<Trefferseite> {
-  const answer = await request<{ items?: Treffer[]; next?: string | null }>(
+  jobId?: string
+): Promise<HitPage> {
+  const answer = await request<{ items?: Hit[]; next?: string | null }>(
     SCOUT_BASE_URL,
-    `/scout/candidates${scoutQuery(cursor, filter, stelle)}`,
+    `/scout/candidates${scoutQuery(cursor, filter, jobId)}`,
     { signal },
-    "fehler.listeNichtGeladen2"
+    "errors.listNotLoaded2"
   );
   if (answer.ok) {
     return {
@@ -156,26 +156,26 @@ export async function sucheKandidaten(
       nextCursor: answer.value?.next ?? null,
     };
   }
-  return deuten<ScoutFehler>(
+  return interpretError<ScoutError>(
     answer.error,
     {
-      0: { reason: "offline", titel: "fehler.keineVerbindung" },
+      0: { reason: "offline", titleKey: "errors.noConnection" },
       401: {
         reason: "unauthenticated",
-        titel: "fehler.sitzungAbgelaufen",
-        text: "fehler.erneutAnmelden",
+        titleKey: "errors.sessionExpired",
+        detailKey: "errors.signInAgain",
       },
       403: {
         reason: "no-company",
-        titel: "fehler.nurFirmenProfile",
-        text: "fehler.firmaWaehlen",
+        titleKey: "errors.onlyCompaniesSeeProfiles",
+        detailKey: "errors.chooseCompany",
       },
-      // NICHT als leere Liste zeigen: das wäre die Behauptung, niemand habe
-      // freigegeben — und genau das weiß in diesem Moment niemand.
+      // NOT shown as an empty list: that would be the claim that nobody
+      // released anything — and exactly that nobody knows at this moment.
       503: {
         reason: "consent-unavailable",
-        titel: "fehler.ledgerSchweigt",
-        text: "fehler.spaeterErneut",
+        titleKey: "errors.ledgerSilent",
+        detailKey: "errors.tryLater",
       },
     },
     "offline"

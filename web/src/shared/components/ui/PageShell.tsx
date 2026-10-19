@@ -3,11 +3,11 @@ import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
 
 /**
- * Der Rahmen einer Inhaltsseite: Titel, ein erklärender Satz, der Inhalt.
+ * The frame of a content page: title, one explanatory sentence, the content.
  *
- * Der `lead` ist kein Zierstreifen. Diese Anwendung entscheidet über Freigaben,
- * und fast jede Seite muss sagen, WAS mit dem passiert, was jemand hier tut.
- * Ein fester Platz dafür sorgt dafür, dass der Satz nicht vergessen wird.
+ * The `lead` is no decorative strip. This application decides about releases,
+ * and almost every page has to say WHAT happens to what somebody does here. A
+ * fixed place for it makes sure the sentence is not forgotten.
  */
 export function PageShell({
   title,
@@ -19,19 +19,19 @@ export function PageShell({
   title: string;
   lead?: string;
   actions?: React.ReactNode;
-  /** Formular- oder Kartenseite statt Liste/Tabelle: etwas schmaler. */
+  /** A form or card page instead of a list/table: somewhat narrower. */
   narrow?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Container
-      // Eigene Breiten statt MUIs `sm`/`lg` (600/1200): die lagen um das
-      // Doppelte auseinander, und der Rahmen sprang beim Blättern. Diese
-      // beiden trennt ein Fünftel. Die Textspalte ist unten auf 62ch begrenzt.
+      // Widths of our own instead of MUI's `sm`/`lg` (600/1200): those lay a
+      // factor of two apart, and the frame jumped while paging. These two are
+      // a fifth apart. The text column below is limited to 62ch.
       maxWidth={false}
-      // Unten weniger als oben, und das ist Absicht: über dem Titel schafft
-      // Luft den Anfang, unter dem letzten Element ist sie nur Leere vor der
-      // Fusszeile.
+      // Less at the bottom than at the top, on purpose: above the title the
+      // air makes the beginning, below the last element it is only emptiness
+      // before the footer.
       sx={{
         maxWidth: narrow ? 960 : 1160,
         pt: { xs: 4, md: 7 },

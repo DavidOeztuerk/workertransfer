@@ -10,7 +10,7 @@ namespace WorkerTransfer.Consent.Infrastructure.Persistence;
 /// Note what is absent here too: no update, no delete. The port offers neither,
 /// and neither does this.
 /// </remarks>
-public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
+public sealed class EfConsentLedger(ConsentDbContext context) : IConsentLedger
 {
     /// <summary>
     /// The reduction, once, as SQL — and the only definition of "newest".
@@ -33,7 +33,7 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
     /// by field where Postgres orders by byte.
     /// </para>
     /// </remarks>
-    private const string Neueste = """
+    private const string Latest = """
         SELECT DISTINCT ON (subject_id, capability)
                id, event_id, subject_id, capability, action, actor_id, reason, metadata,
                recorded_at
@@ -41,70 +41,70 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
         WHERE
         """;
 
-    private const string Ordnung = """
+    private const string Ordering = """
         ORDER BY subject_id, capability, recorded_at DESC, event_id DESC
         """;
 
     /// <inheritdoc />
-    public async Task AnhaengenAsync(
-        ConsentEvent ereignis, CancellationToken cancellationToken = default)
+    public async Task AttachAsync(
+        ConsentEvent consentEvent, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(ereignis);
+        ArgumentNullException.ThrowIfNull(consentEvent);
 
-        kontext.ConsentEvents.Add(new ConsentEventRow
+        context.ConsentEvents.Add(new ConsentEventRow
         {
-            EventId = ereignis.EventId,
-            SubjectId = ereignis.Subject.Value,
-            Capability = ereignis.Capability.Value,
-            Action = ereignis.Action,
-            ActorId = ereignis.Actor?.Value,
-            Reason = ereignis.Reason?.Value,
-            Metadata = JsonSerializer.Serialize(ereignis.Metadata),
-            RecordedAt = ereignis.RecordedAt.UtcDateTime
+            EventId = consentEvent.EventId,
+            SubjectId = consentEvent.Subject.Value,
+            Capability = consentEvent.Capability.Value,
+            Action = consentEvent.Action,
+            ActorId = consentEvent.Actor?.Value,
+            Reason = consentEvent.Reason?.Value,
+            Metadata = JsonSerializer.Serialize(consentEvent.Metadata),
+            RecordedAt = consentEvent.RecordedAt.UtcDateTime
         });
 
         // Written through inside the transaction the caller holds, not at commit
         // time. Two things depend on it: a duplicate event id fails here, where
         // the caller can still see which write caused it, and the read that
         // follows in the same handler sees the fact that was just appended.
-        await kontext.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ConsentEvent>> VerlaufAsync(
+    public async Task<IReadOnlyList<ConsentEvent>> HistoryAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
-            .Where(zeile => zeile.SubjectId == subject.Value)
-            .OrderBy(zeile => zeile.RecordedAt)
-            .ThenBy(zeile => zeile.EventId)
+        var rows = await context.ConsentEvents
+            .Where(row => row.SubjectId == subject.Value)
+            .OrderBy(row => row.RecordedAt)
+            .ThenBy(row => row.EventId)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZuFakt)];
+        return [.. rows.Select(ToFact)];
     }
 
     /// <inheritdoc />
-    public async Task<ConsentEvent?> NeuestesAsync(
+    public async Task<ConsentEvent?> LatestOneAsync(
         SubjectId subject, Capability capability, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
+        var rows = await context.ConsentEvents
             .FromSqlRaw(
-                $"{Neueste} subject_id = {{0}} AND capability = {{1}} {Ordnung}",
+                $"{Latest} subject_id = {{0}} AND capability = {{1}} {Ordering}",
                 subject.Value, capability.Value)
             .ToListAsync(cancellationToken);
 
-        return zeilen.Count is 0 ? null : ZuFakt(zeilen[0]);
+        return rows.Count is 0 ? null : ToFact(rows[0]);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>>
-        NeuesteAsync(
-            IReadOnlyList<(SubjectId Subject, Capability Capability)> paare,
+        LatestAsync(
+            IReadOnlyList<(SubjectId Subject, Capability Capability)> pairs,
             CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(paare);
+        ArgumentNullException.ThrowIfNull(pairs);
 
-        if (paare.Count is 0)
+        if (pairs.Count is 0)
         {
             return new Dictionary<(Guid, string), ConsentEvent>();
         }
@@ -114,40 +114,40 @@ public sealed class EfConsentLedger(ConsentDbContext kontext) : IConsentLedger
         // combination of the subjects and the capabilities named, and answer
         // about pairs nobody asked about. A batch is meant to make one question
         // cheaper, not a hundred questions into ten thousand.
-        var subjekte = paare.Select(paar => paar.Subject.Value).ToArray();
-        var faehigkeiten = paare.Select(paar => paar.Capability.Value).ToArray();
+        var subjects = pairs.Select(pair => pair.Subject.Value).ToArray();
+        var skills = pairs.Select(pair => pair.Capability.Value).ToArray();
 
-        var zeilen = await kontext.ConsentEvents
+        var rows = await context.ConsentEvents
             .FromSqlRaw(
-                $"{Neueste} (subject_id, capability) IN "
+                $"{Latest} (subject_id, capability) IN "
                 + "(SELECT s, c FROM unnest({0}::uuid[], {1}::text[]) AS t(s, c)) "
-                + Ordnung,
-                subjekte, faehigkeiten)
+                + Ordering,
+                subjects, skills)
             .ToListAsync(cancellationToken);
 
-        return zeilen.ToDictionary(
-            zeile => (zeile.SubjectId, zeile.Capability),
-            ZuFakt);
+        return rows.ToDictionary(
+            row => (row.SubjectId, row.Capability),
+            ToFact);
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ConsentEvent>> NeuesteJeFaehigkeitAsync(
+    public async Task<IReadOnlyList<ConsentEvent>> LatestPerSkillAsync(
         SubjectId subject, CancellationToken cancellationToken = default)
     {
-        var zeilen = await kontext.ConsentEvents
-            .FromSqlRaw($"{Neueste} subject_id = {{0}} {Ordnung}", subject.Value)
+        var rows = await context.ConsentEvents
+            .FromSqlRaw($"{Latest} subject_id = {{0}} {Ordering}", subject.Value)
             .ToListAsync(cancellationToken);
 
-        return [.. zeilen.Select(ZuFakt)];
+        return [.. rows.Select(ToFact)];
     }
 
-    private static ConsentEvent ZuFakt(ConsentEventRow zeile) => ConsentEvent.Restore(
-        zeile.EventId,
-        new SubjectId(zeile.SubjectId),
-        Capability.Parse(zeile.Capability),
-        zeile.Action,
-        new DateTimeOffset(DateTime.SpecifyKind(zeile.RecordedAt, DateTimeKind.Utc)),
-        zeile.ActorId is { } akteur ? new SubjectId(akteur) : null,
-        zeile.Reason is { } grund ? WithdrawalReason.Parse(grund) : null,
-        JsonSerializer.Deserialize<Dictionary<string, string>>(zeile.Metadata));
+    private static ConsentEvent ToFact(ConsentEventRow row) => ConsentEvent.Restore(
+        row.EventId,
+        new SubjectId(row.SubjectId),
+        Capability.Parse(row.Capability),
+        row.Action,
+        new DateTimeOffset(DateTime.SpecifyKind(row.RecordedAt, DateTimeKind.Utc)),
+        row.ActorId is { } actorId ? new SubjectId(actorId) : null,
+        row.Reason is { } reason ? WithdrawalReason.Parse(reason) : null,
+        JsonSerializer.Deserialize<Dictionary<string, string>>(row.Metadata));
 }

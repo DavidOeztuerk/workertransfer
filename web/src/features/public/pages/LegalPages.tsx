@@ -9,29 +9,28 @@ import { useTranslation } from "react-i18next";
 import { PageShell } from "../../../shared/components/ui";
 
 /**
- * Die vier rechtlichen Seiten.
+ * The four legal pages.
  *
- * <strong>Sie stehen in EINER Datei, weil sie eine Sorte sind:</strong> Text,
- * kein Zustand, keine Abfrage. Vier Dateien mit je zwölf Zeilen Gerüst wären
- * vier Stellen, an denen dasselbe Gerüst auseinanderläuft.
+ * <strong>They stand in ONE file because they are one kind:</strong> text, no
+ * state, no fetch. Four files with twelve lines of scaffolding each would be
+ * four places where the same scaffolding drifts apart.
  *
- * <strong>Was fehlt, sagt sich selbst.</strong> Impressum und
- * Nutzungsbedingungen hängen an der Rechtsform des Betreibers, und die ist nicht
- * entschieden. Eine erfundene Anschrift wäre schlimmer als eine fehlende — sie
- * sähe aus wie eine Angabe. Die Seiten benennen deshalb die Lücke, statt sie zu
- * füllen.
+ * <strong>What is missing says so itself.</strong> Imprint and terms of use
+ * hang on the operator's legal form, and that is not decided. An invented
+ * postal address would be worse than a missing one — it would look like a
+ * statement. The pages therefore name the gap instead of filling it.
  *
- * Datenschutz und Barrierefreiheit sind dagegen vollständig: was diese
- * Plattform tut und lässt, steht in den ADRs und ist damit belegbar.
+ * Privacy and accessibility, on the other hand, are complete: what this
+ * platform does and refrains from stands in the ADRs and can thus be proven.
  */
 
-/** Ein Abschnitt mit Überschrift — auf allen vier Seiten dasselbe Mass. */
-function Abschnitt({ titel, children }: { titel: string; children: React.ReactNode }) {
+/** A section with a heading — the same measure on all four pages. */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card sx={{ mb: 2.5 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1.5 }}>
-          {titel}
+          {title}
         </Typography>
         {children}
       </CardContent>
@@ -39,7 +38,7 @@ function Abschnitt({ titel, children }: { titel: string; children: React.ReactNo
   );
 }
 
-function Absatz({ children }: { children: React.ReactNode }) {
+function Paragraph({ children }: { children: React.ReactNode }) {
   return (
     <Typography variant="body2" color="text.secondary" sx={{ maxWidth: "76ch" }}>
       {children}
@@ -47,134 +46,135 @@ function Absatz({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Punkte({ punkte }: { punkte: string[] }) {
+function Points({ points }: { points: string[] }) {
   return (
     <Box component="ul" sx={{ pl: 2.5, m: 0, display: "grid", gap: 1 }}>
-      {punkte.map((punkt) => (
+      {points.map((point) => (
         <Typography
           component="li"
           variant="body2"
           color="text.secondary"
-          key={punkt}
+          key={point}
           sx={{ maxWidth: "74ch" }}
         >
-          {punkt}
+          {point}
         </Typography>
       ))}
     </Box>
   );
 }
 
-/** <c>/imprint</c> — die Angaben nach § 5 DDG, und was davon fehlt. */
+/**
+ * <c>/imprint</c> — the statements under § 5 DDG, and what of them is missing.
+ *
+ * The last section is the GeoNames attribution. It stands here and not only in
+ * NOTICE.md because CC BY demands it towards the USERS, and nobody of them ever
+ * sees a file in the source tree.
+ */
 export function ImprintPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.impressumTitel")} narrow lead={t("recht.impressumLead")}>
+    <PageShell title={t("legal.imprintTitle")} narrow lead={t("legal.imprintLead")}>
       <Alert severity="warning" sx={{ mb: 2.5 }}>
-        <AlertTitle>{t("recht.impressumOffenTitel")}</AlertTitle>
-        {t("recht.impressumOffenText")}
+        <AlertTitle>{t("legal.imprintIncompleteTitle")}</AlertTitle>
+        {t("legal.imprintIncompleteText")}
       </Alert>
 
-      <Abschnitt titel={t("recht.impressumVerantwortlich")}>
-        <Absatz>{t("recht.dsKontaktText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.imprintResponsible")}>
+        <Paragraph>{t("legal.privacyContactText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.impressumStreit")}>
-        <Absatz>{t("recht.impressumStreitText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.imprintDisputes")}>
+        <Paragraph>{t("legal.imprintDisputesText")}</Paragraph>
+      </Section>
 
-      {/*
-        Die Namensnennung für GeoNames. Sie steht hier und nicht nur in
-        NOTICE.md, weil CC BY sie gegenüber den NUTZENDEN verlangt und eine
-        Datei im Quellbaum niemand von ihnen sieht.
-      */}
-      <Abschnitt titel={t("recht.impressumDaten")}>
-        <Absatz>{t("recht.impressumDatenText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.imprintData")}>
+        <Paragraph>{t("legal.imprintDataText")}</Paragraph>
+      </Section>
     </PageShell>
   );
 }
 
-/** <c>/privacy</c> — vollständig, weil die Antworten in den ADRs stehen. */
+/** <c>/privacy</c> — complete, because the answers stand in the ADRs. */
 export function PrivacyPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.datenschutzTitel")} narrow lead={t("recht.datenschutzLead")}>
-      <Abschnitt titel={t("recht.dsGrundsatzTitel")}>
-        <Absatz>{t("recht.dsGrundsatzText")}</Absatz>
-      </Abschnitt>
+    <PageShell title={t("legal.privacyTitle")} narrow lead={t("legal.privacyLead")}>
+      <Section title={t("legal.privacyPrincipleTitle")}>
+        <Paragraph>{t("legal.privacyPrincipleText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.dsWasTitel")}>
-        <Absatz>{t("recht.dsWasText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.privacyStoredTitle")}>
+        <Paragraph>{t("legal.privacyStoredText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.dsNichtTitel")}>
-        <Punkte
-          punkte={[
-            t("recht.dsNicht1"),
-            t("recht.dsNicht2"),
-            t("recht.dsNicht3"),
-            t("recht.dsNicht4"),
+      <Section title={t("legal.privacyNotTitle")}>
+        <Points
+          points={[
+            t("legal.privacyNot1"),
+            t("legal.privacyNot2"),
+            t("legal.privacyNot3"),
+            t("legal.privacyNot4"),
           ]}
         />
-      </Abschnitt>
+      </Section>
 
-      <Abschnitt titel={t("recht.dsKiTitel")}>
-        <Absatz>{t("recht.dsKiText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.privacyAiTitle")}>
+        <Paragraph>{t("legal.privacyAiText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.dsRechteTitel")}>
-        <Absatz>{t("recht.dsRechteText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.privacyRightsTitle")}>
+        <Paragraph>{t("legal.privacyRightsText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.dsKontaktTitel")}>
-        <Absatz>{t("recht.dsKontaktText")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.privacyContactTitle")}>
+        <Paragraph>{t("legal.privacyContactText")}</Paragraph>
+      </Section>
     </PageShell>
   );
 }
 
-/** <c>/terms</c> — was schon gilt, und was noch am Betreibermodell hängt. */
+/** <c>/terms</c> — what already holds, and what still hangs on the operator model. */
 export function TermsPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.agbTitel")} narrow lead={t("recht.agbLead")}>
+    <PageShell title={t("legal.termsTitle")} narrow lead={t("legal.termsLead")}>
       <Alert severity="warning" sx={{ mb: 2.5 }}>
-        <AlertTitle>{t("recht.agbOffenTitel")}</AlertTitle>
-        {t("recht.agbOffenText")}
+        <AlertTitle>{t("legal.termsIncompleteTitle")}</AlertTitle>
+        {t("legal.termsIncompleteText")}
       </Alert>
 
-      <Abschnitt titel={t("recht.agbSchonTitel")}>
-        <Punkte
-          punkte={[t("recht.agb1"), t("recht.agb2"), t("recht.agb3"), t("recht.agb4")]}
+      <Section title={t("legal.termsAlreadyTitle")}>
+        <Points
+          points={[t("legal.terms1"), t("legal.terms2"), t("legal.terms3"), t("legal.terms4")]}
         />
-      </Abschnitt>
+      </Section>
     </PageShell>
   );
 }
 
-/** <c>/accessibility</c> — mit den Lücken, denn eine Erklärung ohne sie ist keine. */
+/** <c>/accessibility</c> — with the gaps, because a statement without them is none. */
 export function AccessibilityPage() {
   const { t } = useTranslation();
 
   return (
-    <PageShell title={t("recht.a11yTitel")} narrow lead={t("recht.a11yLead")}>
-      <Abschnitt titel={t("recht.a11yStandTitel")}>
-        <Absatz>{t("recht.a11yStandText")}</Absatz>
-      </Abschnitt>
+    <PageShell title={t("legal.a11yTitle")} narrow lead={t("legal.a11yLead")}>
+      <Section title={t("legal.a11yStatusTitle")}>
+        <Paragraph>{t("legal.a11yStatusText")}</Paragraph>
+      </Section>
 
-      <Abschnitt titel={t("recht.a11yTunTitel")}>
-        <Punkte
-          punkte={[t("recht.a11y1"), t("recht.a11y2"), t("recht.a11y3"), t("recht.a11y4")]}
+      <Section title={t("legal.a11yAppliesTitle")}>
+        <Points
+          points={[t("legal.a11y1"), t("legal.a11y2"), t("legal.a11y3"), t("legal.a11y4")]}
         />
-      </Abschnitt>
+      </Section>
 
-      <Abschnitt titel={t("recht.a11yLueckenTitel")}>
-        <Absatz>{t("recht.a11yLuecken")}</Absatz>
-      </Abschnitt>
+      <Section title={t("legal.a11yGapsTitle")}>
+        <Paragraph>{t("legal.a11yGaps")}</Paragraph>
+      </Section>
     </PageShell>
   );
 }

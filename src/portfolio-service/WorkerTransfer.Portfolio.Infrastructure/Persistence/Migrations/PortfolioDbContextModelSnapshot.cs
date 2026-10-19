@@ -17,12 +17,12 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Portfolio.Infrastructure.Persistence.PortfolioZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Portfolio.Infrastructure.Persistence.PortfolioRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -45,6 +45,8 @@ namespace WorkerTransfer.Portfolio.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("portfolios", (string)null);
+
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

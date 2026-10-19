@@ -1,20 +1,24 @@
-// Basis-URLs der Dienste. Vite injiziert die VITE_-Variablen (deklariert in
-// turbo.json globalEnv + vite/client types); sie sind optional, der literale
-// Zugriff ist unter noUncheckedIndexedAccess also `string | undefined`.
+// Base URLs of the services. Vite injects the VITE_ variables (typed by
+// vite/client); they are optional, so under noUncheckedIndexedAccess the
+// literal access is `string | undefined`.
 //
-// Je Dienst eine eigene Variable statt eines Gateways: die Dienste laufen auf
-// eigenen Ports und haben eigene Datenbanken (ADR-0004). Ein gemeinsames
-// Präfix würde eine Zusammenlegung suggerieren, die es nicht gibt.
+// One variable per service instead of one gateway: the services run on ports
+// of their own and have databases of their own (ADR-0004). A shared prefix
+// would suggest a merger that does not exist.
+//
+// The key strings (`API_BASE_URL` …), the `VITE_*` names and `__WT_CONFIG__`
+// are a contract with `public/config.js` and the Helm chart, which writes that
+// file — renaming one here leaves the chart's value unread.
 
 /**
- * Der Ersatz nimmt den Host der Seite, nicht `127.0.0.1`.
+ * The fallback takes the page's host, not `127.0.0.1`.
  *
- * Cookies unterscheiden `localhost` und `127.0.0.1` als verschiedene Hosts,
- * Ports dagegen ignorieren sie. Ein fester Ersatz auf `127.0.0.1` liefert
- * deshalb bei einer Seite auf `localhost` keine Verbindungsfehler, sondern
- * etwas Schlimmeres: Anfragen ohne Sitzungscookie, die wortlos mit 401
- * antworten. Genau so ist die E2E-Reise einmal gescheitert — der Dienst lief,
- * das Token war gültig, und trotzdem war niemand angemeldet.
+ * Cookies treat `localhost` and `127.0.0.1` as different hosts, but ignore
+ * ports. A fixed fallback on `127.0.0.1` therefore yields no connection errors
+ * for a page on `localhost` but something worse: requests without a session
+ * cookie that silently answer 401. That is exactly how the E2E journey once
+ * failed — the service ran, the token was valid, and still nobody was signed
+ * in.
  */
 function fallback(port: number): string {
   const host = typeof window === "undefined" ? "127.0.0.1" : window.location.hostname;
@@ -22,17 +26,17 @@ function fallback(port: number): string {
 }
 
 /**
- * Laufzeitkonfiguration, gesetzt von `public/config.js` VOR dem Modulbündel.
+ * Runtime configuration, set by `public/config.js` BEFORE the module bundle.
  *
- * Sie existiert wegen einer Eigenschaft von `vite build`: die `VITE_`-Variablen
- * werden beim BAUEN in das Bündel eingesetzt. Ein gebautes Image trägt seine
- * URLs also fest in sich — und könnte in zwei Umgebungen nicht dasselbe sein.
- * Für docker compose ist das gleichgültig (dort läuft der Dev-Server, der die
- * Umgebung beim Start liest), für ein Helm-Chart nicht: dort ist "ein Artefakt,
- * viele Umgebungen" die ganze Idee (ADR-0028).
+ * It exists because of a property of `vite build`: the `VITE_` variables are
+ * inserted into the bundle at BUILD time. A built image therefore carries its
+ * URLs baked in — and could not be the same in two environments. For docker
+ * compose that does not matter (the dev server runs there and reads the
+ * environment at start), for a Helm chart it does: there "one artifact, many
+ * environments" is the whole idea (ADR-0028).
  *
- * Die Voreinstellung im Repository ist ein leeres Objekt, ändert also nichts.
- * Erst das Chart legt eine echte Fassung darüber.
+ * The default in the repository is an empty object and so changes nothing.
+ * Only the chart lays a real version over it.
  */
 type RuntimeConfig = Partial<Record<string, string>>;
 
@@ -43,10 +47,10 @@ function runtime(key: string): string | undefined {
 }
 
 /**
- * Drei Stufen, in dieser Reihenfolge: Laufzeitwert, Bauzeitwert, Port-Rückfall.
+ * Three steps, in this order: runtime value, build-time value, port fallback.
  *
- * Die Reihenfolge ist die eigentliche Aussage. Der Laufzeitwert gewinnt, weil
- * er als Einziger weiss, wo das Bündel gerade tatsächlich ausgeliefert wird.
+ * The order is the actual statement. The runtime value wins because it alone
+ * knows where the bundle is actually being served right now.
  */
 function resolve(key: string, raw: string | undefined, port: number): string {
   const live = runtime(key);
@@ -94,11 +98,11 @@ export const TRANSFER_BASE_URL = resolve(
 export const GITHUB_BASE_URL = resolve(
   "GITHUB_BASE_URL",
   import.meta.env.VITE_GITHUB_BASE_URL,
-  // 8011, nicht 8010 — 8010 gehört notification-service. Der Versatz kam beim
-  // Hinzufügen jenes Dienstes und blieb unbemerkt, weil ihn NIEMAND sonst
-  // benutzt: die Oberfläche redet mit notification-service gar nicht, die
-  // Benachrichtigungs-Einstellungen liegen bei identity. Wer /github öffnete,
-  // schickte sein Konto an den falschen Dienst.
+  // 8011, not 8010 — 8010 belongs to notification-service. The offset came
+  // when that service was added and went unnoticed because NOBODY else uses
+  // it: the UI does not talk to notification-service at all, the notification
+  // settings live at identity. Whoever opened /github sent their account to
+  // the wrong service.
   8011
 );
 export const SCOUT_BASE_URL = resolve(

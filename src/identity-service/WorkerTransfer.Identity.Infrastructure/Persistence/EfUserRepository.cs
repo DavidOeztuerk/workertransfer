@@ -6,7 +6,7 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
 /// <summary>Reads and writes the <c>users</c> table.</summary>
-public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr) : IUserRepository
+public sealed class EfUserRepository(IdentityDbContext context, TimeProvider clock) : IUserRepository
 {
     /// <inheritdoc />
     /// <remarks>
@@ -21,7 +21,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         var row = await context.Users
             .FirstOrDefaultAsync(candidate => candidate.Email == email, cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
@@ -32,7 +32,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         var row = await context.Users
             .FirstOrDefaultAsync(candidate => candidate.Id == id.Value, cancellationToken);
 
-        return row is null ? null : ZumAggregat(row);
+        return row is null ? null : ToAggregate(row);
     }
 
     /// <inheritdoc />
@@ -40,7 +40,7 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        var jetzt = uhr.GetUtcNow().UtcDateTime;
+        var now = clock.GetUtcNow().UtcDateTime;
 
         context.Users.Add(new UserRow
         {
@@ -53,10 +53,10 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
             Status = user.Status,
             Roles = JsonSerializer.Serialize(user.Roles),
             PendingCompanyName = user.PendingCompanyName,
-            Language = Sprachwahl.Etikett(user.Kontosprache),
-            Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld),
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt,
+            Language = LanguageChoice.Label(user.AccountLanguage),
+            OccupationalField = OccupationalFieldChoice.Label(user.OccupationalField),
+            CreatedAt = now,
+            UpdatedAt = now,
             Version = 1
         });
 
@@ -89,15 +89,15 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
 
         row.Status = user.Status;
         row.PendingCompanyName = user.PendingCompanyName;
-        row.Language = Sprachwahl.Etikett(user.Kontosprache);
-        row.Berufsfeld = Berufsfeldwahl.Etikett(user.Berufsfeld);
+        row.Language = LanguageChoice.Label(user.AccountLanguage);
+        row.OccupationalField = OccupationalFieldChoice.Label(user.OccupationalField);
         row.GivenName = user.GivenName;
         row.FamilyName = user.FamilyName;
-        row.UpdatedAt = uhr.GetUtcNow().UtcDateTime;
+        row.UpdatedAt = clock.GetUtcNow().UtcDateTime;
         row.Version += 1;
     }
 
-    private static User ZumAggregat(UserRow row) => User.Restore(
+    private static User ToAggregate(UserRow row) => User.Restore(
         new SubjectId(row.Id),
         row.Email,
         row.PasswordHash,
@@ -105,8 +105,8 @@ public sealed class EfUserRepository(IdentityDbContext context, TimeProvider uhr
         row.Status,
         JsonSerializer.Deserialize<List<string>>(row.Roles) ?? [],
         row.PendingCompanyName,
-        Sprachwahl.Aus(row.Language),
+        LanguageChoice.From(row.Language),
         row.GivenName,
         row.FamilyName,
-        Berufsfeldwahl.Aus(row.Berufsfeld));
+        OccupationalFieldChoice.From(row.OccupationalField));
 }

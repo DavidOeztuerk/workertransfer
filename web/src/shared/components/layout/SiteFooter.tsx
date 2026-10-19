@@ -9,16 +9,16 @@ import { Link as RouterLink } from "react-router-dom";
 import { useAppSelector } from "../../../core/store/hooks";
 
 /**
- * Die Fusszeile.
+ * The footer.
  *
- * <strong>Darstellung und Sprache standen hier und stehen jetzt oben</strong>,
- * im Zahnrad. Der Gedanke „das stellt man einmal ein, also gehört es nach
- * unten" war logisch und praktisch falsch: wer die Sprache wechselt, weil er
- * die Oberfläche nicht lesen kann, scrollt nicht erst an das Ende der Seite.
+ * <strong>Appearance and language used to stand here and now stand at the
+ * top</strong>, in the gear. The thought "one sets that once, so it belongs at
+ * the bottom" was logical and practically wrong: whoever switches the language
+ * because they cannot read the UI does not scroll to the end of the page first.
  *
- * <strong>Die rechtlichen Seiten sind echt und nicht nur verlinkt.</strong> Ein
- * Verweis auf ein Impressum, das es nicht gibt, ist schlechter als kein
- * Verweis: er behauptet eine Angabe, die fehlt.
+ * <strong>The legal pages are real and not merely linked.</strong> A link to an
+ * imprint that does not exist is worse than no link: it claims a statement that
+ * is missing.
  */
 export function SiteFooter() {
   const { t } = useTranslation();
@@ -28,9 +28,9 @@ export function SiteFooter() {
     <Box
       component="footer"
       sx={{
-        // Vorher 10 (40 px). Zusammen mit dem Seitenrand darunter klaffte
-        // unter dem letzten Element — meist einer Blätterleiste — ein Loch von
-        // achtundsechzig Pixeln.
+        // Formerly 10 (40 px). Together with the page margin below, a hole of
+        // sixty-eight pixels gaped under the last element — usually a
+        // pagination bar.
         mt: 5,
         borderTop: 1,
         borderColor: "divider",
@@ -55,23 +55,23 @@ export function SiteFooter() {
             </Typography>
           </Box>
 
-          <Spalte titel={t("fuss.plattform")}>
-            <Verweis to="/jobs">{t("fuss.stellen")}</Verweis>
+          <FooterColumn title={t("footer.platform")}>
+            <FooterLink to="/jobs">{t("footer.jobs")}</FooterLink>
             {signedIn ? (
               <>
-                <Verweis to="/market">{t("fuss.marktstatus")}</Verweis>
-                <Verweis to="/consents">{t("fuss.freigaben")}</Verweis>
-                <Verweis to="/my-data">{t("fuss.meineDaten")}</Verweis>
+                <FooterLink to="/market">{t("footer.marketStatus")}</FooterLink>
+                <FooterLink to="/consents">{t("footer.consents")}</FooterLink>
+                <FooterLink to="/my-data">{t("footer.myData")}</FooterLink>
               </>
             ) : null}
-          </Spalte>
+          </FooterColumn>
 
-          <Spalte titel={t("fuss.rechtliches")}>
-            <Verweis to="/imprint">{t("fuss.impressum")}</Verweis>
-            <Verweis to="/privacy">{t("fuss.datenschutz")}</Verweis>
-            <Verweis to="/terms">{t("fuss.agb")}</Verweis>
-            <Verweis to="/accessibility">{t("fuss.barrierefreiheit")}</Verweis>
-          </Spalte>
+          <FooterColumn title={t("footer.legal")}>
+            <FooterLink to="/imprint">{t("footer.imprint")}</FooterLink>
+            <FooterLink to="/privacy">{t("footer.privacy")}</FooterLink>
+            <FooterLink to="/terms">{t("footer.terms")}</FooterLink>
+            <FooterLink to="/accessibility">{t("footer.accessibility")}</FooterLink>
+          </FooterColumn>
 
         </Box>
 
@@ -87,7 +87,8 @@ export function SiteFooter() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            {t("fuss.rechte", { jahr: new Date().getFullYear() })}
+            {/* `jahr` is the catalogue's placeholder name ({{jahr}}) and stays. */}
+            {t("footer.copyright", { jahr: new Date().getFullYear() })}
           </Typography>
         </Box>
       </Container>
@@ -95,7 +96,7 @@ export function SiteFooter() {
   );
 }
 
-function Spalte({ titel, children }: { titel: string; children: React.ReactNode }) {
+function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box>
       <Typography
@@ -109,7 +110,7 @@ function Spalte({ titel, children }: { titel: string; children: React.ReactNode 
           mb: 1.5,
         }}
       >
-        {titel}
+        {title}
       </Typography>
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
         {children}
@@ -118,7 +119,7 @@ function Spalte({ titel, children }: { titel: string; children: React.ReactNode 
   );
 }
 
-function Verweis({ to, children }: { to: string; children: React.ReactNode }) {
+function FooterLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link component={RouterLink} to={to} variant="body2" color="text.primary">
       {children}

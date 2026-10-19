@@ -10,7 +10,7 @@ namespace WorkerTransfer.Consent.Domain.Ledger;
 /// is offered. A test pins the absence.
 /// <para>
 /// Account erasure needs one exception and takes it elsewhere, under a name
-/// that says why (<c>IFreitextraeumung</c>): a <c>ClearReasons</c> method here
+/// that says why (<c>IFreeTextClearing</c>): a <c>ClearReasons</c> method here
 /// would stand open to every caller, and the promise would be gone for all of
 /// them.
 /// </para>
@@ -18,14 +18,14 @@ namespace WorkerTransfer.Consent.Domain.Ledger;
 public interface IConsentLedger
 {
     /// <summary>Records one new fact. Never touches an existing one.</summary>
-    Task AnhaengenAsync(ConsentEvent ereignis, CancellationToken cancellationToken = default);
+    Task AttachAsync(ConsentEvent consentEvent, CancellationToken cancellationToken = default);
 
     /// <summary>Every fact about one person, oldest first.</summary>
-    Task<IReadOnlyList<ConsentEvent>> VerlaufAsync(
+    Task<IReadOnlyList<ConsentEvent>> HistoryAsync(
         SubjectId subject, CancellationToken cancellationToken = default);
 
     /// <summary>The newest fact for one pair, or none.</summary>
-    Task<ConsentEvent?> NeuestesAsync(
+    Task<ConsentEvent?> LatestOneAsync(
         SubjectId subject, Capability capability, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -38,19 +38,19 @@ public interface IConsentLedger
     /// line up. The order the caller asked in is the caller's business, and the
     /// endpoint keeps it.
     /// <para>
-    /// The same reduction and the same ordering as <see cref="NeuestesAsync"/>,
+    /// The same reduction and the same ordering as <see cref="LatestOneAsync"/>,
     /// pinned by a test.
     /// </para>
     /// </remarks>
-    Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>> NeuesteAsync(
-        IReadOnlyList<(SubjectId Subject, Capability Capability)> paare,
+    Task<IReadOnlyDictionary<(Guid Subject, string Capability), ConsentEvent>> LatestAsync(
+        IReadOnlyList<(SubjectId Subject, Capability Capability)> pairs,
         CancellationToken cancellationToken = default);
 
     /// <summary>The newest fact for every capability one person ever held.</summary>
     /// <remarks>
-    /// The same reduction as <see cref="NeuestesAsync"/>, over all capabilities
+    /// The same reduction as <see cref="LatestOneAsync"/>, over all capabilities
     /// instead of one.
     /// </remarks>
-    Task<IReadOnlyList<ConsentEvent>> NeuesteJeFaehigkeitAsync(
+    Task<IReadOnlyList<ConsentEvent>> LatestPerSkillAsync(
         SubjectId subject, CancellationToken cancellationToken = default);
 }

@@ -39,59 +39,60 @@ import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
 import MenuList from "@mui/material/MenuList";
 import Popover from "@mui/material/Popover";
 
-import { useVorlieben } from "./darstellung";
-import { Vorliebenebene, Vorliebenzeile, type Menueebene } from "./Vorliebenmenue";
-import { ProfilAvatar } from "../ui";
-import { zeigtGitHub } from "../../lib/berufsfelder";
+import { usePreferences } from "./appearance";
+import { PreferenceLevel, PreferenceRow, type MenuLevel } from "./PreferencesMenu";
+import { ProfileAvatar } from "../ui";
+import { offersGitHub } from "../../lib/occupationalFields";
 
 /**
- * Die Kopfzeile.
+ * The routes of the header — described ONCE.
  *
- * <strong>Abgemeldet steht hier GENAU EIN Zugang: „Anmelden".</strong> Vorher
- * standen dort zwei Einträge, und jeder blendete sich auf seiner eigenen Seite
- * aus — auf `/login` sah man nur „Registrieren", auf `/register` nur
- * „Anmelden", sonst beide. Der Kopf änderte damit seinen Inhalt beim Navigieren,
- * und das ist genau die Bewegung, die eine Oberfläche unzuverlässig wirken
- * lässt: die Ankerpunkte müssen liegen bleiben.
- *
- * Der Wechsel zwischen Anmelden und Registrieren gehört auf die Seite selbst,
- * wo die Person schon entschieden hat, sich anzumelden — dort ist es eine
- * Auswahl und keine zweite Werbefläche.
- *
- * <strong>Die Kopfzeile verbirgt nur, sie schützt nicht.</strong> Ob jemand
- * etwas darf, entscheidet der Server je Anfrage; wer hier einen Eintrag
- * versteckt, hat nichts gesichert. Die Firmeneinträge sind deshalb eine
- * Bequemlichkeit, keine Zugriffskontrolle.
+ * The header bar and the drawer show the same entries; written twice they
+ * drift apart at the next new route, and at the place nobody looks at (the
+ * narrow one).
  */
-/**
- * Die Wege der Kopfzeile — EINMAL beschrieben.
- *
- * Kopfleiste und Schublade zeigen dieselben Einträge; zweimal geschrieben gehen
- * sie beim nächsten neuen Weg auseinander, und zwar an der Stelle, die niemand
- * ansieht (die schmale).
- */
-const WEGE: { pfad: string; schluessel: string; immer: boolean }[] = [
-  { pfad: "/jobs", schluessel: "kopf.stellen", immer: true },
-  { pfad: "/overview", schluessel: "kopf.uebersicht", immer: false },
-  { pfad: "/market", schluessel: "kopf.marktstatus", immer: false },
-  { pfad: "/transfers", schluessel: "kopf.gespraeche", immer: false },
-  // Der Berater (ADR-0037). Er steht bei den Wegen der PERSON: das Mandat
-  // gehoert ihr, nicht dem Unternehmen, fuer das sie gerade handelt.
-  { pfad: "/advisor", schluessel: "kopf.berater", immer: false },
-  // Die Arbeitsprobe (ADR-0042). Auch sie steht bei den Wegen der PERSON:
-  // die Bewertung gehoert dem Vorgang, und lesen darf sie, um wen es geht.
-  { pfad: "/assessments", schluessel: "kopf.arbeitsproben", immer: false },
+const ROUTES: { path: string; labelKey: string; always: boolean }[] = [
+  { path: "/jobs", labelKey: "header.jobs", always: true },
+  { path: "/overview", labelKey: "header.overview", always: false },
+  { path: "/market", labelKey: "header.marketStatus", always: false },
+  { path: "/transfers", labelKey: "header.conversations", always: false },
+  // The advisor (ADR-0037). It stands among the PERSON's routes: the mandate
+  // belongs to her, not to the company she is acting for right now.
+  { path: "/advisor", labelKey: "header.advisor", always: false },
+  // The work sample (ADR-0042). It too stands among the PERSON's routes: the
+  // evaluation belongs to the case, and whoever it is about may read it.
+  { path: "/assessments", labelKey: "header.assessments", always: false },
 ];
+
+/**
+ * The header.
+ *
+ * <strong>Signed out, EXACTLY ONE entrance stands here: "Anmelden".</strong>
+ * There used to be two entries, and each hid itself on its own page — on
+ * `/login` one saw only "Registrieren", on `/register` only "Anmelden",
+ * elsewhere both. The header thereby changed its content while navigating, and
+ * that is exactly the movement that makes a UI feel unreliable: the anchor
+ * points must stay put.
+ *
+ * Switching between signing in and registering belongs on the page itself,
+ * where the person has already decided to sign in — there it is a choice and
+ * not a second advertising space.
+ *
+ * <strong>The header only hides, it does not protect.</strong> Whether somebody
+ * may do something is decided by the server per request; whoever hides an
+ * entry here has secured nothing. The company entries are therefore a
+ * convenience, not access control.
+ */
 
 export function SiteHeader() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const [schublade, setSchublade] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
   const signedIn = status === "authenticated";
-  const alsFirma = session?.tenantId != null;
+  const actingForCompany = session?.tenantId != null;
 
   return (
     <AppBar
@@ -106,20 +107,21 @@ export function SiteHeader() {
         borderColor: "divider",
       }}
     >
-      {/* Das Randmass steht in allen drei Hüllen gleich (Kopf, Inhalt, Fuss).
-          Vorher trug jede ihr eigenes, und der Anmeldeknopf klebte rechts am
-          Rand — bei einer Kopfzeile fällt das am stärksten auf, weil sie auf
-          jeder Seite steht. */}
-      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+      <Container
+        maxWidth="lg"
+        // The same gutter in all three shells (header, content, footer): with
+        // its own, the sign-in button sticks to the right edge — most visible in
+        // a header, because it stands on every page.
+        sx={{ px: { xs: 2, sm: 3, md: 4 } }}
+      >
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
-          {/* DIE NAVIGATION VERSCHWAND ERSATZLOS.
-              Bei 420px stand oben nur noch „workertransfer" und „Anmelden" —
-              `Stellen` lag hinter `display: { xs: "none", md: "flex" }` und war
-              von einem Telefon aus gar nicht erreichbar. Verstecken ohne Ersatz
-              ist kein responsives Verhalten, sondern eine fehlende Seite. */}
           <IconButton
-            onClick={() => setSchublade(true)}
-            aria-label={t("kopf.menueOeffnen")}
+            // The drawer is the narrow-screen replacement for the navigation
+            // below, which hides behind `display: { xs: "none", md: "flex" }`.
+            // Hiding without a replacement is not responsive behaviour but a
+            // missing page.
+            onClick={() => setDrawerOpen(true)}
+            aria-label={t("header.openMenu")}
             size="small"
             edge="start"
             sx={{ display: { xs: "inline-flex", md: "none" }, mr: 0.5 }}
@@ -143,9 +145,9 @@ export function SiteHeader() {
           </Typography>
 
           <Box sx={{ display: { xs: "none", md: "flex" }, gap: 0.5 }}>
-            {WEGE.filter((weg) => weg.immer || signedIn).map((weg) => (
-              <NavLink key={weg.pfad} to={weg.pfad} current={pathname}>
-                {t(weg.schluessel)}
+            {ROUTES.filter((route) => route.always || signedIn).map((route) => (
+              <NavLink key={route.path} to={route.path} current={pathname}>
+                {t(route.labelKey)}
               </NavLink>
             ))}
           </Box>
@@ -155,19 +157,19 @@ export function SiteHeader() {
           {signedIn ? (
             <>
               <CompanySwitcher />
-              {alsFirma ? <FirmenMenu /> : null}
+              {actingForCompany ? <CompanyMenu /> : null}
               <AccountMenu />
             </>
           ) : (
-            <BesucherMenu />
+            <VisitorMenu />
           )}
         </Toolbar>
       </Container>
 
       <Drawer
         anchor="left"
-        open={schublade}
-        onClose={() => setSchublade(false)}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         slotProps={{ paper: { sx: { width: 268 } } }}
       >
         <Box sx={{ px: 2, pt: 2.5, pb: 1 }}>
@@ -176,19 +178,19 @@ export function SiteHeader() {
             sx={{ fontWeight: 660, letterSpacing: "0.06em", textTransform: "uppercase" }}
             color="text.secondary"
           >
-            {t("kopf.navigation")}
+            {t("header.navigation")}
           </Typography>
         </Box>
         <List sx={{ px: 1 }}>
-          {WEGE.filter((weg) => weg.immer || signedIn).map((weg) => (
+          {ROUTES.filter((route) => route.always || signedIn).map((route) => (
             <ListItemButton
-              key={weg.pfad}
+              key={route.path}
               component={RouterLink}
-              to={weg.pfad}
-              selected={pathname === weg.pfad}
-              onClick={() => setSchublade(false)}
+              to={route.path}
+              selected={pathname === route.path}
+              onClick={() => setDrawerOpen(false)}
             >
-              <ListItemText primary={t(weg.schluessel)} />
+              <ListItemText primary={t(route.labelKey)} />
             </ListItemButton>
           ))}
         </List>
@@ -206,20 +208,20 @@ function NavLink({
   current: string;
   children: React.ReactNode;
 }) {
-  // `startsWith` statt Gleichheit, damit auch /jobs/123 den Eintrag markiert:
-  // eine Unterseite gehört sichtbar zu ihrem Bereich.
-  const aktiv = current === to || current.startsWith(`${to}/`);
+  // `startsWith` instead of equality, so that /jobs/123 marks the entry too: a
+  // subpage visibly belongs to its area.
+  const active = current === to || current.startsWith(`${to}/`);
 
   return (
     <Button
       component={RouterLink}
       to={to}
       size="small"
-      aria-current={aktiv ? "page" : undefined}
+      aria-current={active ? "page" : undefined}
       sx={{
-        color: aktiv ? "primary.main" : "text.secondary",
-        backgroundColor: aktiv ? "action.selected" : "transparent",
-        fontWeight: aktiv ? 620 : 560,
+        color: active ? "primary.main" : "text.secondary",
+        backgroundColor: active ? "action.selected" : "transparent",
+        fontWeight: active ? 620 : 560,
         "&:hover": { color: "text.primary" },
       }}
     >
@@ -228,70 +230,65 @@ function NavLink({
   );
 }
 
-/** Welche Ebene des Menüs offen ist. Beim Schliessen zurück auf „haupt". */
-function useVorliebenansicht(setAnker: (wert: null) => void) {
-  const [ebene, setEbene] = useState<Menueebene>("haupt");
-  const vorlieben = useVorlieben();
+/** Which level of the menu is open. Closing returns to "main". */
+function usePreferenceView(setAnchor: (value: null) => void) {
+  const [level, setLevel] = useState<MenuLevel>("main");
+  const preferences = usePreferences();
 
   return {
-    ansicht: vorlieben,
-    ebene,
-    setzeAnsicht: setEbene,
-    schliessen: () => {
-      setAnker(null);
-      setEbene("haupt");
+    preferences,
+    level,
+    setLevel,
+    close: () => {
+      setAnchor(null);
+      setLevel("main");
     },
   };
 }
 
 /**
- * Das eigene Konto.
+ * One's own account.
  *
- * <strong>Getrennt vom Firmenmenü, und das ist keine Ordnungsliebe.</strong>
- * Hier stand beides zusammen, durch einen Trennstrich geschieden — kompakter,
- * aber es verwischt genau die Grenze, um die sich diese Anwendung dreht: was
- * jemand als PERSON tut, und was er FÜR EIN UNTERNEHMEN tut. Wer sein Profil
- * freigibt, tut etwas anderes als wer Kandidatinnen ansieht, und die beiden
- * gehören nicht in dieselbe Liste.
+ * <strong>Separate from the company menu, and that is not tidiness.</strong>
+ * Both used to stand together, parted by a divider — more compact, but it
+ * blurs exactly the boundary this application turns on: what somebody does as
+ * a PERSON, and what they do FOR A COMPANY. Whoever releases their profile does
+ * something other than whoever looks at candidates, and the two do not belong
+ * in the same list.
  */
 function AccountMenu() {
   const { t } = useTranslation();
-  const [anker, setAnker] = useState<null | HTMLElement>(null);
+  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const name = useAppSelector((state) => state.auth.session?.displayName ?? "");
 
-  // Das Menü folgt dem Berufsfeld (ADR-0039). Es verbirgt nur — die Route
-  // bleibt erreichbar, und ohne Berufsfeld bleibt der Eintrag stehen.
-  const berufsfeld = useAppSelector(
-    (state) => state.auth.session?.berufsfeld ?? null,
+  // The menu follows the occupational field (ADR-0039). It only hides — the
+  // route stays reachable, and without an occupational field the entry stays.
+  const occupationalField = useAppSelector(
+    (state) => state.auth.session?.occupationalField ?? null,
   );
-  const github = zeigtGitHub(berufsfeld);
+  const github = offersGitHub(occupationalField);
 
   const email = useAppSelector((state) => state.auth.session?.email ?? "");
-  const { ansicht, ebene, setzeAnsicht, schliessen } = useVorliebenansicht(setAnker);
+  const { preferences, level, setLevel, close } = usePreferenceView(setAnchor);
 
   return (
     <>
-      {/* DAS BILD DER PERSON, nicht ein Knopf mit dem Wort „Mein Konto".
-          Solange niemand ein Foto hochgeladen hat, stehen dort die Initialen
-          auf einer Farbe, die dem Namen folgt — beständig über Geräte hinweg,
-          sonst wäre sie kein Erkennungsmerkmal. Kommt das Foto, füllt es
-          `src` und sonst ändert sich nichts. */}
-      <Tooltip title={t("kopf.meinKonto")}>
+      <Tooltip title={t("header.myAccount")}>
         <IconButton
-          onClick={(event) => setAnker(event.currentTarget)}
+          onClick={(event) => setAnchor(event.currentTarget)}
           aria-haspopup="menu"
-          aria-expanded={anker !== null}
-          aria-label={t("kopf.meinKonto")}
+          aria-expanded={anchor !== null}
+          aria-label={t("header.myAccount")}
           size="small"
           sx={{ ml: 0.5, p: 0.25 }}
         >
-          <ProfilAvatar name={name} size={32} />
+          <ProfileAvatar name={name} size={32} />
         </IconButton>
       </Tooltip>
       <Popover
-        anchorEl={anker}
-        open={anker !== null}
-        onClose={schliessen}
+        anchorEl={anchor}
+        open={anchor !== null}
+        onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { width: 312, mt: 1 } } }}
@@ -308,66 +305,70 @@ function AccountMenu() {
         </Box>
         <Divider />
 
-        {ebene !== "haupt" ? (
+        {level !== "main" ? (
           <MenuList sx={{ py: 0.5 }}>
-            <Vorliebenebene
-              ebene={ebene}
-              darstellung={ansicht.darstellung}
-              sprache={ansicht.sprache}
-              onZurueck={() => setzeAnsicht("haupt")}
-              onFertig={schliessen}
+            <PreferenceLevel
+              level={level}
+              appearance={preferences.appearance}
+              language={preferences.language}
+              onBack={() => setLevel("main")}
+              onDone={close}
             />
           </MenuList>
         ) : (
         <MenuList sx={{ py: 0.5 }}>
-        <Eintrag to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.profil")}
-        </Eintrag>
-        <Eintrag to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.lebenslauf")}
-        </Eintrag>
-        <Eintrag to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.arbeiten")}
-        </Eintrag>
+        <MenuEntry to="/profile" icon={<PersonOutlineIcon fontSize="small" />} onDone={close}>
+          {t("header.profile")}
+        </MenuEntry>
+        <MenuEntry to="/resume" icon={<DescriptionOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.resume")}
+        </MenuEntry>
+        <MenuEntry to="/portfolio" icon={<CollectionsOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.portfolio")}
+        </MenuEntry>
         {github ? (
-          <Eintrag to="/github" icon={<GitHubIcon fontSize="small" />} onFertig={schliessen}>
-            {t("kopf.github")}
-          </Eintrag>
+          <MenuEntry to="/github" icon={<GitHubIcon fontSize="small" />} onDone={close}>
+            {t("header.github")}
+          </MenuEntry>
         ) : null}
-        <Eintrag to="/applications" icon={<SendOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.bewerbungen")}
-        </Eintrag>
-        <Eintrag to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.entwuerfe")}
-        </Eintrag>
+        <MenuEntry to="/applications" icon={<SendOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.applications")}
+        </MenuEntry>
+        <MenuEntry to="/applications/drafts" icon={<EditNoteOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.drafts")}
+        </MenuEntry>
 
         <Divider />
-        <Eintrag to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.freigaben")}
-        </Eintrag>
-        <Eintrag to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.meineDaten")}
-        </Eintrag>
-        <Eintrag to="/settings" icon={<SettingsOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.einstellungen")}
-        </Eintrag>
+        <MenuEntry to="/consents" icon={<VerifiedUserOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.consents")}
+        </MenuEntry>
+        <MenuEntry to="/my-data" icon={<FolderSharedOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.myData")}
+        </MenuEntry>
+        <MenuEntry to="/settings" icon={<SettingsOutlinedIcon fontSize="small" />} onDone={close}>
+          {t("header.settings")}
+        </MenuEntry>
 
         <Divider />
-        <Vorliebenzeile
-          vorliebe={ansicht.darstellung}
-          onOeffnen={() => setzeAnsicht("darstellung")}
+        <PreferenceRow
+          preference={preferences.appearance}
+          onOpen={() => setLevel("appearance")}
         />
-        <Vorliebenzeile
-          vorliebe={ansicht.sprache}
-          onOeffnen={() => setzeAnsicht("sprache")}
+        <PreferenceRow
+          preference={preferences.language}
+          onOpen={() => setLevel("language")}
         />
 
-        {/* „Konto löschen" steht in den Einstellungen und auf „Meine Daten",
-            nicht hier neben „Abmelden". */}
         <Divider />
-        <Eintrag to="/logout" icon={<LogoutOutlinedIcon fontSize="small" />} onFertig={schliessen}>
-          {t("kopf.abmelden")}
-        </Eintrag>
+        <MenuEntry
+          // "Delete account" lives in the settings and on "My data", never here
+          // beside "Sign out".
+          to="/logout"
+          icon={<LogoutOutlinedIcon fontSize="small" />}
+          onDone={close}
+        >
+          {t("header.signOut")}
+        </MenuEntry>
         </MenuList>
         )}
       </Popover>
@@ -376,22 +377,22 @@ function AccountMenu() {
 }
 
 /**
- * Das Nutzersymbol für abgemeldete Besucher — an derselben Stelle wie der
- * Avatar, mit Anmelden, Registrieren und den Vorlieben.
+ * The user symbol for signed-out visitors — at the same place as the avatar,
+ * with sign in, register and the preferences.
  */
-function BesucherMenu() {
+function VisitorMenu() {
   const { t } = useTranslation();
-  const [anker, setAnker] = useState<null | HTMLElement>(null);
-  const { ansicht, ebene, setzeAnsicht, schliessen } = useVorliebenansicht(setAnker);
+  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  const { preferences, level, setLevel, close } = usePreferenceView(setAnchor);
 
   return (
     <>
-      <Tooltip title={t("kopf.besucherMenue")}>
+      <Tooltip title={t("header.visitorMenu")}>
         <IconButton
-          onClick={(event) => setAnker(event.currentTarget)}
+          onClick={(event) => setAnchor(event.currentTarget)}
           aria-haspopup="menu"
-          aria-expanded={anker !== null}
-          aria-label={t("kopf.besucherMenue")}
+          aria-expanded={anchor !== null}
+          aria-label={t("header.visitorMenu")}
           size="small"
           sx={{ ml: 0.5, p: 0.25, color: "text.secondary" }}
         >
@@ -400,48 +401,48 @@ function BesucherMenu() {
       </Tooltip>
 
       <Popover
-        anchorEl={anker}
-        open={anker !== null}
-        onClose={schliessen}
+        anchorEl={anchor}
+        open={anchor !== null}
+        onClose={close}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { width: 288, mt: 1 } } }}
       >
-        {ebene !== "haupt" ? (
+        {level !== "main" ? (
           <MenuList sx={{ py: 0.5 }}>
-            <Vorliebenebene
-              ebene={ebene}
-              darstellung={ansicht.darstellung}
-              sprache={ansicht.sprache}
-              onZurueck={() => setzeAnsicht("haupt")}
-              onFertig={schliessen}
+            <PreferenceLevel
+              level={level}
+              appearance={preferences.appearance}
+              language={preferences.language}
+              onBack={() => setLevel("main")}
+              onDone={close}
             />
           </MenuList>
         ) : (
           <MenuList sx={{ py: 0.5 }}>
-            <Eintrag
+            <MenuEntry
               to="/login"
               icon={<LoginOutlinedIcon fontSize="small" />}
-              onFertig={schliessen}
+              onDone={close}
             >
-              {t("kopf.anmelden")}
-            </Eintrag>
-            <Eintrag
+              {t("header.signIn")}
+            </MenuEntry>
+            <MenuEntry
               to="/register"
               icon={<PersonAddOutlinedIcon fontSize="small" />}
-              onFertig={schliessen}
+              onDone={close}
             >
-              {t("kopf.registrieren")}
-            </Eintrag>
+              {t("header.register")}
+            </MenuEntry>
 
             <Divider />
-            <Vorliebenzeile
-              vorliebe={ansicht.darstellung}
-              onOeffnen={() => setzeAnsicht("darstellung")}
+            <PreferenceRow
+              preference={preferences.appearance}
+              onOpen={() => setLevel("appearance")}
             />
-            <Vorliebenzeile
-              vorliebe={ansicht.sprache}
-              onOeffnen={() => setzeAnsicht("sprache")}
+            <PreferenceRow
+              preference={preferences.language}
+              onOpen={() => setLevel("language")}
             />
           </MenuList>
         )}
@@ -451,67 +452,66 @@ function BesucherMenu() {
 }
 
 /**
- * Was für ein Unternehmen getan wird — nur sichtbar, während dafür gehandelt
- * wird.
+ * What is done for a company — visible only while acting for one.
  *
- * <strong>Es verbirgt, es schützt nicht.</strong> Ob jemand Kandidatinnen sehen
- * oder eine Stelle veröffentlichen darf, entscheidet der Server je Anfrage. Wer
- * die Adresse direkt tippt, bekommt dieselbe Antwort wie über dieses Menü.
+ * <strong>It hides, it does not protect.</strong> Whether somebody may see
+ * candidates or publish a job is decided by the server per request. Whoever
+ * types the address directly gets the same answer as through this menu.
  */
-function FirmenMenu() {
+function CompanyMenu() {
   const { t } = useTranslation();
-  const [anker, setAnker] = useState<null | HTMLElement>(null);
+  const [anchor, setAnchor] = useState<null | HTMLElement>(null);
 
   return (
     <>
       <Button
         size="small"
         endIcon={<ExpandMoreIcon />}
-        onClick={(event) => setAnker(event.currentTarget)}
+        onClick={(event) => setAnchor(event.currentTarget)}
         aria-haspopup="menu"
-        aria-expanded={anker !== null}
+        aria-expanded={anchor !== null}
         sx={{ color: "text.secondary" }}
       >
-        Unternehmen
+        {t("header.company")}
       </Button>
       <Menu
-        anchorEl={anker}
-        open={anker !== null}
-        onClose={() => setAnker(null)}
-        onClick={() => setAnker(null)}
+        anchorEl={anchor}
+        open={anchor !== null}
+        onClose={() => setAnchor(null)}
+        onClick={() => setAnchor(null)}
         slotProps={{ paper: { sx: { minWidth: 232, mt: 1 } } }}
       >
-        <Eintrag to="/scout">{t("kopf.kandidaten")}</Eintrag>
-        <Eintrag to="/company/jobs">{t("kopf.unsereStellen")}</Eintrag>
-        <Eintrag to="/company/applications">{t("kopf.unsereBewerbungen")}</Eintrag>
-        <Eintrag to="/company/transfers">{t("kopf.unsereGespraeche")}</Eintrag>
-        <Eintrag to="/company/advisor">{t("kopf.unsereBerater")}</Eintrag>
-        <Eintrag to="/company/assessments">{t("kopf.unsereProben")}</Eintrag>
+        <MenuEntry to="/scout">{t("header.candidates")}</MenuEntry>
+        <MenuEntry to="/company/jobs">{t("header.ourJobs")}</MenuEntry>
+        <MenuEntry to="/company/applications">{t("header.receivedApplications")}</MenuEntry>
+        <MenuEntry to="/company/transfers">{t("header.ourConversations")}</MenuEntry>
+        <MenuEntry to="/company/advisor">{t("header.ourAdvisor")}</MenuEntry>
+        <MenuEntry to="/company/assessments">{t("header.ourAssessments")}</MenuEntry>
         <Divider />
-        <Eintrag to="/company/profile">{t("kopf.firmenprofil")}</Eintrag>
-        <Eintrag to="/company/team">{t("kopf.team")}</Eintrag>
+        <MenuEntry to="/company/profile">{t("header.companyProfile")}</MenuEntry>
+        <MenuEntry to="/company/team">{t("header.team")}</MenuEntry>
       </Menu>
     </>
   );
 }
 
-/** Eine Zeile im Kontomenü. */
-function Eintrag({
+/** One row in the account menu. */
+function MenuEntry({
   to,
   icon,
-  onFertig,
+  onDone,
   children,
 }: {
   to: string;
   icon?: React.ReactNode;
-  onFertig?: () => void;
+  onDone?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <MenuItem
       component={RouterLink}
       to={to}
-      onClick={onFertig}
+      onClick={onDone}
     >
       {icon ? <ListItemIcon>{icon}</ListItemIcon> : null}
       {children}

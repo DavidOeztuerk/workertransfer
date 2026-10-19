@@ -5,22 +5,23 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
-using WorkerTransfer.Ablage;
+using WorkerTransfer.DocumentStore;
 using WorkerTransfer.Outbox;
-using WorkerTransfer.Resume.Application.Anfragen;
 using WorkerTransfer.Resume.Application.Behaviors;
 using WorkerTransfer.Resume.Application.Ports;
-using WorkerTransfer.Resume.Domain.Anfragen;
-using WorkerTransfer.Resume.Domain.Lebenslaeufe;
-using WorkerTransfer.Resume.Domain.Pruefspur;
-using WorkerTransfer.Resume.Infrastructure.Benachrichtigung;
-using WorkerTransfer.Resume.Infrastructure.Einwilligung;
-using WorkerTransfer.Resume.Infrastructure.Loeschung;
+using WorkerTransfer.Resume.Application.Requests;
+using WorkerTransfer.Resume.Domain.Audit;
+using WorkerTransfer.Resume.Domain.Documents;
+using WorkerTransfer.Resume.Domain.Requests;
+using WorkerTransfer.Resume.Domain.Resumes;
+using WorkerTransfer.Resume.Infrastructure.Consent;
+using WorkerTransfer.Resume.Infrastructure.Erasure;
+using WorkerTransfer.Resume.Infrastructure.Notification;
 using WorkerTransfer.Resume.Infrastructure.Persistence;
 using WorkerTransfer.Resume.Infrastructure.Security;
-using WorkerTransfer.Resume.Infrastructure.Texterkennung;
+using WorkerTransfer.Resume.Infrastructure.TextRecognition;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Resume.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
@@ -48,50 +49,50 @@ public static class ResumeInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Benachrichtigungseinstellungen>(
-            configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
-
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<NotificationSettings>(
+            configuration.GetSection(NotificationSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
         services.AddSingleton(_ => ResumeDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ResumeDbContext>((provider, options) =>
-            ResumeDbContextFactory.Konfiguriere(
+            ResumeDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<ResumeDbContext>("resume");
-        services.AddSchluesselbund<ResumeDbContext>();
+        services.AddDatabaseReadiness<ResumeDbContext>("resume");
+        services.AddKeyRing<ResumeDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<ILebenslaufSpeicher, EfLebenslaufSpeicher>();
-        services.AddScoped<IAnfragenSpeicher, EfAnfragenSpeicher>();
-        services.AddScoped<IUnterlagenSpeicher, EfUnterlagenSpeicher>();
-        services.AddScoped<IFundSpeicher, EfFundSpeicher>();
+        services.AddScoped<IResumeStore, EfResumeStore>();
+        services.AddScoped<IRequestStore, EfRequestStore>();
+        services.AddScoped<IDocumentRecordStore, EfDocumentRecordStore>();
+        services.AddScoped<ITermStore, EfTermStore>();
 
-        // DER TEXTERKENNER — eine Bibliothek im Prozess, kein Dienst im Netz
-        // (ADR-0043). Hier steht die Entscheidung, und hier waere sie zu
-        // aendern: wer jemals einen fremden Erkenner einsetzt, schreibt dessen
-        // Adresse in dieselbe Zeile in die Konfiguration — sonst weist die
-        // Souveraenitaetsgrenze den Aufruf ab, ohne eine Zeile zu
-        // protokollieren, und der Knopf tut einfach nichts.
-        services.AddSingleton<ITexterkennung, PdfTexterkennung>();
+        // THE TEXT RECOGNISER — a library in the process, not a service on the
+        // network (ADR-0043). The decision stands here, and here it would have
+        // to be changed: whoever ever uses a foreign recogniser writes its
+        // address into the configuration on the same line — otherwise the
+        // sovereignty boundary refuses the call without logging a line, and the
+        // button simply does nothing.
+        services.AddSingleton<ITextRecogniser, PdfTextRecogniser>();
 
-        // Die Ablage aus ADR-0021, zurueck in .NET (ADR-0035). Sie steht hier
-        // und nicht in `ServiceDefaults`: ob ein Dienst Dateien haelt, ist eine
-        // Entscheidung, und Entscheidungen gehoeren in den Kompositionswurzel
-        // des Dienstes, der sie trifft (ADR-0003).
-        services.AddAblage(configuration);
-        services.AddScoped<IPruefspur, EfPruefspur>();
+        // The document store from ADR-0021, back in .NET (ADR-0035). It stands
+        // here and not in `ServiceDefaults`: whether a service holds files is a
+        // decision, and decisions belong in the composition root of the service
+        // that makes them (ADR-0003).
+        services.AddDocumentStore(configuration);
+        services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
-        services.AddScoped<HttpKorrelation>();
-        services.AddScoped<IKorrelation>(a => a.GetRequiredService<HttpKorrelation>());
-        services.AddScoped<IKorrelationsanhang>(a => a.GetRequiredService<HttpKorrelation>());
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
+        services.AddScoped<HttpCorrelation>();
+        services.AddScoped<ICorrelation>(provider => provider.GetRequiredService<HttpCorrelation>());
+        services.AddScoped<IAuditEntryFactory>(
+            provider => provider.GetRequiredService<HttpCorrelation>());
 
         // The old path lost a notification whenever the HTTP call failed after
         // the commit — the failure was swallowed, and nobody learned that their
@@ -99,56 +100,54 @@ public static class ResumeInfrastructure
         // and a dispatcher delivers it (ADR-0025). Ten attempts, not unlimited:
         // never giving up is reserved for an erasure, where a dead recipient
         // must block the completion.
-        services.AddScoped<IZustellung, HttpBenachrichtigung>();
+        services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<ResumeDbContext>(configuration);
 
-        services.AddCQRS(typeof(LebenslaufAnfragenBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(RequestResumeCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the ServiceFoundation, for the same
+    /// reason the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is missing here on purpose — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Anfragestand).Assembly, typeof(StationV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(RequestState).Assembly, typeof(PositionV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        // No AI seam: `ProviderCheck` without a source reports NotApplicable,
+        // and that is expressly NOT a green tick — a tick on something that does
+        // not apply here would be noise in the document meant to cut through
+        // noise.
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
+        // No further type stands between the question and the ledger — the
+        // precondition on which ADR-0013 fails in practice. A cache in front of
+        // it strikes nobody, because everything keeps working, only with the
+        // state from a moment ago.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
-
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "resume",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
-            pruefspurVorhanden: true));
+            !string.IsNullOrEmpty(erasure.Secret),
+            auditTrailPresent: true));
     }
 }

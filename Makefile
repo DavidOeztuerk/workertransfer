@@ -1,157 +1,155 @@
-# Ein Ziel je Frage, die jemand wirklich stellt.
+# One target per question somebody really asks.
 #
-# `check` ist das Tor: baut, prueft, testet — und BAUT UND TESTET IN GETRENNTEN
-# AUFRUFEN. Verkettet scheitern die Testcontainers-Reihen und sehen dabei aus
-# wie echte Testfehler.
+# `check` is the gate: builds, checks, tests — and BUILDS AND TESTS IN SEPARATE
+# INVOCATIONS. Chained, the Testcontainers suites fail and look exactly like
+# real test failures.
 
 .DEFAULT_GOAL := help
 DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e \
-        fix dev env up down images routenkarte analyze nachweis nachweis-pruefen \
+        fix dev env up down images route-map analyze evidence evidence-check \
         control-plane k8s-up k8s-down k8s-lint k8s-seed clean
 
-help:  # Diese Liste.
-	@# `0-9` im Muster, sonst fehlen k8s-up/-down/-seed/-lint — vorhanden, aber
-	@# unsichtbar, und damit fuer niemanden auffindbar.
-	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z0-9_-]+:.*# / {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+help:  # This list.
+	@# `0-9` in the pattern, otherwise k8s-up/-down/-seed/-lint are missing —
+	@# present, but invisible, and so findable by nobody.
+	@awk 'BEGIN {FS = ":.*#"} /^[a-zA-Z0-9_-]+:.*# / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-check: check-dotnet check-web  # Das Tor: alles, fail-fast.
+check: check-dotnet check-web  # The gate: everything, fail-fast.
 
-check-dotnet: build test  # Erst bauen, dann testen — in dieser Reihenfolge.
+check-dotnet: build test  # Build first, then test — in this order.
 
-build:  # Uebersetzen. Warnungen sind Fehler (Directory.Build.props).
+build:  # Compile. Warnings are errors (Directory.Build.props).
 	dotnet build $(DOTNET_SLN)
 
-test:  # Die Testreihen, EINZELN.
-	@# Nicht `dotnet test` ueber die Projektmappe: vierzehn Reihen starten dann
-	@# vierzehn Container gleichzeitig, der ResourceReaper von Testcontainers
-	@# laeuft in eine Zeitueberschreitung, und ALLE Reihen fallen binnen einer
-	@# Millisekunde mit TypeInitializationException. Das sieht aus wie ein
-	@# kaputter Bau und ist keiner.
+test:  # The test suites, ONE AT A TIME.
+	@# Not `dotnet test` over the solution: fourteen suites then start fourteen
+	@# containers at once, Testcontainers' ResourceReaper runs into a timeout,
+	@# and ALL suites fall within a millisecond with
+	@# TypeInitializationException. That looks like a broken build and is none.
 	@./scripts/test-dotnet.sh
 
-check-web:  # Frontend: TypeScript + Vitest + Buendeln.
-	@# `pnpm build` gehoert dazu. tsc und Vitest laufen beide NICHT ueber den
-	@# Bauweg; ein Fehler, der erst beim Buendeln auftritt, faellt sonst erst im
-	@# Bild auf — und das baut hier niemand nebenbei.
+check-web:  # Frontend: TypeScript + Vitest + bundling.
+	@# `pnpm build` belongs here. tsc and Vitest both do NOT run through the
+	@# build path; an error that only shows up when bundling otherwise shows up
+	@# only in the image — and nobody builds that here on the side.
 	cd web && pnpm check
 	cd web && pnpm test
 	cd web && pnpm build
 
-test-web:  # Nur die Frontend-Reihe.
+test-web:  # Only the frontend suite.
 	cd web && pnpm test
 
-validate:  # Wie check, aber laeuft durch und berichtet jeden roten Schritt.
+validate:  # Like check, but runs through and reports every red step.
 	./scripts/validate.sh
 
-analyze:  # Noelias Werkzeug ueber die Zusammensetzung dieses Baumes (ADR-0045).
-	@# Statisch: es liest literale Aufrufe und Konfiguration. Was zur Laufzeit
-	@# entschieden wird, sieht es nicht — dafuer gibt es
+analyze:  # Noelia's tool over the composition of this tree (ADR-0045).
+	@# Static: it reads literal calls and configuration. What is decided at
+	@# runtime it does not see — for that there is
 	@# `noelia analyze --url <dashboard>`.
 	@#
-	@# Exit 0 sauber, 1 Befunde, 2 das Werkzeug selbst kaputt. Die 2 ist der
-	@# Grund, warum hier nicht `|| true` steht: ein Werkzeug, das nicht laeuft,
-	@# ist kein sauberer Baum.
+	@# Exit 0 clean, 1 findings, 2 the tool itself broken. The 2 is the reason
+	@# there is no `|| true` here: a tool that does not run is no clean tree.
 	@PATH="$$PATH:$$HOME/.dotnet/tools" noelia analyze .
 
-nachweis:  # Die drei signierten Dokumente gegen den laufenden Stapel (ADR-0044).
-	@# Datenschutz, KI, Mitbestimmung — drei Dokumente fuer drei Leser, weil
-	@# man aus einem gemischten den einen Teil zitieren kann, ohne den Teil zu
-	@# zitieren, der ihn einschraenkt. Braucht `make up`.
-	./scripts/nachweis.sh
+evidence:  # The three signed documents against the running stack (ADR-0044).
+	@# Datenschutz, KI, Mitbestimmung — three documents for three readers,
+	@# because from a mixed one the one part can be quoted without quoting the
+	@# part that limits it. Needs `make up`.
+	./scripts/evidence.sh
 
-nachweis-pruefen:  # Jede Pruefung in jedem Dienst; rot, sobald eine Zusage offen ist.
-	@# Rot NUR bei `fehlt`. Ein Hinweis ist kein Mangel, sondern eine Frage an
-	@# einen Menschen — ein Tor, das auf eine gewollte Zurueckhaltung rot geht,
-	@# schaltet der naechste Mensch ab. Braucht `make up`.
-	./scripts/nachweis-pruefen.sh
+evidence-check:  # Every check in every service; red as soon as a promise is open.
+	@# Red ONLY on `Fail`. A warning is no defect but a question to a human —
+	@# a gate that goes red on deliberate restraint gets switched off by the
+	@# next person. Needs `make up`.
+	./scripts/evidence-check.sh
 
-routenkarte:  # docs/routenkarte.yml gegen den laufenden Stapel fahren.
-	@# Die VOLLSTAENDIGKEIT der Karte prueft RoutenkarteTests und laeuft in
-	@# jeder Reihe mit. Hier werden die ANTWORTEN geprueft, und dafuer braucht
-	@# es den Stapel: `make up` zuerst.
-	./scripts/routenkarte.sh
+route-map:  # Drive docs/routenkarte.yml against the running stack.
+	@# The COMPLETENESS of the map is checked by RouteMapTests and runs in
+	@# every suite. Here the ANSWERS are checked, and that needs the stack:
+	@# `make up` first.
+	./scripts/route-map.sh
 
-validate-e2e:  # Zusaetzlich die Browser-Reise; braucht den laufenden Stapel.
+validate-e2e:  # The browser journeys as well; needs the running stack.
 	./scripts/validate.sh --e2e
 
-fix:  # Formatieren.
+fix:  # Format.
 	dotnet format $(DOTNET_SLN)
 
-env:  # .env anlegen: vier Geheimnisse wuerfeln, das Token-Schluesselpaar erzeugen.
-	@# Der erste Befehl in einem frischen Klon. Danach laeuft `make up`.
+env:  # Create .env: roll four secrets, generate the token key pair.
+	@# The first command in a fresh clone. After it, `make up` runs.
 	@#
-	@# Die Geheimnisse stehen in .env.example LEER — ein eingebauter Vorgabewert
-	@# waere das Geheimnis selbst, und es laege in git. Hier entstehen sie neu,
-	@# je Klon andere.
+	@# The secrets stand EMPTY in .env.example — a built-in default would be
+	@# the secret itself, and it would sit in git. Here they come about fresh,
+	@# different per clone.
 	@if [ -f .env ]; then \
-		echo ".env gibt es schon — nichts geaendert."; \
-		echo "Zum Neuwuerfeln: rm .env && make env"; \
+		echo ".env exists already — nothing changed."; \
+		echo "To roll again: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_NACHWEIS_SECRET; do \
-			wert=$$(openssl rand -base64 32); \
+		for s in WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_EVIDENCE_SECRET; do \
+			value=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
-			awk -v k="$$s" -v v="$$wert" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
+			awk -v k="$$s" -v v="$$value" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
 		pem=$$(mktemp); \
 		openssl ecparam -name prime256v1 -genkey -noout -out "$$pem" 2>/dev/null; \
-		privat=$$(openssl pkcs8 -topk8 -nocrypt -in "$$pem" -outform DER 2>/dev/null | base64 | tr -d '\n'); \
-		oeffentlich=$$(openssl ec -in "$$pem" -pubout -outform DER 2>/dev/null | base64 | tr -d '\n'); \
+		private=$$(openssl pkcs8 -topk8 -nocrypt -in "$$pem" -outform DER 2>/dev/null | base64 | tr -d '\n'); \
+		public=$$(openssl ec -in "$$pem" -pubout -outform DER 2>/dev/null | base64 | tr -d '\n'); \
 		rm -f "$$pem"; \
-		for paar in "WORKERTRANSFER_JWT_PRIVATE_KEY=$$privat" "WORKERTRANSFER_JWT_PUBLIC_KEY=$$oeffentlich"; do \
-			k=$${paar%%=*}; v=$${paar#*=}; \
+		for pair in "WORKERTRANSFER_JWT_PRIVATE_KEY=$$private" "WORKERTRANSFER_JWT_PUBLIC_KEY=$$public"; do \
+			k=$${pair%%=*}; v=$${pair#*=}; \
 			tmp=$$(mktemp); \
 			awk -v k="$$k" -v v="$$v" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
-		echo ".env angelegt: vier Geheimnisse gewuerfelt, ein Schluesselpaar erzeugt."; \
-		echo "Sie ist ignoriert und gehoert nicht in git."; \
+		echo ".env created: four secrets rolled, one key pair generated."; \
+		echo "It is ignored and does not belong in git."; \
 	fi
 
-up:  # Der ganze Stapel lokal: Postgres, Mailpit, zwoelf Dienste, Gateway, Oberflaeche.
+up:  # The whole stack locally: Postgres, Mailpit, fourteen services, gateway, UI.
 	docker compose up -d --build
 
-down:  # Anhalten. `make down ARGS=-v` wirft auch die Datenbanken weg.
+down:  # Stop. `make down ARGS=-v` throws the databases away too.
 	docker compose down $(ARGS)
 
-dev: up  # Alias fuer `up` — der Stapel IST die Entwicklungsumgebung.
+dev: up  # Alias for `up` — the stack IS the development environment.
 
-k8s-up:  # Lokale Staging-Umgebung auf kind — bauen, ausrollen, BELEGEN.
+k8s-up:  # Local staging environment on kind — build, roll out, PROVE.
 	./scripts/k8s-up.sh
 
-k8s-down:  # Den kind-Cluster samt Daten loeschen.
+k8s-down:  # Delete the kind cluster together with its data.
 	./scripts/k8s-down.sh
 
-k8s-seed:  # Testdaten in die laufende Umgebung: Firma, drei Stellen, ein Bewerber-Konto.
+k8s-seed:  # Test data into the running environment: company, three jobs, an applicant account.
 	./scripts/k8s-seed.sh
 
-control-plane:  # Die Noelia Control Plane ueber den laufenden Stapel: http://localhost:8091
-	@# Ein Overlay und kein Teil von `make up`: das Produkt liegt in einem
-	@# Nachbarrepositorium, und `make up` darf bei niemandem daran scheitern.
-	@# Der Pfad laesst sich mit NOELIA_CONTROL_PLANE_PFAD umbiegen.
+control-plane:  # The Noelia Control Plane over the running stack: http://localhost:8091
+	@# An overlay and no part of `make up`: the product lives in a neighbouring
+	@# repository, and `make up` must fail for nobody because of it.
+	@# The path can be redirected with NOELIA_CONTROL_PLANE_PFAD.
 	docker compose -f docker-compose.yml -f docker-compose.noelia.yml up -d --build noelia-control-plane
 
-images:  # Beide ausgelieferten Bilder bauen. Der lokale Zwilling des CI-Jobs.
-	@# Eine gruene Pruefung, die kein Bild baut, sagt nichts ueber das, was
-	@# ausgeliefert wird: der Sprung auf node 25 kam so durch und zerlegte das
-	@# Oberflaechenbild (node 25 bringt kein corepack mehr mit).
+images:  # Build both shipped images. The local twin of the CI job.
+	@# A green check that builds no image says nothing about what is shipped:
+	@# the jump to node 25 got through that way and broke the UI image (node 25
+	@# no longer ships corepack).
 	docker build -f docker/dotnet-service.Dockerfile \
 		--secret "id=nuget_config,src=$(HOME)/.nuget/NuGet/NuGet.Config" \
 		-t workertransfer-dotnet:local .
 	docker build -f docker/web-prod.Dockerfile -t workertransfer/web:local .
 
-# Die zwei Schluesselwerte sind WEGWERFWERTE und heissen deshalb so. Das Chart
-# verlangt sie (`required`), weil ein gewuerfeltes Paar nicht zueinander passt
-# — hier wird aber nur gerendert, nie angewendet. Ohne sie prueft dieses Ziel
-# das Chart gar nicht erst zu Ende.
+# The two key values are THROWAWAY values and are called that. The chart
+# demands them (`required`), because a rolled pair does not fit together — but
+# here it is only rendered, never applied. Without them this target does not
+# check the chart to the end.
 HELM_PROBE = --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
-	--set secrets.jwtPrivateKey=wegwerfwert --set secrets.jwtPublicKey=wegwerfwert
+	--set secrets.jwtPrivateKey=throwaway --set secrets.jwtPublicKey=throwaway
 
-k8s-lint:  # Chart pruefen, ohne Cluster: helm lint + rendern.
+k8s-lint:  # Check the chart without a cluster: helm lint + render.
 	helm lint deploy/helm/workertransfer $(HELM_PROBE)
 	helm template deploy/helm/workertransfer $(HELM_PROBE) > /dev/null
-	@echo "Chart rendert."
+	@echo "Chart renders."
 
-clean:  # Bau- und Testreste.
+clean:  # Build and test leftovers.
 	find src tests -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} +

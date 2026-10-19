@@ -9,10 +9,10 @@
   <ItemGroup>
     <PackageReference Include="Ocelot" />
     <!--
-      Noelias Zwischenschichten fuer Bremse und Korrelation — und seit 4.2.0
-      kosten sie nichts weiter: `Noelia.Http` bringt NULL Fremdpakete mit,
-      waehrend `Noelia.Infrastructure` vierundvierzig zoege. Genau dieser Preis
-      war der Grund, warum hier vorher beides von Hand stand.
+      Noelia's middleware for the brake and the correlation id — and since
+      4.2.0 it costs nothing more: `Noelia.Http` brings ZERO third-party
+      packages, while `Noelia.Infrastructure` would pull forty-four. Exactly
+      that price was the reason both stood here by hand before.
     -->
     <PackageReference Include="Noelia.Abstractions" />
     <PackageReference Include="Noelia.Http" />
@@ -20,19 +20,19 @@
 
   <ItemGroup>
     <!--
-      Nur fuer `Umgebung.Laden()`. Das Gateway ruft bewusst NICHT
-      `AddWorkerTransferDefaults` — es hat keine Datenbank, keine CQRS-Pipeline
-      und keine Endpunkte, die ein Token pruefen. Aber die Konfiguration soll
-      es genauso lesen wie die elf anderen: ein zweiter Weg dafuer waere ein
-      zweiter Ort, an dem ein Schluessel fehlen kann.
+      Only for `EnvironmentFile.Load()`. The gateway deliberately does NOT call
+      `AddWorkerTransferDefaults` — it has no database, no CQRS pipeline and no
+      endpoints that verify a token. But it should read its configuration
+      exactly like the fourteen others: a second way of doing that would be a
+      second place where a key can be missing.
     -->
     <ProjectReference Include="..\..\shared\WorkerTransfer.ServiceDefaults\WorkerTransfer.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!--
-      Die Landkarte reist mit dem Bild. Sie ist kein Anhängsel der
-      Konfiguration, sondern das Einzige, was dieser Dienst tut.
+      The route map travels with the image. It is no appendix to the
+      configuration but the only thing this service does.
     -->
     <Content Update="ocelot.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

@@ -9,71 +9,103 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { LoadingBlock, PageShell } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
+import { SignInRequired } from "../components/SignInRequired";
 import { useAsync } from "../lib/useAsync";
 import {
-  type Abschnitt,
-  abschnitt,
-  baueAuskunft,
-  dateiname,
+  type ExportSection,
+  buildExport,
+  fileName,
+  section,
 } from "../lib/export";
+import type { MessageKey } from "../../../shared/api/errors";
 import { listMyConsentHistory, listMyConsents } from "../api/consent";
 import { getMyProfile } from "../api/profile";
-import { ladeMeinen, ladeMeineAnfragen } from "../api/resume";
-import { ladeMeines } from "../api/portfolio";
-import { ladeMeine as ladeGitHub } from "../api/github";
-import { ladeWahl } from "../api/settings";
-import { ladeAnschrift } from "../api/zivilidentitaet";
+import { getMyCurriculumVitae, getMyResumeRequests } from "../api/resume";
+import { getMyPortfolio } from "../api/portfolio";
+import { getMyConnection } from "../api/github";
+import { getNotificationPreferences } from "../api/notificationPreferences";
+import { getPostalAddress } from "../api/civilIdentity";
 import { getMyMarketStatus, listMyMarketRequests } from "../../work/api/market";
 import { listMyTransfers } from "../../work/api/transfers";
 import { listMyApplications } from "../../work/api/applications";
 
 /**
- * <c>/my-data</c> — alles über einen selbst, in einer Datei.
+ * <c>/my-data</c> — everything about oneself, in one file.
  *
- * <strong>Sie entsteht im Browser und wird nirgends abgelegt.</strong> Es gibt
- * keinen Endpunkt, der sie erzeugt — sonst hätte eine Auskunft über die eigenen
- * Daten selbst wieder Daten hinterlassen.
+ * <strong>It is built in the browser and stored nowhere.</strong> There is no
+ * endpoint that produces it — otherwise an export of one's own data would
+ * itself have left data behind.
  *
- * <strong>Zwölf Quellen, parallel, und keine bricht die Seite.</strong> Was
- * nicht antwortet, wird als <c>nicht_abrufbar</c> vermerkt — auf der Seite UND
- * in der Datei. Eine Auskunft, die stillschweigend die Hälfte weglässt, ist
- * schlimmer als eine, die fehlt: die eine merkt man, die andere nicht.
+ * <strong>Twelve sources, in parallel, and none breaks the page.</strong>
+ * Whatever does not answer is marked <c>nicht_abrufbar</c> — on the page AND in
+ * the file. An export that silently leaves out half is worse than one that is
+ * missing: the one is noticed, the other is not.
  *
- * <strong>Kein Löschen-Knopf neben dem Herunterladen-Knopf.</strong> Hier lässt
- * sich nichts falsch anklicken, was sich nicht rückgängig machen liesse. Der
- * Verweis geht in beide Richtungen, damit niemand glaubt, es gäbe eine
- * Pflichtreihenfolge.
+ * <strong>No delete button next to the download button.</strong> Nothing here
+ * can be clicked wrongly that could not be undone. The link goes in both
+ * directions, so that nobody believes there is a mandatory order.
  */
+/**
+ * What the page CALLS each section — the catalogue's word, in the person's
+ * language.
+ *
+ * <strong>The file keeps its German section names</strong> (`profil`,
+ * `freigaben_verlauf` …): they are keys of a data format somebody may already
+ * have parsed, and consents-journey reads them from the downloaded file. The
+ * page drew exactly those keys until 26.09.2026 (`name.replace(/_/g, " ")`),
+ * so an English or French person read "freigaben verlauf". The type makes the
+ * two lists one: a section without a label does not compile.
+ */
+const SECTION_LABELS = {
+  konto: "myData.sectionAccount",
+  benachrichtigungen: "myData.sectionNotifications",
+  profil: "myData.sectionProfile",
+  lebenslauf: "myData.sectionResume",
+  lebenslauf_anfragen: "myData.sectionResumeRequests",
+  portfolio: "myData.sectionPortfolio",
+  github: "myData.sectionGitHub",
+  marktstatus: "myData.sectionMarketStatus",
+  markt_anfragen: "myData.sectionMarketRequests",
+  transfers: "myData.sectionTransfers",
+  bewerbungen: "myData.sectionApplications",
+  freigaben: "myData.sectionConsents",
+  freigaben_verlauf: "myData.sectionConsentHistory",
+} as const satisfies Record<string, MessageKey>;
+
+type SectionName = keyof typeof SECTION_LABELS;
+
+const labelOf = (name: string): MessageKey =>
+  SECTION_LABELS[name as SectionName] ?? "myData.sectionOther";
+
 export function MyDataPage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
 
-  const auskunft = useAsync(
-    async (signal): Promise<Record<string, Abschnitt>> => {
+  const dataExport = useAsync(
+    async (signal): Promise<Record<SectionName, ExportSection>> => {
       const [
-        benachrichtigungen,
-        anschrift,
+        notifications,
+        postalAddress,
         profile,
-        lebenslauf,
-        lebenslaufAnfragen,
+        curriculumVitae,
+        resumeRequests,
         portfolio,
         github,
-        marktstatus,
-        marktAnfragen,
+        marketStatus,
+        marketRequests,
         transfers,
-        bewerbungen,
-        freigaben,
-        verlauf,
+        applications,
+        consents,
+        history,
       ] = await Promise.all([
-        ladeWahl(signal),
-        ladeAnschrift(signal),
+        getNotificationPreferences(signal),
+        getPostalAddress(signal),
         getMyProfile(signal),
-        ladeMeinen(signal),
-        ladeMeineAnfragen(signal),
-        ladeMeines(signal),
-        ladeGitHub(signal),
+        getMyCurriculumVitae(signal),
+        getMyResumeRequests(signal),
+        getMyPortfolio(signal),
+        getMyConnection(signal),
         getMyMarketStatus(signal),
         listMyMarketRequests(signal),
         listMyTransfers(signal),
@@ -83,54 +115,55 @@ export function MyDataPage() {
       ]);
 
       return {
-        konto: abschnitt(session !== null, {
+        // The keys of this object are the SECTION NAMES of the file a person
+        // downloads — a data contract, not an incidental name. They are German
+        // because they were at the first export, and the E2E journey reads them
+        // off the page (`consents-journey.spec.ts`).
+        konto: section(session !== null, {
           ...session,
-          anschrift: anschrift ?? undefined,
+          anschrift: postalAddress ?? undefined,
         }),
-        benachrichtigungen: abschnitt(
-          benachrichtigungen !== null,
-          benachrichtigungen ?? undefined,
+        benachrichtigungen: section(
+          notifications !== null,
+          notifications ?? undefined,
         ),
-        // Die Schlüssel dieses Objekts sind die ABSCHNITTSNAMEN der Datei, die
-        // ein Mensch herunterlädt — Datenvertrag, kein beiläufiger Name. Sie
-        // heissen deutsch, weil sie es beim ersten Export taten.
-        profil: abschnitt(profile.ok, profile.ok ? profile.profile : undefined),
-        lebenslauf: abschnitt(
-          lebenslauf.ok,
-          lebenslauf.ok ? lebenslauf.value : undefined,
+        profil: section(profile.ok, profile.ok ? profile.profile : undefined),
+        lebenslauf: section(
+          curriculumVitae.ok,
+          curriculumVitae.ok ? curriculumVitae.value : undefined,
         ),
-        lebenslauf_anfragen: abschnitt(
-          lebenslaufAnfragen.ok,
-          lebenslaufAnfragen.ok ? lebenslaufAnfragen.value : undefined,
+        lebenslauf_anfragen: section(
+          resumeRequests.ok,
+          resumeRequests.ok ? resumeRequests.value : undefined,
         ),
-        portfolio: abschnitt(
+        portfolio: section(
           portfolio.ok,
           portfolio.ok ? portfolio.value : undefined,
         ),
-        github: abschnitt(github.ok, github.ok ? github.value : undefined),
-        marktstatus: abschnitt(
-          marktstatus.ok,
-          marktstatus.ok ? marktstatus.status : undefined,
+        github: section(github.ok, github.ok ? github.value : undefined),
+        marktstatus: section(
+          marketStatus.ok,
+          marketStatus.ok ? marketStatus.status : undefined,
         ),
-        markt_anfragen: abschnitt(
-          marktAnfragen.ok,
-          marktAnfragen.ok ? marktAnfragen.requests : undefined,
+        markt_anfragen: section(
+          marketRequests.ok,
+          marketRequests.ok ? marketRequests.requests : undefined,
         ),
-        transfers: abschnitt(
+        transfers: section(
           transfers.ok,
           transfers.ok ? transfers.transfers : undefined,
         ),
-        bewerbungen: abschnitt(
-          bewerbungen.ok,
-          bewerbungen.ok ? bewerbungen.applications : undefined,
+        bewerbungen: section(
+          applications.ok,
+          applications.ok ? applications.applications : undefined,
         ),
-        freigaben: abschnitt(
-          freigaben.ok,
-          freigaben.ok ? freigaben.consents : undefined,
+        freigaben: section(
+          consents.ok,
+          consents.ok ? consents.consents : undefined,
         ),
-        freigaben_verlauf: abschnitt(
-          verlauf.ok,
-          verlauf.ok ? verlauf.events : undefined,
+        freigaben_verlauf: section(
+          history.ok,
+          history.ok ? history.events : undefined,
         ),
       };
     },
@@ -140,57 +173,59 @@ export function MyDataPage() {
 
   if (status === "anonymous") {
     return (
-      <AnmeldungNoetig
-        titel={t("meineDaten.titel")}
-        satz="meineDaten.anmelden"
+      <SignInRequired
+        title={t("myData.title")}
+        sentenceKey="myData.signInRequired"
       />
     );
   }
 
   const result =
-    auskunft.value === undefined ? null : baueAuskunft(auskunft.value);
+    dataExport.value === undefined ? null : buildExport(dataExport.value);
   const missing = result?.unvollständig ?? [];
 
-  function herunterladen() {
+  function download() {
     if (result === null) return;
 
     const content = new Blob([JSON.stringify(result, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(content);
-    const verweis = document.createElement("a");
-    verweis.href = url;
-    verweis.download = dateiname();
-    verweis.click();
-    // Freigeben, sonst haelt der Browser den Inhalt bis zum Neuladen im
-    // Speicher — bei einer Datei ueber die eigenen Daten unnoetig lange.
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName();
+    link.click();
+    // Release it, otherwise the browser keeps the content in memory until the
+    // next reload — needlessly long for a file about one's own data.
     URL.revokeObjectURL(url);
   }
 
   return (
     <PageShell
-      title={t("meineDaten.titel")}
+      title={t("myData.title")}
       narrow
-      lead={t("meineDaten.lead")}
+      lead={t("myData.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          {auskunft.laedt ? (
-            <LoadingBlock label={t("meineDaten.laden")} />
+          {dataExport.loading ? (
+            <LoadingBlock label={t("myData.loading")} />
           ) : null}
 
           {missing.length > 0 ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {t("meineDaten.unvollstaendig", { teile: missing.join(", ") })}
+              {t("myData.incomplete", {
+                teile: missing.map((name) => t(labelOf(name))).join(", "),
+              })}
             </Alert>
           ) : null}
 
           {result !== null ? (
             <>
-              {/* Ein `<dl>`, keine Liste: zu jedem Abschnitt gehört die
-                  Auskunft, ob er enthalten ist. Diese Zuordnung IST der Inhalt
-                  der Aufstellung und steht damit im Markup statt im Layout. */}
               <Box
+                // A <dl> and not a list: every section carries whether it is
+                // included, and that pairing IS the content, so it belongs in
+                // the markup rather than in the layout.
                 component="dl"
                 sx={{
                   display: "grid",
@@ -203,7 +238,7 @@ export function MyDataPage() {
                 {Object.entries(result.abschnitte).map(([name, entry]) => (
                   <Box key={name} sx={{ display: "contents" }}>
                     <Typography component="dt" variant="body2">
-                      {name.replace(/_/g, " ")}
+                      {t(labelOf(name))}
                     </Typography>
                     <Typography
                       component="dd"
@@ -217,16 +252,16 @@ export function MyDataPage() {
                     >
                       {t(
                         entry.status === "ok"
-                          ? "meineDaten.enthalten"
-                          : "meineDaten.fehlt",
+                          ? "myData.included"
+                          : "myData.missing",
                       )}
                     </Typography>
                   </Box>
                 ))}
               </Box>
 
-              <Button variant="contained" onClick={herunterladen}>
-                {t("meineDaten.herunterladen")}
+              <Button variant="contained" onClick={download}>
+                {t("myData.download")}
               </Button>
             </>
           ) : null}
@@ -236,10 +271,10 @@ export function MyDataPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1 }}>
-            {t("meineDaten.loeschenTitel")}
+            {t("myData.deleteTitle")}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("meineDaten.loeschenText")}
+            {t("myData.deleteText")}
           </Typography>
           <Button
             component={RouterLink}
@@ -247,7 +282,7 @@ export function MyDataPage() {
             variant="outlined"
             color="error"
           >
-            {t("kopf.kontoLoeschen")}
+            {t("header.deleteAccount")}
           </Button>
         </CardContent>
       </Card>

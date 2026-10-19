@@ -32,10 +32,10 @@ public sealed class UserRow
     /// <summary>The company meant at registration. <c>null</c> means a person.</summary>
     public string? PendingCompanyName { get; set; }
 
-    /// <summary>Bürgerlicher Vorname. Nullable — Art. 25, ADR-0038.</summary>
+    /// <summary>The civil given name. Nullable — Art. 25, ADR-0038.</summary>
     public string? GivenName { get; set; }
 
-    /// <summary>Bürgerlicher Nachname.</summary>
+    /// <summary>The civil family name.</summary>
     public string? FamilyName { get; set; }
 
     /// <summary>The <c>language</c> column: two letters, never null.</summary>
@@ -47,14 +47,13 @@ public sealed class UserRow
     /// </remarks>
     public string Language { get; set; } = "de";
 
-    /// <summary>Die <c>berufsfeld</c>-Spalte: ein Etikett, oder <c>null</c>.</summary>
+    /// <summary>The <c>berufsfeld</c> column: a label, or <c>null</c>.</summary>
     /// <remarks>
-    /// Nullbar ohne Vorgabe (ADR-0039): bestehende Zeilen behalten die neutrale
-    /// Ansicht. Eine Zeichenkette und nicht die Aufzählung, wie bei
-    /// <see cref="Language"/> — ein zwölftes Feld ist dann keine Wanderung des
-    /// Spaltentyps.
+    /// Nullable with no default (ADR-0039): existing rows keep the neutral view.
+    /// A string and not the enumeration, as with <see cref="Language"/> — a
+    /// twelfth field is then no migration of the column type.
     /// </remarks>
-    public string? Berufsfeld { get; set; }
+    public string? OccupationalField { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -63,37 +62,37 @@ public sealed class UserRow
     public int Version { get; set; }
 }
 
-/// <summary>Was eine Person über sich entschieden hat.</summary>
+/// <summary>What a person decided about themselves.</summary>
 /// <remarks>
-/// <strong>Eine Personenzeile</strong> (siehe die Anmerkung unten): der
-/// Schlüssel IST die Person, es gibt keine `subject_id`-Spalte daneben. Der
-/// Löschwächter erkennt solche Tabellen an der Anmerkung und nicht am
-/// Spaltennamen — sonst übersähe er ausgerechnet die, die am meisten halten.
+/// <strong>A subject-keyed table</strong> (see the annotation below): the key IS
+/// the person, there is no `subject_id` column beside it. The erasure guard
+/// recognises such tables by the annotation and not by the column name —
+/// otherwise it would miss precisely the ones that hold the most.
 /// </remarks>
-public sealed class KontoeinstellungenRow
+public sealed class AccountSettingsRow
 {
-    /// <summary>Wessen. Zugleich der Schlüssel.</summary>
+    /// <summary>Whose. And at the same time the key.</summary>
     public Guid SubjectId { get; set; }
 
-    /// <summary>Verfall in Monaten, oder <c>null</c> für „nie von selbst".</summary>
+    /// <summary>The lapse in months, or <c>null</c> for "never by itself".</summary>
     public int? DeleteAfterMonths { get; set; }
 
-    /// <summary>Der KI-Anbieter als Etikett: none, openai_compatible, anthropic.</summary>
+    /// <summary>The AI provider as a label: none, openai_compatible, anthropic.</summary>
     public string AiProvider { get; set; } = "none";
 
-    /// <summary>Seine Adresse.</summary>
+    /// <summary>Its address.</summary>
     public string AiBaseUrl { get; set; } = string.Empty;
 
-    /// <summary>Sein Modell.</summary>
+    /// <summary>Its model.</summary>
     public string AiModel { get; set; } = string.Empty;
 
-    /// <summary>Der Schlüssel, verschlüsselt. Nie im Klartext.</summary>
+    /// <summary>The key, encrypted. Never in the clear.</summary>
     public string AiKeyEncrypted { get; set; } = string.Empty;
 
-    /// <summary>Die letzten vier Zeichen, zum Wiedererkennen.</summary>
+    /// <summary>The last four characters, for recognising it again.</summary>
     public string AiKeyTail { get; set; } = string.Empty;
 
-    /// <summary>Ob festgehalten wird, DASS eine Anfrage hinausging.</summary>
+    /// <summary>Whether it is recorded THAT a request went out.</summary>
     public bool AiAuditLog { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -102,13 +101,13 @@ public sealed class KontoeinstellungenRow
 }
 
 /// <summary>
-/// Die Bewerbungsanschrift — Vorlage für Briefkopf, nie für Suche, nie für KI.
+/// The application address — a template for a letterhead, never for the search, never for AI.
 /// </summary>
 /// <remarks>
-/// Personenzeile: der Schlüssel IST die Person. Ohne die Anmerkung fände der
-/// Löschwächter die Tabelle nicht (ADR-0027/0038).
+/// A subject-keyed table: the key IS the person. Without the annotation the
+/// erasure guard would not find the table (ADR-0027/0038).
 /// </remarks>
-public sealed class AnschriftRow
+public sealed class PostalAddressRow
 {
     public Guid SubjectId { get; set; }
 
@@ -142,11 +141,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 {
     public DbSet<UserRow> Users => Set<UserRow>();
 
-    /// <summary>Was eine Person über sich entschieden hat.</summary>
-    public DbSet<KontoeinstellungenRow> AccountSettings => Set<KontoeinstellungenRow>();
+    /// <summary>What a person decided about themselves.</summary>
+    public DbSet<AccountSettingsRow> AccountSettings => Set<AccountSettingsRow>();
 
-    /// <summary>Bewerbungsanschrift. Personenzeile.</summary>
-    public DbSet<AnschriftRow> Addresses => Set<AnschriftRow>();
+    /// <summary>The application address. A subject-keyed table.</summary>
+    public DbSet<PostalAddressRow> Addresses => Set<PostalAddressRow>();
 
     public DbSet<AuditEventRow> AuditEvents => Set<AuditEventRow>();
 
@@ -168,10 +167,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
         modelBuilder.Entity<UserRow>(entity =>
         {
-            // Bis zur Migration besass Alembic diese Tabelle; die Abbildung trug
-            // dafuer `ExcludeFromMigrations()`. Mit dem Python-Dienst faellt die
-            // Ausnahme weg: dieser Dienst legt sein Schema jetzt selbst an, wie
-            // die anderen zehn auch.
+            // Until the migration Alembic owned this table; the mapping carried
+            // `ExcludeFromMigrations()` for that. With the Python service the
+            // exception falls away: this service now creates its schema itself,
+            // like the other ten.
             entity.ToTable("users");
             entity.HasKey(row => row.Id);
             entity.Property(row => row.Id).HasColumnName("id");
@@ -183,21 +182,26 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.Status).HasColumnName("status");
             entity.Property(row => row.Roles).HasColumnName("roles").HasColumnType("jsonb");
             entity.Property(row => row.PendingCompanyName).HasColumnName("pending_company_name");
-            entity.Property(row => row.Language).HasColumnName("language");
-            entity.Property(row => row.Berufsfeld).HasColumnName("berufsfeld");
+            // The default belongs in the model, not in a migration. It used to
+            // live only in the one that added the column, and a regenerated
+            // schema therefore dropped it — a row written without a language
+            // then fails the NOT NULL constraint instead of reading "de".
+            entity.Property(row => row.Language).HasColumnName("language")
+                .HasDefaultValue("de");
+            entity.Property(row => row.OccupationalField).HasColumnName("berufsfeld");
             entity.Property(row => row.CreatedAt).HasColumnName("created_at");
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
             entity.Property(row => row.Version).HasColumnName("version").IsConcurrencyToken();
         });
 
-        modelBuilder.Entity<KontoeinstellungenRow>(entity =>
+        modelBuilder.Entity<AccountSettingsRow>(entity =>
         {
             entity.ToTable("account_settings");
-            // `Personenzeile`: der Schlüssel IST die Person. Ohne diese
-            // Anmerkung fände der Löschwächter die Tabelle nicht — er sucht
-            // nach Spaltennamen UND nach dieser Anmerkung, genau weil solche
-            // Tabellen keine `subject_id` neben dem Schlüssel haben.
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            // `SubjectKeyedTable`: the key IS the person. Without this
+            // annotation the erasure guard would not find the table — it looks
+            // for column names AND for this annotation, precisely because such
+            // tables have no `subject_id` beside the key.
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.DeleteAfterMonths).HasColumnName("delete_after_months");
@@ -211,10 +215,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
         });
 
-        modelBuilder.Entity<AnschriftRow>(entity =>
+        modelBuilder.Entity<PostalAddressRow>(entity =>
         {
             entity.ToTable("addresses");
-            entity.HasAnnotation(Personenzeile.Anmerkung, true);
+            entity.HasAnnotation(SubjectKeyedTable.Annotation, true);
             entity.HasKey(row => row.SubjectId);
             entity.Property(row => row.SubjectId).HasColumnName("subject_id");
             entity.Property(row => row.Line1).HasColumnName("line1");

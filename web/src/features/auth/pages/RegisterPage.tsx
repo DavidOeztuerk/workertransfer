@@ -18,106 +18,112 @@ import Link from "@mui/material/Link";
 import { Trans, useTranslation } from "react-i18next";
 
 import { useAppSelector } from "../../../core/store/hooks";
-import { BerufsfeldSelect } from "../../../shared/components/ui";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { OccupationalFieldSelect } from "../../../shared/components/ui";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { AuthCard } from "../components/AuthCard";
 import { AuthModeTabs } from "../components/AuthModeTabs";
 import {
   isPublicEmailDomain,
-  registriere,
-  sendeBestaetigungErneut,
-} from "../api/registrierung";
+  register,
+  resendVerification,
+} from "../api/registration";
 import {
-  PASSWORT_MINDESTLAENGE,
-  emailFehler,
-  passwortFehler,
-} from "../lib/formpruefung";
+  PASSWORD_MIN_LENGTH,
+  emailError,
+  passwordError,
+} from "../lib/formValidation";
 
-type Art = "person" | "company";
+type AccountKind = "person" | "company";
 
 /**
- * Ein Konto anlegen — für sich selbst oder für ein Unternehmen.
+ * Create an account — for oneself or for a company.
  *
- * <strong>Kein Mandantenfeld.</strong> Der Client nennt hier höchstens einen
- * NAMEN, nie eine Zugehörigkeit. Die Domain leitet der Server aus der
- * bestätigten Adresse ab — was der Client nicht senden kann, kann er nicht
- * fälschen (ADR-0017/0018/0019).
+ * <strong>No tenant field.</strong> The client names at most a NAME here, never
+ * an affiliation. The server derives the domain from the confirmed address —
+ * what the client cannot send, it cannot forge (ADR-0017/0018/0019).
  */
 export function RegisterPage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
   const [searchParams] = useSearchParams();
 
-  // Die Voreinstellung ist „person", und zwar ausdrücklich: registrieren ist
-  // der Akt einer natürlichen Person (ADR-0017), und der Normalfall auf einem
-  // Transfermarkt ist jemand ohne Unternehmen. Die Hero-Knöpfe der Startseite
-  // tragen die andere Absicht als `?as=company` mit — ohne diese Vorauswahl
-  // landet jemand, der „Als Unternehmen entdecken" klickt, im Personenformular
-  // und merkt es erst nach der Bestätigungsmail.
-  const [art, setArt] = useState<Art>(
+  // The default is "person", and explicitly so: registering is the act of a
+  // natural person (ADR-0017), and the normal case on a transfer market is
+  // someone without a company. The hero buttons of the home page carry the
+  // other intent along as `?as=company` — without this preselection someone who
+  // clicks "Discover as a company" lands in the person form and only notices
+  // after the confirmation mail.
+  const [kind, setKind] = useState<AccountKind>(
     searchParams.get("as") === "company" ? "company" : "person",
   );
 
-  const [unternehmensname, setUnternehmensname] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
-  const [passwort, setPasswort] = useState("");
-  const [anzeigename, setAnzeigename] = useState("");
-  const [vorname, setVorname] = useState("");
-  const [nachname, setNachname] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [givenName, setGivenName] = useState("");
+  const [familyName, setFamilyName] = useState("");
 
-  // Kein Pflichtfeld, Vorauswahl leer (ADR-0039).
-  const [berufsfeld, setBerufsfeld] = useState<BerufsfeldWahl>(null);
+  // Not required, preselection empty (ADR-0039).
+  const [occupationalField, setOccupationalField] = useState<OccupationalFieldChoice>(null);
 
-  // Geurteilt wird erst, wenn ein Feld verlassen wurde: während des Tippens
-  // ist jede Adresse unfertig.
-  const [emailBeruehrt, setEmailBeruehrt] = useState(false);
-  const [passwortBeruehrt, setPasswortBeruehrt] = useState(false);
+  // Judged only once a field was left: while typing every address is
+  // unfinished.
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
 
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
-  const [abgeschickt, setAbgeschickt] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const personHinweis = useId();
-  const firmaHinweis = useId();
+  // Referenced through `aria-describedby`, so the hint sits BESIDE the label and
+  // not inside it; otherwise a screen reader announces the option as "Für ein
+  // Unternehmen Braucht deine Arbeitsadresse — …" and a test naming it fails.
+  const personHint = useId();
+  const companyHint = useId();
 
-  // Nur wenn überhaupt eine Adresse dasteht: `isPublicEmailDomain("")` urteilte
-  // über einen leeren Domainteil und blitzte beim ersten getippten Zeichen auf.
+  // Only when an address stands there at all: `isPublicEmailDomain("")` judged
+  // an empty domain part and flashed at the first typed character.
+  //
+  // Shown at once rather than after the confirmation mail, so nobody learns two
+  // steps later that their path is closed. The refusal is still the SERVER's
+  // (422); this only makes visible what already holds.
   const freemail = useMemo(
     () =>
-      art === "company" && email.includes("@") && isPublicEmailDomain(email),
-    [art, email],
+      kind === "company" && email.includes("@") && isPublicEmailDomain(email),
+    [kind, email],
   );
 
-  // Sichtbar vor dem Abschicken; die Absage spricht weiterhin der Server (422).
-  const emailProblem = emailBeruehrt ? emailFehler(email) : null;
-  const passwortProblem = passwortBeruehrt ? passwortFehler(passwort) : null;
-  const unvollstaendig =
-    email.trim() === "" || passwort === "" || anzeigename.trim() === "";
+  // Visible before submitting; the refusal is still spoken by the server (422).
+  const emailProblem = emailTouched ? emailError(email) : null;
+  const passwordProblem = passwordTouched ? passwordError(password) : null;
+  const incomplete =
+    email.trim() === "" || password === "" || displayName.trim() === "";
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setFehler(null);
-    setLaeuft(true);
-    const result = await registriere({
+    setError(null);
+    setRunning(true);
+    const result = await register({
       email,
-      password: passwort,
-      anzeigename,
-      ...(vorname.trim() ? { vorname: vorname.trim() } : {}),
-      ...(nachname.trim() ? { nachname: nachname.trim() } : {}),
-      ...(art === "company" ? { unternehmensname } : {}),
-      ...(berufsfeld !== null ? { berufsfeld } : {}),
+      password,
+      displayName,
+      ...(givenName.trim() ? { givenName: givenName.trim() } : {}),
+      ...(familyName.trim() ? { familyName: familyName.trim() } : {}),
+      ...(kind === "company" ? { companyName } : {}),
+      ...(occupationalField !== null ? { occupationalField } : {}),
     });
-    setLaeuft(false);
-    if (result.ok) setAbgeschickt(true);
-    else setFehler(result.meldung);
+    setRunning(false);
+    if (result.ok) setSubmitted(true);
+    else setError(result.message);
   }
 
-  if (abgeschickt) return <FastGeschafft email={email} />;
+  if (submitted) return <AlmostDone email={email} />;
 
   return (
-    <AuthCard title={t("registrierung.titel")} lead={t("registrierung.lead")}>
+    <AuthCard title={t("register.title")} lead={t("register.lead")}>
       <AuthModeTabs current="register" />
 
       <Box
@@ -128,17 +134,13 @@ export function RegisterPage() {
       >
         <FormControl component="fieldset" sx={{ display: "grid", gap: 1 }}>
           <FormLabel component="legend" sx={{ mb: 0.5 }}>
-            {t("registrierung.wofuer")}
+            {t("register.purpose")}
           </FormLabel>
-          {/* Der Hinweis steht NEBEN der Beschriftung, nicht darin: sonst hiesse
-              die Auswahl für einen Screenreader „Für ein Unternehmen Braucht
-              deine Arbeitsadresse — …", und ein Test, der sie beim Namen nennt,
-              fände sie nicht mehr. */}
           <RadioGroup
-            name="art"
-            value={art}
+            name="kind"
+            value={kind}
             onChange={(event) =>
-              setArt(event.target.value === "company" ? "company" : "person")
+              setKind(event.target.value === "company" ? "company" : "person")
             }
           >
             <Box>
@@ -146,18 +148,18 @@ export function RegisterPage() {
                 value="person"
                 control={
                   <Radio
-                    slotProps={{ input: { "aria-describedby": personHinweis } }}
+                    slotProps={{ input: { "aria-describedby": personHint } }}
                   />
                 }
-                label={t("registrierung.fuerMich")}
+                label={t("register.forMe")}
               />
               <Typography
-                id={personHinweis}
+                id={personHint}
                 variant="body2"
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                {t("registrierung.fuerMichHinweis")}
+                {t("register.forMeHint")}
               </Typography>
             </Box>
             <Box sx={{ mt: 1 }}>
@@ -165,121 +167,117 @@ export function RegisterPage() {
                 value="company"
                 control={
                   <Radio
-                    slotProps={{ input: { "aria-describedby": firmaHinweis } }}
+                    slotProps={{ input: { "aria-describedby": companyHint } }}
                   />
                 }
-                label={t("registrierung.fuerFirma")}
+                label={t("register.forCompany")}
               />
               <Typography
-                id={firmaHinweis}
+                id={companyHint}
                 variant="body2"
                 color="text.secondary"
                 sx={{ ml: 4 }}
               >
-                {t("registrierung.fuerFirmaHinweis")}
+                {t("register.forCompanyHint")}
               </Typography>
             </Box>
           </RadioGroup>
         </FormControl>
 
         <TextField
-          label={t("registrierung.email")}
+          label={t("register.email")}
           type="email"
           autoComplete="username"
           error={emailProblem !== null}
           helperText={
             emailProblem !== null
               ? t(emailProblem)
-              : art === "company"
-                ? t("registrierung.emailHinweisFirma")
-                : t("registrierung.emailHinweisPerson")
+              : kind === "company"
+                ? t("register.emailHintCompany")
+                : t("register.emailHintPerson")
           }
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          onBlur={() => setEmailBeruehrt(true)}
+          onBlur={() => setEmailTouched(true)}
           required
         />
 
-        {art === "company" ? (
+        {kind === "company" ? (
           <TextField
-            label={t("registrierung.firmenname")}
+            label={t("register.companyName")}
             autoComplete="organization"
-            helperText={t("registrierung.firmennameHinweis")}
-            value={unternehmensname}
-            onChange={(event) => setUnternehmensname(event.target.value)}
+            helperText={t("register.companyNameHint")}
+            value={companyName}
+            onChange={(event) => setCompanyName(event.target.value)}
             required
           />
         ) : null}
 
-        {/* Sofort, nicht erst nach der Bestätigungsmail: sonst erfährt jemand
-            erst zwei Schritte später, dass sein Weg nicht geht. Die Absage
-            spricht weiterhin der SERVER aus (422) — hier wird nur sichtbar
-            gemacht, was ohnehin gilt. */}
         {freemail ? (
           <Alert severity="warning">
-            {t("registrierung.freemail")}
+            {t("register.freemail")}
           </Alert>
         ) : null}
 
         <TextField
-          label={t("registrierung.passwort")}
+          label={t("register.password")}
           type="password"
           autoComplete="new-password"
-          error={passwortProblem !== null}
+          error={passwordProblem !== null}
           helperText={
-            passwortProblem !== null
-              ? t(passwortProblem, { mindestens: PASSWORT_MINDESTLAENGE })
-              : t("registrierung.passwortHinweis")
+            passwordProblem !== null
+              ? t(passwordProblem, { mindestens: PASSWORD_MIN_LENGTH })
+              : t("register.passwordHint")
           }
-          value={passwort}
-          onChange={(event) => setPasswort(event.target.value)}
-          onBlur={() => setPasswortBeruehrt(true)}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          onBlur={() => setPasswordTouched(true)}
           required
         />
         <TextField
-          label={t("registrierung.anzeigename")}
+          label={t("register.displayName")}
           autoComplete="nickname"
-          helperText={t("registrierung.anzeigenameHinweis")}
-          value={anzeigename}
-          onChange={(event) => setAnzeigename(event.target.value)}
+          helperText={t("register.displayNameHint")}
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
           required
         />
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
           <TextField
-            label={t("zivil.vorname")}
+            label={t("civilIdentity.firstName")}
             autoComplete="given-name"
-            value={vorname}
-            onChange={(event) => setVorname(event.target.value)}
+            value={givenName}
+            onChange={(event) => setGivenName(event.target.value)}
           />
           <TextField
-            label={t("zivil.nachname")}
+            label={t("civilIdentity.lastName")}
             autoComplete="family-name"
-            value={nachname}
-            onChange={(event) => setNachname(event.target.value)}
+            value={familyName}
+            onChange={(event) => setFamilyName(event.target.value)}
           />
         </Box>
         <Typography variant="body2" color="text.secondary">
-          {t("zivil.klarnameHinweis")}
+          {t("civilIdentity.legalNameHint")}
         </Typography>
 
-        <BerufsfeldSelect wert={berufsfeld} onChange={setBerufsfeld} />
+        <OccupationalFieldSelect value={occupationalField} onChange={setOccupationalField} />
 
-        {fehler !== null ? <Alert severity="error">{fehler}</Alert> : null}
+        {error !== null ? <Alert severity="error">{error}</Alert> : null}
 
         <Button
           type="submit"
           variant="contained"
           size="large"
-          // Der Knopf urteilt immer; rot gefärbt wird erst nach dem Verlassen.
+          // The button always judges; coloured red only after leaving the field.
           disabled={
             running
             || freemail
-            || unvollstaendig
-            || emailFehler(email) !== null
-            || passwortFehler(passwort) !== null
+            || incomplete
+            || emailError(email) !== null
+            || passwordError(password) !== null
           }
         >
-          {running ? t("registrierung.laeuft") : t("registrierung.knopf")}
+          {running ? t("register.inProgress") : t("register.button")}
         </Button>
       </Box>
     </AuthCard>
@@ -287,60 +285,61 @@ export function RegisterPage() {
 }
 
 /**
- * Nach dem Absenden.
+ * After submitting.
  *
- * <strong>Dieselbe Nachricht, ob die Adresse neu war oder schon existierte.</strong>
- * Der Server verrät es nicht (er antwortet auch bekannten Adressen 201 und
- * schickt der echten Inhaberin eine Warnung), und beides ist wahr: es wurde
- * eine E-Mail geschickt. Ein „gibt es schon" hier wäre der Aufzählungskanal,
- * den `/auth/register` gerade schliesst.
+ * <strong>The same message whether the address was new or already
+ * existed.</strong> The server does not reveal it (it answers known addresses
+ * 201 as well and sends the real owner a warning), and both are true: a mail
+ * was sent. An "already exists" here would be the enumeration channel that
+ * `/auth/register` just closes.
  */
-function FastGeschafft({ email }: { email: string }) {
+function AlmostDone({ email }: { email: string }) {
   const { t } = useTranslation();
-  const [running, setLaeuft] = useState(false);
-  const [gesendet, setGesendet] = useState(false);
-  const [gescheitert, setGescheitert] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  async function erneutSenden() {
-    setLaeuft(true);
-    setGescheitert(false);
-    const result = await sendeBestaetigungErneut(email);
-    setLaeuft(false);
-    if (result.ok) setGesendet(true);
-    else setGescheitert(true);
+  // The failure branch is load-bearing: without it the button visibly did
+  // NOTHING on a network error, and a 429 from the rate limit (3/min) produced
+  // the promise "on its way" while nothing was on its way.
+  async function resend() {
+    setRunning(true);
+    setFailed(false);
+    const result = await resendVerification(email);
+    setRunning(false);
+    if (result.ok) setSent(true);
+    else setFailed(true);
   }
 
   return (
     <AuthCard
-      title={t("registrierung.fastGeschafft")}
-      lead={t("registrierung.fastGeschafftLead")}
+      title={t("register.almostDone")}
+      lead={t("register.almostDoneLead")}
     >
       <Box sx={{ display: "grid", gap: 2 }}>
-        {/* Ohne den Fehlerzweig tat dieser Knopf bei einem Netzfehler sichtbar
-            NICHTS: der Aufruf warf, die Zusage wurde nie gesetzt. Und ein 429
-            von der Bremse (3/min) erzeugte die Zusage „ist unterwegs", obwohl
-            nichts unterwegs war. */}
-        <Button variant="outlined" onClick={erneutSenden} disabled={running}>
-          {running ? t("registrierung.erneutLaeuft") : t("registrierung.erneut")}
+        <Button variant="outlined" onClick={resend} disabled={running}>
+          {running ? t("register.resending") : t("register.resend")}
         </Button>
 
-        {gescheitert ? (
+        {failed ? (
           <Alert severity="error">
-            {t("registrierung.erneutGescheitert")}
+            {t("register.resendFailed")}
           </Alert>
         ) : null}
 
-        {/* `role="status"` und NICHT „alert": eine Bestätigung unterbricht
-            nicht. MUIs `Alert` trägt sonst immer `role="alert"`. */}
-        {gesendet ? (
-          <Alert role="status" severity="success">
-            {t("registrierung.erneutGesendet")}
+        {sent ? (
+          <Alert
+            // A confirmation must not interrupt; MUI's Alert would set role="alert".
+            role="status"
+            severity="success"
+          >
+            {t("register.resent")}
           </Alert>
         ) : null}
 
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="registrierung.schonBestaetigt"
+            i18nKey="register.alreadyVerified"
             components={{ 1: <Link component={RouterLink} to="/login" /> }}
           />
         </Typography>

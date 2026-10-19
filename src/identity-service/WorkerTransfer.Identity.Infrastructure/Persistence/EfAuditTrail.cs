@@ -17,7 +17,7 @@ public sealed class EfAuditTrail(IdentityDbContext context) : IAuditTrail
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        var jetzt = entry.OccurredAt.UtcDateTime;
+        var now = entry.OccurredAt.UtcDateTime;
 
         context.AuditEvents.Add(new AuditEventRow
         {
@@ -27,9 +27,9 @@ public sealed class EfAuditTrail(IdentityDbContext context) : IAuditTrail
             Action = entry.Action,
             TargetId = entry.Target?.Value,
             CorrelationId = entry.CorrelationId,
-            OccurredAt = jetzt,
-            CreatedAt = jetzt,
-            UpdatedAt = jetzt,
+            OccurredAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
             Metadata = JsonSerializer.Serialize(entry.Metadata)
         });
 

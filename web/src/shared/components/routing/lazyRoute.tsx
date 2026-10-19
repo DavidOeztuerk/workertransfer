@@ -3,51 +3,51 @@ import { useTranslation } from "react-i18next";
 
 import { LoadingBlock } from "../ui";
 
-/** Eigene Komponente, damit der Text zur ZEICHENZEIT übersetzt wird — beim
- *  Modulaufbau stünde die Sprache fest, bevor jemand sie wählen konnte. */
-function Seitenladefeld() {
+/** A component of its own, so that the text is translated at RENDER time —
+ *  at module build the language would be fixed before anybody could choose it. */
+function PageLoadingBlock() {
   const { t } = useTranslation();
-  return <LoadingBlock label={t("allgemein.seiteLaedt")} />;
+  return <LoadingBlock label={t("common.pageLoading")} />;
 }
 
 /**
- * Eine Route, deren Seite erst beim Betreten geladen wird.
+ * A route whose page is loaded only when it is entered.
  *
- * <strong>Warum überhaupt.</strong> Mit MUI wiegt das Bündel 762 kB (236 kB
- * gepackt) — vorher waren es 439 kB. Wer die Startseite öffnet, lud damit auch
- * den Editor für Arbeitsproben, die Kandidatensuche und die Löschseite mit.
- * Aufgeteilt zahlt jede Seite nur, was sie braucht.
+ * <strong>Why at all.</strong> With MUI the bundle weighs 762 kB (236 kB
+ * gzipped) — before it was 439 kB. Whoever opened the start page also loaded
+ * the work-sample editor, the candidate search and the erasure page. Split up,
+ * every page pays only for what it needs.
  *
- * <strong>Und warum ein eigener Ladezustand statt eines leeren Bildschirms.</strong>
- * `React.lazy` braucht ein `Suspense` darüber; ohne eines wirft React. Mit einem
- * leeren Rumpf sähe ein langsamer Nachladevorgang aus wie eine kaputte Seite —
- * gerade auf einem Mobilfunkanschluss, wo das Nachladen tatsächlich dauert.
+ * <strong>And why a loading state of its own instead of an empty
+ * screen.</strong> `React.lazy` needs a `Suspense` above it; without one React
+ * throws. With an empty body a slow load would look like a broken page —
+ * especially on a mobile connection, where loading really takes time.
  *
- * <strong>Das `Suspense` liegt je Route</strong> und nicht einmal über der
- * ganzen Anwendung: so bleibt die Kopfzeile stehen, während der Inhalt kommt.
- * Läge es weiter oben, verschwände beim Navigieren die halbe Seite.
+ * <strong>The `Suspense` sits per route</strong> and not once above the whole
+ * application: that way the header stays while the content arrives. Were it
+ * higher up, half the page would vanish while navigating.
  */
 export function lazyRoute(
   load: () => Promise<Record<string, ComponentType>>,
   name: string
 ): React.ReactElement {
-  // `lazy` erwartet einen Vorgabeexport; unsere Seiten sind benannte Exporte,
-  // weil ein benannter Export beim Umbenennen mitzieht und ein Vorgabeexport
-  // still zu etwas anderem wird.
-  const Seite = lazy(async () => {
-    const modul = await load();
-    const komponente = modul[name];
+  // `lazy` expects a default export; our pages are named exports, because a
+  // named export follows a rename and a default export silently becomes
+  // something else.
+  const Page = lazy(async () => {
+    const module = await load();
+    const component = module[name];
 
-    if (komponente === undefined) {
-      throw new Error(`Die Seite ${name} exportiert sich nicht unter diesem Namen.`);
+    if (component === undefined) {
+      throw new Error(`The page ${name} does not export itself under that name.`);
     }
 
-    return { default: komponente };
+    return { default: component };
   });
 
   return (
-    <Suspense fallback={<Seitenladefeld />}>
-      <Seite />
+    <Suspense fallback={<PageLoadingBlock />}>
+      <Page />
     </Suspense>
   );
 }

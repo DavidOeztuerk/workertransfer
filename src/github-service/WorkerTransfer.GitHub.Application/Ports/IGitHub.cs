@@ -1,41 +1,41 @@
-using WorkerTransfer.GitHub.Domain.Verbindungen;
+using WorkerTransfer.GitHub.Domain.Connections;
 
 namespace WorkerTransfer.GitHub.Application.Ports;
 
-/// <summary>GitHub hat nicht geantwortet — ein Systemzustand, kein Ausgang.</summary>
+/// <summary>GitHub did not answer — a system state, not an outcome.</summary>
 /// <remarks>
-/// Nicht auf „nicht bewiesen" abzubilden: das hieße, jemandem den Nachweis
-/// abzusprechen, weil <em>wir</em> gerade nicht fragen konnten.
+/// Not to be mapped onto "not proved": that would mean denying somebody their
+/// proof because <em>we</em> could not ask just now.
 /// </remarks>
-public sealed class GitHubSchweigt(string grund, Exception? ursache = null)
-    : Exception(grund, ursache);
+public sealed class GitHubSilent(string reason, Exception? cause = null)
+    : Exception(reason, cause);
 
-/// <summary>Der Zugriff auf GitHub — einmal lesen, nicht zusehen.</summary>
+/// <summary>Access to GitHub — read once, do not watch.</summary>
 /// <remarks>
-/// Es gibt hier bewusst <strong>keinen Hintergrundabgleich</strong>, keinen
-/// Nachtlauf und keinen Webhook. ADR-0004 verbietet Scraping; der Buchstabe
-/// wäre mit einem periodischen Abruf eingehalten, der Sinn nicht: eine
-/// Plattform, die einem Menschen dauerhaft hinterhersieht, tut etwas anderes
-/// als eine, die einmal auf seine Bitte hinsieht.
+/// There is deliberately <strong>no background reconciliation</strong> here, no
+/// nightly run and no webhook. ADR-0004 forbids scraping; the letter would be
+/// kept by a periodic fetch, the sense would not: a platform that keeps
+/// watching a human being does something different from one that looks once at
+/// their request.
 /// <para>
-/// Nebenbei löst das die sechzig Anfragen pro Stunde: die Zahl der Abrufe hängt
-/// an Handlungen von Menschen, nicht an einer Uhr.
+/// Incidentally that solves the sixty requests an hour: the number of fetches
+/// hangs on acts by human beings, not on a clock.
 /// </para>
 /// </remarks>
 public interface IGitHub
 {
-    /// <summary>Steht die Einmalzeichenfolge in der Beschreibung eines Gists?</summary>
-    /// <exception cref="GitHubSchweigt">GitHub hat nicht geantwortet.</exception>
-    Task<bool> HatNachweisgistAsync(
-        string login, string einmalzeichenfolge, CancellationToken cancellationToken = default);
+    /// <summary>Does the one-time string stand in the description of a gist?</summary>
+    /// <exception cref="GitHubSilent">GitHub did not answer.</exception>
+    Task<bool> HasProofGistAsync(
+        string login, string nonce, CancellationToken cancellationToken = default);
 
-    /// <summary>Die öffentlichen Repositories dieses Kontos.</summary>
+    /// <summary>This account's public repositories.</summary>
     /// <remarks>
-    /// Der <see cref="Abzug" /> trägt neben den Belegen, ob die Sprachen für
-    /// jeden davon geholt werden konnten — ADR-0022 §3 verlangt, dass eine
-    /// unvollständige Menge sich als unvollständig zu erkennen gibt.
+    /// Beside the evidence, the <see cref="Snapshot" /> carries whether the
+    /// languages could be fetched for every one of them — ADR-0022 §3 demands
+    /// that an incomplete set gives itself away as incomplete.
     /// </remarks>
-    /// <exception cref="GitHubSchweigt">GitHub hat nicht geantwortet.</exception>
-    Task<Abzug> RepositoriesAsync(
+    /// <exception cref="GitHubSilent">GitHub did not answer.</exception>
+    Task<Snapshot> RepositoriesAsync(
         string login, CancellationToken cancellationToken = default);
 }

@@ -1,19 +1,19 @@
 import { useAppSelector } from "../../../core/store/hooks";
 
 /**
- * Wer gerade handelt — für die Seiten dieses Bereichs.
+ * Who is acting right now — for the pages of this area.
  *
- * <strong>Drei Zustände, nicht zwei.</strong> `unknown` heisst „noch nicht
- * gefragt" und muss als LADEN gezeichnet werden. Zeichnete man ihn als
- * „abgemeldet", blitzte auf jeder dieser Seiten kurz „Bitte anmelden" auf,
- * obwohl die Person angemeldet ist — und auf `/delete-account` wäre das der
- * schlimmste Satz, den die Anwendung sagen kann.
+ * <strong>Three states, not two.</strong> `unknown` means "not asked yet" and
+ * must be drawn as LOADING. Drawn as "signed out", every one of these pages
+ * would briefly flash "Please sign in" although the person is signed in — and
+ * on `/delete-account` that would be the worst sentence the application can
+ * say.
  */
 export function usePerson(): {
   subjectId: string | null;
   email: string | null;
-  /** Die Sitzung ist noch nicht geprüft. Weder angemeldet noch abgemeldet. */
-  unbekannt: boolean;
+  /** The session has not been checked yet. Neither signed in nor signed out. */
+  sessionUnknown: boolean;
 } {
   const status = useAppSelector((state) => state.auth.status);
   const session = useAppSelector((state) => state.auth.session);
@@ -21,6 +21,6 @@ export function usePerson(): {
   return {
     subjectId: session?.userId ?? null,
     email: session?.email ?? null,
-    unbekannt: status === "unknown",
+    sessionUnknown: status === "unknown",
   };
 }

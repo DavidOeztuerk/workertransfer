@@ -1,22 +1,19 @@
-// Fähigkeiten als Formulareingabe — für das Profil einer Person und für das,
-// was eine Stelle verlangt.
+// Skills as form input — for a person's profile and for what a job asks for.
 //
-// Ein Zerleger für beide Seiten, weil beide Listen im Browser gegeneinander
-// gehalten werden (`lib/match.ts`). Zwei Zerleger, die auseinanderlaufen,
-// fänden zufällige Treffer: schriebe die eine Seite `"Python, Go"` als zwei
-// Einträge und die andere als einen, verglichen sich hinterher Sätze mit
-// Wörtern.
+// One parser for both sides, because both lists are held against each other in
+// the browser (`lib/match.ts`). Two parsers that diverge would find accidental
+// hits: if one side wrote `"Python, Go"` as two entries and the other as one,
+// sentences would afterwards be compared with words.
 //
-// <strong>Er benennt nicht um und er schließt nichts aus.</strong> Das
-// Vereinheitlichen von Schreibweisen („Postgres" = „PostgreSQL") passiert im
-// Dienst, in den Fähigkeits-Wertobjekten (ADR-0023) — und dort ist es eine
-// Aussage über SPRACHE. Eine Liste erlaubter Fähigkeiten im Browser wäre eine
-// Behauptung darüber, welche Arbeit es gibt.
+// <strong>It renames nothing and excludes nothing.</strong> Unifying spellings
+// ("Postgres" = "PostgreSQL") happens in the service, in the skill value
+// objects (ADR-0023) — and there it is a statement about LANGUAGE. A list of
+// permitted skills in the browser would be a claim about which work exists.
 
 /**
- * Kommagetrennt statt Chips: eine Zeile, die man aus dem Lebenslauf einfügen
- * kann. Leeres und Whitespace fällt weg — die Domäne entdoppelt zusätzlich, was
- * hier durchrutscht.
+ * Comma-separated instead of chips: one line that can be pasted from a CV.
+ * Empty entries and whitespace fall away — the domain additionally
+ * de-duplicates what slips through here.
  */
 export function parseSkills(raw: string): string[] {
   return raw

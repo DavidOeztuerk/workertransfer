@@ -11,25 +11,26 @@ import { Link as RouterLink } from "react-router-dom";
 
 import { PageShell } from "../../../shared/components/ui";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { sitzungBeendet } from "../../auth/store/authSlice";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
-import { loeschungVerlangen } from "../api/erasure";
+import { sessionEnded } from "../../auth/store/authSlice";
+import { SignInRequired } from "../components/SignInRequired";
+import { requestErasure } from "../api/erasure";
+import { failureKey } from "../../../shared/api/errors";
 
-/** Nur die Nummern — der Wortlaut liegt in den Katalogen. */
-const WAS_VERSCHWINDET = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+/** Only the numbers — the wording lives in the catalogues. */
+const WHAT_DISAPPEARS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
-function Abschnitt({
-  titel,
+function Section({
+  title,
   children,
 }: {
-  titel: string;
+  title: string;
   children: React.ReactNode;
 }) {
   return (
     <Card sx={{ mb: 2 }}>
       <CardContent>
         <Typography variant="h2" sx={{ mb: 1.5 }}>
-          {titel}
+          {title}
         </Typography>
         {children}
       </CardContent>
@@ -38,55 +39,59 @@ function Abschnitt({
 }
 
 /**
- * <c>/delete-account</c> — wo das Versprechen einem Menschen gegeben wird.
+ * <c>/delete-account</c> — where the promise is made to a person.
  *
- * <strong>Alles Wichtige steht VOR dem Knopf</strong>, und der unangenehmste
- * Satz steht laut da: auch die Bewerbung, über die jemand <em>eingestellt</em>
- * wurde, verschwindet aus der Liste des Unternehmens. Eine Löschzusage, deren
- * Ausnahmen man erst hinterher erfährt, ist keine.
+ * <strong>Everything important stands BEFORE the button</strong>, and the most
+ * uncomfortable sentence is said out loud: even the application through which
+ * somebody was <em>hired</em> disappears from the company's list. An erasure
+ * promise whose exceptions one learns only afterwards is none.
  *
- * <strong>Zwei Schritte, inline, kein Dialog.</strong> Ein Dialog nähme die
- * Seite weg, auf der gerade steht, was verschwindet — und genau das soll beim
- * zweiten Klick noch lesbar sein. Der zweite Knopf ist anders formuliert als
- * der erste, damit niemand zweimal dasselbe klickt.
+ * <strong>Two steps, inline, no dialog.</strong> A dialog would take away the
+ * page that says what disappears — and exactly that should still be readable
+ * at the second click. The second button is worded differently from the first,
+ * so that nobody clicks the same thing twice.
  *
- * <strong>Kein getipptes Wort, keine Wartezeit, kein erneutes Passwort.</strong>
- * Wer löschen will, darf. Jede zusätzliche Hürde wäre eine Bremse gegen die
- * Person, nicht für sie.
+ * <strong>No typed word, no waiting period, no re-entered password.</strong>
+ * Whoever wants to delete may. Every additional hurdle would be a brake against
+ * the person, not for them.
  *
- * <strong>Die Falle, die hier schon zugeschnappt ist:</strong> bei Erfolg ist
- * die Sitzung weg, die Hülle zeichnet die Seite also ohne Prinzipal neu. Der
- * angenommene Zustand muss deshalb VOR der Anmeldeaufforderung geprüft werden —
- * sonst liest die Person direkt nach dem Löschen „Bitte anmelden“.
+ * <strong>The trap that has already snapped shut here:</strong> on success the
+ * session is gone, so the shell redraws the page without a principal. The
+ * accepted state must therefore be checked BEFORE the sign-in prompt —
+ * otherwise the person reads "Please sign in" right after deleting.
  */
 export function DeleteAccountPage() {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const status = useAppSelector((state) => state.auth.status);
-  const firmen = useAppSelector((state) => state.auth.memberships);
+  const companies = useAppSelector((state) => state.auth.memberships);
 
-  const [fragt, setFragt] = useState(false);
-  const [running, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [angenommen, setAngenommen] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState(false);
 
-  // ZUERST. Siehe oben — nach dem Löschen gibt es keinen Prinzipal mehr.
-  if (angenommen) {
+  // FIRST. See above — after the erasure there is no principal any more.
+  if (accepted) {
     return (
-      <PageShell title={t("loeschung.titel")} narrow>
+      <PageShell title={t("deleteAccount.title")} narrow>
         <Card>
           <CardContent>
-            {/* `info` und nicht `error`: das ist eine Bestätigung. Ein roter
-                Kasten hier läse sich, als sei etwas schiefgegangen. */}
-            <Alert severity="info" sx={{ mb: 2 }} role="status">
-              <strong>{t("loeschung.angenommenTitel")}</strong>{" "}
+            <Alert
+              // A confirmation, not a failure: a red box here would read as if
+              // something had gone wrong.
+              severity="info"
+              sx={{ mb: 2 }}
+              role="status"
+            >
+              <strong>{t("deleteAccount.acceptedTitle")}</strong>{" "}
               <Trans
-                i18nKey="loeschung.angenommenText"
+                i18nKey="deleteAccount.acceptedText"
                 components={{ 1: <strong /> }}
               />
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              {t("loeschung.angenommenWarum")}
+              {t("deleteAccount.acceptedWhy")}
             </Typography>
           </CardContent>
         </Card>
@@ -96,135 +101,135 @@ export function DeleteAccountPage() {
 
   if (status !== "authenticated") {
     return (
-      <AnmeldungNoetig
-        titel={t("loeschung.titel")}
-        satz="loeschung.anmelden"
+      <SignInRequired
+        title={t("deleteAccount.title")}
+        sentenceKey="deleteAccount.signInRequired"
       />
     );
   }
 
-  async function loeschen() {
-    setLaeuft(true);
-    const result = await loeschungVerlangen();
-    setLaeuft(false);
+  async function erase() {
+    setRunning(true);
+    const result = await requestErasure();
+    setRunning(false);
 
     if (result.ok) {
-      setFehler(null);
-      setAngenommen(true);
+      setError(null);
+      setAccepted(true);
 
-      // Der Server hat jede Sitzung schon widerrufen — der Speicher muss
-      // nachziehen, sonst zeigt der Kopf weiter das Konto-Menü, während diese
-      // Seite „Du bist abgemeldet" sagt. Zwei Aussagen über dieselbe Sache, und
-      // die sichtbarere ist die falsche.
+      // The server has already revoked every session — the store must follow,
+      // otherwise the header keeps showing the account menu while this page
+      // says "you are signed out". Two statements about the same thing, and the
+      // more visible one is the wrong one.
       //
-      // NICHT `logout()`: das fragt den Server, und der antwortet auf eine
-      // widerrufene Sitzung mit 401 — der Speicher bliebe stehen.
-      dispatch(sitzungBeendet());
+      // NOT `logout()`: that asks the server, and it answers a revoked session
+      // with 401 — the store would stay as it is.
+      dispatch(sessionEnded());
     } else {
-      setFehler(result.error.detail);
+      setError(t(failureKey(result.error, "errors.deletionNotAccepted")));
     }
   }
 
   return (
     <PageShell
-      title={t("loeschung.titel")}
+      title={t("deleteAccount.title")}
       narrow
-      lead={t("loeschung.lead")}
+      lead={t("deleteAccount.lead")}
     >
-      <Abschnitt titel={t("loeschung.wasTitel")}>
+      <Section title={t("deleteAccount.deletedTitle")}>
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
-          {WAS_VERSCHWINDET.map((number) => (
+          {WHAT_DISAPPEARS.map((number) => (
             <Typography component="li" key={number} sx={{ mb: 0.5 }}>
-              {t(`loeschung.was${number}`)}
+              {t(`deleteAccount.deleted${number}`)}
             </Typography>
           ))}
         </Box>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="loeschung.nichtsBleibt"
+            i18nKey="deleteAccount.nothingRemains"
             components={[<strong key="a" />, <strong key="b" />]}
           />
         </Typography>
-      </Abschnitt>
+      </Section>
 
-      <Abschnitt titel={t("loeschung.bleibtTitel")}>
+      <Section title={t("deleteAccount.remainsTitle")}>
         <Typography variant="body2" color="text.secondary">
-          <Trans i18nKey="loeschung.bleibtText" components={{ 1: <em /> }} />
+          <Trans i18nKey="deleteAccount.remainsText" components={{ 1: <em /> }} />
         </Typography>
-      </Abschnitt>
+      </Section>
 
-      {firmen.length > 0 ? (
-        <Abschnitt titel={t("loeschung.firmenTitel")}>
+      {companies.length > 0 ? (
+        <Section title={t("deleteAccount.companiesTitle")}>
           <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 2 }}>
-            {firmen.map((firma) => (
-              <Typography component="li" key={firma.id} sx={{ mb: 0.5 }}>
-                <strong>{firma.name}</strong>{" "}
-                {firma.role === "admin" ? (
+            {companies.map((company) => (
+              <Typography component="li" key={company.id} sx={{ mb: 0.5 }}>
+                <strong>{company.name}</strong>{" "}
+                {company.role === "admin" ? (
                   <Trans
-                    i18nKey="loeschung.firmaAdmin"
+                    i18nKey="deleteAccount.companyAdmin"
                     components={{ 1: <em />, 3: <strong /> }}
                   />
                 ) : (
-                  t("loeschung.firmaMitglied")
+                  t("deleteAccount.companyMember")
                 )}
               </Typography>
             ))}
           </Box>
           <Typography variant="body2" color="text.secondary">
             <Trans
-              i18nKey="loeschung.firmenHaeltNichtAuf"
+              i18nKey="deleteAccount.companiesDoNotBlock"
               components={{ 1: <strong /> }}
             />
           </Typography>
-        </Abschnitt>
+        </Section>
       ) : null}
 
-      <Abschnitt titel={t("loeschung.ablaufTitel")}>
+      <Section title={t("deleteAccount.processTitle")}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           <Trans
-            i18nKey="loeschung.ablaufText"
+            i18nKey="deleteAccount.processText"
             components={{ 1: <strong />, 3: <strong /> }}
           />
         </Typography>
         <Typography variant="body2" color="text.secondary">
           <Trans
-            i18nKey="loeschung.ablaufExport"
+            i18nKey="deleteAccount.processExport"
             components={{ 1: <Link component={RouterLink} to="/my-data" /> }}
           />
         </Typography>
-      </Abschnitt>
+      </Section>
 
       <Card>
         <CardContent>
-          {fehler !== null ? (
+          {error !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {fehler}
+              {error}
             </Alert>
           ) : null}
 
-          {fragt ? (
+          {asking ? (
             <>
               <Alert severity="warning" sx={{ mb: 2 }}>
-                {t("loeschung.letzteFrage")}
+                {t("deleteAccount.lastQuestion")}
               </Alert>
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                 <Button
                   variant="contained"
                   color="error"
-                  onClick={() => void loeschen()}
+                  onClick={() => void erase()}
                   disabled={running}
                 >
-                  {running ? t("loeschung.laeuft") : t("loeschung.bestaetigen")}
+                  {running ? t("deleteAccount.inProgress") : t("deleteAccount.confirm")}
                 </Button>
                 <Button
                   variant="text"
                   onClick={() => {
-                    setFragt(false);
-                    setFehler(null);
+                    setAsking(false);
+                    setError(null);
                   }}
                   disabled={running}
                 >
-                  {t("allgemein.abbrechen")}
+                  {t("common.cancel")}
                 </Button>
               </Box>
             </>
@@ -232,9 +237,9 @@ export function DeleteAccountPage() {
             <Button
               variant="outlined"
               color="error"
-              onClick={() => setFragt(true)}
+              onClick={() => setAsking(true)}
             >
-              {t("loeschung.knopf")}
+              {t("deleteAccount.button")}
             </Button>
           )}
         </CardContent>

@@ -5,7 +5,7 @@ using WorkerTransfer.Identity.Domain.Verification;
 namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 
 /// <summary>Reads and writes <c>email_verification_tokens</c>.</summary>
-public sealed class EfVerificationTokenRepository(IdentityDbContext context, TimeProvider uhr)
+public sealed class EfVerificationTokenRepository(IdentityDbContext context, TimeProvider clock)
     : IVerificationTokenRepository
 {
     /// <inheritdoc />
@@ -21,7 +21,7 @@ public sealed class EfVerificationTokenRepository(IdentityDbContext context, Tim
             Purpose = TokenPurposeNames.ToDatabase(token.Purpose),
             ExpiresAt = token.ExpiresAt.UtcDateTime,
             ConsumedAt = token.ConsumedAt?.UtcDateTime,
-            CreatedAt = uhr.GetUtcNow().UtcDateTime
+            CreatedAt = clock.GetUtcNow().UtcDateTime
         });
 
         return Task.CompletedTask;
@@ -42,16 +42,16 @@ public sealed class EfVerificationTokenRepository(IdentityDbContext context, Tim
 
         // An unknown purpose is a token that does not apply here, not a broken
         // database — so it comes back as no token at all rather than throwing.
-        return TokenPurposeNames.FromDatabase(row.Purpose) is not { } zweck
+        return TokenPurposeNames.FromDatabase(row.Purpose) is not { } purpose
             ? null
             : new VerificationToken(
                 row.Id,
                 new SubjectId(row.UserId),
                 row.TokenHash,
-                zweck,
+                purpose,
                 new DateTimeOffset(row.ExpiresAt, TimeSpan.Zero),
-                row.ConsumedAt is { } verbraucht
-                    ? new DateTimeOffset(verbraucht, TimeSpan.Zero)
+                row.ConsumedAt is { } consumedAt
+                    ? new DateTimeOffset(consumedAt, TimeSpan.Zero)
                     : null);
     }
 
@@ -78,16 +78,16 @@ public sealed class EfVerificationTokenRepository(IdentityDbContext context, Tim
         DateTimeOffset at,
         CancellationToken cancellationToken = default)
     {
-        var gespeichert = TokenPurposeNames.ToDatabase(purpose);
+        var stored = TokenPurposeNames.ToDatabase(purpose);
 
-        var offene = await context.VerificationTokens
+        var open = await context.VerificationTokens
             .AsTracking()
             .Where(candidate => candidate.UserId == subject.Value
-                                && candidate.Purpose == gespeichert
+                                && candidate.Purpose == stored
                                 && candidate.ConsumedAt == null)
             .ToListAsync(cancellationToken);
 
-        foreach (var row in offene)
+        foreach (var row in open)
         {
             row.ConsumedAt = at.UtcDateTime;
         }

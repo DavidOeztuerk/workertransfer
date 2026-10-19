@@ -4,42 +4,41 @@ using Npgsql;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Persistence;
 
-/// <summary>Baut Datenquelle und Kontext über dem Schema dieses Dienstes.</summary>
+/// <summary>Builds the data source and the context over this service's schema.</summary>
 /// <remarks>
-/// Ohne <c>MapEnum</c>: die drei Stände stehen als Worte in
-/// <c>varchar</c>-Spalten, genau so, wie sie im Vertrag und in der Oberfläche
-/// stehen.
+/// Without <c>MapEnum</c>: the states stand as words in <c>varchar</c> columns,
+/// exactly as they do in the contract and in the interface.
 /// </remarks>
 public static class TransferDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>The data source.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Optionen über einer Datenquelle, die dem Aufrufer gehört.</summary>
-    public static DbContextOptionsBuilder<TransferDbContext> Optionen(
-        NpgsqlDataSource datenquelle) =>
-        (DbContextOptionsBuilder<TransferDbContext>)Konfiguriere(
-            new DbContextOptionsBuilder<TransferDbContext>(), datenquelle);
+    /// <summary>Options over a data source that belongs to the caller.</summary>
+    public static DbContextOptionsBuilder<TransferDbContext> Options(
+        NpgsqlDataSource dataSource) =>
+        (DbContextOptionsBuilder<TransferDbContext>)Configure(
+            new DbContextOptionsBuilder<TransferDbContext>(), dataSource);
 
     /// <summary>
-    /// Die eine Stelle, an der die Nachverfolgung ausgeschaltet wird, damit
-    /// Behälter, Tests und <c>dotnet ef</c> nicht mit verschiedenen Modellen
-    /// enden.
+    /// The one place where tracking is switched off, so that
+    /// container, tests and <c>dotnet ef</c> do not end up with different
+    /// models.
     /// </summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
-        NpgsqlDataSource datenquelle)
+        NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         return options
-            .UseNpgsql(datenquelle)
+            .UseNpgsql(dataSource)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>, das keine Verbindung braucht.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>, which needs no connection.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {
@@ -49,14 +48,14 @@ public static class TransferDbContextFactory
     }
 }
 
-/// <summary>Baut einen Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>Builds a context for <c>dotnet ef</c>.</summary>
 public sealed class TransferDesignTimeFactory : IDesignTimeDbContextFactory<TransferDbContext>
 {
     /// <inheritdoc />
     public TransferDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<TransferDbContext>)TransferDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<TransferDbContext>(),
-                "Host=entwurfszeit;Database=transfer")
+                "Host=design-time;Database=transfer")
             .Options);
 }

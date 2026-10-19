@@ -10,110 +10,111 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../../work/lib/session";
+import { failureKey } from "../../../shared/api/errors";
+import { useActor } from "../../work/lib/session";
 import { useAsync } from "../../work/lib/useAsync";
 import {
-  type Gespraech,
-  beendeAlsFirma,
-  ladeFirmengespraeche,
-  uebergib,
+  type Conversation,
+  endAsCompany,
+  getCompanyConversations,
+  handOver,
 } from "../../work/api/advisor";
 
 /**
- * <c>/company/advisor</c> — die Gespräche eines Unternehmens.
+ * <c>/company/advisor</c> — a company's conversations.
  *
- * <strong>Was hier fehlt, fehlt.</strong> Die Felder der höheren Stufen sind in
- * der Antwort nicht enthalten, wenn sie nicht freigegeben sind — nicht `null`,
- * sondern gar nicht da. Diese Seite darf daraus keinen Hinweis bauen: kein
- * „noch nicht freigegeben", kein Schloss, keine graue Zeile. Ein solcher Hinweis
- * verriete genau das, was die Stufe zurückhält — dass es etwas gibt (ADR-0037).
+ * <strong>What is missing here is missing.</strong> The fields of the higher
+ * stages are not contained in the answer when they are not released — not
+ * `null`, but not there at all. This page must build no hint from that: no "not
+ * released yet", no lock, no grey line. Such a hint would reveal exactly what
+ * the stage holds back — that there is something (ADR-0037).
  *
- * <strong>Und ein Gespräch auf Stufe 0 steht gar nicht in dieser Liste.</strong>
- * Der Server lässt es weg; eine leere Zeile wäre derselbe Hinweis in
- * Listenform.
+ * <strong>And a conversation at stage 0 does not stand in this list at
+ * all.</strong> The server leaves it out; an empty line would be the same hint
+ * in list form.
  */
 export function CompanyAdvisorPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, fuerFirma, tenantId } = useHandelnder();
+  const { signedIn, loading, forCompany, tenantId } = useActor();
 
-  const gespraeche = useAsync(
-    (signal) => ladeFirmengespraeche(signal),
+  const conversations = useAsync(
+    (signal) => getCompanyConversations(signal),
     [tenantId],
-    signedIn && fuerFirma,
+    signedIn && forCompany,
   );
 
-  const [laeuft, setLaeuft] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [fertig, setFertig] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [handedOver, setHandedOver] = useState(false);
 
-  if (laedt) {
+  if (loading) {
     return (
-      <PageShell title={t("berater.firmaTitel")} narrow>
-        <LoadingBlock label={t("berater.laden")} />
+      <PageShell title={t("advisor.companyTitle")} narrow>
+        <LoadingBlock label={t("advisor.loading")} />
       </PageShell>
     );
   }
 
-  if (!signedIn || !fuerFirma) {
+  if (!signedIn || !forCompany) {
     return (
-      <PageShell title={t("berater.firmaTitel")} narrow>
+      <PageShell title={t("advisor.companyTitle")} narrow>
         <Card>
           <CardContent>
-            <Typography>{t("berater.firmaNurFirma")}</Typography>
+            <Typography>{t("advisor.companyOnly")}</Typography>
           </CardContent>
         </Card>
       </PageShell>
     );
   }
 
-  async function zug(id: string, was: "hand-over" | "end") {
-    setLaeuft(true);
-    const ergebnis = was === "hand-over" ? await uebergib(id) : await beendeAlsFirma(id);
-    setLaeuft(false);
+  async function act(id: string, action: "hand-over" | "end") {
+    setRunning(true);
+    const result = action === "hand-over" ? await handOver(id) : await endAsCompany(id);
+    setRunning(false);
 
-    setFehler(ergebnis.ok ? null : (ergebnis.error.detail ?? ergebnis.error.title));
-    setFertig(ergebnis.ok && was === "hand-over");
-    gespraeche.reload();
+    setError(result.ok ? null : t(failureKey(result.error, "errors.conversationStepFailed")));
+    setHandedOver(result.ok && action === "hand-over");
+    conversations.reload();
   }
 
   return (
-    <PageShell title={t("berater.firmaTitel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("berater.firmaLead")}</Typography>
+    <PageShell title={t("advisor.companyTitle")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("advisor.companyLead")}</Typography>
 
-      {fehler !== null && (
+      {error !== null && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       )}
 
-      {fertig && (
+      {handedOver && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          {t("berater.uebergebenFertig")}
+          {t("advisor.handOverDone")}
         </Alert>
       )}
 
-      {gespraeche.pending && <LoadingBlock label={t("berater.laden")} />}
+      {conversations.pending && <LoadingBlock label={t("advisor.loading")} />}
 
-      {gespraeche.data?.ok === false && (
+      {conversations.data?.ok === false && (
         <Alert severity="warning">
-          {gespraeche.data.reason === "no-company"
-            ? t("berater.firmaNurFirma")
-            : t("fehler.ledgerSchweigt")}
+          {conversations.data.reason === "no-company"
+            ? t("advisor.companyOnly")
+            : t("errors.ledgerSilent")}
         </Alert>
       )}
 
-      {gespraeche.data?.ok === true && gespraeche.data.items.length === 0 && (
-        <EmptyBlock title={t("berater.firmaLeer")} hint={t("berater.firmaLeerHinweis")} />
+      {conversations.data?.ok === true && conversations.data.items.length === 0 && (
+        <EmptyBlock title={t("advisor.companyEmpty")} hint={t("advisor.companyEmptyHint")} />
       )}
 
       <Stack spacing={2}>
-        {gespraeche.data?.ok === true &&
-          gespraeche.data.items.map((gespraech) => (
-            <Firmenkarte
-              key={gespraech.id}
-              gespraech={gespraech}
-              laeuft={laeuft}
-              zug={(was) => zug(gespraech.id, was)}
+        {conversations.data?.ok === true &&
+          conversations.data.items.map((conversation) => (
+            <CompanyConversationCard
+              key={conversation.id}
+              conversation={conversation}
+              running={running}
+              act={(action) => act(conversation.id, action)}
             />
           ))}
       </Stack>
@@ -121,100 +122,116 @@ export function CompanyAdvisorPage() {
   );
 }
 
-/** Eine Karte je Gespräch — mit genau den Feldern, die angekommen sind. */
-function Firmenkarte({
-  gespraech,
-  laeuft,
-  zug,
+/** One card per conversation — with exactly the fields that arrived. */
+function CompanyConversationCard({
+  conversation,
+  running,
+  act,
 }: {
-  gespraech: Gespraech;
-  laeuft: boolean;
-  zug: (was: "hand-over" | "end") => void;
+  conversation: Conversation;
+  running: boolean;
+  act: (action: "hand-over" | "end") => void;
 }) {
   const { t } = useTranslation();
-  const offen = gespraech.state === "talking" || gespraech.state === "agreed";
+  const open = conversation.state === "talking" || conversation.state === "agreed";
 
   return (
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-          <Chip label={t(`berater.stand_${gespraech.state}`)} size="small" />
+          <Chip label={t(`advisor.state_${conversation.state}`)} size="small" />
           <Chip
-            label={t("berater.firmaStufe", {
-              stand: t(`berater.stufe${gespraech.stage}Kurz`),
+            label={t("advisor.companyStage", {
+              stand: t(`advisor.stage${conversation.stage}Short`),
             })}
             size="small"
             variant="outlined"
           />
         </Stack>
 
-        {/* Ab Stufe 3. Fehlt der Name, steht hier die Subjekt-Kennung — und
-            ausdruecklich kein Platzhalter wie „anonym": der behauptete, die
-            Person habe sich verborgen, und das waere eine Aussage ueber sie. */}
-        <Typography variant="h3" sx={{ mb: 1 }}>
-          {gespraech.name ?? gespraech.subject_id}
-        </Typography>
-
-        {gespraech.email !== undefined && (
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            {gespraech.email}
+        {conversation.name !== undefined ? (
+          <Typography variant="h3" sx={{ mb: 1 }}>
+            {conversation.name}
+          </Typography>
+        ) : (
+          // Without a name the id is shown as what it is — a case reference,
+          // not a heading. No placeholder: "anonymous" or "not released yet"
+          // would claim the person hid themselves, and ADR-0020 §1 wants the
+          // name absent rather than explained.
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1, fontFamily: "monospace" }}
+          >
+            {conversation.subject_id}
           </Typography>
         )}
 
-        {gespraech.note.length > 0 && (
-          <Typography sx={{ mb: 1 }}>{gespraech.note}</Typography>
+        {conversation.email !== undefined && (
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {conversation.email}
+          </Typography>
+        )}
+
+        {conversation.note.length > 0 && (
+          <Typography sx={{ mb: 1 }}>{conversation.note}</Typography>
         )}
 
         <Divider sx={{ my: 2 }} />
 
         <Stack spacing={0.5} sx={{ mb: 2 }}>
-          {/* Ab Stufe 1. Fehlt das Feld, steht hier NICHTS — kein „nicht
-              angegeben", kein „noch nicht freigegeben". Die beiden waeren von
-              aussen nicht zu unterscheiden, und genau das ist die Zusage. */}
-          {gespraech.entry_month !== undefined && (
-            <Typography variant="body2">
-              {t("berater.eintritt")}: {gespraech.entry_month}
+          {conversation.entry_month !== undefined && (
+            <Typography
+              // From stage 1. If the field is missing, NOTHING stands here — no
+              // "not given", no "not released yet": from the outside the two are
+              // indistinguishable, and that is exactly the promise.
+              variant="body2"
+            >
+              {t("advisor.earliestStart")}: {conversation.entry_month}
             </Typography>
           )}
-          {gespraech.workload_percent !== undefined && (
+          {conversation.workload_percent !== undefined && (
             <Typography variant="body2">
-              {t("berater.pensum")}: {gespraech.workload_percent}
+              {t("advisor.workload")}: {conversation.workload_percent}
             </Typography>
           )}
-          {/* Ab Stufe 2. */}
-          {(gespraech.salary_min !== undefined || gespraech.salary_max !== undefined) && (
-            <Typography variant="body2">
-              {gespraech.salary_min !== undefined && gespraech.salary_max !== undefined
-                ? t("berater.spanne", {
-                    von: gespraech.salary_min,
-                    bis: gespraech.salary_max,
+          {(conversation.salary_min !== undefined || conversation.salary_max !== undefined) && (
+            <Typography
+              // From stage 2 — absent and not released stay indistinguishable,
+              // as above.
+              variant="body2"
+            >
+              {conversation.salary_min !== undefined && conversation.salary_max !== undefined
+                ? t("advisor.salaryRange", {
+                    von: conversation.salary_min,
+                    bis: conversation.salary_max,
                   })
-                : gespraech.salary_min !== undefined
-                  ? t("berater.bisOffen", { von: gespraech.salary_min })
-                  : t("berater.vonOffen", { bis: gespraech.salary_max })}
+                : conversation.salary_min !== undefined
+                  ? t("advisor.salaryFromOnly", { von: conversation.salary_min })
+                  : t("advisor.salaryToOnly", { bis: conversation.salary_max })}
             </Typography>
           )}
         </Stack>
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.uebergebenHinweis")}
+          {t("advisor.handOverHint")}
         </Typography>
 
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-          {gespraech.state === "agreed" && (
+          {conversation.state === "agreed" && (
             <Button
               variant="contained"
               size="small"
-              disabled={laeuft}
-              onClick={() => zug("hand-over")}
+              disabled={running}
+              onClick={() => act("hand-over")}
             >
-              {t("berater.uebergeben")}
+              {t("advisor.handOver")}
             </Button>
           )}
 
-          {offen && (
-            <Button size="small" color="error" disabled={laeuft} onClick={() => zug("end")}>
-              {t("berater.beenden")}
+          {open && (
+            <Button size="small" color="error" disabled={running} onClick={() => act("end")}>
+              {t("advisor.end")}
             </Button>
           )}
         </Stack>

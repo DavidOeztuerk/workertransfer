@@ -13,33 +13,33 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
         Capacity capacity,
         CancellationToken cancellationToken = default)
     {
-        var zeile = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
-        if (capacity is not Capacity.ForCompany firma)
+        if (capacity is not Capacity.ForCompany company)
         {
             // Acting for oneself is what a missing row already says. Storing a
             // second way of saying it would mean two answers to one question.
-            if (zeile is not null)
+            if (row is not null)
             {
-                context.SessionCapacities.Remove(zeile);
+                context.SessionCapacities.Remove(row);
             }
 
             return;
         }
 
-        if (zeile is null)
+        if (row is null)
         {
             context.SessionCapacities.Add(new SessionCapacityRow
             {
                 SessionId = session.Value,
-                TenantId = firma.Tenant.Value
+                TenantId = company.Tenant.Value
             });
 
             return;
         }
 
-        zeile.TenantId = firma.Tenant.Value;
-        context.SessionCapacities.Update(zeile);
+        row.TenantId = company.Tenant.Value;
+        context.SessionCapacities.Update(row);
     }
 
     /// <inheritdoc />
@@ -47,11 +47,11 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
         SessionId session,
         CancellationToken cancellationToken = default)
     {
-        var zeile = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
-        return zeile is null
+        return row is null
             ? Capacity.AsSelf.Instance
-            : new Capacity.ForCompany(new TenantId(zeile.TenantId));
+            : new Capacity.ForCompany(new TenantId(row.TenantId));
     }
 
     /// <inheritdoc />
@@ -62,15 +62,15 @@ public sealed class EfSessionCapacity(IdentityDbContext context) : ISessionCapac
     /// </remarks>
     public async Task ForgetAsync(SessionId session, CancellationToken cancellationToken = default)
     {
-        var zeile = await Zeile(session, cancellationToken);
+        var row = await FindRow(session, cancellationToken);
 
-        if (zeile is not null)
+        if (row is not null)
         {
-            context.SessionCapacities.Remove(zeile);
+            context.SessionCapacities.Remove(row);
         }
     }
 
-    private Task<SessionCapacityRow?> Zeile(
+    private Task<SessionCapacityRow?> FindRow(
         SessionId session,
         CancellationToken cancellationToken) =>
         context.SessionCapacities

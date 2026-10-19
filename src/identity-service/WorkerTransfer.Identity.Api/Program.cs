@@ -1,39 +1,39 @@
 using Microsoft.AspNetCore.Authorization;
 using WorkerTransfer.Identity.Api;
-using WorkerTransfer.Identity.Api.Berechtigung;
+using WorkerTransfer.Identity.Api.Permissions;
 using WorkerTransfer.Identity.Infrastructure;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+// Configuration out of the EnvironmentFile. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loading
+// afterwards would mean loading and nobody reading.
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 const string serviceName = "identity-service";
 
-// The only service that calls AlsAussteller(): it holds the private half of the
+// The only service that calls AsIssuer(): it holds the private half of the
 // key. A second issuer would be a second place that can mint a principal, and
 // nothing downstream could tell the two apart.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    girder => girder.AlsAussteller());
+    girder => girder.AsIssuer());
 
-// Die Richtlinienmaschinerie kommt seit Girder 4.0.2 aus der Vorgabe:
-// `NoeliaModule.Authorization` ruft `AddAuthorization()` und bringt damit den
-// PermissionPolicyProvider mit — den, der `Permission:*`-Namen zur Laufzeit
-// aufloest. Bis 4.0.1 rief dasselbe Modul `AddResourceAuthorization()`, und die
-// Maschinerie fehlte still; sie stand hier von Hand. Jetzt nicht mehr noetig —
-// UnternehmensreiseTests belegt, dass sie trotzdem greift.
+// Since Girder 4.0.2 the policy machinery comes out of the defaults:
+// `NoeliaModule.Authorization` calls `AddAuthorization()` and thereby brings
+// the PermissionPolicyProvider — the one that resolves `Permission:*` names at
+// run time. Until 4.0.1 the same module called `AddResourceAuthorization()`,
+// and the machinery was silently missing; it stood here by hand. Not needed any
+// more — CompanyJourneyTests shows it bites all the same.
 
-// Wer ein Firmenrecht hat, entscheidet die MITGLIEDSCHAFTSTABELLE, nicht das
-// Token. Noelias eigener Handler bleibt daneben stehen und liest Ansprueche —
-// er findet bei uns keine. Beide laufen; ein Succeed genuegt.
+// Who holds a company permission is decided by the MEMBERSHIP TABLE, not by
+// the token. Noelia's own handler stays beside it and reads claims — it finds
+// none of ours. Both run; one Succeed is enough.
 //
-// Rechte ins Token zu legen waere der kuerzere Weg und der schlechtere: ein
-// Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde.
-builder.Services.AddScoped<IAuthorizationHandler, Mitgliedschaftsrecht>();
+// Putting permissions into the token would be the shorter way and the worse
+// one: a token lives on after somebody was removed from a company.
+builder.Services.AddScoped<IAuthorizationHandler, MembershipPermission>();
 
 builder.Services.AddIdentityInfrastructure(
     builder.Configuration,
@@ -42,17 +42,17 @@ builder.Services.AddIdentityInfrastructure(
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<IdentityDbContext>();
+// Migrate first, serve afterwards (ADR-0010).
+await app.MigrateSchemaAsync<IdentityDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
 app.MapAuthEndpoints();
-app.MapRegistrierungsEndpoints();
-app.MapUnternehmensEndpoints();
-app.MapMeldeEndpoints();
-app.MapLoeschEndpoints();
-app.MapInterneEndpoints();
+app.MapRegistrationEndpoints();
+app.MapCompanyEndpoints();
+app.MapNotifyEndpoints();
+app.MapErasureEndpoints();
+app.MapInternalEndpoints();
 
 await app.RunAsync();
 

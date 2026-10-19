@@ -14,8 +14,8 @@ public sealed class ConsentDesignTimeFactory : IDesignTimeDbContextFactory<Conse
     /// <inheritdoc />
     public ConsentDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<ConsentDbContext>)ConsentDbContextFactory
-            .ZurEntwurfszeit(
+            .AtDesignTime(
                 new DbContextOptionsBuilder<ConsentDbContext>(),
-                "Host=entwurfszeit;Database=consent")
+                "Host=design-time;Database=consent")
             .Options);
 }

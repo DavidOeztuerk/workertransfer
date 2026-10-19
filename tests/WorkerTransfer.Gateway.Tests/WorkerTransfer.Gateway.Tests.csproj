@@ -20,7 +20,7 @@
     <ProjectReference Include="..\..\src\gateway\WorkerTransfer.Gateway\WorkerTransfer.Gateway.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Die ausgelieferte Landkarte, damit der Test nicht seine eigene prueft. -->
+    <!-- The shipped route map, so that the test does not check its own copy. -->
     <Content Include="..\..\src\gateway\WorkerTransfer.Gateway\ocelot.json"
              Link="ocelot.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

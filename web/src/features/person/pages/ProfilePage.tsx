@@ -14,17 +14,18 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 
 import {
-  BerufsfeldSelect,
+  OccupationalFieldSelect,
   ConsentSwitch,
   ErrorBlock,
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
 import type { ApiError } from "../../../core/store/thunkHelpers";
+import { type MessageKey, failureKey } from "../../../shared/api/errors";
 import {
-  type Pendelstufe,
+  type CommuteReadiness,
   type Profile,
-  type Umzugsbereitschaft,
+  type RelocationReadiness,
   getMyProfile,
   getVisibility,
   saveMyProfile,
@@ -32,32 +33,32 @@ import {
 } from "../api/profile";
 import { parseSkills } from "../lib/skills";
 import {
-  ausArbeiten,
-  ausRepositories,
-  ausStationen,
-  ausUnterlagen,
-  vorschlaegeAus,
-} from "../lib/vorschlaege";
-import { ladeMeine } from "../api/github";
+  fromDocuments,
+  fromPortfolioItems,
+  fromPositions,
+  fromRepositories,
+  suggestionsFrom,
+} from "../lib/suggestions";
+import { getMyConnection } from "../api/github";
 import {
-  type Unterlagenfund,
-  ladeMeinen,
-  ladeUnterlagenfunde,
-  leseUnterlagen,
+  type DocumentTerms,
+  getDocumentTerms,
+  getMyCurriculumVitae,
+  readDocuments,
 } from "../api/resume";
-import { ladeMeines } from "../api/portfolio";
+import { getMyPortfolio } from "../api/portfolio";
 import { useAsync } from "../lib/useAsync";
 import { usePerson } from "../lib/session";
-import { AnmeldungNoetig } from "../components/AnmeldungNoetig";
-import { Nachweise } from "../components/Nachweise";
-import { AusUnterlagen } from "../components/AusUnterlagen";
-import { zeigtGitHub } from "../../../shared/lib/berufsfelder";
-import type { BerufsfeldWahl } from "../../../shared/lib/berufsfelder";
+import { SignInRequired } from "../components/SignInRequired";
+import { EvidenceKinds } from "../components/EvidenceKinds";
+import { FromDocuments } from "../components/FromDocuments";
+import { offersGitHub } from "../../../shared/lib/occupationalFields";
+import type { OccupationalFieldChoice } from "../../../shared/lib/occupationalFields";
 import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
-import { berufsfeldGesetzt } from "../../auth/store/authSlice";
-import { speichereBerufsfeld } from "../api/berufsfeld";
+import { occupationalFieldSet } from "../../auth/store/authSlice";
+import { saveOccupationalField } from "../api/occupationalField";
 import { DraftHelp } from "../components/DraftHelp";
-import { Zivilidentitaet } from "../components/Zivilidentitaet";
+import { CivilIdentity } from "../components/CivilIdentity";
 
 interface FormState {
   headline: string;
@@ -65,12 +66,12 @@ interface FormState {
   location: string;
   remote_ok: boolean;
   skills: string;
-  /** Leerer Text heisst „nichts gesagt" — im Formular, nicht auf dem Draht. */
+  /** Empty text means "said nothing" — in the form, not on the wire. */
   commute_km: string;
   relocation: string;
 }
 
-const LEER: FormState = {
+const EMPTY: FormState = {
   headline: "",
   bio: "",
   location: "",
@@ -81,19 +82,21 @@ const LEER: FormState = {
 };
 
 /**
- * Die fünf Stufen — als Werte, nicht als Zahlen (ADR-0041).
+ * The five steps — as values, not as numbers (ADR-0041). The members are wire
+ * words.
  *
- * Die Schwellen sind gemessen: der mittlere Arbeitsweg liegt bei 17,2 km, über
- * 50 km pendeln 4,1 Mio Menschen, über 100 km noch 2,4 Mio. „Egal" muss es
- * deshalb geben — damit niemand sich kleiner machen muss, als er ist.
+ * The thresholds are measured: the median commute is 17.2 km, 4.1 million
+ * people commute more than 50 km, still 2.4 million more than 100 km. "Egal"
+ * (any distance) must therefore exist — so that nobody has to make themselves
+ * smaller than they are.
  */
-const PENDELSTUFEN = ["bis_10", "bis_25", "bis_50", "bis_100", "egal"] as const;
+const COMMUTE_READINESS = ["bis_10", "bis_25", "bis_50", "bis_100", "egal"] as const;
 
-/** Drei Werte, und „offen" ist keiner davon zu viel. */
-const UMZUGSWERTE = ["ja", "nein", "offen"] as const;
+/** Three values, and "offen" (open) is not one too many. */
+const RELOCATION_READINESS = ["ja", "nein", "offen"] as const;
 
-function zuFormular(profile: Profile | null): FormState {
-  if (profile === null) return LEER;
+function toForm(profile: Profile | null): FormState {
+  if (profile === null) return EMPTY;
   return {
     headline: profile.headline,
     bio: profile.bio,
@@ -106,230 +109,237 @@ function zuFormular(profile: Profile | null): FormState {
 }
 
 /**
- * Mein Profil — der Inhalt und, daneben, die Freigabe.
+ * My profile — the content and, beside it, the release.
  *
- * Die beiden stehen getrennt, weil sie getrennt sind: das Profil gehört
- * profile-service, die Sichtbarkeit dem Ledger. Der Schalter schreibt deshalb
- * <strong>nur</strong> in den Ledger, und ein Speichern des Profils ändert an
- * der Freigabe nichts.
+ * The two stand apart because they are apart: the profile belongs to
+ * profile-service, the visibility to the ledger. The switch therefore writes
+ * <strong>only</strong> into the ledger, and saving the profile changes
+ * nothing about the release.
  */
 export function ProfilePage() {
   const { t } = useTranslation();
-  const { subjectId, unbekannt } = usePerson();
+  const { subjectId, sessionUnknown } = usePerson();
 
   const profile = useAsync(
     (signal) => getMyProfile(signal),
     [subjectId],
     subjectId !== null,
   );
-  const freigabe = useAsync(
+  const release = useAsync(
     (signal) => getVisibility(subjectId ?? "", signal),
     [subjectId],
     subjectId !== null,
   );
 
-  const [form, setzeFormular] = useState<FormState>(LEER);
-  const [fehler, setzeFehler] = useState<ApiError | null>(null);
-  const [saved, setzeGespeichert] = useState(false);
-  const [saving, setzeSpeichert] = useState(false);
-  const [toggling, setzeSchaltet] = useState(false);
+  const [form, setForm] = useState<FormState>(EMPTY);
+  // The failure and the step's own sentence for it: what the person reads is
+  // a catalogue text chosen by status, never profile-service's sentence.
+  const [error, setError] = useState<{ error: ApiError; fallback: MessageKey } | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
-  // Das Formular folgt dem Server, solange niemand tippt. Danach gehört der
-  // Zustand der Person — sonst verliert sie ihre Eingabe, sobald die Antwort
-  // eintrifft.
+  // The form follows the server as long as nobody types. After that the state
+  // belongs to the person — otherwise they lose their input the moment the
+  // answer arrives.
   const loaded = profile.value;
   useEffect(() => {
-    if (loaded?.ok === true) setzeFormular(zuFormular(loaded.profile));
+    if (loaded?.ok === true) setForm(toForm(loaded.profile));
   }, [loaded]);
 
   function change<K extends keyof FormState>(
     key: K,
     value: FormState[K],
   ) {
-    setzeGespeichert(false);
-    setzeFormular((now) => ({ ...now, [key]: value }));
+    setSaved(false);
+    setForm((now) => ({ ...now, [key]: value }));
   }
 
   /*
-   * Die Belege werden nur GELESEN, um Vorschläge zu bilden. Ohne verbundenes
-   * Konto ist die Liste leer und der Abschnitt erscheint gar nicht — ein
-   * ausgegrauter Kasten für jemanden ohne GitHub wäre die stillschweigende
-   * Behauptung, dort fehle etwas (ADR-0022 §3).
+   * The evidence is only READ, to form suggestions. Without a connected
+   * account the list is empty and the section does not appear at all — a
+   * greyed-out box for somebody without GitHub would be the silent claim that
+   * something is missing there (ADR-0022 §3).
    */
-  // Das Berufsfeld entscheidet, was angeboten wird — nie, was erlaubt ist
+  // The occupational field decides what is offered — never what is allowed
   // (ADR-0039).
-  const berufsfeld = useAppSelector(
-    (state) => state.auth.session?.berufsfeld ?? null,
+  const occupationalField = useAppSelector(
+    (state) => state.auth.session?.occupationalField ?? null,
   );
-  const github = zeigtGitHub(berufsfeld);
+  const github = offersGitHub(occupationalField);
   const dispatch = useAppDispatch();
 
   /**
-   * Das Berufsfeld steht auf dem Profil, wo alles steht, was jemand über seine
-   * Arbeit sagt — nicht in den Einstellungen, die das Konto tragen.
+   * The occupational field stands on the profile, where everything stands that
+   * somebody says about their work — not in the settings, which carry the
+   * account.
    *
-   * Es gilt sofort, nicht erst mit „Speichern": Nachweiskasten und Navigation
-   * folgen ihm unmittelbar.
+   * It holds at once, not only with "Save": the evidence box and the
+   * navigation follow it immediately.
    */
-  async function waehleBerufsfeld(feld: BerufsfeldWahl) {
-    if (feld === berufsfeld) return;
+  async function chooseOccupationalField(field: OccupationalFieldChoice) {
+    if (field === occupationalField) return;
 
-    const result = await speichereBerufsfeld(feld);
+    const result = await saveOccupationalField(field);
 
     if (result.ok) {
-      dispatch(berufsfeldGesetzt(feld));
+      dispatch(occupationalFieldSet(field));
     } else {
-      // Die Anzeige darf keine Wahl behaupten, die der Server abgelehnt hat.
-      setzeFehler({ status: 0, title: "", detail: result.detail });
+      // The display must not claim a choice the server refused.
+      setError({ error: result.error, fallback: "errors.occupationNotSaved" });
     }
   }
 
-  // Wem GitHub nicht angeboten wird, wird auch nicht danach gefragt.
-  const belege = useAsync(
-    (signal) => ladeMeine(signal),
+  // Whoever is not offered GitHub is not asked about it either.
+  const evidence = useAsync(
+    (signal) => getMyConnection(signal),
     [subjectId, github],
     subjectId !== null && github,
   );
 
   /*
-   * Gefiltert wird gegen das Formular UND gegen das geladene Profil.
+   * Filtered against the form AND against the loaded profile.
    *
-   * Nur gegen das Formular zu filtern hatte einen sichtbaren Fehler: es folgt
-   * dem Server über einen Effekt, läuft also einen Durchgang hinterher. In
-   * genau diesem Durchgang stand „C#" schon im Profil und wurde trotzdem
-   * vorgeschlagen — ein Vorschlag, den die Person längst befolgt hat. Gemessen
-   * im Test, nicht ausgedacht.
+   * Filtering against the form alone had a visible defect: it follows the
+   * server through an effect, so it runs one pass behind. In exactly that pass
+   * "C#" already stood in the profile and was suggested anyway — a suggestion
+   * the person had long since followed. Measured in the test, not made up.
    */
-  const bereitsGenannt = [
+  const alreadyNamed = [
     ...parseSkills(form.skills),
     ...(loaded?.ok === true ? (loaded.profile?.skills ?? []) : []),
   ];
 
   /*
-   * DREI QUELLEN: die Repositories, die Technologien der Lebenslauf-Stationen
-   * und die der eigenen Arbeiten. Alles Wörter, die ein Mensch selbst
-   * hingeschrieben hat — und alles wird erst durch einen Klick hier oben zu
-   * einer Aussage über ihn.
+   * THREE SOURCES: the repositories, the technologies of the CV positions and
+   * those of one's own portfolio. All words a human wrote themselves — and all
+   * become a statement about them only through a click up here.
    */
-  const lebenslauf = useAsync(
-    (signal) => ladeMeinen(signal),
+  const curriculumVitae = useAsync(
+    (signal) => getMyCurriculumVitae(signal),
     [subjectId],
     subjectId !== null,
   );
 
-  const arbeiten = useAsync(
-    (signal) => ladeMeines(signal),
+  const portfolio = useAsync(
+    (signal) => getMyPortfolio(signal),
     [subjectId],
     subjectId !== null,
   );
 
   /*
-   * DIE VIERTE QUELLE: die eigenen hochgeladenen Unterlagen (PBI-7).
+   * THE FOURTH SOURCE: one's own uploaded documents (PBI-7).
    *
-   * Diese Abfrage LIEST KEINE DATEI. Sie holt, was ein früherer Klick ergeben
-   * hat — der Dienst öffnet ein Zeugnis erst, wenn jemand unten auf den Knopf
-   * drückt. Beim Laden einer Seite zu lesen wäre genau der Hintergrundlauf, den
-   * ADR-0004 ausschliesst.
+   * This query READS NO FILE. It fetches what an earlier click yielded — the
+   * service opens a reference only when somebody presses the button below.
+   * Reading while a page loads would be exactly the background run that
+   * ADR-0004 rules out.
    */
-  const funde = useAsync(
-    (signal) => ladeUnterlagenfunde(signal),
+  const documentTerms = useAsync(
+    (signal) => getDocumentTerms(signal),
     [subjectId],
     subjectId !== null,
   );
 
-  const [liest, setzeLiest] = useState(false);
-  const [lesefehler, setzeLesefehler] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
 
-  const gefunden: Unterlagenfund[] =
-    funde.value?.ok === true ? funde.value.value : [];
+  const findings: DocumentTerms[] =
+    documentTerms.value?.ok === true ? documentTerms.value.value : [];
 
-  async function leseUnterlagenJetzt() {
-    setzeLiest(true);
-    setzeLesefehler(null);
-    const result = await leseUnterlagen();
-    setzeLiest(false);
+  async function readDocumentsNow() {
+    setReading(true);
+    setReadError(null);
+    const result = await readDocuments();
+    setReading(false);
 
     if (result.ok) {
-      funde.setze({ ok: true, value: result.value });
+      documentTerms.set({ ok: true, value: result.value });
     } else {
-      // Die Anzeige darf keinen Fund behaupten, den es nicht gibt — sie behält
-      // den alten Stand und sagt daneben, dass der Versuch scheiterte.
-      setzeLesefehler(result.error.detail);
+      // The display must not claim a finding that does not exist — it keeps
+      // the old state and says beside it that the attempt failed.
+      setReadError(t(failureKey(result.error, "errors.documentsNotRead")));
     }
   }
 
-  const quellen = [
-    ...(belege.value?.ok === true && belege.value.value !== null
-      ? ausRepositories(belege.value.value.repositories)
+  const sources = [
+    ...(evidence.value?.ok === true && evidence.value.value !== null
+      ? fromRepositories(evidence.value.value.repositories)
       : []),
-    ...(lebenslauf.value?.ok === true
-      ? ausStationen(lebenslauf.value.value?.positions ?? [])
+    ...(curriculumVitae.value?.ok === true
+      ? fromPositions(curriculumVitae.value.value?.positions ?? [])
       : []),
-    ...(arbeiten.value?.ok === true
-      ? ausArbeiten(arbeiten.value.value?.items ?? [])
+    ...(portfolio.value?.ok === true
+      ? fromPortfolioItems(portfolio.value.value?.items ?? [])
       : []),
-    ...ausUnterlagen(gefunden),
+    ...fromDocuments(findings),
   ];
 
-  const vorschlaege = vorschlaegeAus(quellen, bereitsGenannt);
+  // EVIDENCE BECOMES A SUGGESTION, NEVER A NAMING. What occurs in a repository
+  // is a fact about a repository; that a person can do something is a statement
+  // about a human, and only they may make it (ADR-0022). Taking a word over is
+  // therefore TWO acts: a click fills the field, and only Save makes it a
+  // naming. A search knows only what was named — evidence stands beside it and
+  // never finds.
+  const suggestions = suggestionsFrom(sources, alreadyNamed);
 
-  function uebernimm(wort: string) {
-    // Ans Ende der Zeile, mit Komma — dieselbe Schreibweise, die jemand von
-    // Hand tippen würde. Gespeichert wird dadurch nichts.
-    const vorhanden = form.skills.trim();
+  function adopt(word: string) {
+    // At the end of the line, with a comma — the same spelling somebody would
+    // type by hand. Nothing is saved by this.
+    const present = form.skills.trim();
     change(
       "skills",
-      vorhanden === "" ? wort : `${vorhanden.replace(/,\s*$/, "")}, ${wort}`,
+      present === "" ? word : `${present.replace(/,\s*$/, "")}, ${word}`,
     );
   }
 
   async function save() {
-    setzeSpeichert(true);
+    setSaving(true);
     const result = await saveMyProfile({
       headline: form.headline,
       bio: form.bio,
       location: form.location,
       remote_ok: form.remote_ok,
-      // Leer heisst `null` und damit „nichts gesagt": die Angabe wird
-      // zurueckgenommen, nicht beibehalten.
-      commute_km: (form.commute_km as Pendelstufe | "") === "" ? null : (form.commute_km as Pendelstufe),
+      // Empty means `null` and thus "said nothing": the statement is taken
+      // back, not kept.
+      commute_km: (form.commute_km as CommuteReadiness | "") === "" ? null : (form.commute_km as CommuteReadiness),
       relocation:
-        (form.relocation as Umzugsbereitschaft | "") === ""
+        (form.relocation as RelocationReadiness | "") === ""
           ? null
-          : (form.relocation as Umzugsbereitschaft),
+          : (form.relocation as RelocationReadiness),
       skills: parseSkills(form.skills),
     });
-    setzeSpeichert(false);
+    setSaving(false);
     if (result.ok) {
-      setzeFehler(null);
-      setzeGespeichert(true);
-      profile.setze({ ok: true, profile: result.profile });
+      setError(null);
+      setSaved(true);
+      profile.set({ ok: true, profile: result.profile });
     } else {
-      setzeGespeichert(false);
-      setzeFehler(result.error);
+      setSaved(false);
+      setError({ error: result.error, fallback: "errors.profileNotSaved" });
     }
   }
 
-  async function toggle(naechster: boolean) {
+  async function toggle(next: boolean) {
     if (subjectId === null) return;
-    setzeSchaltet(true);
-    const result = await setVisibility(subjectId, naechster);
-    setzeSchaltet(false);
+    setToggling(true);
+    const result = await setVisibility(subjectId, next);
+    setToggling(false);
     if (result.ok) {
-      setzeFehler(null);
-      // Der Ledger sagt, was gilt — nicht der Wunsch des Klicks.
-      freigabe.setze(result.granted);
+      setError(null);
+      // The ledger says what holds — not the wish of the click.
+      release.set(result.granted);
     } else {
-      setzeFehler(result.error);
-      // Zurückstellen: ein Schalter, der „sichtbar" zeigt, obwohl nichts
-      // freigegeben wurde, wäre die gefährlichere Lüge.
-      freigabe.setze(!naechster);
+      setError({ error: result.error, fallback: "errors.consentNotChanged" });
+      // Reset: a switch that shows "visible" although nothing was released
+      // would be the more dangerous lie.
+      release.set(!next);
     }
   }
 
-  if (unbekannt) {
+  if (sessionUnknown) {
     return (
-      <PageShell title={t("profil.titel")} narrow>
+      <PageShell title={t("profile.title")} narrow>
         <LoadingBlock />
       </PageShell>
     );
@@ -337,67 +347,66 @@ export function ProfilePage() {
 
   if (subjectId === null) {
     return (
-      <AnmeldungNoetig titel={t("profil.titel")} satz="profil.anmelden" />
+      <SignInRequired title={t("profile.title")} sentenceKey="profile.signInRequired" />
     );
   }
 
-  if (profile.laedt || loaded === undefined) {
-    // Kein leeres Formular, das sich nachträglich füllt: wer in der Zwischenzeit
-    // zu tippen anfängt, verliert seine Eingabe, sobald die Antwort eintrifft.
+  if (profile.loading || loaded === undefined) {
+    // No empty form that fills afterwards: whoever starts typing in the
+    // meantime loses their input the moment the answer arrives.
     return (
-      <PageShell title={t("profil.titel")} narrow>
-        <LoadingBlock label={t("profil.laden")} />
+      <PageShell title={t("profile.title")} narrow>
+        <LoadingBlock label={t("profile.loading")} />
       </PageShell>
     );
   }
 
   if (!loaded.ok) {
-    // Und schon gar kein leeres Formular über einer gescheiterten Abfrage: wer
-    // darin etwas tippt und speichert, überschreibt alles, was dastand, mit
-    // leer. Der Ladezustand ist dann vorbei, die Seite sähe aus wie „noch
-    // nichts eingetragen".
+    // And certainly no empty form over a failed request: whoever types
+    // something into it and saves overwrites everything that stood there with
+    // empty. The loading state is over by then, and the page would look like
+    // "nothing entered yet".
     return (
-      <PageShell title={t("profil.titel")} narrow>
-        <ErrorBlock error={loaded.error} />
+      <PageShell title={t("profile.title")} narrow>
+        <ErrorBlock error={loaded.error} fallback="errors.ownProfileNotLoaded" />
       </PageShell>
     );
   }
 
-  const hatProfil = loaded.profile !== null;
-  // Die ANZEIGE bleibt bei Nichtwissen aus — ein Schalter, der versehentlich
-  // „freigegeben" behauptet, ist die gefährlichere Lüge.
-  const freigegeben = freigabe.value === true;
-  // ... aber „weiss ich nicht" ist nicht „nein". Solange die Antwort aussteht
-  // oder ausbleibt, darf der Schalter nicht BEDIENBAR sein: sonst schickt der
-  // nächste Klick ein `grant` für eine Einwilligung, deren Zustand niemand
-  // kennt.
-  const ledgerSchweigt = !freigabe.laedt && freigabe.value === null;
-  const ledgerUnbekannt = freigabe.laedt || ledgerSchweigt;
+  const hasProfile = loaded.profile !== null;
+  // The DISPLAY stays off when nothing is known — a switch that accidentally
+  // claims "released" is the more dangerous lie.
+  const released = release.value === true;
+  // ... but "I do not know" is not "no". As long as the answer is pending or
+  // absent the switch must not be OPERABLE: otherwise the next click sends a
+  // `grant` for a consent whose state nobody knows.
+  const ledgerSilent = !release.loading && release.value === null;
+  const ledgerUnknown = release.loading || ledgerSilent;
 
   return (
     <PageShell
-      title={t("profil.titel")}
+      title={t("profile.title")}
       narrow
-      lead={t("profil.lead")}
+      lead={t("profile.lead")}
     >
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <ConsentSwitch
-            label={t("profil.freigabeLabel")}
-            checked={freigegeben}
-            disabled={!hatProfil || toggling || ledgerUnbekannt}
+            label={t("profile.releaseLabel")}
+            checked={released}
+            disabled={!hasProfile || toggling || ledgerUnknown}
             hint={
-              ledgerSchweigt
-                ? t("profil.freigabeSchweigt")
-                : freigabe.laedt
-                  ? t("profil.freigabePruefung")
+              ledgerSilent
+                ? t("profile.releaseSilent")
+                : release.loading
+                  ? t("profile.releaseChecking")
                   : t(
-                      hatProfil
-                        ? "profil.freigabeWirkt"
-                        : "profil.freigabeOhneProfil",
+                      hasProfile
+                        ? "profile.releaseEffective"
+                        : "profile.releaseWithoutProfile",
                     )
             }
-            onChange={(naechster) => void toggle(naechster)}
+            onChange={(next) => void toggle(next)}
           />
         </CardContent>
       </Card>
@@ -413,8 +422,8 @@ export function ProfilePage() {
             sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
           >
             <TextField
-              label={t("profil.ueberschrift")}
-              helperText={t("profil.ueberschriftHinweis")}
+              label={t("profile.headline")}
+              helperText={t("profile.headlineHint")}
               value={form.headline}
               onChange={(event) =>
                 change("headline", event.target.value)
@@ -424,8 +433,8 @@ export function ProfilePage() {
               fullWidth
             />
             <TextField
-              label={t("profil.ueberMich")}
-              helperText={t("profil.ueberMichHinweis")}
+              label={t("profile.aboutMe")}
+              helperText={t("profile.aboutMeHint")}
               multiline
               rows={6}
               value={form.bio}
@@ -438,8 +447,8 @@ export function ProfilePage() {
               hasText={form.bio.trim().length > 0}
             />
             <TextField
-              label={t("profil.ort")}
-              helperText={t("profil.ortHinweis")}
+              label={t("profile.location")}
+              helperText={t("profile.locationHint")}
               value={form.location}
               onChange={(event) =>
                 change("location", event.target.value)
@@ -447,148 +456,136 @@ export function ProfilePage() {
               slotProps={{ htmlInput: { maxLength: 120 } }}
               fullWidth
             />
-            <BerufsfeldSelect
-              wert={berufsfeld}
-              onChange={(feld) => void waehleBerufsfeld(feld)}
+            <OccupationalFieldSelect
+              value={occupationalField}
+              onChange={(field) => void chooseOccupationalField(field)}
             />
 
             <TextField
-              label={t("profil.faehigkeiten")}
-              // Der Hinweis erklärt, warum aus „postgres" nach dem Speichern
-              // „PostgreSQL" wird. Ohne ihn sähe es aus, als hätte die Seite
-              // etwas an der Eingabe verändert, ohne zu fragen.
-              helperText={t("profil.faehigkeitenHinweis")}
+              label={t("profile.skills")}
+              // The hint explains why "postgres" becomes "PostgreSQL" after
+              // saving. Without it, it would look as if the page had changed
+              // the input without asking.
+              helperText={t("profile.skillsHint")}
               value={form.skills}
               onChange={(event) => change("skills", event.target.value)}
               fullWidth
             />
 
-            {/*
-              AUS BELEGEN WERDEN VORSCHLÄGE — NIE NENNUNGEN.
-
-              Was in einem Repository vorkommt, ist eine Tatsache über ein
-              Repository. Dass eine Person etwas kann, ist eine Aussage über
-              einen Menschen, und die darf nur sie selbst treffen (ADR-0022).
-              Diese Wörter zu übernehmen sind deshalb ZWEI Handlungen: ein Klick
-              füllt das Feld darüber, und erst „Speichern" macht daraus eine
-              Nennung. Nichts wandert von allein hinüber.
-
-              Und genau darauf kommt es später an: eine Suche kennt nur
-              Genanntes. Belege stehen daneben, sie finden nie.
-            */}
-            {vorschlaege.length > 0 || gefunden.length > 0 ? (
+            {suggestions.length > 0 || findings.length > 0 ? (
               <Box>
-                {vorschlaege.length > 0 ? (
+                {suggestions.length > 0 ? (
                   <>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                      {t(github ? "profil.vorschlaegeTitel" : "profil.vorschlaegeTitelEigen")}
+                      {t(github ? "profile.suggestionsTitle" : "profile.suggestionsTitleOwn")}
                     </Typography>
                     <Typography
                       variant="caption"
                       color="text.secondary"
                       sx={{ display: "block", mb: 1 }}
                     >
-                      {t(github ? "profil.vorschlaegeHinweis" : "profil.vorschlaegeHinweisEigen")}
+                      {t(github ? "profile.suggestionsHint" : "profile.suggestionsHintOwn")}
                     </Typography>
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-                      {vorschlaege.map((wort) => (
+                      {suggestions.map((word) => (
                         <Chip
-                          key={wort}
-                          label={wort}
+                          key={word}
+                          label={word}
                           size="small"
                           variant="outlined"
                           icon={<AddIcon />}
-                          onClick={() => uebernimm(wort)}
-                          aria-label={t("profil.vorschlagUebernehmen", { wort })}
+                          onClick={() => adopt(word)}
+                          aria-label={t("profile.suggestionAdopt", { wort: word })}
                         />
                       ))}
                     </Box>
                   </>
                 ) : null}
-                {/* Der Knopf steht UNTER den Wörtern, nicht daneben: was schon
-                    gefunden wurde, liest man zuerst. */}
-                <AusUnterlagen
-                  funde={gefunden}
-                  laeuft={liest}
-                  fehler={lesefehler}
-                  onLesen={() => void leseUnterlagenJetzt()}
+                <FromDocuments
+                  findings={findings}
+                  reading={reading}
+                  error={readError}
+                  onRead={() => void readDocumentsNow()}
                 />
               </Box>
             ) : null}
-            {/* Eine Ankreuzbox und KEIN Schalter: dies ist ein Profilfeld, und
-                es gilt erst mit dem Speichern. Genau umgekehrt zur Freigabe
-                darüber — dort wäre eine Box das falsche Versprechen. */}
             <FormControlLabel
               control={
                 <Checkbox
+                  // A checkbox and NOT a switch: this is a profile field and it
+                  // only holds once saved. The opposite of the consent switch
+                  // above, where a box would be the wrong promise.
                   checked={form.remote_ok}
                   onChange={(event) =>
                     change("remote_ok", event.target.checked)
                   }
                 />
               }
-              label={t("profil.remote")}
+              label={t("profile.remote")}
             />
 
-            {/* ADR-0041: eine STUFE und keine Kilometerzahl. Ein Zahlenfeld
-                lüde zum Rechnen ein — „37 ≤ 50, also 74 % passend" —, eine
-                Stufe ist eine Aussage, die jemand getroffen hat.
-
-                Beide sind freiwillig, und die leere Wahl steht ausdrücklich
-                oben: „nichts gesagt" ist ein Zustand, kein Versäumnis, und es
-                muss sich zurücknehmen lassen. */}
             <TextField
+              // ADR-0041: a STEP and no kilometre figure. A number field would
+              // invite arithmetic ("37 ≤ 50, so 74 % fitting"); a step is a
+              // statement somebody made. The empty choice stands at the top on
+              // purpose — "said nothing" is a state, not an omission, and it
+              // must be revocable.
               select
-              label={t("profil.pendeln")}
-              helperText={t("profil.pendelnHinweis")}
+              label={t("profile.commute")}
+              helperText={t("profile.commuteHint")}
               value={form.commute_km}
               onChange={(event) => change("commute_km", event.target.value)}
             >
-              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
-              {PENDELSTUFEN.map((stufe) => (
-                <MenuItem key={stufe} value={stufe}>
-                  {t(`profil.pendeln_${stufe}`)}
+              <MenuItem value="">{t("profile.notStated")}</MenuItem>
+              {COMMUTE_READINESS.map((readiness) => (
+                <MenuItem key={readiness} value={readiness}>
+                  {t(`profile.commute_${readiness}`)}
                 </MenuItem>
               ))}
             </TextField>
 
             <TextField
               select
-              label={t("profil.umzug")}
-              helperText={t("profil.umzugHinweis")}
+              label={t("profile.relocate")}
+              helperText={t("profile.relocateHint")}
               value={form.relocation}
               onChange={(event) => change("relocation", event.target.value)}
             >
-              <MenuItem value="">{t("profil.nichtsGesagt")}</MenuItem>
-              {UMZUGSWERTE.map((wert) => (
-                <MenuItem key={wert} value={wert}>
-                  {t(`profil.umzug_${wert}`)}
+              <MenuItem value="">{t("profile.notStated")}</MenuItem>
+              {RELOCATION_READINESS.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {t(`profile.relocate_${value}`)}
                 </MenuItem>
               ))}
             </TextField>
 
-            {fehler !== null ? <ErrorBlock error={fehler} /> : null}
-            {/* `role="status"` und nicht `alert`: eine Bestätigung, die den
-                Vorleser unterbricht, ist Lärm. */}
-            {saved && fehler === null ? (
-              <Alert severity="success" role="status">
-                {t("profil.gespeichert")}
+            {error !== null ? (
+              <ErrorBlock error={error.error} fallback={error.fallback} />
+            ) : null}
+            {saved && error === null ? (
+              <Alert
+                severity="success"
+                // A confirmation that interrupts the screen reader is noise;
+                // MUI's Alert would otherwise set role="alert".
+                role="status"
+              >
+                {t("profile.saved")}
               </Alert>
             ) : null}
 
             <Box>
               <Button type="submit" variant="contained" disabled={saving}>
                 {saving
-                  ? t("allgemein.speichernLaeuft")
-                  : t("allgemein.speichern")}
+                  ? t("common.saving")
+                  : t("common.save")}
               </Button>
             </Box>
           </Box>
         </CardContent>
       </Card>
 
-      <Nachweise feld={berufsfeld} />
-      <Zivilidentitaet />
+      <EvidenceKinds field={occupationalField} />
+      <CivilIdentity />
     </PageShell>
   );
 }

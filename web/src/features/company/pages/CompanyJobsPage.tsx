@@ -13,7 +13,8 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { ADMIN_CASES, failureKey } from "../../../shared/api/errors";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type Job,
@@ -22,45 +23,45 @@ import {
   publishJob,
 } from "../../work/api/jobs";
 
-/** Der Stand als Katalogschlüssel — der Wortlaut liegt in den Katalogen. */
-const STAND: Record<string, string> = {
-  draft: "firmenstellen.standDraft",
-  published: "firmenstellen.standPublished",
-  closed: "firmenstellen.standClosed",
+/** The state as a catalogue key — the wording lies in the catalogues. */
+const STATUS_KEYS: Record<string, string> = {
+  draft: "companyJobs.statusDraft",
+  published: "companyJobs.statusPublished",
+  closed: "companyJobs.statusClosed",
 };
 
 /**
- * <c>/company/jobs</c> — die eigenen Anzeigen.
+ * <c>/company/jobs</c> — one's own adverts.
  *
- * <strong>Drei Zustände, und der mittlere ist öffentlich.</strong> Ein Entwurf
- * sieht niemand ausser dem Unternehmen; veröffentlicht ist er für alle sichtbar,
- * auch ohne Konto; geschlossen bleibt geschlossen. Eine geschlossene Anzeige
- * lässt sich nicht wieder öffnen — wer neu ausschreibt, schreibt neu aus.
+ * <strong>Three states, and the middle one is public.</strong> A draft is seen
+ * by nobody but the company; published it is visible to everyone, even without
+ * an account; closed stays closed. A closed advert cannot be reopened — whoever
+ * advertises anew writes a new advert.
  *
- * <strong>Das Formular liegt auf einer eigenen Adresse</strong>
- * (<c>/company/jobs/new</c>), und diese Liste verweist sichtbar darauf. Eine
- * E2E-Reise sucht es heute noch hier; das ist ihr Fehler und nicht der der
- * Oberfläche, aber die Verlinkung muss deshalb auffindbar sein.
+ * <strong>The form lies on an address of its own</strong>
+ * (<c>/company/jobs/new</c>), and this list visibly links to it. An E2E journey
+ * still looks for it here today; that is the journey's defect and not the
+ * UI's, but the link must be findable for that reason.
  */
 export function CompanyJobsPage() {
   const { t } = useTranslation();
-  const { fuerFirma } = useHandelnder();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const { forCompany } = useActor();
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  const stellen = useAsync(
+  const jobs = useAsync(
     (signal) => listOwnJobs(signal),
-    [fuerFirma],
-    fuerFirma,
+    [forCompany],
+    forCompany,
   );
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
-      <PageShell title={t("firmenstellen.titel")} narrow>
+      <PageShell title={t("companyJobs.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("firmenstellen.nurFirma")}
+              {t("companyJobs.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -68,64 +69,78 @@ export function CompanyJobsPage() {
     );
   }
 
-  async function schalten(id: string, veroeffentlichen: boolean) {
-    setLaeuft(true);
-    const result = veroeffentlichen
+  async function toggle(id: string, publish: boolean) {
+    setRunning(true);
+    const result = publish
       ? await publishJob(id)
       : await closeJob(id);
-    setLaeuft(false);
-    setFehler(result.ok ? null : result.error.detail);
-    stellen.reload();
+    setRunning(false);
+    // Publishing and closing demand an `admin` (PBI-2); a 409 means the advert
+    // already stands otherwise. A catalogue text, never the server's sentence.
+    setError(
+      result.ok
+        ? null
+        : t(
+            failureKey(result.error, "errors.jobNotSaved", [
+              ...ADMIN_CASES,
+              { status: 409, key: "companyJobs.stateMovedOn" },
+            ]),
+          ),
+    );
+    jobs.reload();
   }
 
-  const result = stellen.data;
+  const result = jobs.data;
   const list = result?.ok ? result.jobs : [];
 
   return (
     <PageShell
-      title={t("firmenstellen.titel")}
+      title={t("companyJobs.title")}
       narrow
-      lead={t("firmenstellen.lead")}
+      lead={t("companyJobs.lead")}
       actions={
         <Button
           component={RouterLink}
           to="/company/jobs/new"
           variant="contained"
         >
-          {t("firmenstellen.neu")}
+          {t("companyJobs.new")}
         </Button>
       }
     >
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
       <Card>
         <CardContent>
-          {/* Reihenfolge: lädt, dann Fehler, dann leer, dann Inhalt. Der
-              LADEZUSTAND fehlte im alten Code — und weil auch der Leersatz eine
-              geglückte Antwort verlangte, blieb die Karte währenddessen
-              vollständig leer. */}
-          {stellen.pending ? (
-            <LoadingBlock label={t("firmenstellen.laden")} />
+          {jobs.pending ? (
+            <LoadingBlock
+              // Its own branch, before error and empty: the empty sentence needs
+              // a successful answer, so without this branch the card stayed
+              // completely empty while loading.
+              label={t("companyJobs.loading")}
+            />
           ) : null}
 
           {result !== null && !result.ok ? (
-            <Alert severity="error">{result.error.detail}</Alert>
+            <Alert severity="error">
+              {t(failureKey(result.error, "errors.listNotLoaded"))}
+            </Alert>
           ) : null}
 
           {result?.ok && list.length === 0 ? (
             <EmptyBlock
-              title={t("firmenstellen.leer")}
+              title={t("companyJobs.empty")}
               action={
                 <Button
                   component={RouterLink}
                   to="/company/jobs/new"
                   variant="contained"
                 >
-                  {t("firmenstellen.neu")}
+                  {t("companyJobs.new")}
                 </Button>
               }
             />
@@ -143,8 +158,8 @@ export function CompanyJobsPage() {
                 m: 0,
               }}
             >
-              {list.map((stelle: Job) => (
-                <Card key={stelle.id} component="li" variant="outlined">
+              {list.map((job: Job) => (
+                <Card key={job.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",
@@ -155,31 +170,31 @@ export function CompanyJobsPage() {
                     }}
                   >
                     <Box>
-                      <Typography variant="h4">{stelle.title}</Typography>
+                      <Typography variant="h4">{job.title}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {t(STAND[stelle.status] ?? stelle.status)}
+                        {t(STATUS_KEYS[job.status] ?? job.status)}
                       </Typography>
                     </Box>
 
-                    {stelle.status !== "closed" ? (
+                    {job.status !== "closed" ? (
                       <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
-                        {stelle.status === "draft" ? (
+                        {job.status === "draft" ? (
                           <Button
                             variant="contained"
                             size="small"
-                            onClick={() => void schalten(stelle.id, true)}
+                            onClick={() => void toggle(job.id, true)}
                             disabled={running}
                           >
-                            {t("firmenstellen.veroeffentlichen")}
+                            {t("companyJobs.publish")}
                           </Button>
                         ) : null}
                         <Button
                           variant="text"
                           size="small"
-                          onClick={() => void schalten(stelle.id, false)}
+                          onClick={() => void toggle(job.id, false)}
                           disabled={running}
                         >
-                          {t("firmenstellen.schliessen")}
+                          {t("companyJobs.close")}
                         </Button>
                       </Box>
                     ) : null}

@@ -6,11 +6,11 @@ import { SiteHeader } from "./SiteHeader";
 import { SessionGate } from "./SessionGate";
 
 /**
- * Der Rahmen um jede Seite: Kopfzeile, Inhalt, Fusszeile.
+ * The frame around every page: header, content, footer.
  *
- * `SessionGate` liegt darum und nicht darin — es lädt die Sitzung EINMAL beim
- * Start. Läge die Prüfung in jeder Seite, liefe sie bei jedem Wechsel neu, und
- * die Kopfzeile flackerte zwischen angemeldet und abgemeldet.
+ * `SessionGate` lies around it and not inside — it loads the session ONCE at
+ * start. Were the check inside every page, it would run anew at every switch,
+ * and the header would flicker between signed in and signed out.
  */
 export function AppLayout() {
   return (

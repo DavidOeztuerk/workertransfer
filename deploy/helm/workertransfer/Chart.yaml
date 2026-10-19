@@ -1,16 +1,16 @@
 apiVersion: v2
 name: workertransfer
 description: >-
-  Die zehn Dienste, das Gateway und die Oberfläche als ein Release. Lokal gegen
-  kind, in Staging und Produktion mit einer anderen values.yaml — nicht mit
-  einer anderen Struktur.
+  The services, the gateway and the UI as one release. Locally against kind,
+  in staging and production with a different values.yaml — not with a
+  different structure.
 type: application
 
-# Version des Charts. Steigt, wenn sich die Templates ändern.
+# The chart's version. Goes up when the templates change.
 version: 0.1.0
 
-# Die Software, die es ausliefert. Kein fester Wert, weil das Repo keine
-# Release-Nummern vergibt; `appVersion` folgt dem Image-Tag aus values.yaml.
+# The software it ships. No fixed value, because the repository assigns no
+# release numbers; `appVersion` follows the image tag from values.yaml.
 appVersion: "dev"
 
 kubeVersion: ">=1.29.0-0"

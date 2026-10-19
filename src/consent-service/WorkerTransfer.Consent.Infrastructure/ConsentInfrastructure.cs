@@ -6,16 +6,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Consent.Application.Behaviors;
-using WorkerTransfer.Consent.Application.Einwilligung;
+using WorkerTransfer.Consent.Application.Consents;
 using WorkerTransfer.Consent.Application.Ports;
 using WorkerTransfer.Consent.Domain.Audit;
 using WorkerTransfer.Consent.Domain.Ledger;
-using WorkerTransfer.Consent.Infrastructure.Loeschung;
+using WorkerTransfer.Consent.Infrastructure.Erasure;
 using WorkerTransfer.Consent.Infrastructure.Persistence;
 using WorkerTransfer.Consent.Infrastructure.Security;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.Consent.Infrastructure.Nachweis;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.Consent.Infrastructure.Evidence;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Contracts.Consent;
 using Noelia.Abstractions.Security.Checks;
 
@@ -45,75 +45,74 @@ public static class ConsentInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
         services.AddSingleton(_ => ConsentDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ConsentDbContext>((provider, options) =>
-            ConsentDbContextFactory.Konfiguriere(
+            ConsentDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<ConsentDbContext>("consent");
-        services.AddSchluesselbund<ConsentDbContext>();
+        services.AddDatabaseReadiness<ConsentDbContext>("consent");
+        services.AddKeyRing<ConsentDbContext>();
 
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IConsentLedger, EfConsentLedger>();
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IFreitextraeumung, EfFreitextraeumung>();
-        services.AddScoped<Einwilligungsschreiber>();
-        services.AddSingleton<IKorrelation, HttpKorrelation>();
+        services.AddScoped<IFreeTextClearing, EfFreeTextClearing>();
+        services.AddScoped<ConsentWriter>();
+        services.AddSingleton<ICorrelation, HttpCorrelation>();
 
         // Seven handlers, so the mediator earns its keep. Registered before the
         // transaction behaviour so that one ends up innermost: Noelia's logging
         // and validation run before anything is written, which is where a
         // rejected command costs nothing.
-        services.AddCQRS(typeof(EinwilligungErteilenBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(GrantConsentCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the ServiceFoundation, for the same
+    /// reason the ledger, the audit trail and the store stand here: they are
+    /// decisions of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads
+    /// nothing but the configuration, is therefore the same for every service,
+    /// and stands in <c>AddEvidence</c>. It is the one a new service cannot
+    /// forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(AuditAction).Assembly, typeof(EinwilligungsfrageV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(AuditAction).Assembly, typeof(ConsentQuestionV1).Assembly]));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        // No AI seam: `ProviderCheck` without a source reports NotApplicable,
+        // and that is expressly NOT a green tick — a tick on something that does
+        // not apply here at all would be noise in the document that exists to
+        // cut through noise.
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        // Der Ledger selbst — die eine Pruefung im Bereich `Ledger`, und der
-        // Grund, dass es diesen Bereich gibt. Sie misst ein NICHT-Vorhandensein
-        // (keine Mandantenspalte), und das sind die, die am leichtesten wieder
-        // verschwinden.
-        services.AddSingleton<ISecurityCheck, Ledgerpruefung>();
+        // The ledger itself — the one check in the `Ledger` area, and the
+        // reason that area exists. It measures a NON-existence (no tenant
+        // column), and those are the ones that disappear again most easily.
+        services.AddSingleton<ISecurityCheck, LedgerCheck>();
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "consent",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
-            pruefspurVorhanden: false));
+            !string.IsNullOrEmpty(erasure.Secret),
+            auditTrailPresent: false));
     }
 }

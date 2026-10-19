@@ -15,9 +15,9 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NSubstitute" />
     <!--
-      Nicht um zu lesen, sondern um zu SCHREIBEN: `ErkennungsreiseTests` setzt
-      seine Zeugnisse als echte PDFs, statt eine Binaerdatei einzuchecken.
-      Dieselbe Bibliothek in die andere Richtung.
+      Not to read but to WRITE: `RecognitionJourneyTests` typesets its
+      references as real PDFs instead of checking in a binary file. The same
+      library in the other direction.
     -->
     <PackageReference Include="PdfPig" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />

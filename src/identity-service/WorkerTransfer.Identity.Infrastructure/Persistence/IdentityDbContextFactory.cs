@@ -12,10 +12,10 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence;
 public static class IdentityDbContextFactory
 {
     /// <summary>The Postgres enum behind <c>audit_events.action</c>.</summary>
-    private const string AuditActionTyp = "audit_action";
+    private const string AuditActionType = "audit_action";
 
     /// <summary>The Postgres enum behind <c>users.status</c>.</summary>
-    private const string AccountStatusTyp = "account_status";
+    private const string AccountStatusType = "account_status";
 
     /// <summary>A data source that knows both Postgres enums.</summary>
     /// <remarks>
@@ -28,18 +28,18 @@ public static class IdentityDbContextFactory
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);
         builder.EnableUnmappedTypes();
-        builder.MapEnum<AuditAction>(AuditActionTyp);
-        builder.MapEnum<AccountStatus>(AccountStatusTyp);
+        builder.MapEnum<AuditAction>(AuditActionType);
+        builder.MapEnum<AccountStatus>(AccountStatusType);
         return builder.Build();
     }
 
     /// <summary>A context over <paramref name="connectionString"/>.</summary>
-    public static IdentityDbContext Fuer(string connectionString) =>
-        new(Optionen(DataSource(connectionString)).Options);
+    public static IdentityDbContext For(string connectionString) =>
+        new(Options(DataSource(connectionString)).Options);
 
     /// <summary>Options for a data source the caller owns.</summary>
-    public static DbContextOptionsBuilder<IdentityDbContext> Optionen(NpgsqlDataSource dataSource) =>
-        (DbContextOptionsBuilder<IdentityDbContext>)Konfiguriere(
+    public static DbContextOptionsBuilder<IdentityDbContext> Options(NpgsqlDataSource dataSource) =>
+        (DbContextOptionsBuilder<IdentityDbContext>)Configure(
             new DbContextOptionsBuilder<IdentityDbContext>(), dataSource);
 
     /// <summary>
@@ -49,13 +49,13 @@ public static class IdentityDbContextFactory
     /// </summary>
     /// <param name="options">The builder to configure.</param>
     /// <param name="dataSource">Where the data lives.</param>
-    public static DbContextOptionsBuilder Konfiguriere(
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
         NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return options.UseNpgsql(dataSource, Gemeinsam).UseQueryTrackingBehavior(
+        return options.UseNpgsql(dataSource, Shared).UseQueryTrackingBehavior(
             QueryTrackingBehavior.NoTracking);
     }
 
@@ -67,13 +67,13 @@ public static class IdentityDbContextFactory
     /// design-time model that differs from the running one produces migrations
     /// for changes nobody made — and, worse, none for changes somebody did.
     /// </remarks>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options,
         string connectionString)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return options.UseNpgsql(connectionString, Gemeinsam);
+        return options.UseNpgsql(connectionString, Shared);
     }
 
     /// <summary>
@@ -81,9 +81,9 @@ public static class IdentityDbContextFactory
     /// type; this teaches EF that the column is it — without it the parameter
     /// goes out as an integer and Postgres refuses it.
     /// </summary>
-    private static void Gemeinsam(NpgsqlDbContextOptionsBuilder npgsql)
+    private static void Shared(NpgsqlDbContextOptionsBuilder npgsql)
     {
-        npgsql.MapEnum<AuditAction>(AuditActionTyp);
-        npgsql.MapEnum<AccountStatus>(AccountStatusTyp);
+        npgsql.MapEnum<AuditAction>(AuditActionType);
+        npgsql.MapEnum<AccountStatus>(AccountStatusType);
     }
 }

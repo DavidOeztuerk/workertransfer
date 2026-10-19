@@ -2,22 +2,22 @@ import { request } from "../../../core/api/client";
 import type { ApiError } from "../../../core/store/thunkHelpers";
 import { API_BASE_URL } from "../../../env";
 
-export type Loeschergebnis = { ok: true } | { ok: false; error: ApiError };
+export type ErasureResult = { ok: true } | { ok: false; error: ApiError };
 
 /**
- * <c>POST /account/erasure</c> — nur für einen selbst, und ohne Begründung.
+ * <c>POST /account/erasure</c> — for oneself only, and without a reason.
  *
- * <strong>Kein Grundfeld, und das ist keine Auslassung.</strong> Von jemandem,
- * der gehen will, eine Rechtfertigung zu verlangen, ist ein Hebel gegen ihn.
- * Deshalb schickt dieser Aufruf einen leeren Rumpf, und es gibt nichts, was man
- * hier ergänzen könnte, ohne die Zusage zu brechen.
+ * <strong>No reason field, and that is not an omission.</strong> Demanding a
+ * justification from someone who wants to leave is a lever against them. So
+ * this call sends an empty body, and there is nothing that could be added here
+ * without breaking the promise.
  */
-export async function loeschungVerlangen(signal?: AbortSignal): Promise<Loeschergebnis> {
+export async function requestErasure(signal?: AbortSignal): Promise<ErasureResult> {
   const answer = await request<void>(
     API_BASE_URL,
     "/account/erasure",
     { method: "POST", signal },
-    "fehler.loeschungNichtAngenommen"
+    "errors.deletionNotAccepted"
   );
 
   return answer.ok ? { ok: true } : { ok: false, error: answer.error };

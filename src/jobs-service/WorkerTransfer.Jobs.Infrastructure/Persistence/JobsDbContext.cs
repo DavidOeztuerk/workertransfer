@@ -4,8 +4,8 @@ using Npgsql;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Persistence;
 
-/// <summary>Eine Zeile von <c>jobs</c>.</summary>
-public sealed class StellenZeile
+/// <summary>A row of <c>jobs</c>.</summary>
+public sealed class JobRow
 {
     public Guid Id { get; set; }
 
@@ -17,14 +17,14 @@ public sealed class StellenZeile
 
     public string Location { get; set; } = string.Empty;
 
-    /// <summary>Die Postleitzahl. Leer, wenn keine angegeben wurde.</summary>
+    /// <summary>The postal code. Empty when none was given.</summary>
     public string PostalCode { get; set; } = string.Empty;
 
     public string RemoteMode { get; set; } = "none";
 
     public string EmploymentType { get; set; } = "full_time";
 
-    /// <summary>Die Anforderungen als jsonb.</summary>
+    /// <summary>The requirements as jsonb.</summary>
     public string Skills { get; set; } = "[]";
 
     public string Status { get; set; } = "draft";
@@ -36,56 +36,56 @@ public sealed class StellenZeile
     public DateTime? PublishedAt { get; set; }
 }
 
-/// <summary>Die eine Tabelle dieses Dienstes.</summary>
+/// <summary>The one table of this service.</summary>
 public sealed class JobsDbContext(DbContextOptions<JobsDbContext> options) : DbContext(options)
 {
-    public DbSet<StellenZeile> Stellen => Set<StellenZeile>();
+    public DbSet<JobRow> Jobs => Set<JobRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
 
-        modelBuilder.Entity<StellenZeile>(zeile =>
+        modelBuilder.Entity<JobRow>(row =>
         {
-            zeile.ToTable("jobs");
-            zeile.HasKey(eintrag => eintrag.Id);
-            zeile.Property(eintrag => eintrag.Id).HasColumnName("id");
-            zeile.Property(eintrag => eintrag.TenantId).HasColumnName("tenant_id");
-            zeile.Property(eintrag => eintrag.Title).HasColumnName("title").IsRequired();
-            zeile.Property(eintrag => eintrag.Description)
+            row.ToTable("jobs");
+            row.HasKey(entry => entry.Id);
+            row.Property(entry => entry.Id).HasColumnName("id");
+            row.Property(entry => entry.TenantId).HasColumnName("tenant_id");
+            row.Property(entry => entry.Title).HasColumnName("title").IsRequired();
+            row.Property(entry => entry.Description)
                 .HasColumnName("description").IsRequired();
-            zeile.Property(eintrag => eintrag.Location).HasColumnName("location").IsRequired();
-            zeile.Property(eintrag => eintrag.PostalCode)
+            row.Property(entry => entry.Location).HasColumnName("location").IsRequired();
+            row.Property(entry => entry.PostalCode)
                 .HasColumnName("postal_code").IsRequired().HasDefaultValue(string.Empty);
-            zeile.Property(eintrag => eintrag.RemoteMode).HasColumnName("remote_mode").IsRequired();
-            zeile.Property(eintrag => eintrag.EmploymentType)
+            row.Property(entry => entry.RemoteMode).HasColumnName("remote_mode").IsRequired();
+            row.Property(entry => entry.EmploymentType)
                 .HasColumnName("employment_type").IsRequired();
-            zeile.Property(eintrag => eintrag.Skills)
+            row.Property(entry => entry.Skills)
                 .HasColumnName("skills").HasColumnType("jsonb").IsRequired();
-            zeile.Property(eintrag => eintrag.Status).HasColumnName("status").IsRequired();
-            zeile.Property(eintrag => eintrag.CreatedAt).HasColumnName("created_at");
-            zeile.Property(eintrag => eintrag.UpdatedAt).HasColumnName("updated_at");
-            zeile.Property(eintrag => eintrag.PublishedAt).HasColumnName("published_at");
+            row.Property(entry => entry.Status).HasColumnName("status").IsRequired();
+            row.Property(entry => entry.CreatedAt).HasColumnName("created_at");
+            row.Property(entry => entry.UpdatedAt).HasColumnName("updated_at");
+            row.Property(entry => entry.PublishedAt).HasColumnName("published_at");
 
-            // Beides sind Wege, auf denen gesucht wird: die Liste eines
-            // Unternehmens und die öffentliche Seite.
-            zeile.HasIndex(eintrag => eintrag.TenantId);
-            zeile.HasIndex(eintrag => new { eintrag.Status, eintrag.PublishedAt });
+            // Both are paths that are searched along: a company's list and the
+            // public page.
+            row.HasIndex(entry => entry.TenantId);
+            row.HasIndex(entry => new { entry.Status, entry.PublishedAt });
         });
 
         base.OnModelCreating(modelBuilder);
     }
 }
 
-/// <summary>Baut Datenquelle und Kontext.</summary>
+/// <summary>Builds data source and context.</summary>
 public static class JobsDbContextFactory
 {
-    /// <summary>Die Datenquelle.</summary>
-    public static NpgsqlDataSource Datenquelle(string connectionString) =>
+    /// <summary>The data source.</summary>
+    public static NpgsqlDataSource DataSource(string connectionString) =>
         new NpgsqlDataSourceBuilder(connectionString).Build();
 
-    /// <summary>Die eine Stelle, an der Verfolgen abgeschaltet wird.</summary>
-    public static DbContextOptionsBuilder Konfiguriere(
+    /// <summary>The one place where tracking is switched off.</summary>
+    public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options, NpgsqlDataSource dataSource)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -95,8 +95,8 @@ public static class JobsDbContextFactory
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
-    /// <summary>Dasselbe Modell für <c>dotnet ef</c>.</summary>
-    public static DbContextOptionsBuilder ZurEntwurfszeit(
+    /// <summary>The same model for <c>dotnet ef</c>.</summary>
+    public static DbContextOptionsBuilder AtDesignTime(
         DbContextOptionsBuilder options, string connectionString)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -105,13 +105,13 @@ public static class JobsDbContextFactory
     }
 }
 
-/// <summary>Der Kontext für <c>dotnet ef</c>.</summary>
+/// <summary>The context for <c>dotnet ef</c>.</summary>
 public sealed class JobsDesignTimeFactory : IDesignTimeDbContextFactory<JobsDbContext>
 {
     /// <inheritdoc />
     public JobsDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<JobsDbContext>)JobsDbContextFactory
-            .ZurEntwurfszeit(
-                new DbContextOptionsBuilder<JobsDbContext>(), "Host=entwurfszeit;Database=jobs")
+            .AtDesignTime(
+                new DbContextOptionsBuilder<JobsDbContext>(), "Host=design-time;Database=jobs")
             .Options);
 }

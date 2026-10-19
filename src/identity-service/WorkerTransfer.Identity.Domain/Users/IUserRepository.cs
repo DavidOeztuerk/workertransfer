@@ -7,7 +7,7 @@ namespace WorkerTransfer.Identity.Domain.Users;
 /// Returns detached aggregates. A change to one reaches the database only
 /// through an explicit save — every context runs
 /// <c>QueryTrackingBehavior.NoTracking</c>, so a read-assign-SaveChanges writes
-/// nothing and the caller still gets its 204. A <c>SichereAsync</c> that mutates
+/// nothing and the caller still gets its 204. A <c>SaveAsync</c> that mutates
 /// therefore reads with <c>.AsTracking()</c>. See "Persistence" in
 /// <c>CLAUDE.md</c>.
 /// </remarks>

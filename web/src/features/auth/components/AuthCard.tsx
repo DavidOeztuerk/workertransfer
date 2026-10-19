@@ -5,10 +5,10 @@ import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
 
 /**
- * Der Rahmen für Anmelden und Registrieren.
+ * The frame for signing in and registering.
  *
- * Schmal und mittig: auf diesen beiden Seiten gibt es genau eine Aufgabe, und
- * eine volle Bildschirmbreite bietet nur Platz für Ablenkung.
+ * Narrow and centred: on these two pages there is exactly one task, and a full
+ * screen width only offers room for distraction.
  */
 export function AuthCard({
   title,

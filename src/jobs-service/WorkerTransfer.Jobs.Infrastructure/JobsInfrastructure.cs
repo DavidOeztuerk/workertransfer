@@ -7,29 +7,29 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using WorkerTransfer.Jobs.Application.Behaviors;
 using WorkerTransfer.Jobs.Application.Ports;
-using WorkerTransfer.Jobs.Application.Stellen;
-using WorkerTransfer.Jobs.Domain.Stellen;
-using WorkerTransfer.Jobs.Infrastructure.Entwurf;
+using WorkerTransfer.Jobs.Application.Jobs;
+using WorkerTransfer.Jobs.Domain.Jobs;
+using WorkerTransfer.Jobs.Infrastructure.Draft;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
-using WorkerTransfer.Jobs.Infrastructure.Rueckzug;
+using WorkerTransfer.Jobs.Infrastructure.Withdrawal;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Jobs.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Jobs.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Was hier <em>nicht</em> steht, ist so wichtig wie was hier steht: kein
-/// Consent-Tor, weil dieser Dienst nichts über Menschen hält, und keine
-/// Outbox — es gibt keine Absicht zu verschicken.
+/// What does <em>not</em> stand here matters as much as what does: no consent
+/// gate, because this service holds nothing about people, and no outbox — there
+/// is no intent to send.
 /// </remarks>
 public static class JobsInfrastructure
 {
-    /// <param name="services">Der Container.</param>
-    /// <param name="configuration">Woher Entwurf und Geheimnis kommen.</param>
-    /// <param name="connectionString">Wo die Stellendatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where draft and secret come from.</param>
+    /// <param name="connectionString">Where the jobs database lies.</param>
     public static IServiceCollection AddJobsInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -38,82 +38,84 @@ public static class JobsInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Entwurfseinstellungen>(
-            configuration.GetSection(Entwurfseinstellungen.Abschnitt));
-        services.Configure<Rueckzugseinstellungen>(
-            configuration.GetSection(Rueckzugseinstellungen.Abschnitt));
+        services.Configure<DraftSettings>(
+            configuration.GetSection(DraftSettings.Section));
+        services.Configure<WithdrawalSettings>(
+            configuration.GetSection(WithdrawalSettings.Section));
 
-
-        services.AddSingleton(_ => JobsDbContextFactory.Datenquelle(connectionString));
-        services.AddDbContext<JobsDbContext>((anbieter, optionen) =>
-            JobsDbContextFactory.Konfiguriere(
-                optionen, anbieter.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<JobsDbContext>("jobs");
-        services.AddSchluesselbund<JobsDbContext>();
+        services.AddSingleton(_ => JobsDbContextFactory.DataSource(connectionString));
+        services.AddDbContext<JobsDbContext>((provider, options) =>
+            JobsDbContextFactory.Configure(
+                options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddDatabaseReadiness<JobsDbContext>("jobs");
+        services.AddKeyRing<JobsDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IStellenspeicher, EfStellenspeicher>();
+        services.AddScoped<IJobStore, EfJobStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
-        // Ohne hinterlegten Schlüssel wird kein Fremddienst gerufen. Das ist
-        // die Voreinstellung und kein Rückfall.
-        var entwurf = new Entwurfseinstellungen();
-        configuration.GetSection(Entwurfseinstellungen.Abschnitt).Bind(entwurf);
+        // Without a deposited key no foreign service is called. That is the
+        // default and not a fallback.
+        var draft = new DraftSettings();
+        configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(entwurf.Schluessel))
+        if (string.IsNullOrEmpty(draft.ApiKey))
         {
-            services.AddScoped<IEntwerfer, KeinEntwerfer>();
+            services.AddScoped<IDrafter, NoDrafter>();
         }
         else
         {
-            services.AddScoped<IEntwerfer, HttpEntwerfer>();
+            services.AddScoped<IDrafter, HttpDrafter>();
         }
 
-        services.AddCQRS(typeof(StelleAnlegenBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(CreateJobCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, entwurf);
+        Evidence(services, draft);
 
         return services;
     }
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in the ServiceFoundation, for the same
+    /// reason the store and the drafter stand here: they are <em>this</em>
+    /// service's decisions.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is missing here on purpose — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
-        IServiceCollection services, Entwurfseinstellungen entwurf)
+    private static void Evidence(
+        IServiceCollection services, DraftSettings draft)
     {
-        var naht = !string.IsNullOrEmpty(entwurf.Schluessel);
+        var seam = !string.IsNullOrEmpty(draft.ApiKey);
 
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Faehigkeitenliste).Assembly, typeof(StelleV1).Assembly]));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(SkillList).Assembly, typeof(JobV1).Assembly]));
 
-        services.AddSingleton<ISecurityCheck>(_ => new Nahtpruefung(
-            typeof(Anzeigenentwurf),
-            ["Titel", "Beschreibung", "Faehigkeiten", "Ort", "Wunsch", "Prompt"],
+        // THE FIELD SET, pinned — and pinned at what runs. `DraftBoundaryTests`
+        // pins the same set at the tree; this one stands in the evidence. The
+        // description stays German: it goes into the German evidence document.
+        services.AddSingleton<ISecurityCheck>(_ => new SeamCheck(
+            typeof(AdvertDraft),
+            ["Title", "Description", "Skills", "Location", "Wish", "Prompt"],
             "für eine Stellenanzeige"));
 
-        // Der Anbieter dieses Dienstes ist der des BETREIBERS: `Draft__*` aus
-        // der Umgebung, einer fuer alle. Den Zugang je Person haelt
-        // identity-service, und dort wird gezaehlt statt genannt.
-        services.AddSingleton<IAnbieterquelle>(_ => new Betreiberquelle(
-            "anthropic", entwurf.Adresse, naht));
+        // This service's provider is the OPERATOR's: `Draft__*` from the
+        // environment file, one for everybody. Access per person stands in
+        // identity-service, and there it is counted instead of named.
+        services.AddSingleton<IProviderSource>(_ => new OperatorProviderSource(
+            "anthropic", draft.BaseUrl, seam));
 
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
-
-        // Kein Empfaenger: eine Anzeige gehoert einem Unternehmen, nicht einem Menschen (ADR-0027 §2). Der Firmenrueckzug ist ein eigener Vertrag und zaehlt ausdruecklich nicht zur Vollstaendigkeit einer Loeschung.
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.OhneZeilen("jobs"));
+        // No recipient: an advert belongs to a company, not to a human being
+        // (ADR-0027 §2). The company withdrawal is a contract of its own and
+        // expressly does not count towards the completeness of an erasure.
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.WithoutSubjectRows("jobs"));
     }
 }

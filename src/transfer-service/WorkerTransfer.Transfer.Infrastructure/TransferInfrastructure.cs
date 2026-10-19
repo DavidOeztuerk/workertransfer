@@ -8,35 +8,35 @@ using Npgsql;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Transfer.Application.Behaviors;
-using WorkerTransfer.Transfer.Application.Markt;
+using WorkerTransfer.Transfer.Application.Market;
 using WorkerTransfer.Transfer.Application.Ports;
-using WorkerTransfer.Transfer.Domain.Anfragen;
-using WorkerTransfer.Transfer.Domain.Markt;
-using WorkerTransfer.Transfer.Domain.Vorgaenge;
-using WorkerTransfer.Transfer.Infrastructure.Benachrichtigung;
-using WorkerTransfer.Transfer.Infrastructure.Einwilligung;
-using WorkerTransfer.Transfer.Infrastructure.Loeschung;
+using WorkerTransfer.Transfer.Domain.Requests;
+using WorkerTransfer.Transfer.Domain.Market;
+using WorkerTransfer.Transfer.Domain.Cases;
+using WorkerTransfer.Transfer.Infrastructure.Notification;
+using WorkerTransfer.Transfer.Infrastructure.Consent;
+using WorkerTransfer.Transfer.Infrastructure.Erasure;
 using WorkerTransfer.Transfer.Infrastructure.Persistence;
 using WorkerTransfer.Transfer.Infrastructure.Security;
-using WorkerTransfer.ServiceDefaults.Pruefungen;
+using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Transfer.Contracts;
 using Noelia.Abstractions.Security.Checks;
 
 namespace WorkerTransfer.Transfer.Infrastructure;
 
-/// <summary>Beantwortet die Ports der Anwendungsschicht.</summary>
+/// <summary>Answers the ports of the application layer.</summary>
 /// <remarks>
-/// Kein Zwischenspeicher — und bei diesem Dienst wiegt das am schwersten: was
-/// hier freigegeben wird, ist die Aussage „ich höre zu", und ein Widerruf muss
-/// beim allernächsten Lesezugriff wirken (ADR-0013). Nichts hier ist ein
-/// <c>ICacheableQuery</c>, weshalb <c>AddCQRS</c> beide
-/// Zwischenspeicher-Glieder gar nicht erst in die Kette hängt.
+/// No cache — and at this service that weighs heaviest: what is released here
+/// is the statement "I am listening", and a revocation has to take effect at
+/// the very next read (ADR-0013). Nothing here is an <c>ICacheableQuery</c>,
+/// which is why <c>AddCQRS</c> does not hang either caching link into the chain
+/// in the first place.
 /// </remarks>
 public static class TransferInfrastructure
 {
-    /// <param name="services">Der Behälter.</param>
-    /// <param name="configuration">Woher Ledger und Geheimnisse kommen.</param>
-    /// <param name="connectionString">Wo die Transferdatenbank liegt.</param>
+    /// <param name="services">The container.</param>
+    /// <param name="configuration">Where ledger and secrets come from.</param>
+    /// <param name="connectionString">Where the transfer database lies.</param>
     public static IServiceCollection AddTransferInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -45,111 +45,112 @@ public static class TransferInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<Einwilligungseinstellungen>(
-            configuration.GetSection(Einwilligungseinstellungen.Abschnitt));
-        services.Configure<Benachrichtigungseinstellungen>(
-            configuration.GetSection(Benachrichtigungseinstellungen.Abschnitt));
-        services.Configure<Loescheinstellungen>(
-            configuration.GetSection(Loescheinstellungen.Abschnitt));
+        services.Configure<ConsentSettings>(
+            configuration.GetSection(ConsentSettings.Section));
+        services.Configure<NotificationSettings>(
+            configuration.GetSection(NotificationSettings.Section));
+        services.Configure<ErasureSettings>(
+            configuration.GetSection(ErasureSettings.Section));
 
 
-        services.AddSingleton(_ => TransferDbContextFactory.Datenquelle(connectionString));
+        services.AddSingleton(_ => TransferDbContextFactory.DataSource(connectionString));
         services.AddDbContext<TransferDbContext>((provider, options) =>
-            TransferDbContextFactory.Konfiguriere(
+            TransferDbContextFactory.Configure(
                 options, provider.GetRequiredService<NpgsqlDataSource>()));
-        services.AddDatenbankbereitschaft<TransferDbContext>("transfer");
-        services.AddSchluesselbund<TransferDbContext>();
+        services.AddDatabaseReadiness<TransferDbContext>("transfer");
+        services.AddKeyRing<TransferDbContext>();
 
         services.AddHttpClient();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddScoped<IMarktspeicher, EfMarktspeicher>();
-        services.AddScoped<IAnfragenspeicher, EfAnfragenspeicher>();
-        services.AddScoped<ITransferspeicher, EfTransferspeicher>();
+        services.AddScoped<IMarketStore, EfMarketStore>();
+        services.AddScoped<IRequestStore, EfRequestStore>();
+        services.AddScoped<ITransferStore, EfTransferStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<ILoeschbestand, EfLoeschbestand>();
-        services.AddScoped<IEinwilligungstor, HttpEinwilligungstor>();
-        services.AddScoped<IAufrufertoken, HttpAufrufertoken>();
+        services.AddScoped<IErasureLedger, EfErasureLedger>();
+        services.AddScoped<IConsentGate, HttpConsentGate>();
+        services.AddScoped<ICallerToken, HttpCallerToken>();
 
-        // Die Absicht committet mit der Änderung, ein Zusteller bringt sie
-        // (ADR-0025). Zehn Versuche, nicht unbegrenzt: nie aufzugeben ist der
-        // Löschung vorbehalten, wo ein toter Empfänger die Vollständigkeit
-        // blockieren muss.
-        services.AddScoped<IZustellung, HttpBenachrichtigung>();
+        // The intent commits with the change, a dispatcher delivers it
+        // (ADR-0025). Ten attempts, not unlimited: never giving up is reserved
+        // for the erasure, where a dead recipient has to block completeness.
+        services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<TransferDbContext>(configuration);
 
-        services.AddCQRS(typeof(MarktstatusSichernBefehl).Assembly);
-        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransaktionsBehavior<,>));
+        services.AddCQRS(typeof(SaveMarketStatusCommand).Assembly);
+        services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
-        Nachweis(services, configuration);
+        Evidence(services, configuration);
 
         return services;
     }
 
-    /// <summary>Vier Namen, bei denen <c>note</c> ein echtes Homonym ist.</summary>
+    /// <summary>Four names where <c>note</c> is a genuine homonym.</summary>
     /// <remarks>
-    /// <strong>Öffentlich, weil sie zwei Leser hat</strong>: <c>wt.ki.keine-zahl</c>
-    /// zur Laufzeit und <c>WortschatzTests</c> zur Bauzeit.
+    /// <strong>Public, because it has two readers</strong>:
+    /// <c>wt.ki.keine-zahl</c> at run time and <c>VocabularyTests</c> at build
+    /// time.
     /// <para>
-    /// Es ist überall die <em>Anmerkung</em> — was eine Person zu ihrem
-    /// Marktstatus schreibt, und was ein Unternehmen zu seinem Angebot
-    /// dazusagt. Das deutsche Wort wäre die gefährlichste Vokabel, die eine
-    /// Vermittlungsplattform haben kann, und steht deshalb auf der Liste.
+    /// Everywhere it is the <em>remark</em> — what a person writes about their
+    /// market status, and what a company adds to its offer. The German word
+    /// would be the most dangerous vocabulary a placement platform can have,
+    /// and therefore stands on the list.
     /// </para>
     /// </remarks>
-    public static IReadOnlyList<Wortausnahme> Wortausnahmen { get; } =
+    public static IReadOnlyList<TermExemption> TermExemptions { get; } =
     [
-        new("MarktstatusV1.Note", Anmerkung),
-        new("MarktstatusSchreibenV1.Note", Anmerkung),
-        new("AngebotV1.Note", Anmerkung),
-        new("TransferV1.OfferNote", Anmerkung)
+        new("MarketStatusV1.Note", Note),
+        new("WriteMarketStatusV1.Note", Note),
+        new("OfferV1.Note", Note),
+        new("TransferV1.OfferNote", Note)
     ];
 
-    private const string Anmerkung =
+    // German on purpose: the reason appears in the finding, and the finding goes
+    // into the German evidence documents.
+    private const string Note =
         "englisch note = Anmerkung — was die Person zu ihrem Marktstatus "
         + "schreibt, beziehungsweise was ein Unternehmen zu seinem Angebot "
         + "dazusagt; deutsch Note waere eine Bewertung und ist hier nicht gemeint";
 
-    /// <summary>Was dieser Dienst über sich selbst beantworten kann (ADR-0044).</summary>
+    /// <summary>What this service can answer about itself (ADR-0044).</summary>
     /// <remarks>
-    /// <para>Sie stehen hier und nicht in der Dienstgrundlage, aus demselben
-    /// Grund, aus dem der Ledger, die Prüfspur und der Speicher hier stehen: es
-    /// sind Entscheidungen <em>dieses</em> Dienstes.</para>
+    /// <para>They stand here and not in ServiceFoundation, for the same reason
+    /// the ledger, the audit trail and the store stand here: they are decisions
+    /// of <em>this</em> service.</para>
     ///
-    /// <para><c>wt.grenze.ziele</c> fehlt hier absichtlich — sie liest nur die
-    /// Konfiguration, ist damit für jeden Dienst dieselbe und steht in
-    /// <c>AddNachweis</c>. Sie ist die eine, die ein neuer Dienst nicht
-    /// vergessen kann.</para>
+    /// <para><c>wt.grenze.ziele</c> is deliberately missing here — it reads only
+    /// the configuration, is therefore the same for every service and stands in
+    /// <c>AddEvidence</c>. It is the one a new service cannot forget.</para>
     /// </remarks>
-    private static void Nachweis(
+    private static void Evidence(
         IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ISecurityCheck>(_ => new Zahlpruefung(
-            [typeof(Anfragestand).Assembly, typeof(MarktstatusV1).Assembly],
-            Wortausnahmen));
+        services.AddSingleton<ISecurityCheck>(_ => new NumberCheck(
+            [typeof(RequestState).Assembly, typeof(MarketStatusV1).Assembly],
+            TermExemptions));
 
-        // Keine KI-Naht: `Anbieterpruefung` ohne Quelle meldet NichtAnwendbar,
-        // und das ist ausdruecklich KEIN gruener Haken — ein Haken an etwas,
-        // das hier gar nicht gilt, waere Rauschen in dem Dokument, das Rauschen
-        // durchschneiden soll.
-        services.AddSingleton<ISecurityCheck>(anbieter => new Anbieterpruefung(
-            anbieter.GetServices<IAnbieterquelle>()));
+        // No AI seam: `ProviderCheck` without a source reports NichtAnwendbar,
+        // and that is expressly NO green tick — a tick on something that does
+        // not apply here at all would be noise in the document that is meant
+        // to cut through noise.
+        services.AddSingleton<ISecurityCheck>(provider => new ProviderCheck(
+            provider.GetServices<IProviderSource>()));
 
 
-        // Zwischen der Frage und dem Ledger steht kein weiterer Typ — die
-        // Vorbedingung, an der ADR-0013 in der Praxis scheitert. Ein
-        // Zwischenspeicher davor faellt niemandem auf, weil alles
-        // weiterfunktioniert, nur eben mit dem Stand von vorhin.
-        services.AddSingleton<ISecurityCheck>(anbieter =>
-            new Widerrufspruefung<IEinwilligungstor>(
-                anbieter, typeof(HttpEinwilligungstor)));
+        // No further type stands between the question and the ledger — the
+        // precondition ADR-0013 fails on in practice. A cache in front of it is
+        // noticed by nobody, because everything keeps working, only with the
+        // state from a moment ago.
+        services.AddSingleton<ISecurityCheck>(provider =>
+            new RevocationCheck<IConsentGate>(
+                provider, typeof(HttpConsentGate)));
 
-        var loeschung = new Loescheinstellungen();
-        configuration.GetSection(Loescheinstellungen.Abschnitt).Bind(loeschung);
+        var erasure = new ErasureSettings();
+        configuration.GetSection(ErasureSettings.Section).Bind(erasure);
 
-        services.AddSingleton<ISecurityCheck>(_ => Loeschpruefung.AlsEmpfaenger(
+        services.AddSingleton<ISecurityCheck>(_ => ErasureCheck.AsRecipient(
             "transfer",
-            !string.IsNullOrEmpty(loeschung.Geheimnis),
-            pruefspurVorhanden: false));
+            !string.IsNullOrEmpty(erasure.Secret),
+            auditTrailPresent: false));
     }
 }

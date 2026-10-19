@@ -14,8 +14,8 @@ public sealed class ResumeDesignTimeFactory : IDesignTimeDbContextFactory<Resume
     /// <inheritdoc />
     public ResumeDbContext CreateDbContext(string[] args) =>
         new((DbContextOptions<ResumeDbContext>)ResumeDbContextFactory
-            .ZurEntwurfszeit(
+            .ForDesignTime(
                 new DbContextOptionsBuilder<ResumeDbContext>(),
-                "Host=entwurfszeit;Database=resume")
+                "Host=design-time;Database=resume")
             .Options);
 }

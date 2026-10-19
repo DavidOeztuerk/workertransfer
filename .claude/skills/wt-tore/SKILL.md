@@ -24,9 +24,9 @@ keiner. **Nur `./scripts/test-dotnet.sh`** oder ein einzelnes `.csproj`.
 Nach *jeder* Modelländerung sofort `dotnet ef migrations add`. Sonst fällt die
 ganze Reihe in ~18 ms mit `PendingModelChangesWarning`.
 
-## 4. Ein `SichereAsync` ohne `.AsTracking()` schreibt lautlos nichts
+## 4. Ein `SaveAsync` ohne `.AsTracking()` schreibt lautlos nichts
 
-Alle elf Kontexte fahren `QueryTrackingBehavior.NoTracking`. Eine gelesene Zeile
+Alle vierzehn Kontexte fahren `QueryTrackingBehavior.NoTracking`. Eine gelesene Zeile
 kommt **abgelöst** zurück; die Zuweisungen laufen ins Leere, `SaveChanges` sieht
 nichts, und der Aufrufer bekommt trotzdem sein `204`.
 

@@ -1,6 +1,6 @@
 export { PageShell } from "./PageShell";
 export { LoadingBlock, ErrorBlock, EmptyBlock } from "./StateBlock";
 export { ConsentSwitch } from "./ConsentSwitch";
-export { PaginationControls, SEITENGROESSEN } from "./PaginationControls";
-export { ProfilAvatar, initialenAus, farbeFuer } from "./ProfilAvatar";
-export { BerufsfeldSelect } from "./BerufsfeldSelect";
+export { PaginationControls, PAGE_SIZES } from "./PaginationControls";
+export { ProfileAvatar, initialsOf, colorFor } from "./ProfileAvatar";
+export { OccupationalFieldSelect } from "./OccupationalFieldSelect";

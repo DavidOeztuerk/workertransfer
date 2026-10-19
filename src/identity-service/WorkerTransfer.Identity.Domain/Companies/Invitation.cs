@@ -77,10 +77,13 @@ public sealed class InvitationInvalidException() : Exception("This invitation is
 /// recipient is holding anyway, and it is fixable — ask to be invited again. A
 /// blanket "invalid" would only leave them at a loss.
 /// </remarks>
-public sealed class InvitationExpiredException() : Exception("This invitation has expired");
+public sealed class InvitationExpiredException()
+    // web/src/features/auth/api/invitation.ts matches this sentence.
+    : Exception("This invitation has expired");
 
 /// <summary>The invitation was issued for a different address.</summary>
 public sealed class NotYourInvitationException()
+    // web/src/features/auth/api/invitation.ts matches this sentence.
     : Exception("This invitation was issued for a different email address");
 
 /// <summary>An invitation into a company.</summary>
@@ -97,7 +100,7 @@ public sealed class NotYourInvitationException()
 /// The company's domain plays no part here. It proves who owns the domain and
 /// is why a company may exist at all; whom that company then lets in is its own
 /// decision — an external recruiter with a foreign address is an entirely
-/// ordinary case.
+/// ordinary caseItem.
 /// </para>
 /// </remarks>
 public sealed class Invitation
@@ -106,7 +109,7 @@ public sealed class Invitation
     /// Seven days. Short enough that a forgotten invitation does not still open
     /// access to applicant data a year later; long enough for a holiday.
     /// </summary>
-    public static readonly TimeSpan Lebensdauer = TimeSpan.FromDays(7);
+    public static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
 
     private Invitation(
         Guid id,
@@ -180,7 +183,7 @@ public sealed class Invitation
 
         return new Invitation(
             Guid.CreateVersion7(), tenant, email, role, invitedBy,
-            InvitationStatus.Pending, now, now + Lebensdauer, acceptedAt: null);
+            InvitationStatus.Pending, now, now + Lifetime, acceptedAt: null);
     }
 
     /// <summary>The invitation as a row holds it.</summary>

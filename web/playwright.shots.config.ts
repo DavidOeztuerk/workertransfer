@@ -1,23 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Getrennte Konfiguration für Screenshot-Aufnahmen — bewusst NICHT Teil von
+ * A separate configuration for screenshots — deliberately NOT part of
  * `playwright.config.ts`.
  *
- * Der Grund ist ein Zähler: `scripts/validate.sh` liest die Zahl bestandener
- * „Reisen" aus dem Playwright-Protokoll, weil sich einmal alle 16 Reisen
- * stillschweigend übersprungen haben und der Bericht trotzdem „Alles grün"
- * sagte. Aufnahmen in derselben Suite würden diese Zahl aufblähen und damit
- * genau den Wächter entwerten, der daraus entstanden ist.
+ * The reason is a counter: `scripts/validate.sh` reads the number of passed
+ * journeys from the Playwright log, because once all 16 journeys silently
+ * skipped themselves and the report still said "all green". Screenshots in the
+ * same suite would inflate that number and thereby devalue exactly the guard
+ * that came out of it.
  *
- * Es gibt keine eingecheckten Referenzbilder und kein CI-Gate: Schriftglättung
- * und Plattform (darwin lokal, linux in der CI) erzeugen Fehlalarme, und die CI
- * fährt den Stapel gar nicht. Verglichen wird mit dem Auge, im PR.
+ * There are no checked-in reference images and no CI gate: font smoothing and
+ * platform (darwin locally, linux in CI) produce false alarms, and CI does not
+ * run this stack. The comparison is by eye, in the PR.
  */
 export default defineConfig({
   testDir: "./e2e-shots",
-  // Die Aufnahmedateien heißen *.shots.ts, damit die Standard-testMatch der
-  // Hauptkonfiguration sie nicht einsammelt.
+  // The screenshot files are called *.shots.ts so that the main
+  // configuration's default testMatch does not collect them.
   testMatch: /.*\.shots\.ts/,
   workers: 1,
   fullyParallel: false,
@@ -25,8 +25,8 @@ export default defineConfig({
   timeout: 60_000,
   use: {
     baseURL: process.env.E2E_WEB_URL ?? "http://localhost:5173",
-    // Feste Bildgröße: ein Vergleich zweier Bilder unterschiedlicher Breite
-    // zeigt Umbrüche, nicht Farben.
+    // A fixed image size: comparing two images of different width shows line
+    // breaks, not colours.
     ...devices["Desktop Chrome"],
     viewport: { width: 1280, height: 900 },
   },

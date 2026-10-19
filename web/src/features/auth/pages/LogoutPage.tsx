@@ -7,19 +7,19 @@ import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { logout } from "../store/authThunks";
 
 /**
- * Abmelden — eine eigene Adresse und kein Knopf im Kopf.
+ * Sign out — an address of its own and no button in the header.
  *
- * <strong>Warum eine Seite.</strong> Das Abmelden räumt ein Cookie ab, das der
- * Browser nie zu sehen bekommt; nur der Server kann es. Als Adresse ist der
- * Vorgang teilbar, aus einem Menü heraus erreichbar und — wichtiger — er hat
- * einen sichtbaren Zwischenzustand. Ein Knopf, der still nichts tut, weil die
- * Anfrage hängt, sieht aus wie ein kaputtes Menü.
+ * <strong>Why a page.</strong> Signing out clears a cookie the browser never
+ * gets to see; only the server can. As an address the operation can be shared,
+ * reached from a menu and — more important — it has a visible intermediate
+ * state. A button that silently does nothing because the request hangs looks
+ * like a broken menu.
  *
- * <strong>Genau einmal.</strong> React 19 ruft Effekte im StrictMode doppelt
- * auf; ohne die Sperre liefe der Abmeldebefehl zweimal, und der zweite träfe
- * eine Sitzung, die es nicht mehr gibt. Das wäre folgenlos, aber es stünde als
- * Fehler im Protokoll — und ein Protokoll, in dem harmlose Fehler stehen, wird
- * nicht mehr gelesen.
+ * <strong>Exactly once.</strong> React 19 calls effects twice in StrictMode;
+ * without the lock the sign-out command would run twice, and the second would
+ * hit a session that no longer exists. That would be harmless, but it would
+ * stand in the log as an error — and a log full of harmless errors is no longer
+ * read.
  */
 export function LogoutPage() {
   const { t } = useTranslation();
@@ -33,11 +33,11 @@ export function LogoutPage() {
     void dispatch(logout());
   }, [dispatch]);
 
-  // Erst wenn der Server bestätigt hat. Vorher weiterzuleiten hiesse, eine
-  // Abmeldung zu behaupten, die vielleicht nicht stattgefunden hat.
+  // Only once the server has confirmed. Redirecting earlier would mean claiming
+  // a sign-out that perhaps did not happen.
   if (status === "anonymous") {
     return <Navigate to="/" replace />;
   }
 
-  return <LoadingBlock label={t("abmeldung.laeuft")} />;
+  return <LoadingBlock label={t("logout.inProgress")} />;
 }

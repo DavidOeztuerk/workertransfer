@@ -1,4 +1,5 @@
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "@mui/material/styles";
 import { configureStore } from "@reduxjs/toolkit";
 import { render } from "@testing-library/react";
@@ -11,12 +12,12 @@ import preferences from "../../../core/store/preferencesSlice";
 import { i18n } from "../../../core/i18n/i18n";
 import { buildTheme } from "../../../styles/theme";
 import auth from "../../auth/store/authSlice";
-import { vergissKontext } from "../lib/kontext";
+import { forgetContext } from "../lib/letterContext";
 import { DraftPage } from "./DraftPage";
 
 const ID = "01a078bd-ec65-7b57-b444-d25c53edbcda";
 
-const ENTWURF = {
+const DRAFT = {
   id: ID,
   job_id: "11111111-1111-4111-8111-111111111111",
   subject: "",
@@ -30,14 +31,14 @@ const ENTWURF = {
   updated_at: "2026-09-07T00:00:00Z",
 };
 
-type Antwort = { status?: number; body?: unknown };
+type Answer = { status?: number; body?: unknown };
 
-function stubFetch(routen: (url: string) => Antwort) {
+function stubFetch(routes: (url: string, init: RequestInit | undefined) => Answer) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (input: string | URL | Request) => {
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      const answer = routen(url);
+      const answer = routes(url, init);
       const status = answer.status ?? 200;
       return new Response(JSON.stringify(answer.body ?? null), {
         status,
@@ -48,31 +49,30 @@ function stubFetch(routen: (url: string) => Antwort) {
 }
 
 /**
- * VOR jedem Fall leeren, nicht nur danach.
+ * Empty BEFORE every case, not only after.
  *
- * `vi.unstubAllGlobals()` im `afterEach` laeuft, bevor die Komponente
- * ausgehaengt ist. Was die sterbende Seite danach noch anstoesst, trifft den
- * ECHTEN Server — im Entwicklungsrechner den laufenden Stapel, der mit 401
- * antwortet — und schreibt das in den gerade geleerten Zwischenspeicher. Der
- * naechste Fall liest es dann statt seines eigenen Stubs.
+ * `vi.unstubAllGlobals()` in the `afterEach` runs before the component is
+ * unmounted. Whatever the dying page still triggers afterwards hits the REAL
+ * server — on a development machine the running stack, which answers 401 — and
+ * writes that into the cache just emptied. The next case then reads it instead
+ * of its own stub.
  */
 beforeEach(() => {
-  vergissKontext();
+  forgetContext();
 });
 
 afterEach(() => {
-  // ERST AUSHAENGEN, DANN DEN STUB ZIEHEN. Andersherum bleibt ein Fenster:
-  // die noch montierte Seite stoesst nach `unstubAllGlobals` einen Abruf an,
-  // der trifft den ECHTEN Server (auf einem Entwicklungsrechner den laufenden
-  // Stapel) und schreibt dessen 401 in den Zwischenspeicher, den der naechste
-  // Fall dann liest statt seines eigenen Stubs.
+  // UNMOUNT FIRST, THEN PULL THE STUB. The other way round leaves a window: the
+  // still mounted page triggers a fetch after `unstubAllGlobals`, it hits the
+  // REAL server (on a development machine the running stack) and writes its
+  // 401 into the cache, which the next case then reads instead of its own stub.
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  vergissKontext();
+  forgetContext();
 });
 
-function zeichne() {
+function draw() {
   const store = configureStore({
     reducer: { auth, preferences },
     preloadedState: {
@@ -86,7 +86,7 @@ function zeichne() {
           displayName: "Anna Beispiel",
           givenName: "",
           familyName: "",
-          berufsfeld: null,
+          occupationalField: null,
         },
         memberships: [],
         error: null,
@@ -111,14 +111,14 @@ function zeichne() {
 }
 
 describe("DraftPage", () => {
-  it("lässt auf Fassung 1 ohne Brief nicht bearbeiten und bietet Generieren", async () => {
+  it("offers no editing on version 1 without a letter and offers Generieren", async () => {
     stubFetch((url) => {
-      if (url.includes(`/applications/drafts/${ID}`)) return { body: ENTWURF };
+      if (url.includes(`/applications/drafts/${ID}`)) return { body: DRAFT };
       if (url.includes("/resume") || url.includes("/documents")) return { body: [] };
       return { status: 404 };
     });
 
-    zeichne();
+    draw();
 
     expect(await screen.findByText("Noch kein Anschreiben.")).toBeInTheDocument();
     expect(screen.getByText(/zu lange nichts geliefert/i)).toBeInTheDocument();
@@ -131,12 +131,12 @@ describe("DraftPage", () => {
     expect(screen.getByText(/Kommentieren geht, sobald ein Text da ist/i)).toBeInTheDocument();
   });
 
-  it("hängt den Lebenslauf immer an und bietet Anpassen statt Vorlagen", async () => {
+  it("always attaches the CV and offers adjusting instead of templates", async () => {
     stubFetch((url) => {
       if (url.includes(`/applications/drafts/${ID}`)) {
         return {
           body: {
-            ...ENTWURF,
+            ...DRAFT,
             status: "review",
             error: "",
             subject: "Bewerbung",
@@ -164,21 +164,21 @@ describe("DraftPage", () => {
       return { status: 404 };
     });
 
-    zeichne();
+    draw();
 
     expect(await screen.findByText(/Der Lebenslauf geht immer mit/i)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Lebenslauf bearbeiten/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /schlicht/i })).not.toBeInTheDocument();
   });
 
-  it("holt während des Schreibens weder Lebenslauf noch Firmenprofil", async () => {
-    const gefragt: string[] = [];
+  it("fetches neither CV nor company profile while writing", async () => {
+    const asked: string[] = [];
     stubFetch((url) => {
-      gefragt.push(url);
+      asked.push(url);
       if (url.includes(`/applications/drafts/${ID}`)) {
         return {
           body: {
-            ...ENTWURF,
+            ...DRAFT,
             status: "generating",
             error: "",
             writing_started_at: "2026-09-07T09:00:00Z",
@@ -200,7 +200,7 @@ describe("DraftPage", () => {
       if (url.includes("/jobs/")) {
         return {
           body: {
-            id: ENTWURF.job_id,
+            id: DRAFT.job_id,
             tenant_id: "44444444-4444-4444-8444-444444444444",
             title: "Stelle",
             description: "",
@@ -218,12 +218,58 @@ describe("DraftPage", () => {
       return { status: 404 };
     });
 
-    zeichne();
+    draw();
 
     expect(await screen.findByText("Wird geschrieben")).toBeInTheDocument();
-    expect(gefragt.some((url) => url.includes("/resumes/me"))).toBe(false);
-    expect(gefragt.some((url) => url.includes("/companies/") && url.includes("/profile"))).toBe(
+    expect(asked.some((url) => url.includes("/resumes/me"))).toBe(false);
+    expect(asked.some((url) => url.includes("/companies/") && url.includes("/profile"))).toBe(
       false,
     );
+  });
+
+  /*
+   * A GERMAN PERSON READS GERMAN when a step fails.
+   *
+   * applications-service answers in English since 62e819e, and until
+   * 26.09.2026 this page put the problem document's `detail` straight into the
+   * alert: "This job is no longer advertised." in the middle of a German page.
+   * The page now reads the status and the sentence and shows the catalogue text
+   * (`lib/draftErrors.ts`). The server's sentence must not appear at all — not
+   * even beside the German one.
+   */
+  it("shows a German sentence and not the server's English when sending fails", async () => {
+    stubFetch((url, init) => {
+      if (url.includes(`/applications/drafts/${ID}/send`) && init?.method === "POST") {
+        return {
+          status: 409,
+          body: {
+            title: "Request failed",
+            detail: "This job is no longer advertised.",
+            correlationId: "abc-123",
+          },
+        };
+      }
+      if (url.includes(`/applications/drafts/${ID}`)) {
+        return {
+          body: {
+            ...DRAFT,
+            status: "approved",
+            error: "",
+            subject: "Bewerbung",
+            body: "Sehr geehrte Damen und Herren",
+            shares_resume: true,
+          },
+        };
+      }
+      if (url.includes("/documents")) return { body: [] };
+      return { status: 404 };
+    });
+
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Senden$/ }));
+
+    expect(await screen.findByText("Diese Stelle ist nicht mehr offen.")).toBeInTheDocument();
+    expect(screen.queryByText(/no longer advertised/i)).not.toBeInTheDocument();
   });
 });

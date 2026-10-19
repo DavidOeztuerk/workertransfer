@@ -19,14 +19,15 @@ src/
   profile-service/  resume-service/  portfolio-service/  jobs-service/
   applications-service/  companies-service/  transfer-service/
   notification-service/  github-service/
+  scout-service/  advisor-service/  assessment-service/
   gateway/            Ocelot — the single entrance
-  shared/             ServiceDefaults, Outbox, Skills, Ablage, Contracts.{Identity,Consent,Erasure}
-tests/                sixteen suites, one per service plus Gateway, Outbox, Skills, Ablage, Ganzes
+  shared/             ServiceDefaults, Outbox, Skills, DocumentStore, Contracts.{Identity,Consent,Erasure}
+tests/                nineteen suites, one per service plus Gateway, Outbox, Skills, DocumentStore, CrossCutting
 web/                  the React app — deliberately not under src/, and the WHOLE frontend
 deploy/  docker/  scripts/  docs/  bugs/
 ```
 
-Eleven services plus the gateway. Ports 8001–8011, gateway on 8090.
+Fourteen services plus the gateway. Ports 8001–8014, gateway on 8090.
 
 ## The order of checks (binding; `make check` runs it)
 
@@ -55,9 +56,9 @@ make validate       # runs through, reports every red step, prints the counts
 make fix            # dotnet format
 make up / down      # docker compose — the whole stack
 make images         # both shipped images, the local twin of the CI job
-make routenkarte    # every endpoint x four principals, needs the running stack
-make nachweis       # three dated, signed evidence documents, needs the running stack
-make nachweis-pruefen  # every check in every service; red on an unkept promise
+make route-map      # every endpoint x four principals, needs the running stack
+make evidence       # three dated, signed evidence documents, needs the running stack
+make evidence-check # every check in every service; red on an unkept promise
 make k8s-up / k8s-down / k8s-lint
 ```
 
@@ -78,8 +79,8 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 - One project per layer per service: `Domain` ← `Application` ← `Api`, with `Infrastructure` pointing inward; `Contracts` at the boundary.
 - Repository interfaces in Domain, implementations in Infrastructure. All wiring behind one `Add<Service>Infrastructure()` (ADR-0003).
 - `ServiceDefaults.AddWorkerTransferDefaults()` decides only what must not differ between services; everything that is a decision stays in the service.
-- CQRS through Noelia's `AddCQRS`, but with **our own `IBefehl`/`IAbfrage`** over MediatR's `IRequest` — Noelia's `ICommand<T>` carries a second error envelope beside RFC 9457. `TransaktionsBehavior` wraps commands only.
-- EF Core, one context and one database per service; **no shared database** (ADR-0004). Migrations run at startup via `ServiceDefaults.Wanderung`, retrying **only transient** failures.
+- CQRS through Noelia's `AddCQRS`, but with **our own `ICommandMessage`/`IQueryMessage`** (per service in `Application/Messages/`) over MediatR's `IRequest` — Noelia's `ICommand<T>` carries a second error envelope beside RFC 9457. `TransactionBehavior` wraps commands only.
+- EF Core, one context and one database per service; **no shared database** (ADR-0004). Migrations run at startup via `ServiceDefaults.SchemaMigration`, retrying **only transient** failures.
 - RFC 9457 everywhere, `correlationId` on every response. An endpoint filter that already wrote a response returns `Results.Empty`, never `null`.
 
 ## Key conventions
@@ -87,19 +88,19 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 - **No secrets, tokens, CVs, contracts or raw source in the repo or in logs.** Noelia logs no values either — do not build that back.
 - **Sharing rule**: only domain-neutral, transport-independent code goes in `src/shared/`. Business models stay in the owning service. `Contracts.*` is DTOs, never a shared domain model.
 - **A tenant is a company; a natural person has none** (ADR-0017). Modelled as `Capacity`: `AsSelf` or `ForCompany`. The consent ledger has no tenant column by design.
-- **The token carries no tenant unless acting for a company**, and never carries roles — those are read from the membership table per operation (ADR-0018). `tenant_id` and `type` are gone; `TokenformTests` pins their absence.
+- **The token carries no tenant unless acting for a company**, and never carries roles — those are read from the membership table per operation (ADR-0018). `tenant_id` and `type` are gone; `TokenShapeTests` pins their absence.
 - **Consent is read synchronously and never cached** (ADR-0013). `/check-batch` changes nothing about that (ADR-0030) — same read, one round trip, answers in the order of the questions.
 - **Visibility lives only in the ledger** (ADR-0020). `profile-service` has no visibility field; 404 = hidden *or* absent (byte-identical), 403 = no active company, 503 = the ledger is silent.
 - **The request is not the permission**: a resume request stays `granted` after a withdrawal and the read still comes up empty. That is the design.
 - **Erasure deletes everything by default** (ADR-0027), hired applications and paid transfers included. The exception is one `static readonly` constant per service, `false`, and a constant rather than a setting. Delivery may fail, has no attempt ceiling, and a dead recipient blocks completion — that is the point.
 - **No number that summarises a person** (ADR-0022) — and read the ADR before concluding more than that: it forbids exactly three things (a summarising number and rankings from it; derived attributes without basis; silent completeness) and explicitly permits evidence with provenance, consent first, visibility through the ledger. Fit is compared in the browser (`web/src/features/work/lib/match.ts`) and stored nowhere.
-- **AI drafts on request and stores nothing** (ADR-0024). Two consumers, mirror images: a person's own text, a company's own advert. Each owns its own `IEntwerfer` and context type — no shared prompt with an `if`. No memory, no vector store, no background suggestion, no reflect loop, no ledger entry.
+- **AI drafts on request and stores nothing** (ADR-0024). Two consumers, mirror images: a person's own text, a company's own advert. Each owns its own `IDrafter` and context type — no shared prompt with an `if`. No memory, no vector store, no background suggestion, no reflect loop, no ledger entry.
 - **`WorkerTransfer.Skills` renames, never infers** (ADR-0023): aliases only. No levels, weights, implications or likelihood-to-switch. Unknown skills pass through unchanged.
-- **A person's own documents are read on trigger, never at upload** (ADR-0043). `PdfPig` in-process — no network call, so no address the egress boundary could refuse in silence. Found is only what `Wortschatz` knows (`Wortfund`); a heuristic would be a guess about a person drawn from the shape of their document. The index lives in resume-service next to the files and falls with the erasure — measured in the database, since after an erasure the answer is empty anyway. `IFundSpeicher` has three methods and no question by *word*. Three answer states that must never become two: never read, read without text, read without a known word.
+- **A person's own documents are read on trigger, never at upload** (ADR-0043). `PdfPig` in-process — no network call, so no address the egress boundary could refuse in silence. Found is only what `Vocabulary` knows (`TermFinder`); a heuristic would be a guess about a person drawn from the shape of their document. The index lives in resume-service next to the files and falls with the erasure — measured in the database, since after an erasure the answer is empty anyway. `ITermStore` has three methods and no question by *word*. Three answer states that must never become two: never read, read without text, read without a known word.
 - **Aggregates come back detached.** A mutation reaches the database only via an explicit save — forgetting it costs nothing in tests and loses the write in production.
 - **Every text a person reads comes from a catalogue** (ADR-0031): `web/src/core/i18n/kataloge/{de,en,fr}.ts`, German the source. The API layer's error messages are catalogue *keys* whose type is derived from the catalogue, so a leftover sentence is a compile error — i18next hands an unknown key straight back, and a German sentence would look right and be untranslated everywhere else. Tables of keys are resolved at answer time, never at module scope: a table built on load freezes the language before anybody could choose one.
-- **The language is a column on the account** (`users.language`), read once from `Accept-Language` at registration and never from a header again; changed via `PUT /account/language`, which refuses an unsupported tag with 422. The reason is the mail: a deletion confirmation is written days later by a dispatcher with no request. The outbox stays content-free (ADR-0025) — the language is read from the row at delivery. The type is `Kontosprache`, because `Sprache` is a transitive NuGet package that owns that namespace.
-- **Problem documents stay English on the wire** and describe a shape; the UI translates by status. Thirteen services with thirteen copies of one catalogue is the divergence everything else here defends against.
+- **The language is a column on the account** (`users.language`), read once from `Accept-Language` at registration and never from a header again; changed via `PUT /account/language`, which refuses an unsupported tag with 422. The reason is the mail: a deletion confirmation is written days later by a dispatcher with no request. The outbox stays content-free (ADR-0025) — the language is read from the row at delivery. The type is `AccountLanguage`, not `Language` — under its German name the plain word was `Sprache`, a transitive NuGet package that owns that namespace, and the longer name stayed.
+- **Problem documents stay English on the wire** and describe a shape; the UI translates by status. Fourteen services with fourteen copies of one catalogue is the divergence everything else here defends against.
 - **Tests pin the language** and assert German literals. Exactly one E2E journey switches and proves it works, mail included.
 - New cross-cutting decisions get an ADR in `docs/adr/`.
 
@@ -108,7 +109,7 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 `make env` first, in a fresh clone. `.env.example` is complete with a comment per key; the secrets ship **empty** and `make env` rolls them. It also generates the **token key pair** (ECDSA P-256): `WORKERTRANSFER_JWT_PRIVATE_KEY` goes to identity-service alone, `…_PUBLIC_KEY` to all fifteen (ADR-0046). `.env` is ignored.
 
 - **No default for a secret.** `${X:?…}` in compose, never `${X:-wert}` — a built-in default *is* the secret and it lives in git. Without a value compose aborts and names the variable.
-- **`Umgebung.Laden()` is the first line of all fourteen `Program.cs`**, before `CreateBuilder`: the configuration builder reads the environment once, when it builds.
+- **`EnvironmentFile.Load()` is the first line of all fifteen `Program.cs`**, before `CreateBuilder`: the configuration builder reads the environment once, when it builds.
 - **A set variable wins.** In compose and in the cluster the environment comes from there; a file in the image must never override it.
 - Precedence: set environment > `.env` > `appsettings.json`.
 - `WORKERTRANSFER_SECRETS_KEY` is required in **every** service now — it encrypts the data-protection key ring as well as a person's AI key. A test host that forgets it fails at resolve time, not at build time.
@@ -117,8 +118,8 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 
 `docs/routenkarte.yml` — every endpoint through the gateway with its expected answer in four principals (no token / person without company / acting for a company as `member` / as `admin`). The fourth column is the one that makes `admin` vs `member` checkable; eight routes demand an `admin`.
 
-- `RoutenkarteTests` (gateway suite, no stack) pins that the map is **complete**: a new route without an entry goes red.
-- `scripts/routenkarte.sh` (`make routenkarte`, needs `make up`) drives the answers. A script and not a suite: a suite without a stack skips itself, and a skipped test looks like a passing one.
+- `RouteMapTests` (gateway suite, no stack) pins that the map is **complete**: a new route without an entry goes red. The map's keys stay German; the suite binds them by `[YamlMember(Alias = …)]`, so a renamed key empties its column silently.
+- `scripts/route-map.sh` (`make route-map`, needs `make up`) drives the answers. A script and not a suite: a suite without a stack skips itself, and a skipped test looks like a passing one.
 - **A deviation is not a reason to edit the map.** The map holds the intent; check which side is wrong first.
 
 ## Gateway
@@ -126,17 +127,17 @@ Restore needs a NuGet login for `Noelia.*` (GitHub Packages); `NuGet.Config` pin
 - Ocelot 25; `ocelot.json` carries its reasoning in `//` comments (the JSON config provider skips them).
 - **`Sec-Fetch-Dest: document` routes to the SPA**, as *middleware* — in Ocelot a literal path beats a placeholder regardless of `Priority`, so a catch-all could never win against `/jobs`. Behind one origin `/jobs` is both an API prefix and a page; clicking works, only deep links and reloads broke, with raw JSON. Do not replace it with a path list.
 - Health probes are middleware too — Ocelot terminates the pipeline, so a `MapGet` behind it never runs.
-- Route order is pinned by `ReihenfolgeTests` against a **reversed** fixture; a probe that only equalised priorities stayed green by accident of file order.
+- Route order is pinned by `RouteOrderTests` against a **reversed** fixture; a probe that only equalised priorities stayed green by accident of file order.
 
 ## Docker and Kubernetes
 
 - **One image for all fourteen entry points** (ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
 - **`curl` is in the runtime image** so the container can answer its own healthcheck. The probe used to be `dotnet --version`, which can never work without an SDK (exit 155) — every service read `unhealthy` while serving fine.
-- **One probe in the `x-dienst` anchor** for all thirteen, asking `/health/live`, port derived from `ASPNETCORE_URLS` so no second list can drift.
+- **One probe in the `x-service` anchor** for all fourteen services and the gateway, asking `/health/live`, port derived from `ASPNETCORE_URLS` so no second list can drift.
 - **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`.
 - **Probes must set `timeoutSeconds`** — the default is 1 s and it once restarted three healthy services.
 - **The web image is a built artifact**, so URLs come from `window.__WT_CONFIG__` at runtime, not from `VITE_*` at build time.
-- **`replicaCount` stays 1** for the eleven services, and for one reason now: every service migrates its schema at startup, so two pods race on one schema. (The dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately — the auth brake counts in-process.
+- **`replicaCount` stays 1** for the fourteen services, and for one reason now: every service migrates its schema at startup, so two pods race on one schema. (The dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately — the auth brake counts in-process.
 - **`make k8s-up` has never been run.** The chart lints and renders; only a run proves it.
 
 ## The auth brake
@@ -148,8 +149,8 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 - **`X-Forwarded-For` is deliberately not read.** The caller sets it, so trusting it hands the attacker the counter's key. A test pins that a forged one changes nothing.
 - **After the health probes, before authentication.** A braked liveness probe would be the outage; a brake behind bcrypt would cost a hash per attempt.
 - **The counter is in-process** → the gateway stays at one replica. The way out is a registration change to `RedisDistributedRateLimitStore`, same interface.
-- **Noelia's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `Dienstgrundlage.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
-- **Noelia's rate limiter is what runs, and `Bremse.cs` is gone (4.2.0).** It survived three rounds of justification, each measured and each wrong differently — last of them "Noelia's is global, ours is selective", which was simply false: a limit of `0` writes no counter. What actually kept it was price: `Noelia.Infrastructure` drags 44 transitive packages and this gateway only routes. `Noelia.Http` carries none. **In the eleven services the limiter stays out for topology** — a service behind the gateway sees only the gateway as the origin, so every caller would share one bucket.
+- **Noelia's input sanitization middleware runs, since 4.1.0 — but not over JSON bodies.** Until 4.0.2 it matched a *bare* SQL keyword on a word boundary (a hyphen is one), so `/jobs?q=Union-Investment` answered **400**, and because every request from the deletion page carried `Referer: …/delete-account` that whole page was dead down to its `/auth/session`. Fixed: it matches injection *syntax*, the `Referer` is not input, and JSON string values are inspected. We set `InspectJsonBodies = false` anyway (reason in `ServiceFoundation.cs`): the filter runs first and cannot name a field, so a 422 saying *which* field is wrong becomes a blunt 400 — measured on five cases across three services. They are still refused; the person filling in the form is just told less. Query string and the two address headers stay inspected.
+- **Noelia's rate limiter is what runs, and `Bremse.cs` is gone (4.2.0).** It survived three rounds of justification, each measured and each wrong differently — last of them "Noelia's is global, ours is selective", which was simply false: a limit of `0` writes no counter. What actually kept it was price: `Noelia.Infrastructure` drags 44 transitive packages and this gateway only routes. `Noelia.Http` carries none. **In the fourteen services the limiter stays out for topology** — a service behind the gateway sees only the gateway as the origin, so every caller would share one bucket.
 
 ## Branches
 

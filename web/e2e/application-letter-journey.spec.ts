@@ -6,34 +6,34 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("mehrfach auswählen → entwürfe → kommentieren → freigeben → senden → mappe mit reitern", async ({
+test("select several → drafts → comment → release → send → folder with tabs", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const domain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(domain);
-  const companyName = `E2E Arbeitgeber ${Date.now()}`;
-  const headline = `E2E Bewerber ${Date.now()}`;
-  const jobTitle1 = `E2E Stelle 1 ${Date.now()}`;
-  const jobTitle2 = `E2E Stelle 2 ${Date.now() + 1}`;
+  const companyName = `E2E Employer ${Date.now()}`;
+  const headline = `E2E Applicant ${Date.now()}`;
+  const jobTitle1 = `E2E Job 1 ${Date.now()}`;
+  const jobTitle2 = `E2E Job 2 ${Date.now() + 1}`;
 
   const recruiterContext = await browser.newContext();
   const recruiter = await recruiterContext.newPage();
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
 
-  for (const titel of [jobTitle1, jobTitle2]) {
+  for (const title of [jobTitle1, jobTitle2]) {
     await recruiter.goto("/company/jobs/new");
-    await recruiter.getByLabel("Titel").fill(titel);
-    await recruiter.getByLabel(/Beschreibung/i).fill(`${titel} Beschreibung.`);
+    await recruiter.getByLabel("Titel").fill(title);
+    await recruiter.getByLabel(/Beschreibung/i).fill(`${title} description.`);
     await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
-    const jobRow = recruiter.locator("li").filter({ hasText: titel });
+    const jobRow = recruiter.locator("li").filter({ hasText: title });
     await expect(jobRow).toBeVisible();
     await jobRow.getByRole("button", { name: /Veröffentlichen/i }).click();
     await expect(jobRow.getByText("Veröffentlicht")).toBeVisible();
@@ -41,7 +41,7 @@ test("mehrfach auswählen → entwürfe → kommentieren → freigeben → sende
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Bewerber");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Applicant");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -50,7 +50,7 @@ test("mehrfach auswählen → entwürfe → kommentieren → freigeben → sende
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
 
   await candidate.goto("/jobs");
-  await candidate.getByLabel(/Suchbegriff/i).fill("E2E Stelle");
+  await candidate.getByLabel(/Suchbegriff/i).fill("E2E Job");
   await candidate.getByRole("button", { name: /Suchen/i }).click();
   await expect(candidate.locator("li").filter({ hasText: jobTitle1 })).toBeVisible();
   await expect(candidate.locator("li").filter({ hasText: jobTitle2 })).toBeVisible();
@@ -61,8 +61,8 @@ test("mehrfach auswählen → entwürfe → kommentieren → freigeben → sende
   await candidate.getByRole("button", { name: /Für alle bewerben/i }).click();
 
   await expect(candidate).toHaveURL(/\/applications\/drafts$/);
-  // Auf die ZEILE eingegrenzt: der Titel steht in der Liste zweimal — einmal
-  // als Überschrift, einmal in der Zeile darunter. `getByText` träfe beide.
+  // Narrowed to the ROW: the title stands in the list twice — once as a heading,
+  // once in the line below. `getByText` would match both.
   await expect(
     candidate.locator("li").filter({ hasText: jobTitle1 }).first(),
   ).toBeVisible({ timeout: 20_000 });
@@ -73,13 +73,13 @@ test("mehrfach auswählen → entwürfe → kommentieren → freigeben → sende
     timeout: 20_000,
   });
 
-  // GENAU DEN ENTWURF ÖFFNEN, DER SPÄTER GEPRÜFT WIRD.
+  // OPEN EXACTLY THE DRAFT THAT IS CHECKED LATER.
   //
-  // `.first()` nahm den obersten der Liste, und die ist nach Änderungszeit
-  // sortiert — also mal den einen, mal den anderen. Gesendet wurde dann der
-  // Entwurf zur zweiten Stelle, geprüft wurde die erste: drei erfolgreiche
-  // Sends im Protokoll und trotzdem Rot. Eine Reihenfolge, auf die sich ein
-  // Test verlässt, ohne sie zu setzen, ist eine Wette.
+  // `.first()` took the topmost of the list, and that is sorted by modification
+  // time — so sometimes the one, sometimes the other. The draft for the second
+  // job was then sent and the first one checked: three successful sends in the
+  // log and red all the same. An order a test relies on without setting it is a
+  // bet.
   await candidate
     .locator("li")
     .filter({ hasText: jobTitle1 })
@@ -94,26 +94,25 @@ test("mehrfach auswählen → entwürfe → kommentieren → freigeben → sende
   await expect(candidate.getByRole("button", { name: /^Schreiben$/i })).toHaveCount(0);
 
   await candidate.getByRole("button", { name: /Selbst schreiben/i }).click();
-  await candidate.getByLabel(/Betreff/i).fill("Bewerbung als Entwickler");
-  await candidate.getByLabel(/^Text$/i).fill("Sehr geehrte Damen und Herren,\n\nich bewerbe mich.");
+  await candidate.getByLabel(/Betreff/i).fill("Application as a developer");
+  await candidate.getByLabel(/^Text$/i).fill("Dear Sir or Madam,\n\nI am applying.");
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
 
   await expect(candidate.getByRole("button", { name: /Freigeben/i })).toBeVisible({ timeout: 10_000 });
   await candidate.getByRole("button", { name: /Freigeben/i }).click();
 
-  // GEPRUEFT WIRD DIE FOLGE, NICHT DIE BESCHRIFTUNG.
+  // WHAT IS CHECKED IS THE CONSEQUENCE, NOT THE LABEL.
   //
-  // `getByText(/Freigegeben/i)` traf zwei Elemente: ein MUI-Chip rendert den
-  // Text in einem `span` INNERHALB eines `div`, und beide enthalten ihn. Eines
-  // davon willkuerlich zu greifen (`.first()`) waere kein Test, sondern eine
-  // Wette darauf, welches zuerst kommt.
+  // `getByText(/Freigegeben/i)` matched two elements: an MUI chip renders the
+  // text in a `span` INSIDE a `div`, and both contain it. Grabbing one of them
+  // at random (`.first()`) would not be a test but a bet on which comes first.
   //
-  // Was „freigegeben" fachlich BEDEUTET, ist ohnehin schaerfer: erst jetzt darf
-  // gesendet werden. Genau das steht hier.
+  // What "released" MEANS in the domain is sharper anyway: only now may it be
+  // sent. Exactly that is what stands here.
   await expect(candidate.getByRole("button", { name: /Senden/i })).toBeEnabled();
   await candidate.getByRole("button", { name: /Senden/i }).click();
 
-  // Und „gesendet" heisst: es geht kein zweites Mal hinaus.
+  // And "sent" means: it does not go out a second time.
   await expect(candidate.getByRole("button", { name: /Senden/i })).toHaveCount(0);
 
   await recruiter.goto("/company/applications");

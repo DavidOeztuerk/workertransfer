@@ -2,11 +2,11 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMitStore } from "../test/render";
-import { vergissKontext } from "../lib/kontext";
+import { renderWithStore } from "../test/render";
+import { forgetContext } from "../lib/letterContext";
 import { DraftsPage } from "./DraftsPage";
 
-const ENTWURF = {
+const DRAFT = {
   id: "01a078bd-ec65-7b57-b444-d25c53edbcda",
   job_id: "11111111-1111-4111-8111-111111111111",
   subject: "ewerbung für die Stelle X",
@@ -20,7 +20,7 @@ const ENTWURF = {
   updated_at: "2026-09-07T00:00:00Z",
 };
 
-const SITZUNG = {
+const SESSION = {
   status: "authenticated" as const,
   session: {
     userId: "33333333-3333-4333-8333-333333333333",
@@ -30,57 +30,58 @@ const SITZUNG = {
     displayName: "Anna Beispiel",
     givenName: "",
     familyName: "",
-    berufsfeld: null,
+    occupationalField: null,
   },
 };
 
-type Antwort = { status?: number; body?: unknown };
+type Answer = { status?: number; body?: unknown };
 
-function stubFetch(routen: (url: string, init: RequestInit | undefined) => Antwort | Promise<Antwort>) {
-  const spion = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+function stubFetch(
+  routes: (url: string, init: RequestInit | undefined) => Answer | Promise<Answer>,
+) {
+  const spy = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    const answer = await routen(url, init);
+    const answer = await routes(url, init);
     const status = answer.status ?? 200;
     return new Response(status === 204 ? null : JSON.stringify(answer.body ?? null), {
       status,
       headers: { "content-type": "application/json" },
     });
   });
-  vi.stubGlobal("fetch", spion);
-  return spion;
+  vi.stubGlobal("fetch", spy);
+  return spy;
 }
 
 /**
- * VOR jedem Fall leeren, nicht nur danach.
+ * Empty BEFORE every case, not only after.
  *
- * `vi.unstubAllGlobals()` im `afterEach` laeuft, bevor die Komponente
- * ausgehaengt ist. Was die sterbende Seite danach noch anstoesst, trifft den
- * ECHTEN Server — im Entwicklungsrechner den laufenden Stapel, der mit 401
- * antwortet — und schreibt das in den gerade geleerten Zwischenspeicher. Der
- * naechste Fall liest es dann statt seines eigenen Stubs.
+ * `vi.unstubAllGlobals()` in the `afterEach` runs before the component is
+ * unmounted. Whatever the dying page still triggers afterwards hits the REAL
+ * server — on a development machine the running stack, which answers 401 — and
+ * writes that into the cache just emptied. The next case then reads it instead
+ * of its own stub.
  */
 beforeEach(() => {
-  vergissKontext();
+  forgetContext();
 });
 
 afterEach(() => {
-  // ERST AUSHAENGEN, DANN DEN STUB ZIEHEN. Andersherum bleibt ein Fenster:
-  // die noch montierte Seite stoesst nach `unstubAllGlobals` einen Abruf an,
-  // der trifft den ECHTEN Server (auf einem Entwicklungsrechner den laufenden
-  // Stapel) und schreibt dessen 401 in den Zwischenspeicher, den der naechste
-  // Fall dann liest statt seines eigenen Stubs.
+  // UNMOUNT FIRST, THEN PULL THE STUB. The other way round leaves a window: the
+  // still mounted page triggers a fetch after `unstubAllGlobals`, it hits the
+  // REAL server (on a development machine the running stack) and writes its
+  // 401 into the cache, which the next case then reads instead of its own stub.
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("DraftsPage", () => {
-  it("zeigt keinen Brieftext auf der Karte und lässt Öffnen zu", async () => {
+  it("shows no letter text on the card and allows opening", async () => {
     stubFetch((url) =>
-      url.includes("/applications/drafts") ? { body: [ENTWURF] } : { status: 404 },
+      url.includes("/applications/drafts") ? { body: [DRAFT] } : { status: 404 },
     );
 
-    renderMitStore(<DraftsPage />, { auth: SITZUNG, route: "/applications/drafts" });
+    renderWithStore(<DraftsPage />, { auth: SESSION, route: "/applications/drafts" });
 
     expect(await screen.findByText("Fehlgeschlagen")).toBeInTheDocument();
     expect(screen.getByText(/zu lange nichts geliefert/i)).toBeInTheDocument();
@@ -89,12 +90,12 @@ describe("DraftsPage", () => {
     expect(screen.getByRole("button", { name: /Öffnen/i })).toBeEnabled();
   });
 
-  it("zeigt eine Zeitüberschreitung ohne HTTP-Zahl", async () => {
+  it("shows a timeout without an HTTP number", async () => {
     stubFetch((url) =>
-      url.includes("/applications/drafts") ? { body: [ENTWURF] } : { status: 404 },
+      url.includes("/applications/drafts") ? { body: [DRAFT] } : { status: 404 },
     );
 
-    renderMitStore(<DraftsPage />, { auth: SITZUNG, route: "/applications/drafts" });
+    renderWithStore(<DraftsPage />, { auth: SESSION, route: "/applications/drafts" });
 
     expect(await screen.findByText(/zu lange nichts geliefert/i)).toBeInTheDocument();
     expect(screen.queryByText(/402/)).not.toBeInTheDocument();
@@ -103,18 +104,18 @@ describe("DraftsPage", () => {
     expect(screen.queryByText(/nicht eingerichtet/i)).not.toBeInTheDocument();
   });
 
-  it("geht nach noch einmal schreiben auf die Detailseite", async () => {
+  it("goes to the detail page after writing again", async () => {
     stubFetch((url, init) => {
       if (url.includes("/write") && init?.method === "POST") {
-        return { body: { ...ENTWURF, status: "generating", error: null, body: "", subject: "" } };
+        return { body: { ...DRAFT, status: "generating", error: null, body: "", subject: "" } };
       }
       if (url.includes("/applications/drafts")) {
-        return { body: [ENTWURF] };
+        return { body: [DRAFT] };
       }
       return { status: 404 };
     });
 
-    renderMitStore(<DraftsPage />, { auth: SITZUNG, route: "/applications/drafts" });
+    renderWithStore(<DraftsPage />, { auth: SESSION, route: "/applications/drafts" });
     expect(await screen.findByText("Fehlgeschlagen")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Noch einmal schreiben/i }));
   });

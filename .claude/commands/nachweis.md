@@ -48,7 +48,7 @@ Wo eine Entscheidung fällt: ein ADR. Das nächste ist **0044**.
 
 - **Kein Wert, kein Schlüssel, kein Name einer Person** in Seite oder Bericht.
   Mit einem Kanarienvogel prüfen, nicht durch Hinsehen.
-- **Kein `Leser` leer**, als Test.
+- **Kein `Reader` leer** (bis ADR-0045 `Leser`), als Test.
 - **Die Wörter „zertifiziert", „Zertifikat", „konform"** in keinem Geltungssatz
   und keinem Vorbehalt, als Test.
 - **Kein Test, der noch bestünde, wenn man den Rumpf löscht.**

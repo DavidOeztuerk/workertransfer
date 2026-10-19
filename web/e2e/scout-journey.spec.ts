@@ -1,15 +1,15 @@
-// Der Scout durch den echten Stapel — und zwar an der Stelle, die ihn von
-// seinem Vorgänger unterscheidet.
+// The scout through the real stack — at exactly the point that sets it apart
+// from its predecessor.
 //
-// `GET /candidates` konnte suchen und filtern; was es nicht konnte, war sagen,
-// WAS jemandem fehlt. Es suchte mit UND — jeder Treffer erfüllte alles, jedes
-// Häkchen wäre gesetzt gewesen, und die Liste hätte nichts ausgesagt. Diese
-// Reise fährt genau den Unterschied: zwei gesuchte Worte, eine Person, die
-// eines davon genannt hat — und ein Haken, der das benennt.
+// `GET /candidates` could search and filter; what it could not do was say WHAT
+// somebody is missing. It searched with AND — every hit satisfied everything,
+// every tick would have been set, and the list would have said nothing. This
+// journey drives exactly the difference: two searched words, a person who
+// named one of them — and a tick that names it.
 //
-// Und sie fährt die Auflagen mit, die man sonst nur im Quelltext liest: keine
-// Zahl auf der Karte, und für jemanden ohne Belege ein SATZ statt einer leeren
-// Box (ADR-0022 §3).
+// And it drives the conditions one otherwise only reads in the source: no
+// number on the card, and for somebody without evidence a SENTENCE instead of
+// an empty box (ADR-0022 §3).
 
 import { expect, test } from "@playwright/test";
 
@@ -19,34 +19,34 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("der Haken sagt, WELCHE Fähigkeit fehlt — und nennt keine Zahl", async ({
+test("the tick says WHICH skill is missing — and names no number", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
   const companyName = `E2E Scout ${Date.now()}`;
   const stamp = Date.now();
 
-  // Zwei Worte, beide erfunden, damit diese Reise nichts von anderen mitsieht.
-  const genannt = `Schweissen${stamp}`;
-  const fehlend = `Zerspanen${stamp}`;
-  const headline = `E2E Scout-Kandidat ${stamp}`;
+  // Two words, both invented, so that this journey sees nothing of the others.
+  const named = `Welding${stamp}`;
+  const missing = `Machining${stamp}`;
+  const headline = `E2E Scout candidate ${stamp}`;
 
-  // Die Person nennt EINES der beiden Worte und gibt ihr Profil frei.
+  // The person names ONE of the two words and releases her profile.
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
-  await candidate.getByLabel(/Fähigkeiten/i).fill(genannt);
+  await candidate.getByLabel(/Fähigkeiten/i).fill(named);
   await candidate.getByLabel("Standort", { exact: true }).fill("Berlin");
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(candidate.getByText(/Profil gespeichert/i)).toBeVisible();
@@ -58,31 +58,32 @@ test("der Haken sagt, WELCHE Fähigkeit fehlt — und nennt keine Zahl", async (
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  // Gesucht wird nach BEIDEN Worten. Unter UND käme niemand zurück; unter ODER
-  // kommt diese Person — und die Häkchen sagen, woran es liegt.
+  // The search is for BOTH words. Under AND nobody would come back; under OR
+  // this person comes — and the ticks say why.
   await recruiter.goto("/scout");
-  await recruiter.getByLabel("Fähigkeiten").fill(`${genannt}, ${fehlend}`);
+  await recruiter.getByLabel("Fähigkeiten").fill(`${named}, ${missing}`);
   await recruiter.getByRole("button", { name: "Suchen" }).click();
 
-  const karte = recruiter.locator("li").filter({ hasText: headline });
-  await expect(karte).toBeVisible();
+  const card = recruiter.locator("li").filter({ hasText: headline });
+  await expect(card).toBeVisible();
 
-  // DER PUNKT DER GANZEN REISE: das genannte Wort mit Haken, das fehlende ohne.
-  await expect(karte.getByText(`${genannt} ✓`)).toBeVisible();
-  await expect(karte.getByText(`${fehlend} ✗`)).toBeVisible();
+  // THE POINT OF THE WHOLE JOURNEY: the named word with a tick, the missing one
+  // without.
+  await expect(card.getByText(`${named} ✓`)).toBeVisible();
+  await expect(card.getByText(`${missing} ✗`)).toBeVisible();
 
-  // Und keine Zahl daneben. Nicht „1 von 2", nicht „50 %", nichts.
-  await expect(karte.getByText(/1 von 2|50\s*%|Passung|Score/i)).toHaveCount(0);
+  // And no number beside it. Not "1 von 2" (1 of 2), not "50 %", nothing.
+  await expect(card.getByText(/1 von 2|50\s*%|Passung|Score/i)).toHaveCount(0);
 
-  // Wer nichts auf GitHub hat, ist nicht schlechter, sondern woanders — und die
-  // Karte sagt das, statt eine leere Box zu zeigen (ADR-0022 §3).
-  await expect(karte.getByText(/Keine Belege freigegeben/)).toBeVisible();
+  // Whoever has nothing on GitHub is not worse but elsewhere — and the card
+  // says so instead of showing an empty box (ADR-0022 §3).
+  await expect(card.getByText(/Keine Belege freigegeben/)).toBeVisible();
 
-  // Der abgeloeste Pfad fuehrt nirgendwohin mehr: die Route ist weg, und die
-  // Oberflaeche zeigt ihre eigene „nicht gefunden"-Seite statt der Liste.
+  // The replaced path leads nowhere any more: the route is gone, and the UI
+  // shows its own "not found" page instead of the list.
   await recruiter.goto("/candidates");
   await expect(recruiter.getByText(headline)).toHaveCount(0);
 
@@ -90,45 +91,47 @@ test("der Haken sagt, WELCHE Fähigkeit fehlt — und nennt keine Zahl", async (
   await recruiterContext.close();
 });
 
-test("wer weiter weg wohnt, bleibt in der Liste — mit einem Kreuz", async ({
+test("whoever lives further away stays in the list — with a cross", async ({
   browser,
 }) => {
-  // ADR-0041 durch den ganzen Stapel. Der Punkt ist eine Aussage über die
-  // LÄNGE der Liste: die Stelle filtert nicht, sie erklärt. Wer draussen liegt,
-  // bleibt drin und trägt ein Kreuz — das Unternehmen entscheidet, nicht die
-  // Suche, und es sieht warum.
+  // ADR-0041 through the whole stack. The point is a statement about the LENGTH
+  // of the list: the job does not filter, it explains. Whoever lies outside
+  // stays in and carries a cross — the company decides, not the search, and it
+  // sees why.
   test.slow();
 
   const stamp = Date.now();
-  const skill = `Ankerwickeln${stamp}`;
+  const skill = `ArmatureWinding${stamp}`;
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Weg ${stamp}`;
+  const companyName = `E2E Commute ${stamp}`;
 
-  const nahHeadline = `E2E Nah ${stamp}`;
-  const fernHeadline = `E2E Fern ${stamp}`;
+  const nearHeadline = `E2E Near ${stamp}`;
+  const farHeadline = `E2E Far ${stamp}`;
 
-  // Zwei Menschen mit derselben Fähigkeit, beide freigegeben — und zwei
-  // verschiedenen Aussagen über ihren Weg.
-  for (const [ort, stufe, headline] of [
-    ["Potsdam", "Bis 50 km", nahHeadline],
-    ["München", "Bis 10 km", fernHeadline],
+  // Two people with the same skill, both released — and two different
+  // statements about their commute. The places are real towns for the place
+  // table ("München", not "Munich"); "Bis 50 km"/"Bis 10 km" are the option
+  // labels.
+  for (const [location, commute, headline] of [
+    ["Potsdam", "Bis 50 km", nearHeadline],
+    ["München", "Bis 10 km", farHeadline],
   ] as const) {
-    const kontext = await browser.newContext();
-    const seite = await kontext.newPage();
-    const mail = uniqueEmail("kandidat.example");
-    await registerAndConfirm(seite, mail, "E2E Kandidat");
-    await login(seite, mail);
-    await seite.goto("/profile");
-    await seite.getByLabel(/Überschrift/i).fill(headline);
-    await seite.getByLabel(/Fähigkeiten/i).fill(skill);
-    await seite.getByLabel("Standort", { exact: true }).fill(ort);
-    await waehleImFeld(seite, /Wie weit würdest du pendeln/i, stufe);
-    await seite.getByRole("button", { name: "Speichern", exact: true }).click();
-    await expect(seite.getByText(/Profil gespeichert/i)).toBeVisible();
-    await seite.getByRole("switch").click();
-    await expect(seite.getByRole("switch")).toBeChecked();
-    await kontext.close();
+    const context = await browser.newContext();
+    const personPage = await context.newPage();
+    const email = uniqueEmail("candidate.example");
+    await registerAndConfirm(personPage, email, "E2E Candidate");
+    await login(personPage, email);
+    await personPage.goto("/profile");
+    await personPage.getByLabel(/Überschrift/i).fill(headline);
+    await personPage.getByLabel(/Fähigkeiten/i).fill(skill);
+    await personPage.getByLabel("Standort", { exact: true }).fill(location);
+    await pickOption(personPage, /Wie weit würdest du pendeln/i, commute);
+    await personPage.getByRole("button", { name: "Speichern", exact: true }).click();
+    await expect(personPage.getByText(/Profil gespeichert/i)).toBeVisible();
+    await personPage.getByRole("switch").click();
+    await expect(personPage.getByRole("switch")).toBeChecked();
+    await context.close();
   }
 
   const recruiterContext = await browser.newContext();
@@ -136,40 +139,40 @@ test("wer weiter weg wohnt, bleibt in der Liste — mit einem Kreuz", async ({
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  // Eine Stelle in Berlin, vor Ort.
+  // A job in Berlin, on site.
   await recruiter.goto("/company/jobs/new");
-  const titel = `E2E Stelle Berlin ${stamp}`;
-  await recruiter.getByLabel("Titel").fill(titel);
-  await recruiter.getByLabel(/Beschreibung/i).fill("Vor Ort in Berlin.");
+  const title = `E2E Job Berlin ${stamp}`;
+  await recruiter.getByLabel("Titel").fill(title);
+  await recruiter.getByLabel(/Beschreibung/i).fill("On site in Berlin.");
   await recruiter.getByLabel("Ort", { exact: true }).fill("Berlin");
   await recruiter.getByRole("button", { name: /Entwurf anlegen/i }).click();
-  await expect(recruiter.getByText(titel)).toBeVisible();
+  await expect(recruiter.getByText(title)).toBeVisible();
 
   await recruiter.goto("/scout");
   await recruiter.getByLabel("Fähigkeiten").fill(skill);
   await recruiter.getByRole("button", { name: "Suchen" }).click();
 
-  // Ohne Stelle: beide da, kein Haken zur Erreichbarkeit.
-  await expect(recruiter.locator("li").filter({ hasText: nahHeadline })).toBeVisible();
-  await expect(recruiter.locator("li").filter({ hasText: fernHeadline })).toBeVisible();
+  // Without a job: both there, no tick for reachability.
+  await expect(recruiter.locator("li").filter({ hasText: nearHeadline })).toBeVisible();
+  await expect(recruiter.locator("li").filter({ hasText: farHeadline })).toBeVisible();
 
-  // Mit Stelle: BEIDE weiterhin da — einer mit Haken, einer mit Kreuz.
-  await waehleImFeld(recruiter, /Gegen welche Stelle/i, titel);
+  // With a job: BOTH still there — one with a tick, one with a cross.
+  await pickOption(recruiter, /Gegen welche Stelle/i, title);
 
-  const nah = recruiter.locator("li").filter({ hasText: nahHeadline });
-  const fern = recruiter.locator("li").filter({ hasText: fernHeadline });
+  const near = recruiter.locator("li").filter({ hasText: nearHeadline });
+  const far = recruiter.locator("li").filter({ hasText: farHeadline });
 
-  await expect(nah).toBeVisible();
-  await expect(fern).toBeVisible();
-  await expect(nah.getByText("Erreichbarkeit ✓")).toBeVisible();
-  await expect(fern.getByText("Erreichbarkeit ✗")).toBeVisible();
+  await expect(near).toBeVisible();
+  await expect(far).toBeVisible();
+  await expect(near.getByText("Erreichbarkeit ✓")).toBeVisible();
+  await expect(far.getByText("Erreichbarkeit ✗")).toBeVisible();
 
-  // Und daneben stehen die AUSSAGEN, nicht die Entfernung.
-  await expect(fern.getByText(/sagt: Bis 10 km/)).toBeVisible();
-  await expect(fern.getByText(/\d+\s*km entfernt|505/)).toHaveCount(0);
+  // And beside them stand the STATEMENTS, not the distance.
+  await expect(far.getByText(/sagt: Bis 10 km/)).toBeVisible();
+  await expect(far.getByText(/\d+\s*km entfernt|505/)).toHaveCount(0);
 
   await recruiterContext.close();
 });

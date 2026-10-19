@@ -2,12 +2,12 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderMitStore } from "../test/render";
+import { renderWithStore } from "../test/render";
 import { RegisterPage } from "./RegisterPage";
 
-type Antwort = { status?: number; body?: unknown; wirft?: boolean };
+type Answer = { status?: number; body?: unknown; throws?: boolean };
 
-function antworten(...folge: Antwort[]) {
+function answerInOrder(...sequence: Answer[]) {
   const asked: { path: string; body: string }[] = [];
   let number = 0;
   vi.stubGlobal(
@@ -17,19 +17,19 @@ function antworten(...folge: Antwort[]) {
         path: new URL(url).pathname,
         body: String(init?.body ?? ""),
       });
-      const answer = folge[number] ??
-        folge[folge.length - 1] ?? { status: 201 };
+      const reply = sequence[number] ??
+        sequence[sequence.length - 1] ?? { status: 201 };
       number += 1;
-      if (answer.wirft === true) throw new TypeError("Failed to fetch");
-      return new Response(JSON.stringify(answer.body ?? {}), {
-        status: answer.status ?? 201,
+      if (reply.throws === true) throw new TypeError("Failed to fetch");
+      return new Response(JSON.stringify(reply.body ?? {}), {
+        status: reply.status ?? 201,
       });
     }),
   );
   return asked;
 }
 
-async function fuelleUndSende(
+async function fillAndSubmit(
   user: ReturnType<typeof userEvent.setup>,
   email: string,
 ) {
@@ -40,7 +40,7 @@ async function fuelleUndSende(
 }
 
 beforeEach(() => {
-  antworten({ status: 201 });
+  answerInOrder({ status: 201 });
 });
 
 afterEach(() => {
@@ -48,41 +48,41 @@ afterEach(() => {
 });
 
 describe("RegisterPage", () => {
-  it("registriert mit einer privaten Adresse und zeigt den Bestätigungshinweis", async () => {
-    // Private Adressen sind der Normalfall, nicht die Ausnahme (ADR-0017).
+  it("registers with a private address and shows the confirmation hint", async () => {
+    // Private addresses are the normal case, not the exception (ADR-0017).
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "max@gmail.com");
+    await fillAndSubmit(user, "max@gmail.com");
 
     expect(await screen.findByText(/E-Mail geschickt/i)).toBeInTheDocument();
   });
 
-  it("fragt weder nach einem Mandanten noch nach einer Firma", () => {
-    renderMitStore(<RegisterPage />, { route: "/register" });
+  it("asks for neither a tenant nor a company", () => {
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     expect(screen.queryByLabelText(/Mandant/i)).toBeNull();
     expect(screen.queryByLabelText("Firma")).toBeNull();
     expect(screen.getByLabelText(/E-Mail/i)).toBeInTheDocument();
   });
 
-  it("schickt display_name in snake_case und nie einen Mandanten", async () => {
-    const asked = antworten({ status: 201 });
+  it("sends display_name in snake_case and never a tenant", async () => {
+    const asked = answerInOrder({ status: 201 });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "a@b.com");
+    await fillAndSubmit(user, "a@b.com");
 
-    // Der Draht bindet `display_name`. Mit `displayName` kommt die Eingabe
-    // nicht herein — gemessen, und der Fehler sah aus wie ein leeres Formular.
+    // The wire binds `display_name`. With `displayName` the input does not
+    // arrive — measured, and the defect looked like an empty form.
     expect(asked[0]?.body).toContain('"display_name"');
     expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
-  it("schickt Vor- und Nachname in snake_case, wenn sie dastehen", async () => {
-    const asked = antworten({ status: 201 });
+  it("sends given and family name in snake_case when they are there", async () => {
+    const asked = answerInOrder({ status: 201 });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "a@b.com");
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
@@ -95,30 +95,30 @@ describe("RegisterPage", () => {
     expect(asked[0]?.body).toContain('"family_name":"Muster"');
   });
 
-  it("sagt bei einer bekannten Adresse dasselbe wie bei einer neuen", async () => {
-    // Der Server antwortet auch bei bekannter Adresse 201 — kein
-    // Aufzählungskanal. Die Oberfläche darf daraus nichts anderes machen.
+  it("says the same for a known address as for a new one", async () => {
+    // The server answers 201 for a known address too — no enumeration channel.
+    // The UI must not make anything else of it.
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "schon-da@firma.de");
+    await fillAndSubmit(user, "already-there@company.de");
 
     expect(await screen.findByText(/E-Mail geschickt/i)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
 
-describe("RegisterPage — Person oder Unternehmen", () => {
-  it("registriert voreingestellt eine Person, ohne nach einem Unternehmen zu fragen", () => {
-    renderMitStore(<RegisterPage />, { route: "/register" });
+describe("RegisterPage — person or company", () => {
+  it("registers a person by default, without asking for a company", () => {
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     expect(screen.getByRole("radio", { name: "Für mich" })).toBeChecked();
     expect(screen.queryByLabelText(/Name des Unternehmens/i)).toBeNull();
   });
 
-  it("fragt den Firmennamen nur, wenn ein Unternehmen registriert wird", async () => {
+  it("asks for the company name only when a company registers", async () => {
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.click(
       screen.getByRole("radio", { name: "Für ein Unternehmen" }),
@@ -127,9 +127,9 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     expect(screen.getByLabelText(/Name des Unternehmens/i)).toBeInTheDocument();
   });
 
-  it("wählt das Unternehmen vor, wenn die Adresse es sagt", () => {
-    // Die Hero-Knöpfe der Startseite tragen die Absicht als ?as=company mit.
-    renderMitStore(<RegisterPage />, { route: "/register?as=company" });
+  it("preselects the company when the address says so", () => {
+    // The hero buttons of the home page carry the intent along as ?as=company.
+    renderWithStore(<RegisterPage />, { route: "/register?as=company" });
 
     expect(
       screen.getByRole("radio", { name: "Für ein Unternehmen" }),
@@ -137,11 +137,11 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     expect(screen.getByLabelText(/Name des Unternehmens/i)).toBeInTheDocument();
   });
 
-  it("sagt sofort, dass ein Massenanbieter kein Unternehmen werden kann", async () => {
-    // Der Server lehnt ohnehin ab (422), aber wer es erst zwei Schritte später
-    // erfährt, hat zwei Schritte verloren.
+  it("says at once that a mass mail provider cannot become a company", async () => {
+    // The server refuses anyway (422), but whoever learns it two steps later
+    // has lost two steps.
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.click(
       screen.getByRole("radio", { name: "Für ein Unternehmen" }),
@@ -156,19 +156,19 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     ).toBeDisabled();
   });
 
-  it("urteilt nicht über eine Adresse, die noch kein @ hat", async () => {
+  it("does not judge an address that has no @ yet", async () => {
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register?as=company" });
+    renderWithStore(<RegisterPage />, { route: "/register?as=company" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "ma");
 
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("färbt eine unfertige Adresse nicht rot, solange getippt wird", async () => {
-    // Geurteilt wird erst, wenn ein Feld verlassen wurde.
+  it("does not colour an unfinished address red while typing", async () => {
+    // Judged only once a field was left.
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "max@");
 
@@ -177,9 +177,9 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     ).toBeNull();
   });
 
-  it("sagt nach dem Verlassen des Feldes, dass die Adresse keine ist", async () => {
+  it("says after leaving the field that the address is none", async () => {
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.type(screen.getByLabelText(/E-Mail/i), "bus");
     await user.tab();
@@ -192,62 +192,99 @@ describe("RegisterPage — Person oder Unternehmen", () => {
     ).toBeDisabled();
   });
 
-  it("prüft Freemail nur beim Beanspruchen einer Domain, nicht bei einer Person", async () => {
+  it("checks freemail only when claiming a domain, not for a person", async () => {
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    // Das ganze Formular: der Knopf ist auch gesperrt, solange Pflichtfelder
-    // leer sind, und dieser Test spricht über Freemail.
+    // The whole form: the button is also locked while required fields are
+    // empty, and this test speaks about freemail.
     await user.type(screen.getByLabelText(/E-Mail/i), "max@gmail.com");
-    await user.type(screen.getByLabelText(/Passwort/i), "ein-langes-passwort");
+    await user.type(screen.getByLabelText(/Passwort/i), "a-long-password");
     await user.type(screen.getByLabelText(/Anzeigename/i), "Max");
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: /Registrieren/i })).toBeEnabled();
   });
 
-  it("schickt den Firmennamen, und nie einen Mandanten", async () => {
-    const asked = antworten({ status: 201 });
+  it("sends the company name, and never a tenant", async () => {
+    const asked = answerInOrder({ status: 201 });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
     await user.click(
       screen.getByRole("radio", { name: "Für ein Unternehmen" }),
     );
-    await user.type(screen.getByLabelText(/E-Mail/i), "chef@firma.de");
+    await user.type(screen.getByLabelText(/E-Mail/i), "boss@company.de");
     await user.type(
       screen.getByLabelText(/Name des Unternehmens/i),
-      "Firma GmbH",
+      "Example GmbH",
     );
     await user.type(screen.getByLabelText(/Passwort/i), "strongpassword1");
-    await user.type(screen.getByLabelText(/Anzeigename/i), "Chef");
+    await user.type(screen.getByLabelText(/Anzeigename/i), "Boss");
     await user.click(screen.getByRole("button", { name: /Registrieren/i }));
 
-    expect(asked[0]?.body).toContain('"company_name":"Firma GmbH"');
+    expect(asked[0]?.body).toContain('"company_name":"Example GmbH"');
     expect(asked[0]?.body).not.toContain("tenant_id");
   });
 
-  it("schickt als Person gar kein company_name", async () => {
-    const asked = antworten({ status: 201 });
+  it("sends no company_name at all as a person", async () => {
+    const asked = answerInOrder({ status: 201 });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "mensch@example.com");
+    await fillAndSubmit(user, "person@example.com");
 
-    // Kein `"company_name":null` — ein null wäre eine Aussage, die niemand
-    // gemacht hat.
+    // No `"company_name":null` — a null would be a statement nobody made.
     expect(asked[0]?.body).not.toContain("company_name");
   });
 });
 
-describe("RegisterPage — die E-Mail erneut anfordern", () => {
-  it("sagt es, wenn die E-Mail nicht einmal angefordert werden konnte", async () => {
-    // Der Knopf tat bei einem Netzfehler sichtbar NICHTS.
-    antworten({ status: 201 }, { wirft: true });
+/*
+ * A GERMAN PERSON READS GERMAN when identity-service refuses.
+ *
+ * Until 26.09.2026 this page drew the problem document's `detail` raw, and
+ * since the backend answers in English a German person read "Password rejected:
+ * exceeds 72 bytes". The refusal is chosen by status and sentence now
+ * (`api/registration.ts`); none of the cases depends on whether the address is
+ * known — the server answers 201 for a known one, too.
+ */
+describe("RegisterPage — a refusal in the person's language", () => {
+  it("names the gateway's brake in German", async () => {
+    answerInOrder({ status: 429, body: { title: "Request failed", detail: "Too many requests" } });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "a@b.com");
+    await fillAndSubmit(user, "a@b.com");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Zu viele Versuche in kurzer Zeit.",
+    );
+    expect(document.body.textContent).not.toMatch(/Too many requests/);
+  });
+
+  it("names a password the server refuses as too long", async () => {
+    answerInOrder({
+      status: 400,
+      body: { title: "Request failed", detail: "Password rejected: exceeds 72 bytes" },
+    });
+    const user = userEvent.setup();
+    renderWithStore(<RegisterPage />, { route: "/register" });
+
+    await fillAndSubmit(user, "a@b.com");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Das Passwort ist zu lang.");
+    expect(document.body.textContent).not.toMatch(/Password rejected/);
+  });
+});
+
+describe("RegisterPage — requesting the mail again", () => {
+  it("says so when the mail could not even be requested", async () => {
+    // On a network error the button visibly did NOTHING.
+    answerInOrder({ status: 201 }, { throws: true });
+    const user = userEvent.setup();
+    renderWithStore(<RegisterPage />, { route: "/register" });
+
+    await fillAndSubmit(user, "a@b.com");
     await user.click(
       await screen.findByRole("button", { name: "E-Mail erneut senden" }),
     );
@@ -259,20 +296,20 @@ describe("RegisterPage — die E-Mail erneut anfordern", () => {
   });
 
   /**
-   * Der zweite Fehlschlag, der vorher als Erfolg durchging: die Bremse
-   * (`/auth/resend-verification`, 3/min) antwortet 429. Alt wurde nur der
-   * Transportfehler gefangen — die Zusage „ist unterwegs" stand da, obwohl
-   * nichts unterwegs war.
+   * The second failure that used to pass as a success: the brake
+   * (`/auth/resend-verification`, 3/min) answers 429. The old code caught only
+   * the transport error — the promise "on its way" stood there while nothing
+   * was on its way.
    */
-  it("meldet auch einen Nicht-2xx als Fehlschlag, statt Versand zu behaupten", async () => {
-    antworten(
+  it("reports a non-2xx as a failure too, instead of claiming a dispatch", async () => {
+    answerInOrder(
       { status: 201 },
-      { status: 429, body: { detail: "Zu viele Anfragen" } },
+      { status: 429, body: { detail: "Too many requests" } },
     );
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "a@b.com");
+    await fillAndSubmit(user, "a@b.com");
     await user.click(
       await screen.findByRole("button", { name: "E-Mail erneut senden" }),
     );
@@ -283,17 +320,17 @@ describe("RegisterPage — die E-Mail erneut anfordern", () => {
     expect(screen.queryByText(/erneut unterwegs/)).toBeNull();
   });
 
-  it("bestätigt den Versand, wenn er hinausging", async () => {
-    antworten({ status: 201 }, { status: 202 });
+  it("confirms the dispatch when it went out", async () => {
+    answerInOrder({ status: 201 }, { status: 202 });
     const user = userEvent.setup();
-    renderMitStore(<RegisterPage />, { route: "/register" });
+    renderWithStore(<RegisterPage />, { route: "/register" });
 
-    await fuelleUndSende(user, "a@b.com");
+    await fillAndSubmit(user, "a@b.com");
     await user.click(
       await screen.findByRole("button", { name: "E-Mail erneut senden" }),
     );
 
-    // role="status" und nicht "alert": eine Bestätigung unterbricht nicht.
+    // role="status" and not "alert": a confirmation does not interrupt.
     expect(await screen.findByRole("status")).toHaveTextContent(
       "erneut unterwegs",
     );

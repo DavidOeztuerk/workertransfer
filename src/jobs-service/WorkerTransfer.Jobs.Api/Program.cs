@@ -1,54 +1,53 @@
 using WorkerTransfer.Jobs.Api;
-using WorkerTransfer.Jobs.Api.Berechtigung;
+using WorkerTransfer.Jobs.Api.Authorization;
 using WorkerTransfer.Jobs.Infrastructure;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults;
-using WorkerTransfer.ServiceDefaults.Rollen;
+using WorkerTransfer.ServiceDefaults.Roles;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration build reads the environment variables exactly once — loaded
+// afterwards would mean loaded and read by nobody.
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
-const string dienstname = "jobs-service";
+const string serviceName = "jobs-service";
 
 builder.Services.AddWorkerTransferDefaults(
-    builder.Configuration, builder.Environment, dienstname);
+    builder.Configuration, builder.Environment, serviceName);
 
-// Zwei Handlungen binden dieses Unternehmen nach aussen — eine Anzeige
-// hinstellen und sie wegnehmen. Wer das darf, entscheidet die
-// MITGLIEDSCHAFTSTABELLE von identity-service, je Anfrage und nicht das Token:
-// ein Token lebt weiter, nachdem jemand aus einer Firma entfernt wurde, und die
-// Entfernung wirkte dann erst beim Ablauf.
+// Two acts bind this company to the outside — putting an advert up and taking
+// it down. Who may do that is decided by identity-service's MEMBERSHIP TABLE,
+// per request and not by the token: a token lives on after somebody was removed
+// from a company, and the removal would then take effect only at expiry.
 //
-// Die Liste steht HIER und nicht in `AddWorkerTransferDefaults`: der Mechanismus
-// darf nicht elfmal beantwortet werden, die Liste ist eine Entscheidung.
-builder.Services.AddAdminrechte(
+// The list stands HERE and not in `AddWorkerTransferDefaults`: the mechanism
+// must not be answered eleven times, the list is a decision.
+builder.Services.AddAdminPermissions(
     builder.Configuration,
-    Stellenrechte.Veroeffentlichen,
-    Stellenrechte.Schliessen);
+    JobPermissions.Publish,
+    JobPermissions.Close);
 
 builder.Services.AddJobsInfrastructure(
     builder.Configuration,
     builder.Configuration.GetConnectionString("jobs")
-    ?? throw new InvalidOperationException("ConnectionStrings:jobs ist nicht gesetzt."));
+    ?? throw new InvalidOperationException("ConnectionStrings:jobs is not set."));
 
 var app = builder.Build();
 
-// Erst wandern, dann bedienen (ADR-0010).
-await app.WandereAsync<JobsDbContext>();
+// Migrate first, then serve (ADR-0010).
+await app.MigrateSchemaAsync<JobsDbContext>();
 
-app.UseWorkerTransferDefaults(builder.Environment, dienstname);
+app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
-app.MapStellenEndpoints();
+app.MapJobEndpoints();
 
-// Kein POST /erasure: dieser Dienst haelt nichts ueber eine natuerliche Person
-// (ADR-0027 §2). Ein Loeschbefehl an ihn waere ein Endpunkt, der "erledigt"
-// sagt, ohne je etwas zu tun. Was er empfaengt, ist der Unternehmensrueckzug.
-app.MapRueckzugsEndpunkt();
+// No POST /erasure: this service holds nothing about a natural person
+// (ADR-0027 §2). An erasure command to it would be an endpoint that says "done"
+// without ever doing anything. What it receives is the company withdrawal.
+app.MapWithdrawalEndpoint();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;

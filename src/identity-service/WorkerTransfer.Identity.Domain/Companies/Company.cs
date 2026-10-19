@@ -45,7 +45,7 @@ public sealed record EmailDomain
         Value = raw.Trim().ToLowerInvariant();
     }
 
-    /// <summary>The domain, lower case.</summary>
+    /// <summary>The domain, lower caseItem.</summary>
     public string Value { get; }
 
     /// <summary>The domain of an address.</summary>
@@ -59,11 +59,11 @@ public sealed record EmailDomain
     {
         ArgumentNullException.ThrowIfNull(email);
 
-        var trenner = email.LastIndexOf('@');
+        var separator = email.LastIndexOf('@');
 
-        return trenner < 0
+        return separator < 0
             ? throw new ArgumentException("Not an address.", nameof(email))
-            : new EmailDomain(email[(trenner + 1)..]);
+            : new EmailDomain(email[(separator + 1)..]);
     }
 
     /// <summary>Whether this is a mass provider.</summary>
@@ -107,9 +107,9 @@ public sealed class Company
     {
         ArgumentNullException.ThrowIfNull(domain);
 
-        var bereinigt = name?.Trim();
+        var cleaned = name?.Trim();
 
-        if (string.IsNullOrEmpty(bereinigt))
+        if (string.IsNullOrEmpty(cleaned))
         {
             throw new InvalidCompanyNameException();
         }
@@ -119,7 +119,7 @@ public sealed class Company
             throw new PublicEmailDomainException(domain.Value);
         }
 
-        return new Company(TenantId.New(), bereinigt, domain, TenantStatus.Active);
+        return new Company(TenantId.New(), cleaned, domain, TenantStatus.Active);
     }
 
     /// <summary>The company as a row holds it.</summary>

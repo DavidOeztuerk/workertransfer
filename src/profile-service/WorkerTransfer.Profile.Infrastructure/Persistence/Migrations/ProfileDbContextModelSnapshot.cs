@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using WorkerTransfer.Profile.Domain.Pruefspur;
+using WorkerTransfer.Profile.Domain.Audit;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
 
 #nullable disable
@@ -18,111 +18,111 @@ namespace WorkerTransfer.Profile.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "pruef_handlung", new[] { "profil_angelegt", "profil_geaendert", "profil_geloescht" });
+            NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "audit_action", new[] { "profile_created", "profile_changed", "profile_deleted" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.ProfilZeile", b =>
+            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.AuditRow", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("AngelegtAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                    b.Property<AuditAction>("Action")
+                        .HasColumnType("audit_action")
+                        .HasColumnName("action");
 
-                    b.PrimitiveCollection<string[]>("Faehigkeiten")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("skills");
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
 
-                    b.Property<DateTimeOffset>("GeaendertAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Ort")
-                        .IsRequired()
+                    b.Property<string>("CorrelationId")
                         .HasColumnType("text")
-                        .HasColumnName("location");
+                        .HasColumnName("correlation_id");
 
-                    b.Property<string>("Pendelbereitschaft")
+                    b.Property<string>("Metadata")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.ProfileRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Commute")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("commute_km");
 
-                    b.Property<bool>("RemoteMoeglich")
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Headline")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("headline");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Relocation")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("relocation");
+
+                    b.Property<bool>("RemoteOk")
                         .HasColumnType("boolean")
                         .HasColumnName("remote_ok");
+
+                    b.PrimitiveCollection<string[]>("Skills")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("skills");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("bio");
 
-                    b.Property<string>("Ueberschrift")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("headline");
-
-                    b.Property<string>("Umzugsbereitschaft")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("relocation");
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GeaendertAm", "Id")
+                    b.HasIndex("UpdatedAt", "Id")
                         .IsDescending()
                         .HasDatabaseName("ix_profiles_seite");
 
                     b.ToTable("profiles", (string)null);
 
-                    b.HasAnnotation("WorkerTransfer:Personenzeile", true);
-                });
-
-            modelBuilder.Entity("WorkerTransfer.Profile.Infrastructure.Persistence.Pruefzeile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("AkteurId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<Guid?>("BetroffenId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("target_id");
-
-                    b.Property<string>("Daten")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata");
-
-                    b.Property<Guid?>("FirmaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("GeschehenAm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<Pruefhandlung>("Handlung")
-                        .HasColumnType("pruef_handlung")
-                        .HasColumnName("action");
-
-                    b.Property<string>("Korrelation")
-                        .HasColumnType("text")
-                        .HasColumnName("correlation_id");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("audit_events", (string)null);
+                    b.HasAnnotation("WorkerTransfer:SubjectKeyedTable", true);
                 });
 #pragma warning restore 612, 618
         }

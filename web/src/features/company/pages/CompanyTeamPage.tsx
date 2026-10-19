@@ -13,7 +13,8 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { ADMIN_CASES, failureKey } from "../../../shared/api/errors";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
   type CompanyMember,
@@ -25,43 +26,42 @@ import {
 } from "../api/team";
 
 /**
- * <c>/company/team</c> — wer für das Unternehmen handeln darf.
+ * <c>/company/team</c> — who may act for the company.
  *
- * <strong>Die Kopfzeile verbirgt nur, sie schützt nicht.</strong> Ob jemand
- * einladen oder entfernen darf, entscheidet der Server je Anfrage aus der
- * Mitgliedschaftstabelle. Was hier nach Rolle ein- oder ausgeblendet wird, ist
- * Bequemlichkeit — kein Zugriffsschutz.
+ * <strong>The header only hides, it does not protect.</strong> Whether someone
+ * may invite or remove is decided by the server per request from the
+ * membership table. What is shown or hidden here by role is convenience — no
+ * access control.
  *
- * <strong>„Verlassen" und „Entfernen" sind derselbe Aufruf</strong>, nur mit
- * anderer Beschriftung: wer sich selbst entfernt, verlässt. Zwei Wege dafür
- * wären zwei Stellen, an denen die letzte Verwaltungsrolle unterschiedlich
- * behandelt werden könnte.
+ * <strong>"Leave" and "remove" are the same call</strong>, only with a
+ * different label: whoever removes themselves leaves. Two ways for it would be
+ * two places where the last administrative role could be treated differently.
  */
 export function CompanyTeamPage() {
   const { t } = useTranslation();
-  const { fuerFirma, tenantId, subjectId } = useHandelnder();
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [running, setLaeuft] = useState(false);
+  const { forCompany, tenantId, subjectId } = useActor();
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  const mitglieder = useAsync(
+  const members = useAsync(
     (signal) => listMembers(tenantId as string, signal),
     [tenantId],
-    fuerFirma,
+    forCompany,
   );
 
-  const einladungen = useAsync(
+  const invitations = useAsync(
     (signal) => listInvitations(tenantId as string, signal),
     [tenantId],
-    fuerFirma,
+    forCompany,
   );
 
-  if (!fuerFirma) {
+  if (!forCompany) {
     return (
-      <PageShell title={t("mannschaft.titel")} narrow>
+      <PageShell title={t("team.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
-              {t("mannschaft.nurFirma")}
+              {t("team.companyOnly")}
             </Typography>
           </CardContent>
         </Card>
@@ -69,67 +69,73 @@ export function CompanyTeamPage() {
     );
   }
 
-  const list = mitglieder.data?.ok ? mitglieder.data.members : [];
-  const meineRolle = list.find(
+  const list = members.data?.ok ? members.data.members : [];
+  const myRole = list.find(
     (entry: CompanyMember) => entry.user_id === subjectId,
   )?.role;
-  const istAdmin = meineRolle === "admin";
+  const isAdmin = myRole === "admin";
 
-  const offene = einladungen.data?.ok ? einladungen.data.invitations : [];
+  const open = invitations.data?.ok ? invitations.data.invitations : [];
 
-  async function entfernen(userId: string) {
-    setLaeuft(true);
+  async function remove(userId: string) {
+    setRunning(true);
     const result = await removeMember(tenantId as string, userId);
-    setLaeuft(false);
-    setFehler(result.ok ? null : result.error.detail);
-    mitglieder.reload();
+    setRunning(false);
+    setError(result.ok ? null : t(failureKey(result.error, "errors.memberNotRemoved")));
+    members.reload();
   }
 
-  async function zurueckziehen(id: string) {
-    setLaeuft(true);
+  async function withdraw(id: string) {
+    setRunning(true);
     const result = await withdrawInvitation(tenantId as string, id);
-    setLaeuft(false);
-    setFehler(result.ok ? null : result.error.detail);
-    einladungen.reload();
+    setRunning(false);
+    setError(
+      result.ok ? null : t(failureKey(result.error, "errors.invitationNotWithdrawn", ADMIN_CASES)),
+    );
+    invitations.reload();
   }
 
   return (
     <PageShell
-      title={t("mannschaft.titel")}
+      title={t("team.title")}
       narrow
-      lead={t("mannschaft.lead")}
+      lead={t("team.lead")}
       actions={
-        istAdmin ? (
+        isAdmin ? (
           <Button
             component={RouterLink}
             to="/company/team/invite"
             variant="contained"
           >
-            {t("mannschaft.einladen")}
+            {t("team.invite")}
           </Button>
         ) : undefined
       }
     >
-      {fehler !== null ? (
+      {error !== null ? (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       ) : null}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("mannschaft.mitglieder")}
+            {t("team.members")}
           </Typography>
 
-          {/* Der LADEZUSTAND fehlte im alten Code, und die Karte blieb
-              währenddessen leer. */}
-          {mitglieder.pending ? (
-            <LoadingBlock label={t("mannschaft.mitgliederLaden")} />
+          {members.pending ? (
+            <LoadingBlock
+              // Its own branch: without it the card stays empty while the
+              // members are in flight.
+              label={t("team.membersLoading")}
+            />
           ) : null}
 
-          {mitglieder.data !== null && !mitglieder.data.ok ? (
-            <Alert severity="error">{mitglieder.data.error.detail}</Alert>
+          {members.data !== null && !members.data.ok ? (
+            <Alert severity="error">
+              {t(failureKey(members.data.error, "errors.teamNotLoaded"))}
+            </Alert>
           ) : null}
 
           {list.length > 0 ? (
@@ -145,26 +151,26 @@ export function CompanyTeamPage() {
               }}
             >
               {list.map((entry: CompanyMember) => (
-                <Zeile
+                <Row
                   key={entry.user_id}
-                  titel={entry.display_name}
+                  title={entry.display_name}
                   meta={t(
                     entry.role === "admin"
-                      ? "mannschaft.rolleAdmin"
-                      : "mannschaft.rolleMitglied",
+                      ? "team.roleAdmin"
+                      : "team.roleMember",
                   )}
                   action={
-                    istAdmin ? (
+                    isAdmin ? (
                       <Button
                         variant="text"
                         size="small"
-                        onClick={() => void entfernen(entry.user_id)}
+                        onClick={() => void remove(entry.user_id)}
                         disabled={running}
                       >
                         {t(
                           entry.user_id === subjectId
-                            ? "mannschaft.verlassen"
-                            : "mannschaft.entfernen",
+                            ? "team.leave"
+                            : "team.remove",
                         )}
                       </Button>
                     ) : undefined
@@ -179,44 +185,46 @@ export function CompanyTeamPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("mannschaft.einladungen")}
+            {t("team.invitations")}
           </Typography>
 
-          {einladungen.pending ? (
-            <LoadingBlock label={t("mannschaft.einladungenLaden")} />
+          {invitations.pending ? (
+            <LoadingBlock label={t("team.invitationsLoading")} />
           ) : null}
 
-          {einladungen.data !== null && !einladungen.data.ok ? (
-            <Alert severity="error">{einladungen.data.error.detail}</Alert>
+          {invitations.data !== null && !invitations.data.ok ? (
+            <Alert severity="error">
+              {t(failureKey(invitations.data.error, "errors.invitationsNotLoaded"))}
+            </Alert>
           ) : null}
 
-          {einladungen.data?.ok && offene.length === 0 ? (
-            <EmptyBlock title={t("mannschaft.einladungenLeer")} />
+          {invitations.data?.ok && open.length === 0 ? (
+            <EmptyBlock title={t("team.invitationsEmpty")} />
           ) : null}
 
-          {offene.length > 0 ? (
+          {open.length > 0 ? (
             <Box
               data-testid="invitation-list"
               sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
             >
-              {offene.map((entry: Invitation) => (
-                <Zeile
+              {open.map((entry: Invitation) => (
+                <Row
                   key={entry.id}
-                  titel={entry.email}
+                  title={entry.email}
                   meta={t(
                     entry.role === "admin"
-                      ? "mannschaft.rolleAdmin"
-                      : "mannschaft.rolleMitglied",
+                      ? "team.roleAdmin"
+                      : "team.roleMember",
                   )}
                   action={
-                    istAdmin ? (
+                    isAdmin ? (
                       <Button
                         variant="text"
                         size="small"
-                        onClick={() => void zurueckziehen(entry.id)}
+                        onClick={() => void withdraw(entry.id)}
                         disabled={running}
                       >
-                        {t("allgemein.zurueckziehen")}
+                        {t("common.withdraw")}
                       </Button>
                     ) : undefined
                   }
@@ -230,12 +238,12 @@ export function CompanyTeamPage() {
   );
 }
 
-function Zeile({
-  titel,
+function Row({
+  title,
   meta,
   action,
 }: {
-  titel: string;
+  title: string;
   meta: string;
   action?: React.ReactNode;
 }) {
@@ -251,7 +259,7 @@ function Zeile({
         }}
       >
         <Box>
-          <Typography variant="h4">{titel}</Typography>
+          <Typography variant="h4">{title}</Typography>
           <Typography variant="body2" color="text.secondary">
             {meta}
           </Typography>

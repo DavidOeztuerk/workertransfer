@@ -14,7 +14,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { useTranslation } from "react-i18next";
 
-import type { Ortung } from "../../../shared/hooks/useGeolocation";
+import type { GeolocationState } from "../../../shared/hooks/useGeolocation";
 import { radius } from "../../../styles/tokens/spacing";
 
 import {
@@ -27,34 +27,33 @@ import {
 } from "../api/jobs";
 
 /**
- * Die anwählbaren Entfernungen, in Kilometern.
+ * The selectable distances, in kilometres.
  *
- * Unter zehn steht keine: die Koordinaten der Anzeigen sind Stadtmittelpunkte,
- * und ein Radius unter der Ausdehnung einer Stadt behauptete eine Genauigkeit,
- * die die Daten nicht haben. Dieselbe Zahl steht als `Umkreis.KleinsterRadiusKm`
- * im Dienst und wird dort auch durchgesetzt — hier ist sie die Auswahl, dort
- * die Regel.
+ * None below ten: the adverts' coordinates are city centres, and a radius below
+ * the extent of a city would claim a precision the data does not have. The same
+ * number stands as the smallest radius in the service and is enforced there —
+ * here it is the choice, there the rule.
  */
-export const ENTFERNUNGEN = [10, 25, 50, 100, 200] as const;
+export const DISTANCES_KM = [10, 25, 50, 100, 200] as const;
 
-/** Was gefiltert werden kann. Leer heisst überall „egal". */
-export interface Stellenfilter {
+/** What can be filtered. Empty means "any" everywhere. */
+export interface JobFilter {
   q: string;
   location: string;
   remote: RemoteMode | "";
   employment: EmploymentType | "";
   skills: string;
   /**
-   * Der Radius in Kilometern, als Zeichenkette wie jedes andere Auswahlfeld.
+   * The radius in kilometres, as a string like every other select field.
    *
-   * Der Standort steht bewusst NICHT hier: er ist keine Eingabe in dieses
-   * Formular, sondern eine Erlaubnis, die der Browser einholt — und er wird
-   * nirgends gespeichert (siehe `useGeolocation`).
+   * The location deliberately does NOT stand here: it is no input into this
+   * form but a permission the browser obtains — and it is stored nowhere (see
+   * `useGeolocation`).
    */
   radius: string;
 }
 
-export const LEERER_FILTER: Stellenfilter = {
+export const EMPTY_FILTER: JobFilter = {
   q: "",
   location: "",
   remote: "",
@@ -63,91 +62,93 @@ export const LEERER_FILTER: Stellenfilter = {
   radius: "",
 };
 
-/** Wie viele Filter gerade etwas tun. Für die Anzeige am Kopf. */
-export function aktiveFilter(filter: Stellenfilter): number {
-  return Object.values(filter).filter((wert) => wert.trim() !== "").length;
+/** How many filters are doing something right now. For the display at the top. */
+export function countActiveFilters(filter: JobFilter): number {
+  return Object.values(filter).filter((value) => value.trim() !== "").length;
 }
 
 /**
- * Die Filter als Seitenleiste.
+ * The filters as a sidebar.
  *
- * <strong>Untereinander und nicht in einer Zeile</strong>, und das ist der
- * eigentliche Gewinn: die Filter standen vorher als fünf Felder nebeneinander
- * über der Liste, wurden auf jedem schmalen Bildschirm umgebrochen und schoben
- * die Ergebnisse unter die Falzkante. Eine Spalte hat Platz für Beschriftung
- * UND Hinweis, und die Liste beginnt oben.
+ * <strong>One below the other and not in a row</strong>, and that is the actual
+ * gain: the filters used to stand as five fields side by side above the list,
+ * wrapped on every narrow screen and pushed the results below the fold. A
+ * column has room for label AND hint, and the list starts at the top.
  *
- * <strong>Gefiltert wird erst beim Absenden.</strong> Kein Filtern beim Tippen:
- * jede Taste wäre eine Anfrage, die Liste spränge unter der Hand, und wer
- * „Kubernetes" tippt, hätte unterwegs elf Ergebnislisten gesehen, die ihn nicht
- * interessieren.
+ * <strong>Filtering happens only on submit.</strong> No filtering while typing:
+ * every key would be a request, the list would jump under one's hand, and
+ * whoever types "Kubernetes" would have seen eleven result lists on the way
+ * that do not interest them.
  */
 export function JobFilterSidebar({
-  entwurf,
+  filter,
   onChange,
   onSubmit,
   onReset,
-  ortung,
+  geolocation,
 }: {
-  entwurf: Stellenfilter;
-  onChange: (filter: Stellenfilter) => void;
+  filter: JobFilter;
+  onChange: (filter: JobFilter) => void;
   onSubmit: () => void;
   onReset: () => void;
-  ortung: Ortung;
+  geolocation: GeolocationState;
 }) {
   const { t } = useTranslation();
-  const anzahl = aktiveFilter(entwurf);
-  const hatStandort = ortung.standort !== null;
+  const activeCount = countActiveFilters(filter);
+  const hasPosition = geolocation.position !== null;
 
   /*
-   * EINE MITTE GENÜGT, und der getippte Ort ist auch eine.
+   * ONE CENTRE IS ENOUGH, and the typed place is one too.
    *
-   * Vorher hing die Entfernung allein am Ortungsknopf. Wer „Leipzig" tippt und
-   * „50 km" will, meint aber „um Leipzig herum" — und braucht dafür weder GPS
-   * noch die Erlaubnis dazu. Der Dienst löst den Ortsnamen mit derselben
-   * Tabelle auf, mit der er auch die Anzeigen verortet (ADR-0032).
+   * The distance used to hang on the location button alone. Whoever types
+   * "Leipzig" and wants "50 km" means "around Leipzig", though — and needs
+   * neither GPS nor the permission for it. The service resolves the place name
+   * with the same table it uses to place the adverts (ADR-0032).
    */
-  const hatMitte = hatStandort || entwurf.location.trim() !== "";
+  const hasCentre = hasPosition || filter.location.trim() !== "";
 
   /*
-    BEI „VOLLSTÄNDIG REMOTE" GIBT ES KEINE ENTFERNUNG.
-   
-    Nicht Geschmack, sondern nachweisbar wirkungslos: der Dienst lässt voll
-    remote ausgeschriebene Stellen unabhängig vom Radius durch (ADR-0032). Die
-    Kombination „nur remote" + „25 km" liefert also dasselbe wie „nur remote"
-    allein — ein Bedienelement, das sichtbar dasteht und provably nichts tut,
-    ist schlimmer als keines. Dieselbe Regel wie in SkillSwap, dort
+    WITH "FULLY REMOTE" THERE IS NO DISTANCE.
+
+    Not taste, but demonstrably without effect: the service lets fully remote
+    adverts through regardless of the radius (ADR-0032). The combination "remote
+    only" + "25 km" therefore delivers the same as "remote only" alone — a
+    control that stands there visibly and provably does nothing is worse than
+    none. The same rule as in SkillSwap, there
     `filters.locationType !== 'remote'`.
   */
-  const nurRemote = entwurf.remote === "full";
+  const remoteOnly = filter.remote === "full";
 
-  // Ein Fehlschlag, sonst die Bestätigung, sonst — falls der Browser gar nicht
-  // orten kann — der Grund dafür. Im Ruhezustand nichts.
-  const hinweis =
-    ortung.fehler ??
-    (hatStandort
-      ? t("stellen.standortGerundet")
-      : ortung.moeglich
+  // A failure, otherwise the confirmation, otherwise — if the browser cannot
+  // locate at all — the reason. Nothing at rest.
+  //
+  // Only when there is something to say: what the button does and that the
+  // position is rounded lives in its tooltip, on demand instead of permanently.
+  const hint =
+    geolocation.error ??
+    (hasPosition
+      ? t("jobs.locationRounded")
+      : geolocation.supported
         ? null
-        : t("standort.nichtMoeglich"));
+        : t("geolocation.unsupported"));
 
   return (
     <Paper
       component="form"
       variant="outlined"
-      onSubmit={(ereignis: React.FormEvent) => {
-        ereignis.preventDefault();
+      onSubmit={(event: React.FormEvent) => {
+        event.preventDefault();
         onSubmit();
       }}
       sx={{
         p: 2.5,
-        // DERSELBE Radius wie eine Stellenkarte. Vorher stand hier `3`, was
-        // über `theme.shape` dreissig Pixel ergab — die Karten daneben haben
-        // vierzehn, und zwei Rundungen nebeneinander sehen aus wie ein
-        // Versehen. Der Wert kommt aus demselben Token wie die Karte.
+        // THE SAME radius as a job card. `3` used to stand here, which gave
+        // thirty pixels via `theme.shape` — the cards beside it have fourteen,
+        // and two roundings side by side look like an accident. The value comes
+        // from the same token as the card.
         borderRadius: `${radius.lg}px`,
-        // Klebt beim Blättern mit — die Filter bleiben erreichbar, ohne dass
-        // jemand nach oben scrollen muss.
+        // Sticks while scrolling — the filters stay reachable without anybody
+        // having to scroll back up.
         position: { md: "sticky" },
         top: { md: 24 },
       }}
@@ -155,27 +156,27 @@ export function JobFilterSidebar({
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
         <TuneIcon fontSize="small" color="action" />
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          {t("stellen.filter")}
+          {t("jobs.filter")}
         </Typography>
-        {anzahl > 0 ? (
+        {activeCount > 0 ? (
           <Button
             size="small"
             variant="text"
             startIcon={<ClearIcon fontSize="small" />}
             onClick={onReset}
           >
-            {t("stellen.filterZuruecksetzen")}
+            {t("jobs.filterReset")}
           </Button>
         ) : null}
       </Box>
 
-      {anzahl > 0 ? (
+      {activeCount > 0 ? (
         <Typography
           variant="caption"
           color="text.secondary"
           sx={{ display: "block", mb: 2 }}
         >
-          {t("stellen.aktiveFilter", { count: anzahl })}
+          {t("jobs.activeFilters", { count: activeCount })}
         </Typography>
       ) : null}
 
@@ -183,174 +184,138 @@ export function JobFilterSidebar({
 
       <Box sx={{ display: "grid", gap: 2.5 }}>
         <TextField
-          label={t("stellen.suchbegriff")}
-          placeholder={t("stellen.suchbegriffBeispiel")}
-          value={entwurf.q}
-          onChange={(ereignis) =>
-            onChange({ ...entwurf, q: ereignis.target.value })
-          }
+          label={t("jobs.searchTerm")}
+          placeholder={t("jobs.searchTermExample")}
+          value={filter.q}
+          onChange={(event) => onChange({ ...filter, q: event.target.value })}
         />
 
-        {/*
-          Ohne Hilfetext unter dem Feld: der Platzhalter („Python, Kubernetes")
-          sagt dasselbe kürzer, und drei Zeilen Erklärung unter einem von sechs
-          Feldern machen aus einer Filterleiste eine Anleitung.
-        */}
         <TextField
-          label={t("stellen.faehigkeiten")}
-          placeholder={t("stellen.faehigkeitenBeispiel")}
-          value={entwurf.skills}
-          onChange={(ereignis) =>
-            onChange({ ...entwurf, skills: ereignis.target.value })
-          }
+          label={t("jobs.skills")}
+          // No helper text below the field: the placeholder says the same thing
+          // shorter, and three lines under one of six fields turn a filter bar
+          // into a manual.
+          placeholder={t("jobs.skillsExample")}
+          value={filter.skills}
+          onChange={(event) => onChange({ ...filter, skills: event.target.value })}
         />
 
         <TextField
           select
-          label={t("stellen.arbeitsform")}
-          value={entwurf.remote}
-          onChange={(ereignis) => {
-            const gewaehlt = ereignis.target.value as RemoteMode | "";
+          label={t("jobs.workMode")}
+          value={filter.remote}
+          onChange={(event) => {
+            const chosen = event.target.value as RemoteMode | "";
 
-            // Der Radius geht MIT, wenn „vollständig remote" gewählt wird.
-            // Bliebe er stehen, zählte er unten als aktiver Filter und wäre
-            // keiner — und er käme beim Zurückschalten unbemerkt wieder.
+            // The radius goes WITH it when "fully remote" is chosen. If it
+            // stayed, it would count below as an active filter and be none —
+            // and it would come back unnoticed when switching back.
             onChange({
-              ...entwurf,
-              remote: gewaehlt,
-              radius: gewaehlt === "full" ? "" : entwurf.radius,
+              ...filter,
+              remote: chosen,
+              radius: chosen === "full" ? "" : filter.radius,
             });
           }}
         >
-          <MenuItem value="">{t("stellen.egal")}</MenuItem>
-          {REMOTE_MODES.map((wert) => (
-            <MenuItem key={wert} value={wert}>
-              {remoteLabel(wert)}
+          <MenuItem value="">{t("jobs.any")}</MenuItem>
+          {REMOTE_MODES.map((value) => (
+            <MenuItem key={value} value={value}>
+              {remoteLabel(value)}
             </MenuItem>
           ))}
         </TextField>
 
         <TextField
           select
-          label={t("stellen.beschaeftigungsart")}
-          value={entwurf.employment}
-          onChange={(ereignis) =>
+          label={t("jobs.employmentType")}
+          value={filter.employment}
+          onChange={(event) =>
             onChange({
-              ...entwurf,
-              employment: ereignis.target.value as EmploymentType | "",
+              ...filter,
+              employment: event.target.value as EmploymentType | "",
             })
           }
         >
-          <MenuItem value="">{t("stellen.egal")}</MenuItem>
-          {EMPLOYMENT_TYPES.map((wert) => (
-            <MenuItem key={wert} value={wert}>
-              {employmentLabel(wert)}
+          <MenuItem value="">{t("jobs.any")}</MenuItem>
+          {EMPLOYMENT_TYPES.map((value) => (
+            <MenuItem key={value} value={value}>
+              {employmentLabel(value)}
             </MenuItem>
           ))}
         </TextField>
 
-        {/*
-          ORT UND ENTFERNUNG SIND EINE GRUPPE, und sie steht am Ende.
-
-          Vorher stand der Ort zwischen Fähigkeiten und Arbeitsform — also
-          getrennt von dem einen Feld, mit dem er zusammen gelesen wird. Beide
-          beantworten dieselbe Frage („wo?"), nur auf zwei Arten: als Name und
-          als Umkreis. Der engere Abstand innerhalb der Gruppe zeigt das, ohne
-          dass eine Überschrift es sagen muss.
-        */}
-        <Box sx={{ display: "grid", gap: 1.25 }}>
+        <Box
+          // PLACE AND DISTANCE ARE ONE GROUP, and it stands last: both answer
+          // the same question ("where?"), as a name and as a radius. The tighter
+          // gap inside the group shows that without a heading having to say it.
+          sx={{ display: "grid", gap: 1.25 }}
+        >
           <TextField
-            label={t("stellen.ort")}
-            value={entwurf.location}
-            onChange={(ereignis) =>
-              onChange({ ...entwurf, location: ereignis.target.value })
-            }
+            label={t("jobs.location")}
+            value={filter.location}
+            onChange={(event) => onChange({ ...filter, location: event.target.value })}
           />
 
-          {nurRemote ? null : (
+          {remoteOnly ? null : (
             <Box>
               <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1 }}>
                 <TextField
                   select
                   sx={{ flexGrow: 1 }}
-                  label={t("stellen.entfernung")}
-                  value={entwurf.radius}
-                  // OHNE Mitte ist dieses Feld tot, und das ist ehrlicher als
-                  // eine Auswahl, die man treffen kann und die dann nichts tut:
-                  // „25 km" ohne Punkt ist keine Frage, die jemand beantworten
-                  // könnte.
-                  disabled={!hatMitte}
-                  onChange={(ereignis) =>
-                    onChange({ ...entwurf, radius: ereignis.target.value })
-                  }
+                  label={t("jobs.distance")}
+                  value={filter.radius}
+                  // WITHOUT a centre this field is dead, and that is more honest
+                  // than a choice one can make and that then does nothing:
+                  // "25 km" without a point is no question anybody could answer.
+                  disabled={!hasCentre}
+                  onChange={(event) => onChange({ ...filter, radius: event.target.value })}
                 >
-                  <MenuItem value="">{t("stellen.egal")}</MenuItem>
-                  {ENTFERNUNGEN.map((km) => (
+                  <MenuItem value="">{t("jobs.any")}</MenuItem>
+                  {DISTANCES_KM.map((km) => (
                     <MenuItem key={km} value={String(km)}>
-                      {t("stellen.kilometer", { km })}
+                      {t("jobs.kilometers", { km })}
                     </MenuItem>
                   ))}
                 </TextField>
 
                 <Tooltip
-                  title={
-                    hatStandort
-                      ? t("stellen.standortVergessen")
-                      : t("stellen.standortHolenHinweis")
-                  }
+                  title={hasPosition ? t("jobs.forgetLocation") : t("jobs.useLocationHint")}
                 >
-                  {/* Der Rahmen ist nötig: ein abgeschalteter Knopf sendet keine
-                  Zeigerereignisse, und der Hinweis erschiene nie — gerade
-                  dann, wenn er am meisten erklärte. */}
-                  <Box component="span">
+                  <Box
+                    // The wrapper is needed: a disabled button sends no pointer
+                    // events, so the tooltip would never appear — exactly when it
+                    // explains the most.
+                    component="span"
+                  >
                     <IconButton
                       aria-label={
-                        hatStandort
-                          ? t("stellen.standortVergessen")
-                          : t("stellen.standortHolen")
+                        hasPosition ? t("jobs.forgetLocation") : t("jobs.useLocation")
                       }
-                      color={hatStandort ? "primary" : "default"}
-                      disabled={!ortung.moeglich || ortung.laedt}
+                      color={hasPosition ? "primary" : "default"}
+                      disabled={!geolocation.supported || geolocation.loading}
                       onClick={() => {
-                        if (!hatStandort) {
-                          ortung.frage();
+                        if (!hasPosition) {
+                          geolocation.request();
                           return;
                         }
 
-                        // Der Standort geht, und die Entfernung geht mit. Ein
-                        // stehengebliebenes „25 km" ohne Punkt sähe wie ein aktiver
-                        // Filter aus und wäre keiner.
-                        ortung.vergiss();
-                        onChange({ ...entwurf, radius: "" });
+                        // The location goes, and the distance goes with it. A
+                        // "25 km" left standing without a point would look like
+                        // an active filter and be none.
+                        geolocation.forget();
+                        onChange({ ...filter, radius: "" });
                       }}
                       sx={{ mb: 0.25 }}
                     >
-                      {ortung.laedt ? (
-                        <CircularProgress size={20} />
-                      ) : (
-                        <MyLocationIcon />
-                      )}
+                      {geolocation.loading ? <CircularProgress size={20} /> : <MyLocationIcon />}
                     </IconButton>
                   </Box>
                 </Tooltip>
               </Box>
 
-              {/*
-              NUR wenn es etwas zu sagen gibt.
-
-              Hier stand vorher IMMER ein Satz, im Ruhezustand „Auf Knopfdruck —
-              dein Browser fragt dich". Das erklärte ein Knopfsymbol, das sich
-              selbst erklärt, und kostete drei Zeilen in einer Leiste mit sechs
-              Feldern. Was der Knopf tut und dass die Position gerundet wird,
-              steht jetzt in seinem Hinweisfähnchen — abrufbar statt dauernd da.
-
-              Ein Fehlschlag und die Bestätigung bleiben: der eine ist die
-              Antwort auf eine Handlung, die andere die Zusage, die diesen Knopf
-              vertretbar macht.
-            */}
-              {hinweis === null ? null : (
-                <FormHelperText error={ortung.fehler !== null} sx={{ mx: 0 }}>
-                  {hinweis}
+              {hint === null ? null : (
+                <FormHelperText error={geolocation.error !== null} sx={{ mx: 0 }}>
+                  {hint}
                 </FormHelperText>
               )}
             </Box>
@@ -358,7 +323,7 @@ export function JobFilterSidebar({
         </Box>
 
         <Button type="submit" variant="contained" fullWidth>
-          {t("stellen.suchen")}
+          {t("jobs.search")}
         </Button>
       </Box>
     </Paper>

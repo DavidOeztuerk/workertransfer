@@ -1,21 +1,20 @@
 /**
- * Die Farbwelt — eine Quelle, aus der Theme und Komponenten lesen.
+ * The colour world — one source that the theme and the components read from.
  *
- * Weg von Grün/Weiß, und nicht aus Geschmack: Grün ist auf einer Plattform,
- * die über Freigaben entscheidet, ein Signal ("erlaubt") und darf deshalb nicht
- * gleichzeitig die Hausfarbe sein. Wer beides mischt, nimmt dem Signal seine
- * Bedeutung.
+ * Away from green/white, and not out of taste: on a platform that decides
+ * about releases, green is a signal ("allowed") and must therefore not also be
+ * the house colour. Whoever mixes the two takes the signal's meaning away.
  *
- * Träger ist ein tiefes Indigo: ruhig, ernst, im Unternehmenskontext lesbar —
- * und weit genug vom generischen SaaS-Blau entfernt, dass die Oberfläche eine
- * eigene Handschrift bekommt. Der Akzent ist Bernstein, warm und sparsam
- * eingesetzt: er gehört der EINEN Handlung, die auf einer Seite zählt.
+ * The carrier is a deep indigo: calm, serious, readable in a company context —
+ * and far enough from generic SaaS blue that the UI gets a hand of its own.
+ * The accent is amber, warm and used sparingly: it belongs to the ONE action
+ * that counts on a page.
  *
- * Grün, Rot und Bernstein bleiben dadurch frei für ihre eigentliche Aufgabe:
- * erteilt, zurückgezogen, in Arbeit.
+ * Green, red and amber thereby stay free for their actual job: granted,
+ * revoked, in progress.
  */
 
-/** Der Träger. 500 ist die Hausfarbe, 600 der Ruhezustand einer Fläche. */
+/** The carrier. 500 is the house colour, 600 the resting state of a surface. */
 export const brand = {
   50: "#eef1ff",
   100: "#e0e5ff",
@@ -30,7 +29,7 @@ export const brand = {
   950: "#221b4c",
 } as const;
 
-/** Der Akzent. Sparsam: er markiert die eine Handlung, die zählt. */
+/** The accent. Sparingly: it marks the one action that counts. */
 export const accent = {
   50: "#fff8ea",
   100: "#ffeec5",
@@ -46,8 +45,8 @@ export const accent = {
 } as const;
 
 /**
- * Die Neutralen — Schiefer mit kühlem Stich, damit sie neben dem Indigo nicht
- * schmutzig wirken. Fast die ganze Oberfläche besteht aus diesen Werten.
+ * The neutrals — slate with a cool tint so that they do not look dirty beside
+ * the indigo. Almost the whole UI consists of these values.
  */
 export const neutral = {
   0: "#ffffff",
@@ -65,8 +64,8 @@ export const neutral = {
 } as const;
 
 /**
- * Die Bedeutungsfarben. `granted` und `revoked` sind KEINE Dekoration: sie
- * sagen, ob eine Freigabe gilt, und dürfen deshalb nirgends sonst auftauchen.
+ * The meaning colours. `granted` and `revoked` are NOT decoration: they say
+ * whether a release holds, and must therefore appear nowhere else.
  */
 export const semantic = {
   granted: {
@@ -88,20 +87,20 @@ export const semantic = {
 } as const;
 
 /**
- * Die Flächen — eine LEITER, kein Paar.
+ * The surfaces — a LADDER, not a pair.
  *
- * <strong>Im Dunkelmodus trägt die Fläche die Tiefe, nicht der Schatten.</strong>
- * Ein Schatten auf dunklem Grund liest sich als Rahmen, nicht als Höhe; das ist
- * der Grund, warum invertierte Themes flach wirken. Stattdessen wird jede
- * Ebene ein paar Prozent heller als ihre Mutter — `canvas` → `surface` →
- * `raised` → `overlay`. Genau so bauen es Linear, Vercel und Radix.
+ * <strong>In dark mode the surface carries depth, not the shadow.</strong> A
+ * shadow on a dark ground reads as a frame, not as height; that is why
+ * inverted themes look flat. Instead every layer becomes a few percent lighter
+ * than its parent — `canvas` → `surface` → `raised` → `overlay`. That is
+ * exactly how Linear, Vercel and Radix build it.
  *
- * <strong>Kein reines Schwarz.</strong> `#000` erzeugt Halation an hellem Text
- * und lässt keine Ebene mehr unter sich zu: der Grund kann nicht dunkler werden
- * als der Grund. Der Boden liegt deshalb bei `#0d0e14`.
+ * <strong>No pure black.</strong> `#000` produces halation around light text
+ * and allows no layer beneath it: the ground cannot become darker than the
+ * ground. The floor therefore lies at `#0d0e14`.
  *
- * `sunken` ist die einzige Ebene, die nach unten geht — für Codeblöcke,
- * Eingabefelder im Ruhezustand und alles, was eingelassen wirken soll.
+ * `sunken` is the only layer that goes down — for code blocks, input fields at
+ * rest and everything that should look inset.
  */
 export const surfaces = {
   light: {
@@ -121,11 +120,11 @@ export const surfaces = {
 } as const;
 
 /**
- * Die Ränder. Drei Stärken reichen, und mehr wären eine Entscheidung, die
- * niemand konsistent trifft.
+ * The borders. Three strengths are enough, and more would be a decision
+ * nobody makes consistently.
  *
- * Im Dunkelmodus tragen sie mehr als im hellen: dort ist der Rand das, was eine
- * Karte von ihrem Grund trennt, weil der Schatten es nicht kann.
+ * In dark mode they carry more than in light: there the border is what
+ * separates a card from its ground, because the shadow cannot.
  */
 export const borders = {
   light: { subtle: "#edeff6", default: neutral[200], strong: neutral[300] },
@@ -133,12 +132,12 @@ export const borders = {
 } as const;
 
 /**
- * Der Fokusring.
+ * The focus ring.
  *
- * Sichtbar und in der Hausfarbe, nicht der blasse Vorgabering des Browsers:
- * wer mit der Tastatur navigiert, muss auf einen Blick sehen, wo er steht.
- * Zwei Lagen — ein deckender Kern und ein weicher Hof —, damit er auf hellem
- * wie auf dunklem Grund trägt.
+ * Visible and in the house colour, not the browser's pale default ring:
+ * whoever navigates with the keyboard must see at a glance where they are. Two
+ * layers — an opaque core and a soft halo — so that it carries on a light as
+ * well as on a dark ground.
  */
 export const focusRing = {
   light: `0 0 0 2px ${neutral[0]}, 0 0 0 4px rgb(107 94 242 / 0.45)`,
@@ -146,11 +145,11 @@ export const focusRing = {
 } as const;
 
 /**
- * Verläufe — sparsam, und nie hinter Text, den man lesen muss.
+ * Gradients — sparingly, and never behind text that has to be read.
  *
- * Genau zwei: einer für die Kopfzone der Marketingseite, einer als dünner
- * Streifen über der Kopfleiste. Ein Verlauf ist Dekoration; drei davon sind
- * eine Behauptung über Wichtigkeit, die niemand eingelöst hat.
+ * Exactly two: one for the hero zone of the marketing page, one as a thin
+ * stripe above the header bar. A gradient is decoration; three of them are a
+ * claim about importance that nobody has redeemed.
  */
 export const gradients = {
   brandSoft: `linear-gradient(135deg, ${brand[500]} 0%, ${brand[700]} 55%, ${accent[600]} 140%)`,

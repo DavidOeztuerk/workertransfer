@@ -5,25 +5,26 @@ import { PROFILE_VISIBILITY, type ConsentResult, isGranted, setGranted } from ".
 import { i18n } from "../../../core/i18n/i18n";
 
 /**
- * profile-service und der Consent-Ledger — zwei Dienste, weil es zwei
- * Wahrheiten sind.
+ * profile-service and the consent ledger — two services, because they are two
+ * truths.
  *
- * Was im Profil steht, gehört profile-service; ob es jemand sehen darf, gehört
- * dem Ledger (ADR-0013). Die Oberfläche zeigt beides nebeneinander, aber sie
- * schreibt an zwei Stellen — und ein Schalter, der nur den Ledger anfasst, ist
- * genau richtig so. Es gibt <strong>kein</strong> Sichtbarkeitsfeld im Profil
- * (ADR-0020); eines wäre eine zweite Wahrheit, und der Client setzte sie.
+ * What stands in the profile belongs to profile-service; whether anybody may
+ * see it belongs to the ledger (ADR-0013). The UI shows both side by side, but
+ * it writes in two places — and a switch that touches only the ledger is
+ * exactly right that way. There is <strong>no</strong> visibility field in the
+ * profile (ADR-0020); one would be a second truth, and the client would set it.
  */
 /**
- * Wie weit jemand zu pendeln bereit ist — eine STUFE, keine Zahl (ADR-0041).
+ * How far somebody is willing to commute — a STEP, not a number (ADR-0041).
  *
- * `null` heisst „nichts gesagt" und ist ein gültiger Zustand: ein Profil ohne
- * diese Angabe ist vollständig. Im Scout wird daraus ein Strich, nie ein Kreuz.
+ * The members are wire words and stay as they are. `null` means "said nothing"
+ * and is a valid state: a profile without this statement is complete. In the
+ * scout it becomes a dash, never a cross.
  */
-export type Pendelstufe = "bis_10" | "bis_25" | "bis_50" | "bis_100" | "egal";
+export type CommuteReadiness = "bis_10" | "bis_25" | "bis_50" | "bis_100" | "egal";
 
-/** Ob jemand umziehen würde. `offen` ist die ehrlichste Antwort und kein Mangel. */
-export type Umzugsbereitschaft = "ja" | "nein" | "offen";
+/** Whether somebody would relocate. `offen` is the most honest answer and no defect. */
+export type RelocationReadiness = "ja" | "nein" | "offen";
 
 export interface Profile {
   subject_id: string;
@@ -32,9 +33,9 @@ export interface Profile {
   location: string;
   remote_ok: boolean;
   skills: string[];
-  /** `null` heisst „nichts gesagt" — ein Zustand, kein Versäumnis (ADR-0041). */
-  commute_km: Pendelstufe | null;
-  relocation: Umzugsbereitschaft | null;
+  /** `null` means "said nothing" — a state, not an omission (ADR-0041). */
+  commute_km: CommuteReadiness | null;
+  relocation: RelocationReadiness | null;
   updated_at: string;
 }
 
@@ -44,17 +45,17 @@ export interface ProfileInput {
   location: string;
   remote_ok: boolean;
   skills: string[];
-  commute_km: Pendelstufe | null;
-  relocation: Umzugsbereitschaft | null;
+  commute_km: CommuteReadiness | null;
+  relocation: RelocationReadiness | null;
 }
 
 /**
- * „Noch keins angelegt" und „nicht ladbar" sind verschiedene Antworten.
+ * "None created yet" and "not loadable" are different answers.
  *
- * Der alte Client gab bei <em>jedem</em> Nicht-2xx `null` zurück, und `null`
- * heisst dort „noch keins". Die Seite zeigte dann ein leeres Formular über einer
- * gescheiterten Abfrage — wer darin etwas tippte und speicherte, überschrieb
- * Überschrift, Text, Ort und Fähigkeiten mit leer.
+ * The old client returned `null` on <em>every</em> non-2xx, and `null` means
+ * "none yet" there. The page then showed an empty form over a failed request —
+ * whoever typed something into it and saved overwrote headline, text, location
+ * and skills with empty.
  */
 export type ProfileLoad = { ok: true; profile: Profile | null } | { ok: false; error: ApiError };
 
@@ -65,11 +66,10 @@ export async function getMyProfile(signal?: AbortSignal): Promise<ProfileLoad> {
     PROFILE_BASE_URL,
     "/profiles/me",
     { signal },
-    "fehler.eigenesProfilNichtGeladen"
+    "errors.ownProfileNotLoaded"
   );
-  // 404 heisst hier „noch keins" — bei der EIGENEN Ressource gibt es die
-  // Doppeldeutigkeit „versteckt oder nicht vorhanden" nicht, die ADR-0020 für
-  // fremde Profile herstellt.
+  // 404 means "none yet" here — for one's OWN resource the ambiguity "hidden
+  // or non-existent" that ADR-0020 creates for foreign profiles does not exist.
   if (!answer.ok) {
     if (answer.error.status === 404) return { ok: true, profile: null };
     return { ok: false, error: answer.error };
@@ -83,39 +83,39 @@ export async function saveMyProfile(input: ProfileInput): Promise<SaveResult> {
     "/profiles/me",
     {
       method: "PUT",
-      // Genau die fünf Felder des Vertrags, in der Schreibweise des Drahtes.
-      // `remote_ok` und nicht `remoteOk`: an genau dieser Stelle ging das
-      // Häkchen „Remote möglich" einmal still verloren.
+      // Exactly the contract's fields, in the wire's spelling. `remote_ok` and
+      // not `remoteOk`: at exactly this spot the "remote possible" tick was
+      // once silently lost.
       body: {
         headline: input.headline,
         bio: input.bio,
         location: input.location,
         remote_ok: input.remote_ok,
         skills: input.skills,
-        // `null` wird MITGESCHICKT und nicht weggelassen: es nimmt die Angabe
-        // zurueck. Ein „fehlt heisst: lass wie es war" machte die Ruecknahme
-        // unmoeglich — und eine Aussage, die man nicht zurueckziehen kann, ist
-        // keine freiwillige (ADR-0041).
+        // `null` is SENT and not left out: it takes the statement back. A
+        // "missing means: leave it as it was" would make taking it back
+        // impossible — and a statement that cannot be withdrawn is not a
+        // voluntary one (ADR-0041).
         commute_km: input.commute_km,
         relocation: input.relocation,
       },
     },
-    "fehler.profilNichtGespeichert"
+    "errors.profileNotSaved"
   );
   if (!answer.ok) return { ok: false, error: answer.error };
   return { ok: true, profile: answer.value };
 }
 
 /**
- * Ein Entwurf für den EIGENEN Profiltext (ADR-0024).
+ * A draft for one's OWN profile text (ADR-0024).
  *
- * Der Text geht an einen fremden Anbieter — das steht an dem Knopf, der das
- * auslöst, und nicht in einer Datenschutzerklärung. Gespeichert wird nichts:
- * der Entwurf lebt im Formular, bis die Person selbst speichert.
+ * The text goes to a third-party provider — that stands at the button that
+ * triggers it, not in a privacy policy. Nothing is stored: the draft lives in
+ * the form until the person saves it themselves.
  *
- * Mitgeschickt wird nur ihr Wunsch. Der Zusammenhang (Überschrift, Text,
- * Fähigkeiten) kommt serverseitig aus dem gespeicherten Profil — was der Client
- * nicht senden kann, kann er nicht in einen fremden Dienst schleusen.
+ * Only their wish is sent. The context (headline, text, skills) comes from the
+ * stored profile on the server — what the client cannot send, it cannot
+ * smuggle into a foreign service.
  */
 export type DraftResult =
   | { ok: true; draft: string }
@@ -126,27 +126,26 @@ export async function draftProfileText(wish: string): Promise<DraftResult> {
     PROFILE_BASE_URL,
     "/profiles/me/draft",
     { method: "POST", body: { wish } },
-    "fehler.entwurfNichtVerfuegbar"
+    "errors.draftHelpUnavailable"
   );
   if (!answer.ok) {
-    // ÜBERSETZT, nicht durchgereicht. `message` ist hier ein fertiger Satz für
-    // die Oberfläche und kein Schlüssel — anders als in den `deuten`-Tabellen,
-    // die `deuten()` selbst auflöst. Der Unterschied ist einmal übersehen
-    // worden, und dann stand `fehler.entwurfNichtVerfuegbarLang` wörtlich im
-    // Warnkasten: i18next gibt einen Schlüssel unverändert zurück, wenn ihn
-    // niemand nachschlägt.
+    // TRANSLATED, not passed through. `message` is a finished sentence for the
+    // UI here and not a key — unlike in the `interpretError` tables, which
+    // `interpretError()` resolves itself. The difference was overlooked once,
+    // and then `errors.draftHelpUnavailableLong` stood verbatim in the warning
+    // box: i18next hands a key back unchanged when nobody looks it up.
     if (answer.error.status === 401) {
-      return { ok: false, message: i18n.t("fehler.sitzungAbgelaufenLang") };
+      return { ok: false, message: i18n.t("errors.sessionExpiredLong") };
     }
-    // 503 heisst „nicht eingerichtet ODER Anbieter still" — von aussen dasselbe,
-    // und beides heisst „später noch einmal", nicht „falsch gemacht". Gemeldet
-    // wird die Art des Fehlschlags, nie der Inhalt.
-    return { ok: false, message: i18n.t("fehler.entwurfNichtVerfuegbarLang") };
+    // 503 means "not configured OR provider silent" — the same from outside,
+    // and both mean "try again later", not "done wrong". What is reported is
+    // the kind of failure, never the content.
+    return { ok: false, message: i18n.t("errors.draftHelpUnavailableLong") };
   }
   return { ok: true, draft: answer.value?.draft ?? "" };
 }
 
-/** `null` heisst: der Ledger hat nicht geantwortet (siehe `isGranted`). */
+/** `null` means: the ledger did not answer (see `isGranted`). */
 export function getVisibility(subjectId: string, signal?: AbortSignal): Promise<boolean | null> {
   return isGranted(subjectId, PROFILE_VISIBILITY, signal);
 }
@@ -156,6 +155,6 @@ export function setVisibility(subjectId: string, granted: boolean): Promise<Cons
     subjectId,
     PROFILE_VISIBILITY,
     granted,
-    i18n.t("fehler.widerrufProfilEinstellungen")
+    i18n.t("errors.revokedInProfileSettings")
   );
 }

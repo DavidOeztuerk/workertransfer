@@ -8,26 +8,26 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { useTranslation } from "react-i18next";
 
-/** Die Grössen, die zur Wahl stehen. Zwölf ist die Vorgabe. */
-export const SEITENGROESSEN = [12, 24, 48, 96] as const;
+/** The sizes on offer. Twelve is the default. */
+export const PAGE_SIZES = [12, 24, 48, 96] as const;
 
 /**
- * Die Blätterleiste: wo man ist, wie viele es sind, und wie viele pro Seite.
+ * The pagination bar: where you are, how many there are, and how many per page.
  *
- * <strong>Der Bereich steht links und nicht als „Seite 3 von 9".</strong>
- * „25–36 von 104" beantwortet zwei Fragen auf einmal — wo bin ich, und wie viel
- * kommt noch. Die Seitenzahl allein beantwortet keine davon, solange man die
- * Seitengrösse nicht im Kopf hat.
+ * <strong>The range stands on the left and not as "page 3 of 9".</strong>
+ * "25–36 of 104" answers two questions at once — where am I, and how much is
+ * still to come. The page number alone answers neither as long as one does not
+ * have the page size in mind.
  *
- * <strong>Sie verschwindet nicht bei einer Seite.</strong> Die Wahl der
- * Seitengrösse bleibt sichtbar, denn genau dann will jemand sie vielleicht
- * verkleinern; nur die Nummernleiste selbst geht weg, weil sie nichts anbietet.
+ * <strong>It does not vanish at one page.</strong> The choice of the page size
+ * stays visible, because exactly then somebody may want to make it smaller;
+ * only the number bar itself goes, because it offers nothing.
  *
- * <strong>Zwei Gruppen, nicht drei Dinge nebeneinander.</strong> Links steht,
- * WO man ist — der Bereich und die Nummern gehören zusammen und werden auch so
- * gelesen. Rechts steht, WIE VIEL auf eine Seite kommt. Vorher trieb ein
- * <c>space-between</c> den Bereich ganz nach links, die Nummern in die Mitte
- * und die Grösse nach rechts: drei Inseln, deren Zusammenhang niemand sieht.
+ * <strong>Two groups, not three things side by side.</strong> On the left
+ * stands WHERE you are — the range and the numbers belong together and are read
+ * that way. On the right stands HOW MUCH goes on a page. Before, a
+ * <c>space-between</c> drove the range fully left, the numbers into the middle
+ * and the size to the right: three islands whose connection nobody sees.
  */
 export function PaginationControls({
   page,
@@ -46,45 +46,46 @@ export function PaginationControls({
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const schmal = useMediaQuery(theme.breakpoints.down("sm"));
-  const groessenFeld = useId();
+  const narrow = useMediaQuery(theme.breakpoints.down("sm"));
+  const sizeFieldId = useId();
 
-  // NICHTS ZU BLAETTERN, ALSO KEINE LEISTE.
+  // NOTHING TO PAGE, SO NO BAR.
   //
-  // Vorher stand hier „Nichts gefunden" — und daneben sagte der Leerblock
-  // „Dazu wurde nichts gefunden." Zweimal dieselbe Auskunft untereinander, und
-  // die E2E-Reise fiel darueber: zwei Treffer auf denselben Text. Der Leerblock
-  // sagt es besser (er bietet auch gleich einen Ausweg an), also schweigt die
-  // Leiste. Zu sortieren gibt es hier ohnehin nichts.
+  // "Nothing found" used to stand here — and beside it the empty block said
+  // "Nothing was found for that." The same information twice, one below the
+  // other, and the E2E journey tripped over it: two hits on the same text. The
+  // empty block says it better (it also offers a way out), so the bar stays
+  // silent. There is nothing to sort here anyway.
   if (totalItems === 0) {
     return null;
   }
 
-  const von = (page - 1) * pageSize + 1;
-  const bis = Math.min(page * pageSize, totalItems);
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, totalItems);
 
   return (
     <Box
       sx={{
         display: "flex",
         flexDirection: { xs: "column", sm: "row" },
-        // `flex-start` und NICHT `stretch`: gestreckt füllt jede Gruppe die
-        // ganze Breite, und ihr `space-between` riss dann „Pro Seite" und das
-        // Feld an die gegenüberliegenden Ränder — zwei Dinge, die zusammen
-        // gehören, so weit auseinander wie möglich.
+        // `flex-start` and NOT `stretch`: stretched, every group fills the
+        // whole width, and its `space-between` then tore "per page" and the
+        // field to opposite edges — two things that belong together, as far
+        // apart as possible.
         alignItems: { xs: "flex-start", sm: "center" },
         justifyContent: "space-between",
         gap: { xs: 1.5, sm: 2 },
-        // Enger als vorher (mt 4 / pt 3). Die Leiste ist eine Fusszeile der
-        // Liste, kein eigener Abschnitt — sie soll an ihr hängen.
+        // Tighter than before (mt 4 / pt 3). The bar is a footer of the list,
+        // not a section of its own — it should hang on to it.
         mt: 3,
         pt: 2,
         borderTop: 1,
         borderColor: "divider",
       }}
     >
-      {/* LINKS: wo man ist. Bereich und Nummern sind EINE Aussage. */}
       <Box
+        // LEFT: where you are. Range and numbers are ONE statement, so they
+        // share a box.
         sx={{
           display: "flex",
           alignItems: "center",
@@ -98,39 +99,31 @@ export function PaginationControls({
           role="status"
           sx={{ whiteSpace: "nowrap" }}
         >
-          {t("blaettern.bereich", { von, bis, gesamt: totalItems })}
+          {/* `von`, `bis`, `gesamt` are the catalogue's placeholder names. */}
+          {t("pagination.range", { von: first, bis: last, gesamt: totalItems })}
         </Typography>
 
         {totalPages > 1 ? (
           <Pagination
             count={totalPages}
             page={page}
-            onChange={(_event, ziel) => onPage(ziel)}
-            // Auf schmalen Bildschirmen nur die Nachbarn: sonst bricht die
-            // Leiste um und schiebt den Inhalt weg.
-            siblingCount={schmal ? 0 : 1}
-            boundaryCount={schmal ? 1 : 2}
-            size={schmal ? "small" : "medium"}
-            getItemAriaLabel={(typ, seite) =>
-              typ === "previous"
-                ? t("blaettern.vorige")
-                : typ === "next"
-                  ? t("blaettern.naechste")
-                  : t("blaettern.seite", { nummer: seite })
+            onChange={(_event, target) => onPage(target)}
+            // On narrow screens only the neighbours: otherwise the bar wraps
+            // and pushes the content away.
+            siblingCount={narrow ? 0 : 1}
+            boundaryCount={narrow ? 1 : 2}
+            size={narrow ? "small" : "medium"}
+            getItemAriaLabel={(type, pageNumber) =>
+              type === "previous"
+                ? t("pagination.previous")
+                : type === "next"
+                  ? t("pagination.next")
+                  : t("pagination.page", { nummer: pageNumber })
             }
           />
         ) : null}
       </Box>
 
-      {/*
-        RECHTS: wie viel auf eine Seite kommt — Beschriftung NEBEN dem Feld.
-
-        Die Beschriftung steht als eigenes `label` daneben und nicht als
-        `label`-Eigenschaft am Feld: die Oberfläche setzt Feldbeschriftungen
-        grundsätzlich ÜBER das Feld (siehe `MuiInputLabel` im Thema), und hier
-        wäre das eine zweizeilige Insel neben einer einzeiligen Leiste. Über
-        `htmlFor` bleibt es trotzdem eine echte Beschriftung.
-      */}
       <Box
         sx={{
           display: "flex",
@@ -140,26 +133,31 @@ export function PaginationControls({
         }}
       >
         <Typography
+          // RIGHT: how much fits on a page — the label stands BESIDE the field
+          // as its own `label` and not as the field's `label` property: this UI
+          // puts field labels ABOVE the field (see `MuiInputLabel` in the
+          // theme), which here would be a two-line island next to a one-line
+          // bar. `htmlFor` keeps it a real label.
           component="label"
-          htmlFor={groessenFeld}
+          htmlFor={sizeFieldId}
           variant="body2"
           color="text.secondary"
           sx={{ whiteSpace: "nowrap" }}
         >
-          {t("blaettern.proSeite")}
+          {t("pagination.perPage")}
         </Typography>
 
         <TextField
           select
           size="small"
-          id={groessenFeld}
+          id={sizeFieldId}
           value={String(pageSize)}
-          onChange={(ereignis) => onPageSize(Number(ereignis.target.value))}
+          onChange={(event) => onPageSize(Number(event.target.value))}
           sx={{ width: 88, flexShrink: 0 }}
         >
-          {SEITENGROESSEN.map((groesse) => (
-            <MenuItem key={groesse} value={groesse}>
-              {groesse}
+          {PAGE_SIZES.map((size) => (
+            <MenuItem key={size} value={size}>
+              {size}
             </MenuItem>
           ))}
         </TextField>

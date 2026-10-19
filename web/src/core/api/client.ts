@@ -1,62 +1,62 @@
 import type { ApiError } from "../store/thunkHelpers";
 import { i18n } from "../i18n/i18n";
-import type { Fehlerschluessel } from "../../shared/api/fehler";
-import { brauchtKeineErneuerung, erneuereEinmal } from "./refreshGate";
+import type { ErrorKey } from "../../shared/api/errors";
+import { skipsRefresh, refreshOnce } from "./refreshGate";
 
 /**
- * Der eine Weg nach draussen.
+ * The one way out.
  *
- * `fetch` und nicht axios: die Dienste antworten in einer Gestalt (RFC 9457),
- * die Sitzung hängt an einem httpOnly-Cookie, und mehr braucht es hier nicht.
- * Eine Bibliothek dazwischen würde vor allem eine zweite Fehlergestalt
- * mitbringen — und zwei Gestalten für "was ging schief" sind genau die
- * Abweichung, die später in der Oberfläche zugekleistert wird.
+ * `fetch` and not axios: the services answer in one shape (RFC 9457), the
+ * session hangs on an httpOnly cookie, and nothing more is needed here. A
+ * library in between would mainly bring a second error shape — and two shapes
+ * for "what went wrong" are exactly the divergence that later gets papered
+ * over in the UI.
  *
- * `credentials: "include"` steht an EINER Stelle. Der Browser sieht das
- * Zugriffstoken nie (es ist httpOnly) und kann es nur als Cookie zurückgeben;
- * wer den Aufruf ohne diese Zeile schreibt, bekommt ein 401, das nach einer
- * abgelaufenen Sitzung aussieht und keines ist.
+ * `credentials: "include"` stands in ONE place. The browser never sees the
+ * access token (it is httpOnly) and can only return it as a cookie; whoever
+ * writes the call without this line gets a 401 that looks like an expired
+ * session and is not one.
  */
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
   /**
-   * Kein 401→Refresh. Für den Refresh selbst und für Auth-Pfade, deren 401
-   * die fachliche Absage ist (falsches Passwort, toter Refresh).
+   * No 401→refresh. For the refresh itself and for auth paths whose 401 is
+   * the actual refusal (wrong password, dead refresh).
    */
-  ohneErneuerung?: boolean;
+  skipRefresh?: boolean;
 }
 
-/** Was der Aufrufer bekommt: die Antwort ODER die Aussage, was fehlte. */
+/** What the caller gets: the answer OR the statement of what was missing. */
 export type ApiResult<T> = { ok: true; value: T } | { ok: false; error: ApiError };
 
 /**
- * Der Netzfehler als FUNKTION und nicht als Konstante: ein `const` entstünde
- * beim Laden des Moduls, also bevor jemand eine Sprache wählen konnte.
+ * The network error as a FUNCTION and not as a constant: a `const` would be
+ * built when the module loads, i.e. before anybody could choose a language.
  */
-function netzfehler(): ApiError {
+function networkError(): ApiError {
   return {
     status: 0,
-    title: i18n.t("fehler.keineVerbindungKurz"),
-    detail: i18n.t("fehler.dienstNichtErreichbar"),
+    title: i18n.t("errors.noConnectionShort"),
+    detail: i18n.t("errors.serviceUnreachable"),
   };
 }
 
 /**
- * Liest ein Problemdokument aus, ohne ihm zu vertrauen.
+ * Reads a problem document without trusting it.
  *
- * Ein Dienst kann auch mit einem leeren Rumpf oder mit HTML antworten (etwa ein
- * Proxy dazwischen). Dann steht hier ein brauchbarer Satz statt eines
- * Parserfehlers, der in der Oberfläche als weisse Seite ankäme.
+ * A service may also answer with an empty body or with HTML (a proxy in
+ * between, say). Then a usable sentence stands here instead of a parser error
+ * that would reach the UI as a white page.
  */
 async function problem(
   response: Response,
-  fallbackSchluessel: Fehlerschluessel
+  fallbackKey: ErrorKey
 ): Promise<ApiError> {
-  // Übersetzt bei der ANTWORT, nicht beim Aufbau der Aufrufstelle: die
-  // Vorgabewerte stehen in Signaturen und entstünden beim Laden des Moduls.
-  const fallback = i18n.t(fallbackSchluessel);
+  // Translated at the ANSWER, not when the call site is built: the defaults
+  // stand in signatures and would be evaluated when the module loads.
+  const fallback = i18n.t(fallbackKey);
   try {
     const body = (await response.json()) as Partial<ApiError> & { detail?: string };
     return {
@@ -74,8 +74,8 @@ type SessionExpiredHandler = () => void;
 const expiredHandlers = new Set<SessionExpiredHandler>();
 
 /**
- * Registriert einen Listener, der gerufen wird, wenn eine Sitzung abgelaufen
- * ist und nicht mehr erneuert werden konnte (z. B. Docker-Neustart oder toter Refresh).
+ * Registers a listener that is called when a session has expired and could no
+ * longer be renewed (e.g. a Docker restart or a dead refresh).
  */
 export function onSessionExpired(handler: SessionExpiredHandler): () => void {
   expiredHandlers.add(handler);
@@ -89,29 +89,29 @@ export function notifySessionExpired(): void {
     try {
       handler();
     } catch {
-      // Fehler im Handler dürfen den HTTP-Fluss nicht brechen
+      // An error in a handler must not break the HTTP flow.
     }
   }
 }
 
-/** Ein Aufruf. Wirft nicht — ein Statuscode ist eine Antwort, keine Störung. */
+/** One call. Never throws — a status code is an answer, not a fault. */
 export async function request<T>(
   baseUrl: string,
   path: string,
   options: RequestOptions = {},
-  fallbackMessage: Fehlerschluessel = "fehler.anfrageFehlgeschlagen"
+  fallbackMessage: ErrorKey = "errors.requestFailed"
 ): Promise<ApiResult<T>> {
-  return senden(baseUrl, path, options, fallbackMessage, false);
+  return send(baseUrl, path, options, fallbackMessage, false);
 }
 
-async function senden<T>(
+async function send<T>(
   baseUrl: string,
   path: string,
   options: RequestOptions,
-  fallbackMessage: Fehlerschluessel,
-  schonErneuert: boolean
+  fallbackMessage: ErrorKey,
+  alreadyRefreshed: boolean
 ): Promise<ApiResult<T>> {
-  const { method = "GET", body, signal, ohneErneuerung } = options;
+  const { method = "GET", body, signal, skipRefresh } = options;
 
   let response: Response;
   try {
@@ -124,25 +124,25 @@ async function senden<T>(
       body: body === undefined ? undefined : form ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
-    return { ok: false, error: netzfehler() };
+    return { ok: false, error: networkError() };
   }
 
   if (
     response.status === 401 &&
-    !schonErneuert &&
-    ohneErneuerung !== true &&
-    !brauchtKeineErneuerung(path)
+    !alreadyRefreshed &&
+    skipRefresh !== true &&
+    !skipsRefresh(path)
   ) {
-    // Access-JWT tot, Refresh-Cookie vielleicht noch da. Ein Flug, Original
-    // einmal wiederholen. Tokens bleiben im Cookie — kein Bearer, kein Speicher.
-    const erneuert = await erneuereEinmal(baseUrl);
-    if (erneuert) {
-      return senden(baseUrl, path, options, fallbackMessage, true);
+    // Access JWT dead, refresh cookie maybe still there. One flight, repeat the
+    // original once. Tokens stay in the cookie — no bearer, no storage.
+    const refreshed = await refreshOnce(baseUrl);
+    if (refreshed) {
+      return send(baseUrl, path, options, fallbackMessage, true);
     }
-    // Refresh fehlgeschlagen: die Sitzung ist definitiv tot.
+    // Refresh failed: the session is definitely dead.
     notifySessionExpired();
-  } else if (response.status === 401 && schonErneuert) {
-    // Selbst nach erfolgreicher Erneuerung antwortet der Dienst 401.
+  } else if (response.status === 401 && alreadyRefreshed) {
+    // Even after a successful renewal the service answers 401.
     notifySessionExpired();
   }
 
@@ -150,8 +150,8 @@ async function senden<T>(
     return { ok: false, error: await problem(response, fallbackMessage) };
   }
 
-  // 204 und ein leerer Rumpf sind gültige Erfolge und dürfen den Parser nicht
-  // in einen Fehler laufen lassen.
+  // 204 and an empty body are valid successes and must not run the parser
+  // into an error.
   if (response.status === 204 || response.headers.get("content-length") === "0") {
     return { ok: true, value: undefined as T };
   }
@@ -164,8 +164,8 @@ async function senden<T>(
 }
 
 /**
- * Für einen Thunk: gibt den Wert zurück oder wirft den `ApiError` in
- * `rejectWithValue`. Damit steht die Fehlerbehandlung einmal statt je Thunk.
+ * For a thunk: returns the value or throws the `ApiError` into
+ * `rejectWithValue`. That way error handling stands once instead of per thunk.
  */
 export async function unwrap<T>(
   result: Promise<ApiResult<T>>,

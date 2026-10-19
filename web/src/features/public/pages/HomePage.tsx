@@ -13,49 +13,48 @@ import { useAppSelector } from "../../../core/store/hooks";
 import { scale } from "../../../styles/tokens/typography";
 
 /**
- * Die drei Sätze, auf denen die Plattform steht — hier stehen nur ihre
- * Schlüssel, der Wortlaut liegt in den Katalogen.
+ * The three sentences the platform stands on — only their keys stand here, the
+ * wording lies in the catalogues.
  */
-const grundlagen = [1, 2, 3] as const;
+const PRINCIPLES = [1, 2, 3] as const;
 
 /**
- * Die Marketingseite auf `/` — und die Weiterleitung Angemeldeter auf
+ * The marketing page at `/` — and the redirect of the signed-in to
  * `/overview`.
  *
- * <strong>Zwei Adressen, nicht eine.</strong> Vorher bediente `/` beides:
- * abgemeldet die Werbung, angemeldet die Übersicht. Das hielt die Werbung zwar
- * aus dem Weg, gab der Übersicht aber keine eigene Adresse — sie war nicht
- * verlinkbar, und ein Screenshot von `/` zeigte je nach Sitzung etwas anderes.
+ * <strong>Two addresses, not one.</strong> Before, `/` served both: the
+ * advertising signed out, the overview signed in. That kept the advertising out
+ * of the way but gave the overview no address of its own — it was not
+ * linkable, and a screenshot of `/` showed something different depending on
+ * the session.
  *
- * Solange die Sitzung noch unbekannt ist, wird NICHTS gezeichnet. Das ist der
- * Unterschied zwischen einer kurzen leeren Fläche und dem Sprung Werbung →
- * Übersicht, der nach einem Fehler aussieht.
+ * As long as the session is still unknown, NOTHING is drawn. That is the
+ * difference between a short empty area and the jump advertising → overview,
+ * which looks like a defect.
  */
 export function HomePage() {
   const { t } = useTranslation();
   const status = useAppSelector((state) => state.auth.status);
 
-  const heldId = useId();
-  const grundlagenId = useId();
-  const wegId = useId();
+  const heroId = useId();
+  const principlesId = useId();
+  const roadmapId = useId();
 
   if (status === "authenticated") return <Navigate to="/overview" replace />;
   if (status === "unknown") return null;
 
   return (
     <Box>
-      {/* Der Held. Grosszügig, ruhig, EIN Hauptaufruf — das hier ist das Erste,
-          was jemand von dieser Plattform sieht. */}
       <Box
         component="section"
-        aria-labelledby={heldId}
+        aria-labelledby={heroId}
         sx={{
           position: "relative",
           overflow: "hidden",
           borderBottom: 1,
           borderColor: "divider",
-          // Der Verlauf kommt aus der Palette, nicht aus Literalen: eine zweite
-          // Farbquelle läuft beim Dunkelmodus auseinander.
+          // The gradient comes from the palette, not from literals: a second
+          // colour source drifts apart in dark mode.
           background: (theme) =>
             `radial-gradient(1200px 480px at 12% -10%, ${alpha(
               theme.palette.primary.main,
@@ -78,10 +77,10 @@ export function HomePage() {
                 mb: 2,
               }}
             >
-              {t("start.auge")}
+              {t("home.eyebrow")}
             </Typography>
             <Typography
-              id={heldId}
+              id={heroId}
               variant="h1"
               sx={{
                 ...scale.display,
@@ -93,23 +92,15 @@ export function HomePage() {
                 mb: 3,
               }}
             >
-              {t("start.titel")}
+              {t("home.title")}
             </Typography>
             <Typography
               variant="body1"
               color="text.secondary"
               sx={{ fontSize: "1.0625rem", mb: 4 }}
             >
-              {t("start.text")}
+              {t("home.text")}
             </Typography>
-            {/* Beide Wege führen nach /register, und der zweite trägt seine
-                ABSICHT mit: ohne `?as=company` landet jemand, der „Als
-                Unternehmen entdecken" klickt, im Personenformular — und merkt
-                es erst nach der Bestätigungsmail, wenn kein Unternehmen da ist.
-
-                Die Unterscheidung selbst trifft die Registrierung, nicht diese
-                Seite: ein Unternehmen braucht eine BESTÄTIGTE Adresse
-                (ADR-0019), und das Konto wäre hier noch pending. */}
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
               <Button
                 component={RouterLink}
@@ -117,15 +108,21 @@ export function HomePage() {
                 variant="contained"
                 size="large"
               >
-                {t("start.alsPerson")}
+                {t("home.asPerson")}
               </Button>
               <Button
                 component={RouterLink}
+                // Carries the INTENT: without `?as=company` whoever clicks
+                // "discover as a company" lands in the person form and notices
+                // only after the confirmation mail, when no company is there.
+                // The distinction itself is drawn at registration, not here: a
+                // company needs a CONFIRMED address (ADR-0019), and the account
+                // is still pending at this point.
                 to="/register?as=company"
                 variant="outlined"
                 size="large"
               >
-                {t("start.alsUnternehmen")}
+                {t("home.asCompany")}
               </Button>
             </Box>
           </Box>
@@ -133,7 +130,7 @@ export function HomePage() {
       </Box>
 
       <Container maxWidth="lg" sx={{ py: { xs: 7, md: 12 } }}>
-        <Box component="section" aria-labelledby={grundlagenId}>
+        <Box component="section" aria-labelledby={principlesId}>
           <Typography
             variant="body2"
             sx={{
@@ -144,14 +141,14 @@ export function HomePage() {
               mb: 1.5,
             }}
           >
-            {t("start.grundlagenAuge")}
+            {t("home.principlesEyebrow")}
           </Typography>
           <Typography
-            id={grundlagenId}
+            id={principlesId}
             variant="h2"
             sx={{ maxWidth: "26ch", mb: { xs: 4, md: 6 } }}
           >
-            {t("start.grundlagenTitel")}
+            {t("home.principlesTitle")}
           </Typography>
 
           <Box
@@ -161,7 +158,7 @@ export function HomePage() {
               gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
             }}
           >
-            {grundlagen.map((number) => (
+            {PRINCIPLES.map((number) => (
               <Card key={number} sx={{ height: "100%" }}>
                 <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
                   <Typography
@@ -177,10 +174,10 @@ export function HomePage() {
                     0{number}
                   </Typography>
                   <Typography variant="h3" sx={{ mb: 1 }}>
-                    {t(`start.grundlage${number}Titel`)}
+                    {t(`home.principle${number}Title`)}
                   </Typography>
                   <Typography color="text.secondary">
-                    {t(`start.grundlage${number}Text`)}
+                    {t(`home.principle${number}Text`)}
                   </Typography>
                 </CardContent>
               </Card>
@@ -193,7 +190,7 @@ export function HomePage() {
         <Container maxWidth="lg" sx={{ py: { xs: 7, md: 11 } }}>
           <Box
             component="section"
-            aria-labelledby={wegId}
+            aria-labelledby={roadmapId}
             sx={{
               display: "grid",
               gap: { xs: 2.5, md: 6 },
@@ -212,14 +209,14 @@ export function HomePage() {
                   mb: 1.5,
                 }}
               >
-                {t("start.wegAuge")}
+                {t("home.roadmapEyebrow")}
               </Typography>
-              <Typography id={wegId} variant="h2">
-                {t("start.wegTitel")}
+              <Typography id={roadmapId} variant="h2">
+                {t("home.roadmapTitle")}
               </Typography>
             </Box>
             <Typography color="text.secondary" sx={{ maxWidth: "58ch" }}>
-              {t("start.wegText")}
+              {t("home.roadmapText")}
             </Typography>
           </Box>
         </Container>

@@ -15,84 +15,85 @@ import {
   LoadingBlock,
   PageShell,
 } from "../../../shared/components/ui";
+import { failureKey } from "../../../shared/api/errors";
 import { useAsync } from "../lib/useAsync";
 import { getCompanyBySlug } from "../api/companies";
 import { remoteLabel, searchJobs } from "../../work/api/jobs";
-import { starteEntwuerfe } from "../../work/lib/entwuerfe";
-import { useHandelnder } from "../lib/session";
+import { startDrafts } from "../../work/lib/startDrafts";
+import { useActor } from "../lib/session";
 import { Trans, useTranslation } from "react-i18next";
 
 /**
- * <c>/careers/&lt;kürzel&gt;</c> — die öffentliche Seite eines Unternehmens.
+ * <c>/careers/&lt;slug&gt;</c> — a company's public page.
  *
- * <strong>Ohne Konto lesbar</strong>, wie die Stellenliste selbst: eine
- * Ausschreibung, die man nur nach Anmeldung sieht, erreicht genau die nicht, für
- * die sie gedacht ist.
+ * <strong>Readable without an account</strong>, like the job list itself: an
+ * advert one only sees after signing in misses exactly those it is meant for.
  *
- * <strong>„Gerade nicht abrufbar" ist nicht „gibt es nicht".</strong> Beide
- * Fälle stehen hier getrennt und mit eigenem Satz — sonst liest jemand, sein
- * Unternehmen existiere nicht, weil ein Dienst gerade schweigt.
+ * <strong>"Not retrievable right now" is not "does not exist".</strong> Both
+ * cases stand apart here, each with a sentence of its own — otherwise someone
+ * reads that their company does not exist because a service is silent right
+ * now.
  *
- * <strong>„Bewerben" ist ein Knopf und kein Verweis.</strong> Er zeigte auf
- * <c>/jobs/:id/apply</c>, und diese Adresse war zuletzt nur noch eine Weiche:
- * sie legte einen Entwurf an und leitete weiter. Eine Adresse, die keine
- * Ansicht hat, ist ein Zwischenhalt, den niemand sehen soll — und sie trug ein
- * totes Formular mit Freigabekästchen mit sich, das nach ihr niemand mehr
- * erreichte. Der Vorgang steht jetzt in <c>lib/entwuerfe</c>, an EINER Stelle,
- * und dieser Knopf ruft genau denselben wie der auf der Stellenliste.
+ * <strong>"Apply" is a button and not a link.</strong> It pointed at
+ * <c>/jobs/:id/apply</c>, and that address had lately become a mere switch: it
+ * created a draft and redirected. An address without a view is a stopover
+ * nobody is meant to see — and it carried a dead form with release boxes that
+ * nobody reached after it. The operation now stands in
+ * <c>work/lib/startDrafts</c>, in ONE place, and this button calls exactly the
+ * same one as the button on the job list.
  */
 export function CareerPage() {
   const { slug } = useParams();
-  const gesucht = slug ?? "";
+  const requestedSlug = slug ?? "";
 
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { signedIn } = useHandelnder();
-  const [laeuftStelle, setLaeuftStelle] = useState<string | null>(null);
-  const [bewerbungsfehler, setBewerbungsfehler] = useState<string | null>(null);
+  const { signedIn } = useActor();
+  const [runningJobId, setRunningJobId] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
-  async function bewerben(stellenId: string) {
+  async function apply(jobId: string) {
     if (!signedIn) {
       void navigate("/login");
       return;
     }
-    setLaeuftStelle(stellenId);
-    setBewerbungsfehler(null);
+    setRunningJobId(jobId);
+    setApplyError(null);
     try {
-      const start = await starteEntwuerfe([stellenId]);
+      const start = await startDrafts([jobId]);
       if (!start.ok) {
-        setBewerbungsfehler(start.fehler);
+        setApplyError(start.error === null ? null : t(start.error));
         return;
       }
-      const erster = start.drafts[0];
-      if (erster) void navigate(`/applications/drafts/${erster.id}`);
+      const first = start.drafts[0];
+      if (first) void navigate(`/applications/drafts/${first.id}`);
     } finally {
-      setLaeuftStelle(null);
+      setRunningJobId(null);
     }
   }
 
-  const unternehmen = useAsync(
-    (signal) => getCompanyBySlug(gesucht, signal),
-    [gesucht],
-    gesucht !== "",
+  const company = useAsync(
+    (signal) => getCompanyBySlug(requestedSlug, signal),
+    [requestedSlug],
+    requestedSlug !== "",
   );
 
-  const profile = unternehmen.data?.ok ? unternehmen.data.profile : undefined;
+  const profile = company.data?.ok ? company.data.profile : undefined;
   const tenantId = profile?.tenant_id;
 
-  const stellen = useAsync(
+  const jobs = useAsync(
     (signal) =>
       searchJobs({ company: tenantId as string }, 1, 50, signal),
     [tenantId],
     tenantId !== undefined,
   );
 
-  if (unternehmen.pending) {
+  if (company.pending) {
     return (
-      <PageShell title={t("karriere.titel")} narrow>
+      <PageShell title={t("careers.title")} narrow>
         <Card>
           <CardContent>
-            <LoadingBlock label={t("karriere.laden")} />
+            <LoadingBlock label={t("careers.loading")} />
           </CardContent>
         </Card>
       </PageShell>
@@ -100,13 +101,14 @@ export function CareerPage() {
   }
 
   if (
-    unternehmen.data?.ok === false &&
-    unternehmen.data.reason === "unavailable"
+    company.data?.ok === false &&
+    company.data.reason === "unavailable"
   ) {
     return (
-      <PageShell title={t("karriere.titel")} narrow>
+      <PageShell title={t("careers.title")} narrow>
         <Alert severity="warning">
-          {unternehmen.data.error.detail} {t("karriere.nichtAbrufbar")}
+          {t(failureKey(company.data.error, "errors.pageUnavailable"))}{" "}
+          {t("careers.unavailable")}
         </Alert>
       </PageShell>
     );
@@ -114,12 +116,12 @@ export function CareerPage() {
 
   if (profile === undefined) {
     return (
-      <PageShell title={t("karriere.keineFirmaTitel")} narrow>
+      <PageShell title={t("careers.noCompanyTitle")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="karriere.keineFirma"
+                i18nKey="careers.noCompany"
                 components={{ 1: <Link component={RouterLink} to="/jobs" /> }}
               />
             </Typography>
@@ -129,9 +131,9 @@ export function CareerPage() {
     );
   }
 
-  const result = stellen.data;
+  const result = jobs.data;
   const list = result?.ok ? result.items : [];
-  const abrufGescheitert =
+  const fetchFailed =
     result !== null && result !== undefined && !result.ok;
 
   return (
@@ -148,7 +150,7 @@ export function CareerPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h2" sx={{ mb: 1 }}>
-              {t("karriere.ueberUns")}
+              {t("careers.aboutUs")}
             </Typography>
             <Typography>{profile.about}</Typography>
           </CardContent>
@@ -160,16 +162,16 @@ export function CareerPage() {
           <CardContent>
             {profile.locations.length > 0 ? (
               <Typography sx={{ mb: profile.benefits.length > 0 ? 1.5 : 0 }}>
-                {t("karriere.standorte", {
+                {t("careers.locations", {
                   orte: profile.locations.join(", "),
                 })}
               </Typography>
             ) : null}
             {profile.benefits.length > 0 ? (
               <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
-                {profile.benefits.map((vorteil: string) => (
-                  <Typography component="li" key={vorteil}>
-                    {vorteil}
+                {profile.benefits.map((benefit: string) => (
+                  <Typography component="li" key={benefit}>
+                    {benefit}
                   </Typography>
                 ))}
               </Box>
@@ -181,27 +183,27 @@ export function CareerPage() {
       <Card>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            {t("karriere.offeneStellen")}
+            {t("careers.openJobs")}
           </Typography>
 
-          {bewerbungsfehler !== null ? (
+          {applyError !== null ? (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {bewerbungsfehler}
+              {applyError}
             </Alert>
           ) : null}
 
-          {stellen.pending ? (
-            <LoadingBlock label={t("karriere.stellenLaden")} />
+          {jobs.pending ? (
+            <LoadingBlock label={t("careers.jobsLoading")} />
           ) : null}
 
-          {abrufGescheitert ? (
+          {fetchFailed ? (
             <Alert severity="warning">
-              {t("karriere.stellenNichtAbrufbar")}
+              {t("careers.jobsUnavailable")}
             </Alert>
           ) : null}
 
-          {!stellen.pending && !abrufGescheitert && list.length === 0 ? (
-            <EmptyBlock title={t("karriere.leer")} />
+          {!jobs.pending && !fetchFailed && list.length === 0 ? (
+            <EmptyBlock title={t("careers.empty")} />
           ) : null}
 
           {list.length > 0 ? (
@@ -216,8 +218,8 @@ export function CareerPage() {
                 m: 0,
               }}
             >
-              {list.map((stelle) => (
-                <Card key={stelle.id} component="li" variant="outlined">
+              {list.map((job) => (
+                <Card key={job.id} component="li" variant="outlined">
                   <CardContent
                     sx={{
                       display: "flex",
@@ -228,12 +230,12 @@ export function CareerPage() {
                     }}
                   >
                     <Box>
-                      <Typography variant="h4">{stelle.title}</Typography>
+                      <Typography variant="h4">{job.title}</Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {stelle.location !== ""
-                          ? stelle.location
-                          : t("karriere.ortFehlt")}{" "}
-                        · {remoteLabel(stelle.remote)}
+                        {job.location !== ""
+                          ? job.location
+                          : t("careers.locationMissing")}{" "}
+                        · {remoteLabel(job.remote)}
                       </Typography>
                     </Box>
                     <Button
@@ -241,15 +243,15 @@ export function CareerPage() {
                       variant="contained"
                       size="small"
                       sx={{ flexShrink: 0 }}
-                      disabled={laeuftStelle !== null}
-                      onClick={() => void bewerben(stelle.id)}
+                      disabled={runningJobId !== null}
+                      onClick={() => void apply(job.id)}
                       startIcon={
-                        laeuftStelle === stelle.id ? (
+                        runningJobId === job.id ? (
                           <CircularProgress color="inherit" size={16} />
                         ) : null
                       }
                     >
-                      {t("karriere.bewerben")}
+                      {t("careers.apply")}
                     </Button>
                   </CardContent>
                 </Card>

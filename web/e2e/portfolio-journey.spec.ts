@@ -1,6 +1,6 @@
-// Das Portfolio durch den Browser — und die Aussage, die nur hier sichtbar wird:
-// Profil und Portfolio sind zwei Freigaben, auch wenn beide Schalter
-// „für Unternehmen sichtbar" heißen.
+// The portfolio through the browser — and the statement that only becomes
+// visible here: profile and portfolio are two releases, even though both
+// switches are called "für Unternehmen sichtbar" (visible to companies).
 
 import { expect, test } from "@playwright/test";
 
@@ -10,25 +10,25 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+test("profile and portfolio are two separate releases", async ({ browser }) => {
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Arbeitgeber ${Date.now()}`;
-  const headline = `E2E Portfolio-Kandidat ${Date.now()}`;
-  const workTitle = `Ein Werkzeug ${Date.now()}`;
+  const companyName = `E2E Employer ${Date.now()}`;
+  const headline = `E2E Portfolio candidate ${Date.now()}`;
+  const workTitle = `A tool ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
-  // Profil anlegen und freigeben.
+  // Create the profile and release it.
   await candidate.goto("/profile");
   await candidate.getByLabel(/Überschrift/i).fill(headline);
   await candidate.getByRole("button", { name: "Speichern", exact: true }).click();
@@ -36,23 +36,23 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  // Arbeiten anlegen — aber NICHT freigeben.
+  // Create work samples — but do NOT release them.
   //
-  // Das Formular hat eine eigene Adresse (`/portfolio/new`); „Arbeit
-  // hinzufügen" ist ein LINK. Nach dem Speichern führt es zurück auf die Liste,
-  // und dort steht die Arbeit — das ist die Bestätigung, nicht ein Satz im
-  // Formular.
+  // The form has an address of its own (`/portfolio/new`); "Arbeit hinzufügen"
+  // (add work) is a LINK. After saving it leads back to the list, and the work
+  // stands there — that is the confirmation, not a sentence in the form.
   await candidate.goto("/portfolio");
   await candidate.getByRole("link", { name: /Arbeit hinzufügen/i }).click();
   await expect(candidate).toHaveURL(/\/portfolio\/new$/);
   await candidate.getByLabel("Titel").fill(workTitle);
-  await candidate.getByLabel(/Link/i).fill("https://example.org/werkzeug");
+  await candidate.getByLabel(/Link/i).fill("https://example.org/tool");
   await candidate.getByRole("button", { name: /^Speichern$/ }).click();
   await expect(candidate.getByText(workTitle)).toBeVisible();
   await expect(candidate.getByRole("switch")).not.toBeChecked();
 
-  // Und der Deep-Link auf das Formular trägt: nur ein Neuladen geht wirklich
-  // durchs Gateway, ein Klick schaltet bloß den Router um.
+  // And the deep link to the form holds: only a fresh load really asks the
+  // server that serves the UI (the Vite dev server since ADR-0040, no longer
+  // the gateway); a click merely switches the router.
   await candidate.goto("/portfolio/0");
   await expect(candidate.getByLabel("Titel")).toHaveValue(workTitle);
   await candidate.goto("/portfolio");
@@ -62,11 +62,11 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  // Das Profil ist da — die Arbeiten nicht. Genau das ist der Punkt: die
-  // Profilfreigabe öffnet das Portfolio nicht.
+  // The profile is there — the work samples are not. That is exactly the
+  // point: the profile release does not open the portfolio.
   await recruiter.goto("/scout");
   await expect(recruiter.getByText(headline)).toBeVisible();
 
@@ -86,7 +86,7 @@ test("Profil und Portfolio sind zwei getrennte Freigaben", async ({ browser }) =
   }, subjectId);
   expect(hidden).toBe(404);
 
-  // Erst die zweite Freigabe öffnet sie.
+  // Only the second release opens them.
   await candidate.goto("/portfolio");
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();

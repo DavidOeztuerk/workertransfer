@@ -2,106 +2,106 @@ using Noelia.Core.Identity;
 
 namespace WorkerTransfer.Portfolio.Domain.Portfolios;
 
-/// <summary>Was jemand gemacht hat, in seiner eigenen Reihenfolge.</summary>
+/// <summary>What somebody has done, in their own order.</summary>
 /// <remarks>
-/// Ein Portfolio je Person; die <c>SubjectId</c> <em>ist</em> der Schlüssel.
-/// Wer es sehen darf, entscheidet der Consent-Ledger und nicht dieses Modul
-/// (ADR-0020 §6) — hier gibt es deshalb kein einziges Sichtbarkeitsfeld.
+/// One portfolio per person; the <c>SubjectId</c> <em>is</em> the key. Who may
+/// see it is decided by the consent ledger and not by this module
+/// (ADR-0020 §6) — which is why there is not a single visibility field here.
 /// </remarks>
 public sealed class Portfolio
 {
-    /// <summary>Wie viele Einträge ein Portfolio trägt.</summary>
+    /// <summary>How many entries a portfolio carries.</summary>
     /// <remarks>
-    /// Eine Grenze, keine Bewertung: dreißig Einträge sind ein Schaufenster,
-    /// dreihundert wären ein Aktenschrank, und niemand liest ihn.
+    /// A limit, not an evaluation: thirty entries are a shop window, three
+    /// hundred would be a filing cabinet, and nobody reads one.
     /// </remarks>
-    public const int HoechsteEintraege = 30;
+    public const int MaxEntries = 30;
 
     private Portfolio(
-        SubjectId wer,
-        IReadOnlyList<Eintrag> eintraege,
-        DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm)
+        SubjectId subject,
+        IReadOnlyList<Entry> entries,
+        DateTimeOffset createdAt,
+        DateTimeOffset changedAt)
     {
-        Wer = wer;
-        Eintraege = eintraege;
-        AngelegtAm = angelegtAm;
-        GeaendertAm = geaendertAm;
+        Subject = subject;
+        Entries = entries;
+        CreatedAt = createdAt;
+        ChangedAt = changedAt;
     }
 
-    /// <summary>Wessen Portfolio das ist.</summary>
-    public SubjectId Wer { get; }
+    /// <summary>Whose portfolio this is.</summary>
+    public SubjectId Subject { get; }
 
     /// <summary>
-    /// Die Einträge, in der Reihenfolge, in der sie kamen.
+    /// The entries, in the order they came in.
     /// </summary>
     /// <remarks>
-    /// Ein Portfolio hat keine natürliche Ordnung. „Das hier zuerst" ist eine
-    /// Entscheidung der Person, und sie umzusortieren hieße, sie zu übergehen.
+    /// A portfolio has no natural order. "This one first" is a decision by the
+    /// person, and re-sorting them would mean overriding it.
     /// </remarks>
-    public IReadOnlyList<Eintrag> Eintraege { get; private set; }
+    public IReadOnlyList<Entry> Entries { get; private set; }
 
-    /// <summary>Wann es zuerst geschrieben wurde.</summary>
-    public DateTimeOffset AngelegtAm { get; }
+    /// <summary>When it was first written.</summary>
+    public DateTimeOffset CreatedAt { get; }
 
-    /// <summary>Wann es zuletzt geändert wurde.</summary>
-    public DateTimeOffset GeaendertAm { get; private set; }
+    /// <summary>When it last changed.</summary>
+    public DateTimeOffset ChangedAt { get; private set; }
 
-    /// <exception cref="ZuVieleEintraege">Es sind zu viele.</exception>
-    public static Portfolio Lege_an(
-        SubjectId wer, IReadOnlyList<Eintrag> eintraege, DateTimeOffset jetzt) =>
-        new(wer, Geprueft(eintraege), jetzt, jetzt);
+    /// <exception cref="TooManyEntries">There are too many.</exception>
+    public static Portfolio Create(
+        SubjectId subject, IReadOnlyList<Entry> entries, DateTimeOffset now) =>
+        new(subject, Checked(entries), now, now);
 
-    /// <summary>Das Portfolio, wie eine Zeile es hält.</summary>
-    public static Portfolio Stelle_her(
-        SubjectId wer,
-        IReadOnlyList<Eintrag> eintraege,
-        DateTimeOffset angelegtAm,
-        DateTimeOffset geaendertAm) =>
-        new(wer, eintraege, angelegtAm, geaendertAm);
+    /// <summary>The portfolio as a row holds it.</summary>
+    public static Portfolio Restore(
+        SubjectId subject,
+        IReadOnlyList<Entry> entries,
+        DateTimeOffset createdAt,
+        DateTimeOffset changedAt) =>
+        new(subject, entries, createdAt, changedAt);
 
-    /// <summary>Ersetzt die Einträge.</summary>
+    /// <summary>Replaces the entries.</summary>
     /// <remarks>
-    /// Erst vollständig prüfen, dann schreiben: ein abgelehntes Formular darf
-    /// kein halb geändertes Aggregat hinterlassen.
+    /// Check everything first, then write: a refused form must not leave a
+    /// half-changed aggregate behind.
     /// </remarks>
-    /// <exception cref="ZuVieleEintraege">Es sind zu viele.</exception>
-    public void Aendere(IReadOnlyList<Eintrag> eintraege, DateTimeOffset jetzt)
+    /// <exception cref="TooManyEntries">There are too many.</exception>
+    public void Change(IReadOnlyList<Entry> entries, DateTimeOffset now)
     {
-        Eintraege = Geprueft(eintraege);
-        GeaendertAm = jetzt;
+        Entries = Checked(entries);
+        ChangedAt = now;
     }
 
-    /// <summary>Ob dieser Anhang zu diesem Portfolio gehört.</summary>
+    /// <summary>Whether this attachment belongs to this portfolio.</summary>
     /// <remarks>
-    /// Der Weg zur Datei entsteht aus <c>SubjectId</c> und Name — aber gefragt
-    /// wird trotzdem, ob ein Eintrag ihn nennt. Sonst bliebe eine gelöschte
-    /// Datei über ihren Namen erreichbar, obwohl sie aus dem Portfolio
-    /// verschwunden ist.
+    /// The path to the file is formed from <c>SubjectId</c> and name — but the
+    /// question is asked all the same whether an entry names it. Otherwise a
+    /// deleted file would stay reachable through its name although it has
+    /// disappeared from the portfolio.
     /// </remarks>
-    public bool Nennt(string anhang) =>
-        Eintraege.Any(eintrag => string.Equals(eintrag.Anhang, anhang, StringComparison.Ordinal));
+    public bool Names(string attachment) =>
+        Entries.Any(entry => string.Equals(entry.Attachment, attachment, StringComparison.Ordinal));
 
-    private static IReadOnlyList<Eintrag> Geprueft(IReadOnlyList<Eintrag> eintraege)
+    private static IReadOnlyList<Entry> Checked(IReadOnlyList<Entry> entries)
     {
-        ArgumentNullException.ThrowIfNull(eintraege);
+        ArgumentNullException.ThrowIfNull(entries);
 
-        return eintraege.Count > HoechsteEintraege
-            ? throw new ZuVieleEintraege(HoechsteEintraege)
-            : eintraege;
+        return entries.Count > MaxEntries
+            ? throw new TooManyEntries(MaxEntries)
+            : entries;
     }
 }
 
-/// <summary>Findet und speichert Portfolios.</summary>
-public interface IPortfoliospeicher
+/// <summary>Finds and stores portfolios.</summary>
+public interface IPortfolioStore
 {
-    /// <summary>Das Portfolio einer Person, oder <c>null</c>.</summary>
-    Task<Portfolio?> HoleAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>A person's portfolio, or <c>null</c>.</summary>
+    Task<Portfolio?> GetAsync(SubjectId subject, CancellationToken cancellationToken = default);
 
-    /// <summary>Legt an oder schreibt zurück.</summary>
-    Task SichereAsync(Portfolio portfolio, CancellationToken cancellationToken = default);
+    /// <summary>Creates or writes back.</summary>
+    Task SaveAsync(Portfolio portfolio, CancellationToken cancellationToken = default);
 
-    /// <summary>Löscht alles zu dieser Person.</summary>
-    /// <returns>Wie viele Zeilen absichtlich stehen blieben. Immer null.</returns>
-    Task<int> LoescheAsync(SubjectId wer, CancellationToken cancellationToken = default);
+    /// <summary>Erases everything about this person.</summary>
+    /// <returns>How many rows deliberately stayed. Always zero.</returns>
+    Task<int> DeleteAsync(SubjectId subject, CancellationToken cancellationToken = default);
 }

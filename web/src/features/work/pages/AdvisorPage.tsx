@@ -11,108 +11,126 @@ import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { i18n } from "../../../core/i18n/i18n";
 import { Link as RouterLink } from "react-router-dom";
 
 import { EmptyBlock, LoadingBlock, PageShell } from "../../../shared/components/ui";
-import { useHandelnder } from "../lib/session";
+import { type ServerCase, failureKey } from "../../../shared/api/errors";
+import { useActor } from "../lib/session";
 import { useAsync } from "../lib/useAsync";
 import {
-  type MeinGespraech,
-  beendeAlsPerson,
-  gibFrei,
-  ladeMandat,
-  ladeMeineGespraeche,
-  nimmZurueck,
-  schreibeMandat,
-  stimmeZu,
+  type MyConversation,
+  advanceStage,
+  agree,
+  endAsPerson,
+  getMandate,
+  getMyConversations,
+  saveMandate,
+  withdrawStage,
 } from "../api/advisor";
 
-/** Eine Zahl aus einem Textfeld, oder `null` für „nichts gesagt". */
-function zahl(roh: string): number | null {
-  const gekuerzt = roh.trim();
-  if (gekuerzt.length === 0) return null;
-  const wert = Number.parseInt(gekuerzt, 10);
-  return Number.isNaN(wert) ? null : wert;
+/** A number from a text field, or `null` for "said nothing". */
+function toNumber(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number.parseInt(trimmed, 10);
+  return Number.isNaN(value) ? null : value;
 }
 
-/** Eine Kommaliste in Domains, ohne Leeres. */
-function domains(roh: string): string[] {
-  return roh
+/** A comma list as domains, without empty entries. */
+function domains(raw: string): string[] {
+  return raw
     .split(",")
-    .map((eintrag) => eintrag.trim().toLowerCase())
-    .filter((eintrag) => eintrag.length > 0);
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
 }
 
 /**
- * <c>/advisor</c> — das eigene Mandat und die eigenen Gespräche.
+ * <c>/advisor</c> — one's own mandate and one's own conversations.
  *
- * <strong>Hier steht kein Sichtbarkeitsschalter.</strong> Wer dich sehen darf,
- * entscheidest du auf der Profilseite und in jedem Gespräch einzeln; das Mandat
- * sind vier Angaben und sonst nichts (ADR-0037). Ein Schalter an dieser Stelle
- * wäre eine zweite Wahrheit neben dem Ledger — und die weicht beim ersten
- * Widerruf ab.
+ * <strong>There is no visibility switch here.</strong> Who may see you, you
+ * decide on the profile page and in every conversation on its own; the mandate
+ * is four statements and nothing else (ADR-0037). A switch at this place would
+ * be a second truth beside the ledger — and it diverges at the first
+ * revocation.
  *
- * <strong>Die Stufe steht an jedem Gespräch, und sie kommt vom Server.</strong>
- * Sie wird bei jeder Anfrage frisch aus dem Ledger gelesen. Deshalb lädt diese
- * Seite nach jeder Freigabe neu, statt die Zahl selbst weiterzuzählen: was
- * gerade gilt, weiss nur der Ledger.
+ * <strong>The stage stands on every conversation, and it comes from the
+ * server.</strong> It is read fresh from the ledger with every request. That is
+ * why this page reloads after every release instead of counting the number on
+ * by itself: what holds right now only the ledger knows.
  *
- * <strong>Und die Warnung am Ausschlussfeld ist keine Höflichkeit.</strong> Wer
- * ein Unternehmen ausschliesst, verliert „für alle Unternehmen sichtbar" — das
- * ist der Preis dafür, dass der Ledger keine Verneinung kennt, und die Person
- * muss ihn vorher lesen, nicht nachher merken.
+ * <strong>And the warning at the exclusion field is no courtesy.</strong>
+ * Whoever excludes a company loses "visible to all companies" — that is the
+ * price of the ledger knowing no negation, and the person must read it before,
+ * not notice it after.
  */
+
+/**
+ * The rules a mandate can break, as the person reads them — never the server's
+ * sentence (advisor-service answers in English). Each pattern matches a
+ * sentence in advisor-service's `Mandate.cs`, which points back here; what none
+ * knows reads as `errors.mandateNotSaved`.
+ */
+const MANDATE_CASES: readonly ServerCase[] = [
+  { status: 422, pattern: /entry date is a month/i, key: "advisor.entryMonthInvalid" },
+  { status: 422, pattern: /workload is between/i, key: "advisor.workloadOutOfRange" },
+  { status: 422, pattern: /salary is not negative/i, key: "advisor.salaryNegative" },
+  { status: 422, pattern: /lower bound of a salary range/i, key: "advisor.salaryRangeReversed" },
+  { status: 422, pattern: /at most \d+ excluded companies/i, key: "advisor.tooManyExclusions" },
+  { status: 422, pattern: /excluded company is named by its domain/i, key: "advisor.exclusionByDomain" },
+];
+
 export function AdvisorPage() {
   const { t } = useTranslation();
-  const { signedIn, laedt, subjectId } = useHandelnder();
+  const { signedIn, loading, subjectId } = useActor();
 
-  const mandat = useAsync((signal) => ladeMandat(signal), [subjectId], signedIn);
-  const gespraeche = useAsync(
-    (signal) => ladeMeineGespraeche(signal),
+  const mandate = useAsync((signal) => getMandate(signal), [subjectId], signedIn);
+  const conversations = useAsync(
+    (signal) => getMyConversations(signal),
     [subjectId],
     signedIn,
   );
 
-  const [eintritt, setEintritt] = useState("");
-  const [von, setVon] = useState("");
-  const [bis, setBis] = useState("");
-  const [pensum, setPensum] = useState("");
-  const [ausschluss, setAusschluss] = useState("");
-  const [uebernommen, setUebernommen] = useState(false);
-  const [laeuft, setLaeuft] = useState(false);
-  const [gespeichert, setGespeichert] = useState(false);
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [entryMonth, setEntryMonth] = useState("");
+  const [salaryFrom, setSalaryFrom] = useState("");
+  const [salaryTo, setSalaryTo] = useState("");
+  const [workload, setWorkload] = useState("");
+  const [excluded, setExcluded] = useState("");
+  const [adopted, setAdopted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Der geladene Stand fuellt das Formular GENAU EINMAL. Liefe das bei jeder
-  // Antwort, ueberschriebe ein Neuladen die gerade getippte Zahl — und ein
-  // Speichern schriebe sie zurueck, ohne dass jemand es merkt.
+  // The loaded state fills the form EXACTLY ONCE. If that ran on every answer, a
+  // reload would overwrite the number just typed — and a save would write it
+  // back without anybody noticing.
   useEffect(() => {
-    if (uebernommen || !mandat.data?.ok) return;
-    const stand = mandat.data.mandat;
-    setEintritt(stand.entry_month ?? "");
-    setVon(stand.salary_min === null ? "" : String(stand.salary_min));
-    setBis(stand.salary_max === null ? "" : String(stand.salary_max));
-    setPensum(stand.workload_percent === null ? "" : String(stand.workload_percent));
-    setAusschluss(stand.excluded_domains.join(", "));
-    setUebernommen(true);
-  }, [uebernommen, mandat.data]);
+    if (adopted || !mandate.data?.ok) return;
+    const current = mandate.data.mandate;
+    setEntryMonth(current.entry_month ?? "");
+    setSalaryFrom(current.salary_min === null ? "" : String(current.salary_min));
+    setSalaryTo(current.salary_max === null ? "" : String(current.salary_max));
+    setWorkload(current.workload_percent === null ? "" : String(current.workload_percent));
+    setExcluded(current.excluded_domains.join(", "));
+    setAdopted(true);
+  }, [adopted, mandate.data]);
 
-  if (laedt) {
+  if (loading) {
     return (
-      <PageShell title={t("berater.titel")} narrow>
-        <LoadingBlock label={t("berater.laden")} />
+      <PageShell title={t("advisor.title")} narrow>
+        <LoadingBlock label={t("advisor.loading")} />
       </PageShell>
     );
   }
 
   if (!signedIn) {
     return (
-      <PageShell title={t("berater.titel")} narrow>
+      <PageShell title={t("advisor.title")} narrow>
         <Card>
           <CardContent>
             <Typography>
               <Trans
-                i18nKey="berater.nurAngemeldet"
+                i18nKey="advisor.signedInOnly"
                 components={{ 1: <Link component={RouterLink} to="/login" /> }}
               />
             </Typography>
@@ -122,128 +140,136 @@ export function AdvisorPage() {
     );
   }
 
-  async function speichern() {
-    setLaeuft(true);
-    const ergebnis = await schreibeMandat({
-      entry_month: eintritt.trim().length === 0 ? null : eintritt.trim(),
-      salary_min: zahl(von),
-      salary_max: zahl(bis),
-      workload_percent: zahl(pensum),
-      excluded_domains: domains(ausschluss),
+  async function save() {
+    setBusy(true);
+    const result = await saveMandate({
+      entry_month: entryMonth.trim().length === 0 ? null : entryMonth.trim(),
+      salary_min: toNumber(salaryFrom),
+      salary_max: toNumber(salaryTo),
+      workload_percent: toNumber(workload),
+      excluded_domains: domains(excluded),
     });
-    setLaeuft(false);
+    setBusy(false);
 
-    if (ergebnis.ok) {
-      setFehler(null);
-      setGespeichert(true);
-      mandat.reload();
+    if (result.ok) {
+      setError(null);
+      setSaved(true);
+      mandate.reload();
       return;
     }
 
-    setGespeichert(false);
-    setFehler(ergebnis.error.detail ?? ergebnis.error.title);
+    setSaved(false);
+    setError(t(failureKey(result.error, "errors.mandateNotSaved", MANDATE_CASES)));
   }
 
-  async function stufenzug(id: string, hinauf: boolean, stufe: number) {
-    setLaeuft(true);
-    const ergebnis = hinauf ? await gibFrei(id, stufe) : await nimmZurueck(id, stufe);
-    setLaeuft(false);
+  async function moveStage(id: string, up: boolean, stage: number) {
+    setBusy(true);
+    const result = up ? await advanceStage(id, stage) : await withdrawStage(id, stage);
+    setBusy(false);
 
-    setFehler(ergebnis.ok ? null : (ergebnis.error.detail ?? ergebnis.error.title));
-    // IMMER neu laden, auch nach einem Fehlschlag: was jetzt gilt, weiss der
-    // Ledger, und nicht diese Seite.
-    gespraeche.reload();
+    setError(result.ok ? null : t(failureKey(result.error, "errors.stageNotChanged")));
+    // ALWAYS reload, also after a failure: what holds now, the ledger knows,
+    // and not this page.
+    conversations.reload();
   }
 
-  async function zug(id: string, was: "agree" | "end") {
-    setLaeuft(true);
-    const ergebnis = was === "agree" ? await stimmeZu(id) : await beendeAlsPerson(id);
-    setLaeuft(false);
+  async function step(id: string, what: "agree" | "end") {
+    setBusy(true);
+    const result = what === "agree" ? await agree(id) : await endAsPerson(id);
+    setBusy(false);
 
-    setFehler(ergebnis.ok ? null : (ergebnis.error.detail ?? ergebnis.error.title));
-    gespraeche.reload();
+    setError(result.ok ? null : t(failureKey(result.error, "errors.conversationStepFailed")));
+    conversations.reload();
   }
 
   return (
-    <PageShell title={t("berater.titel")} narrow>
-      <Typography sx={{ mb: 3 }}>{t("berater.lead")}</Typography>
+    <PageShell title={t("advisor.title")} narrow>
+      <Typography sx={{ mb: 3 }}>{t("advisor.lead")}</Typography>
 
-      {fehler !== null && (
+      {error !== null && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {fehler}
+          {error}
         </Alert>
       )}
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h2" sx={{ mb: 1 }}>
-            {t("berater.mandatTitel")}
+            {t("advisor.mandateTitle")}
           </Typography>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            {t("berater.mandatLead")}
+            {t("advisor.mandateLead")}
           </Typography>
 
-          {mandat.pending && <LoadingBlock label={t("berater.laden")} />}
+          {mandate.pending && <LoadingBlock label={t("advisor.loading")} />}
 
-          {/* Kein Ersatzformular, wenn das Mandat nicht abrufbar ist: wer dann
-              etwas anfasst und speichert, loescht still seine Angaben. */}
-          {!mandat.pending && mandat.data !== null && !mandat.data.ok && (
-            <Alert severity="warning">{t("berater.mandatNichtAbrufbar")}</Alert>
+          {!mandate.pending && mandate.data !== null && !mandate.data.ok && (
+            <Alert
+              // No substitute form when the mandate cannot be read: whoever
+              // touches something and saves silently erases their own entries.
+              severity="warning"
+            >
+              {t("advisor.mandateUnavailable")}
+            </Alert>
           )}
 
-          {mandat.data?.ok === true && (
+          {mandate.data?.ok === true && (
             <Stack spacing={2}>
               <TextField
-                label={t("berater.eintritt")}
-                helperText={t("berater.eintrittHinweis")}
-                value={eintritt}
+                label={t("advisor.earliestStart")}
+                helperText={t("advisor.earliestStartHint")}
+                value={entryMonth}
                 placeholder="2026-11"
-                onChange={(event) => setEintritt(event.target.value)}
+                onChange={(event) => setEntryMonth(event.target.value)}
               />
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
-                  label={t("berater.gehaltVon")}
-                  value={von}
+                  label={t("advisor.salaryFrom")}
+                  value={salaryFrom}
                   inputMode="numeric"
-                  onChange={(event) => setVon(event.target.value)}
+                  onChange={(event) => setSalaryFrom(event.target.value)}
                   fullWidth
                 />
                 <TextField
-                  label={t("berater.gehaltBis")}
-                  value={bis}
+                  label={t("advisor.salaryTo")}
+                  value={salaryTo}
                   inputMode="numeric"
-                  onChange={(event) => setBis(event.target.value)}
+                  onChange={(event) => setSalaryTo(event.target.value)}
                   fullWidth
                 />
               </Stack>
-              <Typography variant="caption">{t("berater.gehaltHinweis")}</Typography>
+              <Typography variant="caption">{t("advisor.salaryHint")}</Typography>
 
               <TextField
-                label={t("berater.pensum")}
-                helperText={t("berater.pensumHinweis")}
-                value={pensum}
+                label={t("advisor.workload")}
+                helperText={t("advisor.workloadHint")}
+                value={workload}
                 inputMode="numeric"
-                onChange={(event) => setPensum(event.target.value)}
+                onChange={(event) => setWorkload(event.target.value)}
               />
 
               <TextField
-                label={t("berater.ausschluss")}
-                helperText={t("berater.ausschlussHinweis")}
-                value={ausschluss}
-                placeholder="arbeitgeber.de"
-                onChange={(event) => setAusschluss(event.target.value)}
+                label={t("advisor.excluded")}
+                helperText={t("advisor.excludedHint")}
+                value={excluded}
+                placeholder={t("advisor.excludedPlaceholder")}
+                onChange={(event) => setExcluded(event.target.value)}
               />
 
-              {/* Immer sichtbar und nicht erst beim Tippen: der Preis gehoert
-                  VOR die Entscheidung, nicht hinter sie. */}
-              <Alert severity="info">{t("berater.ausschlussWarnung")}</Alert>
+              <Alert
+                // Always visible and not only while typing: the price belongs
+                // BEFORE the decision, not behind it.
+                severity="info"
+              >
+                {t("advisor.excludedWarning")}
+              </Alert>
 
-              {gespeichert && <Alert severity="success">{t("berater.gespeichert")}</Alert>}
+              {saved && <Alert severity="success">{t("advisor.saved")}</Alert>}
 
               <Box>
-                <Button variant="contained" onClick={speichern} disabled={laeuft}>
-                  {laeuft ? t("berater.speichert") : t("berater.speichern")}
+                <Button variant="contained" onClick={save} disabled={busy}>
+                  {busy ? t("advisor.saving") : t("advisor.save")}
                 </Button>
               </Box>
             </Stack>
@@ -252,34 +278,34 @@ export function AdvisorPage() {
       </Card>
 
       <Typography variant="h2" sx={{ mb: 1 }}>
-        {t("berater.gespraecheTitel")}
+        {t("advisor.conversationsTitle")}
       </Typography>
       <Typography variant="body2" sx={{ mb: 2 }}>
-        {t("berater.gespraecheLead")}
+        {t("advisor.conversationsLead")}
       </Typography>
 
-      {gespraeche.pending && <LoadingBlock label={t("berater.laden")} />}
+      {conversations.pending && <LoadingBlock label={t("advisor.loading")} />}
 
-      {gespraeche.data?.ok === false && (
-        <Alert severity="warning">{t("fehler.ledgerSchweigt")}</Alert>
+      {conversations.data?.ok === false && (
+        <Alert severity="warning">{t("errors.ledgerSilent")}</Alert>
       )}
 
-      {gespraeche.data?.ok === true && gespraeche.data.items.length === 0 && (
+      {conversations.data?.ok === true && conversations.data.items.length === 0 && (
         <EmptyBlock
-          title={t("berater.keineGespraeche")}
-          hint={t("berater.keineGespraecheHinweis")}
+          title={t("advisor.noConversations")}
+          hint={t("advisor.noConversationsHint")}
         />
       )}
 
       <Stack spacing={2}>
-        {gespraeche.data?.ok === true &&
-          gespraeche.data.items.map((gespraech) => (
-            <Gespraechskarte
-              key={gespraech.id}
-              gespraech={gespraech}
-              laeuft={laeuft}
-              aufStufe={(hinauf, stufe) => stufenzug(gespraech.id, hinauf, stufe)}
-              zug={(was) => zug(gespraech.id, was)}
+        {conversations.data?.ok === true &&
+          conversations.data.items.map((conversation) => (
+            <ConversationCard
+              key={conversation.id}
+              conversation={conversation}
+              busy={busy}
+              onStage={(up, stage) => moveStage(conversation.id, up, stage)}
+              onStep={(what) => step(conversation.id, what)}
             />
           ))}
       </Stack>
@@ -288,115 +314,117 @@ export function AdvisorPage() {
 }
 
 /**
- * Eine Karte je Gespräch.
+ * One card per conversation.
  *
- * <strong>Der nächste Schritt ist genau ein Knopf.</strong> Drei Knöpfe
- * nebeneinander liessen die Wahl aussehen wie eine Voreinstellung; eine Stufe
- * ist ein Stand, und man geht ihn hinauf.
+ * <strong>The next step is exactly one button.</strong> Three buttons side by
+ * side would make the choice look like a default; a stage is a standing, and
+ * one walks it up.
  */
-function Gespraechskarte({
-  gespraech,
-  laeuft,
-  aufStufe,
-  zug,
+function ConversationCard({
+  conversation,
+  busy,
+  onStage,
+  onStep,
 }: {
-  gespraech: MeinGespraech;
-  laeuft: boolean;
-  aufStufe: (hinauf: boolean, stufe: number) => void;
-  zug: (was: "agree" | "end") => void;
+  conversation: MyConversation;
+  busy: boolean;
+  onStage: (up: boolean, stage: number) => void;
+  onStep: (what: "agree" | "end") => void;
 }) {
   const { t } = useTranslation();
-  const naechste = gespraech.stage + 1;
-  const offen = gespraech.state === "talking" || gespraech.state === "agreed";
+  const next = conversation.stage + 1;
+  const open = conversation.state === "talking" || conversation.state === "agreed";
 
   return (
     <Card>
       <CardContent>
         <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap" }}>
-          <Chip label={t(`berater.stand_${gespraech.state}`)} size="small" />
+          <Chip label={t(`advisor.state_${conversation.state}`)} size="small" />
           <Chip
-            label={t(`berater.stufe${gespraech.stage}Kurz`)}
+            label={t(`advisor.stage${conversation.stage}Short`)}
             size="small"
-            color={gespraech.stage > 0 ? "primary" : "default"}
-            variant={gespraech.stage > 0 ? "filled" : "outlined"}
+            color={conversation.stage > 0 ? "primary" : "default"}
+            variant={conversation.stage > 0 ? "filled" : "outlined"}
           />
         </Stack>
 
-        {gespraech.note.length > 0 && (
-          <Typography sx={{ mb: 1 }}>{gespraech.note}</Typography>
+        {conversation.note.length > 0 && (
+          <Typography sx={{ mb: 1 }}>{conversation.note}</Typography>
         )}
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.eroeffnetAm", {
-            datum: new Date(gespraech.opened_at).toLocaleDateString(),
+          {t("advisor.openedOn", {
+            datum: new Date(conversation.opened_at).toLocaleDateString(i18n.language),
           })}
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 2 }}>
-          {t(`berater.stufe${Math.min(gespraech.stage + 1, 3)}`)}
+          {t(`advisor.stage${Math.min(conversation.stage + 1, 3)}`)}
         </Typography>
 
         <Divider sx={{ mb: 2 }} />
 
         <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-          {t("berater.wirkungSofort")}
+          {t("advisor.effectImmediate")}
         </Typography>
 
-        {/* DER HINWEIS, DEN DIE E2E-REISE ERZWUNGEN HAT. „Alles zurueckziehen"
-            stand hier einmal, und es war zu viel versprochen: wer sein Profil
-            auf „fuer alle Unternehmen" gestellt hat, bleibt darueber sichtbar,
-            und die Stufe faellt dann nicht auf 0. Das ist richtig so — ein
-            Knopf in EINEM Gespraech darf keinen plattformweiten Schalter
-            umlegen —, aber es muss dastehen. */}
-        {gespraech.stage > 0 && (
-          <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-            {t("berater.zurueckHinweis")}
+        {conversation.stage > 0 && (
+          <Typography
+            // "Withdraw everything" would promise too much: whoever set their
+            // profile to "for all companies" stays visible through that, and the
+            // stage does not fall to 0. That is right — a button in ONE
+            // conversation must not flip a platform-wide switch — but it has to
+            // be said here.
+            variant="caption"
+            sx={{ display: "block", mb: 1 }}
+          >
+            {t("advisor.backHint")}
           </Typography>
         )}
 
         <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-          {offen && naechste <= 3 && (
+          {open && next <= 3 && (
             <Button
               variant="contained"
               size="small"
-              disabled={laeuft}
-              onClick={() => aufStufe(true, naechste)}
+              disabled={busy}
+              onClick={() => onStage(true, next)}
             >
-              {t("berater.freigeben", { nummer: naechste })}
+              {t("advisor.releaseStage", { nummer: next })}
             </Button>
           )}
 
-          {/* EIN Knopf und nicht drei: eine Stufe ist ein Stand, und man geht
-              ihn hinunter. `withdraw` nimmt ab der genannten Stufe alles
-              darueber mit — von 3 bleibt also 2, von 1 bleibt 0. */}
-          {gespraech.stage > 0 && (
+          {conversation.stage > 0 && (
             <Button
               size="small"
-              disabled={laeuft}
-              onClick={() => aufStufe(false, gespraech.stage)}
+              disabled={busy}
+              // ONE button and not three: a stage is a standing and you walk it
+              // down. `withdraw` takes everything from the named stage upwards —
+              // from 3 leaves 2, from 1 leaves 0.
+              onClick={() => onStage(false, conversation.stage)}
             >
-              {gespraech.stage === 1
-                ? t("berater.zuruecknehmen")
-                : t("berater.zurueckAuf", { nummer: gespraech.stage - 1 })}
+              {conversation.stage === 1
+                ? t("advisor.withdrawRelease")
+                : t("advisor.backToStage", { nummer: conversation.stage - 1 })}
             </Button>
           )}
 
-          {gespraech.state === "talking" && (
-            <Button size="small" disabled={laeuft} onClick={() => zug("agree")}>
-              {t("berater.zustimmen")}
+          {conversation.state === "talking" && (
+            <Button size="small" disabled={busy} onClick={() => onStep("agree")}>
+              {t("advisor.agree")}
             </Button>
           )}
 
-          {offen && (
-            <Button size="small" color="error" disabled={laeuft} onClick={() => zug("end")}>
-              {t("berater.beenden")}
+          {open && (
+            <Button size="small" color="error" disabled={busy} onClick={() => onStep("end")}>
+              {t("advisor.end")}
             </Button>
           )}
         </Stack>
 
-        {gespraech.state === "agreed" && (
+        {conversation.state === "agreed" && (
           <Alert severity="success" sx={{ mt: 2 }}>
-            {t("berater.zugestimmt")}
+            {t("advisor.agreed")}
           </Alert>
         )}
       </CardContent>

@@ -1,25 +1,25 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
-import { renderMitStore } from "../../work/test/render";
+import { renderWithStore } from "../../work/test/render";
 import { CompanyAdvisorPage } from "./CompanyAdvisorPage";
 
 /**
- * Die eine Zusage dieser Seite, als Test.
+ * The one promise of this page, as a test.
  *
- * <strong>Was in einer Stufe nicht freigegeben ist, existiert für die
- * Gegenseite nicht</strong> (ADR-0037). Der Server lässt das Feld im JSON ganz
- * weg; diese Seite darf daraus keinen Hinweis basteln — kein „noch nicht
- * freigegeben", kein Schloss, keine graue Zeile. Ein solcher Hinweis verriete
- * genau das, was die Stufe zurückhält: dass es etwas gibt.
+ * <strong>What is not released at a stage does not exist for the other
+ * side</strong> (ADR-0037). The server leaves the field out of the JSON
+ * entirely; this page must make no hint of it — no "not released yet", no
+ * lock, no grey line. Such a hint would reveal exactly what the stage holds
+ * back: that there is something.
  *
- * <strong>Gestubbt wird `fetch`, nicht das Client-Modul.</strong> So laufen
- * Pfad, Methode und snake_case durch den echten Client — ein Feld, das die
- * Seite unter einem anderen Namen liest, käme sonst nie an, und der Test bliebe
- * grün.
+ * <strong>`fetch` is stubbed, not the client module.</strong> That way path,
+ * method and snake_case run through the real client — a field the page reads
+ * under another name would otherwise never arrive, and the test would stay
+ * green.
  */
 function stubFetch(body: unknown) {
-  const spion = vi.fn(
+  const spy = vi.fn(
     async () =>
       new Response(JSON.stringify(body), {
         status: 200,
@@ -27,21 +27,21 @@ function stubFetch(body: unknown) {
       }),
   );
 
-  vi.stubGlobal("fetch", spion);
-  return spion;
+  vi.stubGlobal("fetch", spy);
+  return spy;
 }
 
-const FIRMA = "11111111-1111-1111-1111-111111111111";
+const COMPANY = "11111111-1111-1111-1111-111111111111";
 const ANNA = "33333333-3333-3333-3333-333333333333";
 
-/** Eine Sitzung, die für ein Unternehmen handelt. */
-const alsFirma = {
+/** A session acting for a company. */
+const asCompany = {
   status: "authenticated" as const,
   session: {
     userId: "22222222-2222-2222-2222-222222222222",
-    email: "werber@beispiel.test",
-    displayName: "Werber",
-    tenantId: FIRMA,
+    email: "recruiter@example.test",
+    displayName: "Recruiter",
+    tenantId: COMPANY,
   } as never,
 };
 
@@ -50,10 +50,10 @@ afterEach(() => {
   cleanup();
 });
 
-it("zeigt auf Stufe 1 weder Gehalt noch Namen — und keinen Hinweis darauf", async () => {
-  // GENAU DIE GESTALT DES SERVERS: die Felder der hoeheren Stufen FEHLEN, sie
-  // sind nicht `null`. Ein `null` hier waere eine erfundene Gestalt, und der
-  // Test pruefte etwas, das es auf dem Draht nie gibt.
+it("shows neither salary nor name at stage 1 — and no hint of them", async () => {
+  // EXACTLY THE SERVER'S SHAPE: the fields of the higher stages are MISSING,
+  // they are not `null`. A `null` here would be an invented shape, and the test
+  // would check something that never exists on the wire.
   stubFetch({
     items: [
       {
@@ -61,7 +61,7 @@ it("zeigt auf Stufe 1 weder Gehalt noch Namen — und keinen Hinweis darauf", as
         subject_id: ANNA,
         state: "talking",
         stage: 1,
-        note: "Wir suchen jemanden für verteilte Systeme.",
+        note: "We are looking for someone for distributed systems.",
         opened_at: "2026-09-11T10:00:00Z",
         updated_at: "2026-09-11T10:00:00Z",
         entry_month: "2026-11",
@@ -70,25 +70,25 @@ it("zeigt auf Stufe 1 weder Gehalt noch Namen — und keinen Hinweis darauf", as
     ],
   });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: asCompany });
 
   await waitFor(() => expect(screen.getByText(/2026-11/)).toBeInTheDocument());
 
-  // Das Freigegebene steht da.
+  // What is released stands there.
   expect(screen.getByText(/80/)).toBeInTheDocument();
 
-  // Und das Nichtfreigegebene fehlt GANZ — nicht als leeres Feld, nicht als
-  // Hinweis, nicht als Platzhalter.
+  // And what is not released is missing ENTIRELY — not as an empty field, not
+  // as a hint, not as a placeholder.
   expect(screen.queryByText(/€/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Anna/)).not.toBeInTheDocument();
   expect(screen.queryByText(/gesperrt|freigegeben werden|noch nicht/i)).not.toBeInTheDocument();
 
-  // Ohne Klarnamen steht die Kennung da und kein erfundener Platzhalter: ein
-  // „anonym" behauptete, die Person habe sich verborgen.
+  // Without a legal name the id stands there and no invented placeholder: an
+  // "anonymous" would claim the person hid themselves.
   expect(screen.getByText(ANNA)).toBeInTheDocument();
 });
 
-it("zeigt auf Stufe 3 Name, Adresse und Spanne", async () => {
+it("shows name, address and range at stage 3", async () => {
   stubFetch({
     items: [
       {
@@ -103,42 +103,42 @@ it("zeigt auf Stufe 3 Name, Adresse und Spanne", async () => {
         workload_percent: 80,
         salary_min: 4000,
         salary_max: 5200,
-        name: "Anna Beispiel",
-        email: "anna@beispiel.test",
+        name: "Anna Example",
+        email: "anna@example.test",
       },
     ],
   });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: asCompany });
 
-  await waitFor(() => expect(screen.getByText("Anna Beispiel")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("Anna Example")).toBeInTheDocument());
 
-  expect(screen.getByText("anna@beispiel.test")).toBeInTheDocument();
+  expect(screen.getByText("anna@example.test")).toBeInTheDocument();
   expect(screen.getByText(/4000–5200/)).toBeInTheDocument();
 
-  // Nach der Zustimmung darf uebergeben werden — und nur dann.
+  // After the agreement handing over is allowed — and only then.
   expect(screen.getByRole("button", { name: /Transfer/ })).toBeInTheDocument();
 });
 
-it("eine leere Liste ist eine Antwort, kein Fehler", async () => {
+it("treats an empty list as an answer, not an error", async () => {
   stubFetch({ items: [] });
 
-  renderMitStore(<CompanyAdvisorPage />, { auth: alsFirma });
+  renderWithStore(<CompanyAdvisorPage />, { auth: asCompany });
 
   await waitFor(() =>
     expect(screen.getByText("Es läuft gerade kein Gespräch.")).toBeInTheDocument(),
   );
 });
 
-it("ohne Unternehmen gibt es hier nichts zu sehen", async () => {
-  const spion = stubFetch({ items: [] });
+it("has nothing to show without a company", async () => {
+  const spy = stubFetch({ items: [] });
 
-  renderMitStore(<CompanyAdvisorPage />, {
+  renderWithStore(<CompanyAdvisorPage />, {
     auth: {
       status: "authenticated",
       session: {
         userId: ANNA,
-        email: "anna@beispiel.test",
+        email: "anna@example.test",
         displayName: "Anna",
         tenantId: null,
       } as never,
@@ -149,7 +149,7 @@ it("ohne Unternehmen gibt es hier nichts zu sehen", async () => {
     screen.getByText(/Gespräche führen nur Unternehmen/),
   ).toBeInTheDocument();
 
-  // Und es wird gar nicht erst gefragt: eine Anfrage, die sicher 403 bekommt,
-  // ist eine Fehlermeldung, die niemand braucht.
-  expect(spion).not.toHaveBeenCalled();
+  // And nothing is asked at all: a request that is sure to get 403 is an error
+  // message nobody needs.
+  expect(spy).not.toHaveBeenCalled();
 });

@@ -6,33 +6,34 @@ using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using WorkerTransfer.Gateway;
 
-// Konfiguration aus der Umgebung. VOR CreateBuilder, weil der
-// Konfigurationsaufbau die Umgebungsvariablen genau einmal liest — danach
-// geladen hiesse geladen und von niemandem gelesen.
-WorkerTransfer.ServiceDefaults.Umgebung.Laden();
+// Configuration from the environment file. BEFORE CreateBuilder, because the
+// configuration builder reads the environment variables exactly once — loading
+// afterwards would mean loading and nobody reading.
+WorkerTransfer.ServiceDefaults.EnvironmentFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Die Landkarte reist als eigene Datei, nicht in appsettings: sie ist der
-// ganze Dienst, und wer sie sucht, soll sie am Namen erkennen.
+// The route map travels as a file of its own, not inside appsettings: it is the
+// whole service, and whoever looks for it should recognise it by its name.
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: false);
 
 builder.Services.AddOcelot(builder.Configuration);
 
-// Die Bremse — Noelias, ganz. Hier standen bis Girder 4.2.0 rund hundertdreißig
-// eigene Zeilen, und der Grund dafür war nie eine fehlende Fähigkeit:
+// The brake — Noelia's, entirely. Until Girder 4.2.0 some hundred and thirty
+// lines of our own stood here, and the reason for them was never a missing
+// capability:
 //
-//   * Selektiv bremsen (fünf benannte Pfade, sonst nichts) kann Noelia, seit es
-//     Grenzen gibt — eine Vorgabe von 0 legt keinen Zähler an. Es stand nur
-//     nirgends, und kein Test hielt es fest.
-//   * Die Abweisung war kein Problemdokument. Behoben in 4.1.0.
-//   * Und sie zu holen kostete `Noelia.Infrastructure` mit vierundvierzig
-//     transitiven Paketen — Swagger, Telemetrie, neun Logging-Pakete — für ein
-//     Gateway, das nur routet. `Noelia.Http` bringt NULL mit.
+//   * Braking selectively (five named paths, nothing else) is something Noelia
+//     can do ever since there have been limits — a default of 0 writes no
+//     counter. It merely stood nowhere, and no test pinned it.
+//   * Its rejection was not a problem document. Fixed in 4.1.0.
+//   * And fetching it cost `Noelia.Infrastructure` with forty-four transitive
+//     packages — Swagger, telemetry, nine logging packages — for a gateway that
+//     only routes. `Noelia.Http` brings NONE with it.
 //
-// Die fünf Grenzen stehen weiter in `ocelot.json`, neben den Routen, aus denen
-// sie ausgewählt sind. `BremsenkarteTests` hält weiterhin fest, dass jeder
-// gebremste Pfad wirklich eine Route hat — die Zusage überlebt die Datei.
+// The five limits still stand in `ocelot.json`, next to the routes they are
+// selected from. `BrakeTests` still pins that every braked path really
+// has a route — the promise outlives the file.
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IDistributedRateLimitStore, InProcessRateLimitStore>();
 builder.Services.Configure<DistributedRateLimitingOptions>(
@@ -40,15 +41,14 @@ builder.Services.Configure<DistributedRateLimitingOptions>(
 
 var app = builder.Build();
 
-// Alles VOR Ocelot, denn Ocelot beendet die Kette: was danach steht, läuft nie.
-// Und in dieser Reihenfolge, jede Stufe aus einem Grund:
+// Everything BEFORE Ocelot, because Ocelot ends the chain: whatever stands
+// after it never runs. And in this order, every step for a reason:
 //
-//   Gesundheit  zuerst und UNGEBREMST. Eine gebremste Probe nähme den Behälter
-//               aus dem Lastverteiler — die Bremse wäre dann der Ausfall.
-//   Korrelation vor der Bremse, damit auch ein 429 seine Kennung trägt: wer
-//               sich beschwert, ausgesperrt worden zu sein, soll eine nennen
-//               können.
-app.UseGesundheit();
+//   Health      first and UNBRAKED. A braked probe would take the container out
+//               of the load balancer — the brake would then be the outage.
+//   Correlation before the brake, so that a 429 carries its id too: whoever
+//               complains about being locked out should be able to name one.
+app.UseHealthProbes();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<DistributedRateLimitingMiddleware>();
 
@@ -56,5 +56,5 @@ await app.UseOcelot();
 
 await app.RunAsync();
 
-/// <summary>Benennt den Einstiegspunkt für den Testwirt.</summary>
+/// <summary>Names the entry point for the test host.</summary>
 public partial class Program;

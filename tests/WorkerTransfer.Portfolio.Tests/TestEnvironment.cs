@@ -1,0 +1,86 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Testcontainers.PostgreSql;
+using WorkerTransfer.Portfolio.Infrastructure.Persistence;
+
+namespace WorkerTransfer.Portfolio.Tests;
+
+/// <summary>A real Postgres carrying this service's schema.</summary>
+public sealed class Postgres : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage("postgres:17-alpine")
+        .WithDatabase("portfolio")
+        .WithUsername("worker")
+        .WithPassword("worker")
+        .Build();
+
+    public string ConnectionString => _container.GetConnectionString();
+
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+
+        await using var source = PortfolioDbContextFactory.DataSource(ConnectionString);
+        await using var context = new PortfolioDbContext(
+            (DbContextOptions<PortfolioDbContext>)PortfolioDbContextFactory.Configure(
+                new DbContextOptionsBuilder<PortfolioDbContext>(), source).Options);
+
+        await context.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync() => await _container.DisposeAsync();
+}
+
+[CollectionDefinition(Name)]
+public sealed class PostgresCollection : ICollectionFixture<Postgres>
+{
+    public const string Name = "postgres";
+}
+
+/// <summary>The token shape this service verifies.</summary>
+public static class TokenShape
+{
+    /// <summary>The private test key (P-256, PKCS#8, base64).</summary>
+    /// <remarks>
+    /// Fixed in the tree because it applies only here: the service under test
+    /// gets the matching public key. Rolled, it would make the journey depend
+    /// on the machine it runs on.
+    /// </remarks>
+    public const string PrivateKey = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgJ3H3ErtgAxTOpVVLh08LeYAzp06ePuF5MOe37hEIpZehRANCAATsDC5wPWJV4/HRgf8P2JwSrTF3mFASKSK7RsgkpBN97pH87mRpgy/rmLIjBqFZhq2C/VrcyfvLR2iev4OwNO7s";
+
+    /// <summary>The matching public key (SPKI, base64).</summary>
+    public const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7AwucD1iVePx0YH/D9icEq0xd5hQEikiu0bIJKQTfe6R/O5kaYMv65iyIwahWYatgv1a3Mn7y0donr+DsDTu7A==";
+
+    /// <summary>Names the key, so a change may hold two of them side by side.</summary>
+    public const string KeyId = "test";
+
+    public const string Issuer = "workertransfer";
+    public const string Audience = "workertransfer";
+
+    private static readonly ECDsa Curve = Read();
+
+    private static ECDsa Read()
+    {
+        var curve = ECDsa.Create();
+        curve.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivateKey), out _);
+        return curve;
+    }
+
+    public static string Person(Guid subject)
+    {
+        var token = new JwtSecurityToken(
+            issuer: Issuer,
+            audience: Audience,
+            claims: [new Claim(JwtRegisteredClaimNames.Sub, subject.ToString())],
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: new SigningCredentials(
+                new ECDsaSecurityKey(Curve) { KeyId = KeyId },
+                SecurityAlgorithms.EcdsaSha256));
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}

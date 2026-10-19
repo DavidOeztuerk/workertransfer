@@ -1,10 +1,10 @@
-// Die Benachrichtigung durch den echten Stack — und was sie NICHT sagt.
+// The notification through the real stack — and what it does NOT say.
 //
-// Der Integrationstest belegt den Inhalt am Versandpfad im Prozess. Hier läuft
-// er über SMTP nach Mailpit, wie in Produktion: identity-service schreibt,
-// transfer-service hat ausgelöst, und dazwischen liegt echtes HTTP mit dem
-// gemeinsamen Geheimnis. Ein fehlendes `WORKER_NOTIFY_SECRET` in einem der
-// beiden Container wäre auf keiner anderen Ebene sichtbar.
+// The integration test proves the content on the in-process sending path. Here
+// it runs over SMTP to Mailpit, as in production: identity-service writes,
+// transfer-service triggered it, and in between lies real HTTP with the shared
+// secret. A missing `WORKERTRANSFER_NOTIFY_SECRET` in one of the two containers
+// would be visible on no other level.
 
 import { expect, test } from "@playwright/test";
 
@@ -15,23 +15,23 @@ import {
   skipWithoutStack,
   uniqueCompanyDomain,
   uniqueEmail,
-  waehleImFeld,
+  pickOption,
 } from "./stack";
 
 skipWithoutStack();
 
-test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, worum es geht", async ({
+test("a request reaches the person by mail — and the mail does not reveal what it is about", async ({
   browser,
 }) => {
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Melder ${Date.now()}`;
-  const headline = `E2E Melde-Kandidat ${Date.now()}`;
+  const companyName = `E2E Notifier ${Date.now()}`;
+  const headline = `E2E Notified candidate ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -46,11 +46,11 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
-  // Ab hier zählt nur, was nach diesem Zeitpunkt zugestellt wird — die
-  // Bestätigungsmail von vorhin ginge sonst als Treffer durch.
+  // From here on only what is delivered after this moment counts — the
+  // confirmation mail from before would otherwise pass as a hit.
   const since = Date.now();
 
   await recruiter.goto("/scout");
@@ -64,8 +64,10 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
 
   const text = `${mail?.subject ?? ""}\n${mail?.text ?? ""}`
     .toLowerCase()
-    // Der Markenname raus: „WorkerTransfer" enthält „transfer".
+    // Drop the brand name: "WorkerTransfer" contains "transfer".
     .replace(/workertransfer/g, "");
+  // The words are German because the mail is: identity-service writes in the
+  // account's language, and this account was registered under `de-DE`.
   for (const leak of [
     "marktstatus",
     "lebenslauf",
@@ -78,30 +80,30 @@ test("eine Anfrage erreicht die Person per Mail — und die Mail verrät nicht, 
   ]) {
     expect(text).not.toContain(leak);
   }
-  // Aber ein Weg zurück steht drin — sonst wäre die Mail wirklich nutzlos.
+  // But a way back is in it — otherwise the mail would be truly useless.
   expect(mail?.text ?? "").toContain("http");
 
   await candidateContext.close();
   await recruiterContext.close();
 });
 
-test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser }) => {
-  // Dreifaches Budget, und zwar wegen der FORM dieser Reise, nicht wegen der
-  // Maschine: sie ist die einzige, die ein volles Mail-Fenster (60 s) absichtlich
-  // mit Warten auf nichts verbringt — eine Abwesenheit lässt sich nur durch
-  // Verstreichen beweisen. Dazu kommen zwei Registrierungen mit Mail-Umlauf,
-  // eine Unternehmensanlage und ein Wechsel. 150 s reichen dafür nicht, und das
-  // Fenster zu verkürzen wäre keine Reparatur, sondern eine schwächere Aussage.
+test("whoever unsubscribes from the kind gets no more mail about it", async ({ browser }) => {
+  // Triple budget, because of the SHAPE of this journey, not the machine: it is
+  // the only one that deliberately spends a full mail window (60 s) waiting for
+  // nothing — an absence can only be proved by letting time pass. On top come
+  // two registrations with a mail round trip, creating a company and a switch.
+  // 150 s are not enough for that, and shortening the window would be no repair
+  // but a weaker statement.
   test.slow();
-  const candidateEmail = uniqueEmail("kandidat.example");
+  const candidateEmail = uniqueEmail("candidate.example");
   const companyDomain = uniqueCompanyDomain();
   const recruiterEmail = uniqueEmail(companyDomain);
-  const companyName = `E2E Stumm ${Date.now()}`;
-  const headline = `E2E Stumm-Kandidat ${Date.now()}`;
+  const companyName = `E2E Muted ${Date.now()}`;
+  const headline = `E2E Muted candidate ${Date.now()}`;
 
   const candidateContext = await browser.newContext();
   const candidate = await candidateContext.newPage();
-  await registerAndConfirm(candidate, candidateEmail, "E2E Kandidat");
+  await registerAndConfirm(candidate, candidateEmail, "E2E Candidate");
   await login(candidate, candidateEmail);
 
   await candidate.goto("/profile");
@@ -111,50 +113,48 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await candidate.getByRole("switch").click();
   await expect(candidate.getByRole("switch")).toBeChecked();
 
-  // Abbestellen — der Schalter wirkt sofort, es gibt keinen Speichern-Knopf.
+  // Unsubscribe — the switch takes effect immediately, there is no save button.
   await candidate.goto("/settings");
   const marketSwitch = candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ });
   await expect(marketSwitch).toBeChecked();
 
-  // Auf die ANTWORT warten, nicht auf den Schalter. Der Schalter steht sofort
-  // um — die Seite schreibt die neue Stellung hin, bevor der Server sie hat —
-  // und das `goto` darunter bricht eine noch laufende Anfrage ab. Dann ist der
-  // Haken nach dem Neuladen wieder da, und die Reise faellt an einer Stelle,
-  // die mit ihrer Aussage nichts zu tun hat. Gemessen: genau so, einmal in
-  // einem Lauf von 25.
+  // Wait for the RESPONSE, not for the switch. The switch flips at once — the
+  // page writes down the new position before the server has it — and the
+  // `goto` below aborts a request still in flight. Then the tick is back after
+  // the reload, and the journey falls at a place that has nothing to do with
+  // its statement. Measured: exactly that, once in a run of 25.
   //
-  // Kein hoeheres Zeitlimit: das saehe aus wie eine Reparatur und verschoebe
-  // das Rennen nur.
-  const gespeichert = candidate.waitForResponse(
-    (antwort) =>
-      antwort.url().includes("/me/notification-preferences") &&
-      antwort.request().method() === "PUT",
+  // No higher time limit: that would look like a repair and only move the race.
+  const saved = candidate.waitForResponse(
+    (response) =>
+      response.url().includes("/me/notification-preferences") &&
+      response.request().method() === "PUT",
   );
   await marketSwitch.click();
   await expect(marketSwitch).not.toBeChecked();
-  await gespeichert;
+  await saved;
 
-  // UND „dein Profil wurde entdeckt" gleich mit — sonst prueft diese Reise
-  // nicht mehr, was sie behauptet.
+  // AND "your profile was discovered" along with it — otherwise this journey no
+  // longer checks what it claims.
   //
-  // Der Grund liegt eine Seite weiter: der Personalsuchende oeffnet unten den
-  // Scout, die Person taucht in seiner Trefferliste auf, und DAS ist eine
-  // eigene Benachrichtigung (ADR-0033). Sie kaeme zu Recht — nur traegt jede
-  // Mail dieser Plattform denselben Satz, ohne zu sagen, worum es geht
-  // (genau das prueft die Reise weiter unten). „Keine Mail" liesse sich also
-  // von „die falsche Mail" nicht unterscheiden, und die Reise waere ab hier
-  // eine Behauptung ueber etwas anderes.
-  const entdeckung = candidate.getByRole("switch", { name: /entdeckt wird/ });
-  const auchGespeichert = candidate.waitForResponse(
-    (antwort) =>
-      antwort.url().includes("/me/notification-preferences") &&
-      antwort.request().method() === "PUT",
+  // The reason lies one page further: the recruiter opens the scout below, the
+  // person shows up in his hit list, and THAT is a notification of its own
+  // (ADR-0033). It would come rightly — only every mail of this platform
+  // carries the same sentence without saying what it is about (exactly what the
+  // journey above checks). "No mail" could therefore not be told apart from
+  // "the wrong mail", and from here on the journey would be a claim about
+  // something else.
+  const discovered = candidate.getByRole("switch", { name: /entdeckt wird/ });
+  const alsoSaved = candidate.waitForResponse(
+    (response) =>
+      response.url().includes("/me/notification-preferences") &&
+      response.request().method() === "PUT",
   );
-  await entdeckung.click();
-  await expect(entdeckung).not.toBeChecked();
-  await auchGespeichert;
+  await discovered.click();
+  await expect(discovered).not.toBeChecked();
+  await alsoSaved;
 
-  // Neu laden: gespeichert ist nur, was den Server erreicht hat.
+  // Reload: saved is only what reached the server.
   await candidate.goto("/settings");
   await expect(
     candidate.getByRole("switch", { name: /Marktstatus sehen möchte/ })
@@ -168,7 +168,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   await registerAndConfirm(recruiter, recruiterEmail, "E2E Recruiter", companyName);
   await login(recruiter, recruiterEmail);
   await recruiter.goto("/");
-  await waehleImFeld(recruiter, /Handeln als/i, companyName);
+  await pickOption(recruiter, /Handeln als/i, companyName);
   await expect(recruiter.getByRole("button", { name: "Unternehmen" })).toBeVisible();
 
   const since = Date.now();
@@ -176,7 +176,7 @@ test("wer die Art abbestellt, bekommt dazu keine Mail mehr", async ({ browser })
   const card = recruiter.locator("li").filter({ hasText: headline });
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: /Marktstatus anfragen/i }).click();
-  // Der Vorgang läuft trotzdem: die Mail ist Höflichkeit, nicht Bedingung.
+  // The process runs anyway: the mail is a courtesy, not a condition.
   await expect(card.getByText(/Marktstatus angefragt/i)).toBeVisible();
 
   const mail = await lastMailFor(candidateEmail, { after: since });

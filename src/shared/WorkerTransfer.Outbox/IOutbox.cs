@@ -11,20 +11,20 @@ namespace WorkerTransfer.Outbox;
 /// </remarks>
 public interface IOutbox
 {
-    /// <param name="empfaenger">Whom the intent is about.</param>
-    /// <param name="art">
+    /// <param name="recipient">Whom the intent is about.</param>
+    /// <param name="kind">
     /// What is meant. A short, stable label — never a message, never a reason.
     /// </param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>The id of the row, for a caller that wants to watch it.</returns>
-    Task<Guid> VermerkeAsync(
-        SubjectId empfaenger,
-        string art,
+    Task<Guid> NoteAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default);
 }
 
 /// <summary>What delivers — HTTP, SMTP, whatever.</summary>
-public interface IZustellung
+public interface IDelivery
 {
     /// <summary>
     /// Delivers one intent, or throws.
@@ -32,13 +32,13 @@ public interface IZustellung
     /// <remarks>
     /// Throwing is a supported answer and for the erasure it is the important
     /// one: a delivery that swallows its failures would make
-    /// <see cref="OutboxZeile.DeliveredAt"/> a lie, and the completeness proof
+    /// <see cref="OutboxRow.DeliveredAt"/> a lie, and the completeness proof
     /// of ADR-0027 would prove nothing.
     /// </remarks>
-    /// <exception cref="NochNichtException">The row's turn has not come.</exception>
-    Task ZustelleAsync(
-        SubjectId empfaenger,
-        string art,
+    /// <exception cref="NotYetException">The row's turn has not come.</exception>
+    Task DeliverAsync(
+        SubjectId recipient,
+        string kind,
         CancellationToken cancellationToken = default);
 }
 
@@ -57,4 +57,4 @@ public interface IZustellung
 /// waited its turn.
 /// </para>
 /// </remarks>
-public sealed class NochNichtException(string grund) : Exception(grund);
+public sealed class NotYetException(string reason) : Exception(reason);

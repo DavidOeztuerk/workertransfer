@@ -13,20 +13,20 @@ import { elevation, layer, motion, radius, size, spacingUnit } from "./tokens/sp
 import { fontFamily, monoFamily, scale } from "./tokens/typography";
 
 /**
- * Das Theme — gebaut aus den Tokens, nicht daneben.
+ * The theme — built from the tokens, not beside them.
  *
- * Alle Farbwerte kommen aus `tokens/colors`. Ein Literal in einer Komponente
- * ist deshalb immer ein Fehler und keine Ausnahme: die zweite Quelle ist genau
- * das, was beim nächsten Dunkelmodus auseinanderläuft.
+ * Every colour value comes from `tokens/colors`. A literal in a component is
+ * therefore always a defect and never an exception: the second source is
+ * exactly what drifts apart at the next dark mode.
  */
 export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
   const light = mode === "light";
 
-  // Die drei Leitern, aus denen fast jede Regel unten liest. Sie stehen hier
-  // einmal, damit keine Komponente sich ihre eigene Ebene ausdenkt.
-  const flaeche = light ? surfaces.light : surfaces.dark;
-  const rand = light ? borders.light : borders.dark;
-  const hoehe = light ? elevation.light : elevation.dark;
+  // The three ladders almost every rule below reads from. They stand here once
+  // so that no component invents its own layer.
+  const surface = light ? surfaces.light : surfaces.dark;
+  const border = light ? borders.light : borders.dark;
+  const shadow = light ? elevation.light : elevation.dark;
 
   return {
     palette: {
@@ -48,15 +48,15 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
       warning: { main: semantic.pending.main, light: semantic.pending.light, dark: semantic.pending.dark },
       info: { main: semantic.info.main, light: semantic.info.light, dark: semantic.info.dark },
       background: {
-        default: flaeche.canvas,
-        paper: flaeche.surface,
+        default: surface.canvas,
+        paper: surface.surface,
       },
       text: {
         primary: light ? neutral[900] : neutral[100],
         secondary: light ? neutral[600] : neutral[400],
         disabled: light ? neutral[400] : neutral[600],
       },
-      divider: rand.default,
+      divider: border.default,
       action: {
         hover: light ? "rgb(107 94 242 / 0.05)" : "rgb(164 174 255 / 0.09)",
         selected: light ? "rgb(107 94 242 / 0.10)" : "rgb(164 174 255 / 0.16)",
@@ -79,25 +79,25 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: {
           ":root": { colorScheme: mode },
 
-          // Der Fokusring ist Bedienbarkeit, nicht Zierde: wer mit der Tastatur
-          // navigiert, muss jederzeit sehen, wo er steht. MUIs Vorgabe ist an
-          // mehreren Stellen unsichtbar auf farbigem Grund. Zwei Lagen, damit er
-          // auf hellem wie auf dunklem Grund trägt.
+          // The focus ring is operability, not ornament: whoever navigates with
+          // the keyboard must see at all times where they are. MUI's default is
+          // invisible on a coloured ground in several places. Two layers, so
+          // that it carries on a light as well as on a dark ground.
           //
-          // NICHT auf Formularfelder. Ein `input`, `select` oder `textarea`
-          // steckt in einem `OutlinedInput`, und der zeichnet im Fokus schon
-          // einen 2px-Rahmen um sich. Beides zusammen ergab zwei Rahmen
-          // ineinander — einen am Feld, einen am Kasten darum —, und weil der
-          // äussere rund und der innere eckig ist, sah es schief aus. Gemessen
-          // an der Sprachwahl und den Filtern.
+          // NOT on form fields. An `input`, `select` or `textarea` sits inside
+          // an `OutlinedInput`, and that already draws a 2px frame around
+          // itself on focus. Both together gave two frames one inside the other
+          // — one at the field, one at the box around it — and because the
+          // outer one is round and the inner one square, it looked crooked.
+          // Measured at the language choice and the filters.
           "*:focus-visible:not(input):not(select):not(textarea)": {
             outline: "none",
             boxShadow: light ? focusRing.light : focusRing.dark,
             borderRadius: radius.sm,
           },
 
-          // Das Feld selbst bekommt gar keinen eigenen Ring: der Kasten um es
-          // herum ist der Fokus, und er ist gross genug, um gesehen zu werden.
+          // The field itself gets no ring of its own: the box around it is the
+          // focus, and it is big enough to be seen.
           "input:focus-visible, select:focus-visible, textarea:focus-visible": {
             outline: "none",
           },
@@ -110,18 +110,17 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
           },
           code: { fontFamily: monoFamily },
 
-          // Eine schmale Bildlaufleiste in den Farben der Oberfläche. Die
-          // Vorgabe des Browsers ist im Dunkelmodus hell und schneidet einen
-          // weissen Streifen in die Seite.
+          // A narrow scrollbar in the UI's colours. The browser's default is
+          // light in dark mode and cuts a white stripe into the page.
           "*::-webkit-scrollbar": { width: 10, height: 10 },
           "*::-webkit-scrollbar-thumb": {
-            backgroundColor: rand.strong,
+            backgroundColor: border.strong,
             borderRadius: radius.pill,
-            border: `2px solid ${flaeche.canvas}`,
+            border: `2px solid ${surface.canvas}`,
           },
           "*::-webkit-scrollbar-track": { background: "transparent" },
 
-          // Wer "weniger Bewegung" eingestellt hat, meint es.
+          // Whoever set "reduce motion" means it.
           "@media (prefers-reduced-motion: reduce)": {
             "*": {
               animationDuration: "0.01ms !important",
@@ -140,18 +139,18 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
             paddingInline: 18,
             minHeight: 40,
             transition: `background-color ${motion.fast}, box-shadow ${motion.fast}, transform ${motion.fast}`,
-            // Ein Druckpunkt. Winzig, aber er ist der Unterschied zwischen
-            // „angeklickt" und „vielleicht angeklickt".
+            // A press point. Tiny, but it is the difference between "clicked"
+            // and "maybe clicked".
             "&:active": { transform: "translateY(0.5px)" },
           },
           sizeSmall: { minHeight: 34, paddingInline: 14 },
           sizeLarge: { minHeight: 48, paddingInline: 26, fontSize: "1rem" },
           contained: {
             boxShadow: "none",
-            "&:hover": { boxShadow: hoehe.hover },
+            "&:hover": { boxShadow: shadow.hover },
           },
           outlined: {
-            borderColor: rand.strong,
+            borderColor: border.strong,
             "&:hover": { borderColor: light ? brand[400] : brand[500] },
           },
           text: { paddingInline: 12 },
@@ -170,13 +169,13 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
       MuiPaper: {
         defaultProps: { elevation: 0 },
         styleOverrides: {
-          // `backgroundImage: none` ist Pflicht: MUI legt im Dunkelmodus einen
-          // Aufhell-Verlauf über jedes Paper, und der kämpft mit unserer
-          // Flächenleiter.
+          // `backgroundImage: none` is mandatory: in dark mode MUI lays a
+          // lightening gradient over every Paper, and that fights our surface
+          // ladder.
           root: { backgroundImage: "none" },
-          outlined: { borderColor: rand.default },
-          elevation1: { boxShadow: hoehe.raised, backgroundColor: flaeche.raised },
-          elevation2: { boxShadow: hoehe.overlay, backgroundColor: flaeche.raised },
+          outlined: { borderColor: border.default },
+          elevation1: { boxShadow: shadow.raised, backgroundColor: surface.raised },
+          elevation2: { boxShadow: shadow.overlay, backgroundColor: surface.raised },
         },
       },
 
@@ -185,9 +184,9 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: {
           root: {
             borderRadius: radius.lg,
-            borderColor: rand.default,
-            backgroundColor: flaeche.surface,
-            boxShadow: hoehe.raised,
+            borderColor: border.default,
+            backgroundColor: surface.surface,
+            boxShadow: shadow.raised,
             transition: `border-color ${motion.base}, box-shadow ${motion.base}`,
           },
         },
@@ -199,24 +198,24 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         },
       },
 
-      // DIE BESCHRIFTUNG STEHT ÜBER DEM FELD, IMMER.
+      // THE LABEL STANDS ABOVE THE FIELD, ALWAYS.
       //
-      // MUIs Vorgabe ist ein schwebendes Label: es sitzt IM leeren Feld und
-      // wandert beim Tippen auf die Rahmenlinie. Das trägt, solange alle Felder
-      // gleich sind — und Auswahlfelder sind es nie: ein `select` zeigt immer
-      // einen Wert, sein Label steht also von Anfang an oben.
+      // MUI's default is a floating label: it sits IN the empty field and moves
+      // onto the outline while typing. That holds as long as all fields are
+      // alike — and select fields never are: a `select` always shows a value,
+      // so its label stands on top from the start.
       //
-      // Gemessen an der Filterleiste: drei Textfelder mit Beschriftung IM Feld
-      // neben zwei Auswahlfeldern mit Beschriftung auf der Rahmenlinie, und
-      // weil das Feld einen gefüllten Grund hat, lag die Schrift dort nicht in
-      // einer Lücke, sondern auf der Linie. Zwei Muster in einer Spalte, und
-      // keines sah nach Absicht aus.
+      // Measured at the filter bar: three text fields with the label IN the
+      // field beside two select fields with the label on the outline, and
+      // because the field has a filled ground, the text there lay not in a gap
+      // but on the line. Two patterns in one column, and neither looked
+      // intended.
       MuiTextField: { defaultProps: { size: "small", fullWidth: true } },
 
       MuiInputLabel: {
-        // `shrink` als VORGABE. Ohne das hängt die Stellung daran, ob ein Feld
-        // gerade gefüllt ist, und das ist genau der Unterschied, der die zwei
-        // Muster erzeugt hat.
+        // `shrink` as the DEFAULT. Without it the position depends on whether a
+        // field happens to be filled, and that is exactly the difference that
+        // produced the two patterns.
         defaultProps: { shrink: true },
         styleOverrides: {
           root: {
@@ -225,16 +224,14 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
             fontWeight: 580,
             lineHeight: 1.4,
             color: light ? neutral[700] : neutral[300],
-            // Der Fokus färbt den RAHMEN, nicht die Beschriftung. Ein Label,
-            // das die Farbe wechselt, zieht den Blick von dem Feld ab, in dem
-            // gerade geschrieben wird.
+            // Focus colours the FRAME, not the label. A label that changes
+            // colour pulls the eye away from the field being written in.
             "&.Mui-focused": { color: light ? neutral[700] : neutral[300] },
           },
-          // DIESE Regel ist die wirksame. `root` allein reicht nicht: MUIs
-          // Variante `outlined` setzt `position: absolute` und einen
-          // `transform` mit höherer Spezifität, und eine Überschreibung nur an
-          // `root` sieht im Quelltext richtig aus und wirkt nicht — an genau
-          // dieser Leiste gemessen.
+          // THIS rule is the effective one. `root` alone is not enough: MUI's
+          // `outlined` variant sets `position: absolute` and a `transform` with
+          // higher specificity, and an override at `root` only looks right in
+          // the source and has no effect — measured at exactly this bar.
           outlined: {
             position: "static",
             transform: "none",
@@ -244,55 +241,48 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         },
       },
 
-      // KEIN NATIVES AUSWAHLFELD MEHR, und der Grund ist gemessen.
+      // NO NATIVE SELECT ANY MORE, and the reason is measured.
       //
-      // Der alte Kommentar hier behauptete, MUIs eigenes Auswahlfeld werde
-      // „weder von `selectOption` noch von einem Screenreader als Auswahlfeld
-      // bedient". Die zweite Hälfte ist falsch: MUI zeichnet `role="combobox"`
-      // mit `aria-expanded` und ein `role="listbox"`, und genau das lesen
-      // Vorleser als Auswahlfeld. Nur `selectOption` von Playwright greift
-      // nicht — dafür steht in `e2e/stack.ts` ein Helfer.
+      // The old comment here claimed MUI's own select would be "operated as a
+      // select neither by `selectOption` nor by a screen reader". The second
+      // half is false: MUI draws `role="combobox"` with `aria-expanded` and a
+      // `role="listbox"`, and screen readers read exactly that as a select.
+      // Only Playwright's `selectOption` does not apply — `e2e/stack.ts` holds
+      // a helper for that.
       //
-      // Was ein natives Feld kostet, ist auf einem Bildschirmfoto zu sehen:
-      // macOS legt sein eigenes Fenster über das Feld, schiebt es nach links,
-      // damit der GEWÄHLTE Eintrag über dem Feld zu liegen kommt, und zeichnet
-      // es in Systemfarben. Auf jedem Betriebssystem anders, und nirgends wie
-      // der Rest dieser Oberfläche.
+      // What a native field costs shows in a screenshot: macOS lays its own
+      // window over the field, shifts it to the left so that the CHOSEN entry
+      // comes to lie over the field, and draws it in system colours. Different
+      // on every operating system, and nowhere like the rest of this UI.
       MuiSelect: {
         defaultProps: {
-          // Kein abdunkelnder Hintergrund: eine Liste mit vier Einträgen ist
-          // kein Dialog.
+          // No darkening backdrop: a list with four entries is not a dialog.
           MenuProps: { slotProps: { backdrop: { invisible: true } } },
 
-          // „Egal" ist eine Wahl und muss dastehen.
+          // "Any" is a choice and has to show.
           //
-          // MUI zeichnet bei einem leeren Wert NICHTS in das geschlossene Feld
-          // — der Eintrag `<MenuItem value="">Egal</MenuItem>` bleibt also
-          // unsichtbar, und das Feld sieht aus, als sei nichts eingestellt.
-          // Ein natives `select` zeigte ihn; beim Umstieg wäre das still
-          // verlorengegangen.
+          // For an empty value MUI draws NOTHING into the closed field — the
+          // entry `<MenuItem value="">…</MenuItem>` stays invisible, and the
+          // field looks as if nothing were set. A native `select` showed it;
+          // in the switch that would have been lost silently.
           displayEmpty: true,
         },
       },
 
       MuiOutlinedInput: {
         styleOverrides: {
-          // Kein Ausschnitt im Rahmen: die Beschriftung steht darüber, also
-          // gibt es nichts freizulassen. Ohne `top: 0` bliebe der Rahmen um
-          // die halbe Zeilenhöhe nach unten versetzt — er ist dafür gebaut, ein
-          // Label in sich zu tragen.
-          // Kein Ausschnitt im Rahmen: die Beschriftung steht darüber, also
-          // gibt es nichts freizulassen. `top: 0` ist Pflicht — der Rahmen ist
-          // dafür gebaut, ein Label in sich zu tragen, und säße sonst um die
-          // halbe Zeilenhöhe zu tief.
+          // No notch in the outline: the label stands above it, so there is
+          // nothing to leave free. `top: 0` is mandatory — the outline is built
+          // to carry a label inside it and would otherwise sit half a line
+          // height too low.
           notchedOutline: { top: 0, "& legend": { display: "none" } },
           root: {
             borderRadius: radius.sm,
-            backgroundColor: flaeche.sunken,
+            backgroundColor: surface.sunken,
             transition: `background-color ${motion.fast}, border-color ${motion.fast}`,
-            "& .MuiOutlinedInput-notchedOutline": { borderColor: rand.default },
-            "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: rand.strong },
-            "&.Mui-focused": { backgroundColor: flaeche.surface },
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: border.default },
+            "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: border.strong },
+            "&.Mui-focused": { backgroundColor: surface.surface },
             "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
               borderWidth: 2,
               borderColor: light ? brand[600] : brand[400],
@@ -306,15 +296,15 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
       },
 
 
-      // Ein Hinweis ohne Rand verschwimmt mit der Seite; gerade Fehler müssen
-      // als eigener Block lesbar sein. Die Fläche kommt aus den Bedeutungs-
-      // farben, damit ein Fehler im Dunkelmodus nicht blendet.
+      // A notice without a border blurs into the page; errors in particular
+      // must read as a block of their own. The surface comes from the meaning
+      // colours so that an error does not dazzle in dark mode.
       MuiAlert: {
         defaultProps: { variant: "outlined" },
         styleOverrides: {
-          // Über Selektoren und nicht über `standardSuccess` & Co.: die
-          // Override-Schlüssel je Schweregrad heissen von MUI-Version zu
-          // MUI-Version anders, die Klassennamen nicht.
+          // Via selectors and not via `standardSuccess` & co.: the override
+          // keys per severity change names from MUI version to MUI version,
+          // the class names do not.
           root: {
             borderRadius: radius.md,
             alignItems: "flex-start",
@@ -343,7 +333,7 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: {
           root: { borderRadius: radius.pill, fontWeight: 560 },
           sizeSmall: { height: 24 },
-          outlined: { borderColor: rand.strong },
+          outlined: { borderColor: border.strong },
         },
       },
 
@@ -370,8 +360,8 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: {
           paper: {
             borderRadius: radius.xl,
-            boxShadow: hoehe.modal,
-            backgroundColor: flaeche.overlay,
+            boxShadow: shadow.modal,
+            backgroundColor: surface.overlay,
             backgroundImage: "none",
           },
         },
@@ -381,9 +371,9 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         styleOverrides: {
           paper: {
             borderRadius: radius.md,
-            boxShadow: hoehe.overlay,
-            backgroundColor: flaeche.overlay,
-            border: `1px solid ${rand.default}`,
+            boxShadow: shadow.overlay,
+            backgroundColor: surface.overlay,
+            border: `1px solid ${border.default}`,
             backgroundImage: "none",
           },
           list: { paddingBlock: 6 },
@@ -396,12 +386,12 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         },
       },
 
-      MuiDivider: { styleOverrides: { root: { borderColor: rand.subtle } } },
+      MuiDivider: { styleOverrides: { root: { borderColor: border.subtle } } },
 
       MuiSkeleton: {
         defaultProps: { animation: "wave" },
         styleOverrides: {
-          root: { backgroundColor: rand.subtle, borderRadius: radius.sm },
+          root: { backgroundColor: border.subtle, borderRadius: radius.sm },
         },
       },
 
@@ -419,9 +409,9 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
         defaultProps: { elevation: 0, color: "inherit" },
         styleOverrides: {
           root: {
-            backgroundColor: flaeche.surface,
+            backgroundColor: surface.surface,
             backgroundImage: "none",
-            borderBottom: `1px solid ${rand.default}`,
+            borderBottom: `1px solid ${border.default}`,
             zIndex: layer.header,
           },
         },
@@ -434,7 +424,7 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
       MuiSwitch: {
         styleOverrides: {
           root: { padding: 8 },
-          track: { borderRadius: radius.pill, opacity: 1, backgroundColor: rand.strong },
+          track: { borderRadius: radius.pill, opacity: 1, backgroundColor: border.strong },
         },
       },
 
@@ -477,5 +467,5 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
   };
 };
 
-/** Fertig gebaut, für die Stellen, die kein `mode` von aussen bekommen. */
+/** Ready built, for the places that get no `mode` from outside. */
 export const buildTheme = (mode: PaletteMode) => createTheme(getThemeOptions(mode));

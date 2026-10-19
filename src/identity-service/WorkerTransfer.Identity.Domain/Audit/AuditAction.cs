@@ -7,7 +7,7 @@ namespace WorkerTransfer.Identity.Domain.Audit;
 /// reading the code that wrote it.
 /// <para>
 /// Every member maps to one label of the <c>audit_action</c> enum in the
-/// database, snake_case of the member name. <c>PruefspurTests</c> pins all
+/// database, snake_case of the member name. <c>AuditTrailTests</c> pins all
 /// thirteen against the real column, because the rule that produces them is
 /// Npgsql's and not ours.
 /// </para>

@@ -1,222 +1,224 @@
 using Noelia.Core.Identity;
 using MediatR;
-using WorkerTransfer.Scout.Application.Ansprache;
-using WorkerTransfer.Scout.Application.Kandidaten;
+using WorkerTransfer.Scout.Application.Approach;
+using WorkerTransfer.Scout.Application.Candidates;
 using WorkerTransfer.Scout.Application.Ports;
-using WorkerTransfer.Scout.Application.Suchen;
+using WorkerTransfer.Scout.Application.Searches;
 using WorkerTransfer.Scout.Contracts;
-using WorkerTransfer.Scout.Domain.Suchen;
-using WorkerTransfer.Scout.Domain.Treffer;
+using WorkerTransfer.Scout.Domain.Hits;
+using WorkerTransfer.Scout.Domain.Searches;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Scout.Api;
 
-/// <summary><c>/scout</c> — suchen, ablegen, ansprechen.</summary>
+/// <summary><c>/scout</c> — search, save, approach.</summary>
 /// <remarks>
-/// <para><strong>Firmenzwang überall.</strong> Wer für sich selbst handelt,
-/// bekommt 403 „no active company" — eine Aussage über den <em>Aufrufer</em>,
-/// die über die Gesuchten nichts verrät. Das ist der harte Teil aus
-/// <c>GET /candidates</c>, mitgenommen und nicht neu erfunden.</para>
+/// <para><strong>A company is required everywhere.</strong> Whoever acts for
+/// themselves gets 403 "no active company" — a statement about the
+/// <em>caller</em> that reveals nothing about those searched for. That is the
+/// hard part of <c>GET /candidates</c>, carried over and not reinvented.</para>
 ///
-/// <para><strong>Und <c>member</c> genügt, kein <c>admin</c>.</strong> Suchen,
-/// entwerfen und ansprechen ist die tägliche Arbeit im Namen der Firma; ein zu
-/// enges Recht machte aus einer Einladung eine Zuschauerkarte, und dann legt
-/// jemand einen zweiten Admin an, um arbeiten zu können.</para>
+/// <para><strong>And <c>member</c> is enough, no <c>admin</c>.</strong>
+/// Searching, drafting and approaching is the daily work in the company's name;
+/// a right that is too narrow would turn an invitation into a spectator seat,
+/// and then somebody creates a second admin in order to work.</para>
 /// </remarks>
 public static class ScoutEndpoints
 {
-    /// <summary>Bindet die Scout-Routen ein.</summary>
+    /// <summary>Maps the scout routes.</summary>
     public static IEndpointRouteBuilder MapScoutEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // Ein schweigender Ledger ist weder ein Ja noch ein Nein, und eine
-        // schweigende Profilsuche auch nicht. 404 sagte, es gebe niemanden; eine
-        // leere Liste behauptete dasselbe leiser. 503 sagt das einzig Wahre:
-        // dieser Dienst kann gerade nicht antworten.
+        // A silent ledger is neither a yes nor a no, and a silent profile search
+        // is not either. 404 would say there is nobody; an empty list would claim
+        // the same more quietly. 503 says the only true thing: this service
+        // cannot answer right now.
         //
-        // Als ein Filter statt als Fang in jeder Route, weil die Route, die ihn
-        // vergisst, wie eine funktionierende aussieht, bis etwas ausfällt.
-        var scout = app.MapGroup("/scout").AddEndpointFilter(SchweigenAbfangen);
+        // As a filter instead of a catch in every route, because the route that
+        // forgets it looks like a working one until something fails.
+        var scout = app.MapGroup("/scout").AddEndpointFilter(CatchSilence);
 
         scout.MapGet("/candidates", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal actor,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Company(actor) is not { } company)
             {
-                await OhneFirma(akteur, context);
+                await WithoutCompany(actor, context);
                 return;
             }
 
-            var anfrage = context.Request.Query;
+            var query = context.Request.Query;
 
-            Suchfilter filter;
+            SearchFilter filter;
 
             try
             {
-                filter = Suchfilter.Aus(
-                    anfrage["skill"].Count > 0 ? [.. anfrage["skill"]!] : null,
-                    anfrage["location"].ToString(),
-                    anfrage["remote"] == "true");
+                filter = SearchFilter.From(
+                    query["skill"].Count > 0 ? [.. query["skill"]!] : null,
+                    query["location"].ToString(),
+                    query["remote"] == "true");
             }
-            catch (Eingabefehler fehler)
+            catch (InputError error)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
                 return;
             }
 
-            // `stelle` FILTERT NICHT. Sie fuegt jedem Treffer eine Auskunft
-            // hinzu und nimmt keinen weg (ADR-0041): wer weiter weg wohnt,
-            // bleibt in der Liste und traegt ein Kreuz. Das Unternehmen
-            // entscheidet, nicht die Suche — und es sieht, warum.
-            var seite = await mediator.Send(
-                new KandidatenAbfrage(
-                    firma, filter, Laenge(anfrage["limit"]), anfrage["cursor"],
-                    Guid.TryParse(anfrage["stelle"], out var welche) ? welche : null),
+            // `stelle` DOES NOT FILTER. It adds a piece of information to each hit
+            // and takes none away (ADR-0041): whoever lives further away stays in
+            // the list and carries a cross. The company decides, not the search —
+            // and it sees why.
+            //
+            // The key `stelle` is German and stays so: it is the query parameter
+            // web/ sends (`?stelle=<id>`), a wire contract and not an identifier.
+            var page = await mediator.Send(
+                new CandidatesQuery(
+                    company, filter, PageLength(query["limit"]), query["cursor"],
+                    Guid.TryParse(query["stelle"], out var job) ? job : null),
                 cancellationToken);
 
-            // DIE EINE STELLE, AN DER EIN LESEN ETWAS SCHREIBT — und sie steht
-            // hier absichtlich sichtbar statt versteckt in der Abfrage.
+            // THE ONE PLACE WHERE A READ WRITES SOMETHING — and it stands here
+            // deliberately visible instead of hidden in the query.
             //
-            // Wer in einer Suche auftaucht, ist entdeckt worden, und ADR-0033
-            // sagt: das erfaehrt die Person. Nicht ueber ein Protokoll „wer hat
-            // wen angesehen" — das waere die sensibelste Tabelle des Systems —
-            // sondern ueber eine Nachricht, die KEIN Unternehmen nennt.
+            // Whoever turns up in a search has been discovered, and ADR-0033 says:
+            // the person learns of it. Not through a log "who looked at whom" —
+            // that would be the most sensitive table of the system — but through a
+            // message that names NO company.
             //
-            // Als eigener BEFEHL und nicht in der Abfrage, weil nur ein Befehl
-            // eine Transaktionsklammer bekommt: die Ausgangszeile muss mit
-            // ihrem Anlass gemeinsam festgeschrieben werden oder gar nicht
-            // (ADR-0025).
-            if (seite.Eintraege.Count > 0)
+            // As a COMMAND of its own and not in the query, because only a command
+            // gets a transaction scope: the outbox row has to be committed together
+            // with its cause or not at all (ADR-0025).
+            if (page.Items.Count > 0)
             {
                 await mediator.Send(
-                    new EntdeckungMeldenBefehl([.. seite.Eintraege.Select(t => t.Wer)]),
+                    new ReportDiscoveryCommand([.. page.Items.Select(hit => hit.Subject)]),
                     cancellationToken);
             }
 
-            // Keine Gesamtzahl (ADR-0026): sie verriete ueber die Differenz zur
-            // Seitenlaenge, wie viele Profile NICHT freigegeben sind.
+            // No total (ADR-0026): through the difference to the page length it
+            // would reveal how many profiles are NOT released.
             await context.Response.WriteAsJsonAsync(
-                new TrefferseiteV1([.. seite.Eintraege.Select(Antwort)], seite.Weiter),
+                new HitPageV1([.. page.Items.Select(ToContract)], page.Next),
                 cancellationToken);
         });
 
         scout.MapPost("/candidates/{subjectId:guid}/draft", async (
             Guid subjectId,
-            AnspracheAnfrageV1? koerper,
+            ApproachRequestV1? body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal actor,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Company(actor) is not { } company)
             {
-                await OhneFirma(akteur, context);
+                await WithoutCompany(actor, context);
                 return;
             }
 
             try
             {
-                // Die gesuchten Worte laufen durch denselben Filter wie die
-                // Suche: derselbe Wortschatz, dieselben Grenzen — und damit
-                // auch hier keine Moeglichkeit, einen Beleg unterzuschieben.
-                var gesucht = Suchfilter.Aus(koerper?.Skills, null, false);
+                // The searched words run through the same filter as the search:
+                // the same vocabulary, the same limits — and thus here too no way
+                // of slipping in a piece of evidence.
+                var searched = SearchFilter.From(body?.Skills, null, false);
 
-                var entwurf = await mediator.Send(
-                    new AnspracheAbfrage(
-                        firma,
+                var draft = await mediator.Send(
+                    new ApproachQuery(
+                        company,
                         new SubjectId(subjectId),
-                        gesucht.GenannteWorte,
-                        koerper?.Wish ?? string.Empty),
+                        searched.NamedWords,
+                        body?.Wish ?? string.Empty),
                     cancellationToken);
 
-                // Nur der Text. Kein `sent_at`, kein Empfaenger, keine Kennung
-                // eines Vorgangs: es gibt keinen Vorgang, weil nichts gesendet
-                // wurde (ADR-0036 Auflage 4).
+                // Only the text. No `sent_at`, no recipient, no identifier of a
+                // case: there is no case, because nothing was sent (ADR-0036
+                // condition 4).
                 await context.Response.WriteAsJsonAsync(
-                    new AnspracheentwurfV1(entwurf), cancellationToken);
+                    new ApproachDraftV1(draft), cancellationToken);
             }
-            catch (KeinAnsprechpartner fehler)
+            catch (NoContactPerson error)
             {
-                // Verborgen und nicht vorhanden antworten gleich, und das muss
-                // so bleiben: ein Unterschied sagte, ob dieser Mensch hier ist.
-                await ProblemDetailsMiddleware.Schreibe(
-                    context, StatusCodes.Status404NotFound, "Request failed", fehler.Message);
+                // Hidden and not present answer alike, and that has to stay so: a
+                // difference would say whether this human being is here.
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status404NotFound, "Request failed", error.Message);
             }
-            catch (AnspracheNichtVerfuegbar fehler)
+            catch (DraftUnavailable error)
             {
-                // Die Art des Fehlschlags, nie sein Inhalt — und ausdruecklich
-                // keine Vorlage, die wie ein Vorschlag aussaehe.
-                await ProblemDetailsMiddleware.Schreibe(
+                // The kind of the failure, never its content — and expressly no
+                // template that would look like a suggestion.
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status503ServiceUnavailable,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
-            catch (Eingabefehler fehler)
+            catch (InputError error)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
         });
 
         scout.MapPost("/searches", async (
-            SucheAnlegenV1? koerper,
+            CreateSearchV1? body,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal actor,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Company(actor) is not { } company)
             {
-                await OhneFirma(akteur, context);
+                await WithoutCompany(actor, context);
                 return;
             }
 
             try
             {
-                var filter = Suchfilter.Aus(
-                    koerper?.Skills, koerper?.Location, koerper?.Remote ?? false);
+                var filter = SearchFilter.From(
+                    body?.Skills, body?.Location, body?.Remote ?? false);
 
-                var suche = await mediator.Send(
-                    new SucheSpeichernBefehl(
-                        firma, akteur.Current!.Subject, koerper?.Name ?? string.Empty, filter),
+                var search = await mediator.Send(
+                    new SaveSearchCommand(
+                        company, actor.Current!.Subject, body?.Name ?? string.Empty, filter),
                     cancellationToken);
 
                 context.Response.StatusCode = StatusCodes.Status201Created;
-                await context.Response.WriteAsJsonAsync(Antwort(suche), cancellationToken);
+                await context.Response.WriteAsJsonAsync(ToContract(search), cancellationToken);
             }
-            catch (Eingabefehler fehler)
+            catch (InputError error)
             {
-                await ProblemDetailsMiddleware.Schreibe(
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
-                    "Request failed", fehler.Message);
+                    "Request failed", error.Message);
             }
         });
 
         scout.MapGet("/searches", async (
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal actor,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Company(actor) is not { } company)
             {
-                await OhneFirma(akteur, context);
+                await WithoutCompany(actor, context);
                 return;
             }
 
-            var suchen = await mediator.Send(
-                new MeineSuchenAbfrage(firma, akteur.Current!.Subject), cancellationToken);
+            var searches = await mediator.Send(
+                new MySearchesQuery(company, actor.Current!.Subject), cancellationToken);
 
             await context.Response.WriteAsJsonAsync(
                 new Dictionary<string, object?>
                 {
-                    ["items"] = suchen.Select(Antwort).ToArray()
+                    ["items"] = searches.Select(ToContract).ToArray()
                 },
                 cancellationToken);
         });
@@ -224,24 +226,24 @@ public static class ScoutEndpoints
         scout.MapDelete("/searches/{id:guid}", async (
             Guid id,
             IMediator mediator,
-            ICurrentPrincipal akteur,
+            ICurrentPrincipal actor,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (Firma(akteur) is not { } firma)
+            if (Company(actor) is not { } company)
             {
-                await OhneFirma(akteur, context);
+                await WithoutCompany(actor, context);
                 return;
             }
 
-            var weg = await mediator.Send(
-                new SucheLoeschenBefehl(id, firma, akteur.Current!.Subject), cancellationToken);
+            var removed = await mediator.Send(
+                new DeleteSearchCommand(id, company, actor.Current!.Subject), cancellationToken);
 
-            if (!weg)
+            if (!removed)
             {
-                // 404 auch fuer die Suche eines Kollegen: ein Unterschied
-                // verriete, dass sie existiert.
-                await ProblemDetailsMiddleware.Schreibe(
+                // 404 for a colleague's search too: a difference would reveal that
+                // it exists.
+                await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status404NotFound, "Request failed", "no such search");
                 return;
             }
@@ -252,125 +254,125 @@ public static class ScoutEndpoints
         return app;
     }
 
-    /// <summary>Das Unternehmen aus dem Token — nie aus der Anfrage.</summary>
+    /// <summary>The company from the token — never from the request.</summary>
     /// <remarks>
-    /// Der Mandant kommt aus dem geprüften Token (ADR-0017/0018). Ihn aus einem
-    /// Kopf oder einem Feld zu nehmen hiesse, den Aufrufer entscheiden zu
-    /// lassen, in wessen Namen er sucht.
+    /// The tenant comes from the verified token (ADR-0017/0018). Taking it from a
+    /// header or a field would mean letting the caller decide in whose name they
+    /// search.
     /// </remarks>
-    private static TenantId? Firma(ICurrentPrincipal akteur) =>
-        akteur.Current?.Acting is Capacity.ForCompany firma ? firma.Tenant : null;
+    private static TenantId? Company(ICurrentPrincipal actor) =>
+        actor.Current?.Acting is Capacity.ForCompany company ? company.Tenant : null;
 
-    private static Task OhneFirma(ICurrentPrincipal akteur, HttpContext context) =>
-        akteur.Current is null
-            ? ProblemDetailsMiddleware.Schreibe(
+    private static Task WithoutCompany(ICurrentPrincipal actor, HttpContext context) =>
+        actor.Current is null
+            ? ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status401Unauthorized,
                 "Request failed", "not authenticated")
-            // 403 ist eine Aussage ueber den Aufrufer und verraet nichts ueber
-            // die Menschen, nach denen er fragt.
-            : ProblemDetailsMiddleware.Schreibe(
+            // 403 is a statement about the caller and reveals nothing about the
+            // human beings they ask about.
+            : ProblemDetailsMiddleware.Write(
                 context, StatusCodes.Status403Forbidden,
                 "Request failed", "no active company");
 
     /// <summary>
-    /// Was ein Filter zurückgibt, der die Antwort selbst geschrieben hat.
+    /// What a filter returns that has written the answer itself.
     /// </summary>
     /// <remarks>
-    /// <strong>Nicht <c>null</c>.</strong> Ein Filter, der <c>null</c>
-    /// zurückgibt, lässt das Rahmenwerk noch einmal schreiben — JSON-<c>null</c>
-    /// samt Kopfzeilen, und die stehen zu diesem Zeitpunkt schon. Bei einer
-    /// Anfrage mit Rumpf reisst dann die Verbindung.
+    /// <strong>Not <c>null</c>.</strong> A filter that returns <c>null</c> lets
+    /// the framework write once more — a JSON <c>null</c> after headers that are
+    /// already sent at that point. For a request with a body the connection then
+    /// tears.
     /// </remarks>
-    private static readonly IResult Geschrieben = Results.Empty;
+    private static readonly IResult Written = Results.Empty;
 
-    private static async ValueTask<object?> SchweigenAbfangen(
-        EndpointFilterInvocationContext aufruf, EndpointFilterDelegate weiter)
+    private static async ValueTask<object?> CatchSilence(
+        EndpointFilterInvocationContext call, EndpointFilterDelegate next)
     {
         try
         {
-            return await weiter(aufruf);
+            return await next(call);
         }
-        catch (EinwilligungSchweigt)
+        catch (ConsentGateSilent)
         {
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                 "Request failed", "the consent ledger did not answer");
 
-            return Geschrieben;
+            return Written;
         }
-        catch (ProfilsucheSchweigt)
+        catch (ProfileSearchSilent)
         {
-            // Ausdruecklich kein leeres Ergebnis: eine leere Trefferliste saehe
-            // aus wie „es gibt niemanden", und das waere eine Aussage ueber
-            // Menschen, die aus unserem Ausfall stammt.
-            await ProblemDetailsMiddleware.Schreibe(
-                aufruf.HttpContext, StatusCodes.Status503ServiceUnavailable,
+            // Expressly no empty result: an empty hit list would look like "there
+            // is nobody", and that would be a statement about people that stems
+            // from our outage.
+            await ProblemDetailsMiddleware.Write(
+                call.HttpContext, StatusCodes.Status503ServiceUnavailable,
                 "Request failed", "the profile search did not answer");
 
-            return Geschrieben;
+            return Written;
         }
     }
 
-    /// <summary>Wie viele Zeilen eine Seite trägt.</summary>
-    private static int Laenge(string? roh) =>
-        int.TryParse(roh, out var wert)
-        && wert > 0
-        && wert <= KandidatenHandler.Hoechstlaenge
-            ? wert
-            : KandidatenHandler.Vorgabe;
+    /// <summary>How many rows a page carries.</summary>
+    private static int PageLength(string? raw) =>
+        int.TryParse(raw, out var value)
+        && value > 0
+        && value <= CandidatesHandler.MaxPageLength
+            ? value
+            : CandidatesHandler.DefaultPageLength;
 
     /// <remarks>
-    /// Trägt keinen Punktwert, keinen Rang und keinen Prozentwert — und es
-    /// gehört keiner darauf (ADR-0022). Was hier steht, hat die Person
-    /// geschrieben oder ist ein Beleg mit Herkunft und Link.
+    /// Carries no score, no rank and no percentage — and none belongs on it
+    /// (ADR-0022). What stands here the person wrote, or it is evidence with
+    /// origin and link.
     /// </remarks>
-    private static TrefferV1 Antwort(Treffer treffer) =>
+    private static HitV1 ToContract(Hit hit) =>
         new(
-            treffer.Wer.Value,
-            treffer.Ueberschrift,
-            treffer.Text,
-            treffer.Ort,
-            treffer.RemoteMoeglich,
-            treffer.Genannt,
-            [.. treffer.Haken.Select(haken => new HakenV1(haken.Wort, haken.Genannt))],
+            hit.Subject.Value,
+            hit.Headline,
+            hit.Bio,
+            hit.Location,
+            hit.RemoteOk,
+            hit.Named,
+            [.. hit.Ticks.Select(tick => new TickV1(tick.Word, tick.Named))],
             [
-                .. treffer.Belege.Select(beleg => new BelegV1(
-                    beleg.Wort, Wort(beleg.Art), beleg.Projekt, beleg.Adresse))
+                .. hit.Evidence.Select(evidence => new EvidenceV1(
+                    evidence.Word, Word(evidence.Kind), evidence.Project, evidence.Url))
             ],
-            Wort(treffer.Belegstand),
-            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Stand),
-            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Stufe),
-            Erreichbarkeitsworte.Wort(treffer.Erreichbarkeit.Anwesenheit));
+            Word(hit.EvidenceState),
+            AvailabilityTerms.Word(hit.Availability.State),
+            AvailabilityTerms.Word(hit.Availability.Commute),
+            AvailabilityTerms.Word(hit.Availability.Attendance));
 
-    private static SucheV1 Antwort(Suche suche) =>
+    private static SearchV1 ToContract(Search search) =>
         new(
-            suche.Id,
-            suche.Name,
-            suche.Filter.GenannteWorte,
-            suche.Filter.Ort,
-            suche.Filter.NurRemote,
-            suche.AngelegtAm);
+            search.Id,
+            search.Name,
+            search.Filter.NamedWords,
+            search.Filter.Location,
+            search.Filter.RemoteOnly,
+            search.CreatedAt);
 
-    /// <summary>Das Wort zur Belegart, auf dem Draht.</summary>
-    private static string Wort(Belegart art) => art switch
+    /// <summary>The word for the evidence kind, on the wire.</summary>
+    private static string Word(EvidenceKind kind) => kind switch
     {
-        Belegart.Thema => "topic",
-        Belegart.Sprache => "language",
-        _ => throw new ArgumentOutOfRangeException(nameof(art))
+        EvidenceKind.Topic => "topic",
+        EvidenceKind.Language => "language",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
-    /// <summary>Das Wort zum Belegstand, auf dem Draht.</summary>
+    /// <summary>The word for the evidence state, on the wire.</summary>
     /// <remarks>
-    /// Ein Wort und kein Satz: die Oberfläche formuliert in der Sprache der
-    /// lesenden Person (ADR-0031), und ein deutscher Satz auf dem Draht wäre
-    /// eine Sprache, die der Server für alle festlegt.
+    /// A word and no sentence: the UI phrases it in the reader's language
+    /// (ADR-0031), and a German sentence on the wire would be a language the
+    /// server fixes for everybody.
     /// </remarks>
-    private static string Wort(Belegstand stand) => stand switch
+    private static string Word(EvidenceState state) => state switch
     {
-        Belegstand.Vollstaendig => "complete",
-        Belegstand.KeineFreigegeben => "none_released",
-        Belegstand.Unvollstaendig => "partial",
-        Belegstand.Unerreichbar => "unavailable",
-        _ => throw new ArgumentOutOfRangeException(nameof(stand))
+        EvidenceState.Complete => "complete",
+        EvidenceState.NoneReleased => "none_released",
+        EvidenceState.Partial => "partial",
+        EvidenceState.Unavailable => "unavailable",
+        _ => throw new ArgumentOutOfRangeException(nameof(state))
     };
 }

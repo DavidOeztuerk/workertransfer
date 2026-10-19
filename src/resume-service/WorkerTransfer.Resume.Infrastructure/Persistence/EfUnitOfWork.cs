@@ -4,29 +4,29 @@ using WorkerTransfer.Resume.Application.Ports;
 namespace WorkerTransfer.Resume.Infrastructure.Persistence;
 
 /// <summary>One database transaction around one command.</summary>
-public sealed class EfUnitOfWork(ResumeDbContext kontext) : IUnitOfWork
+public sealed class EfUnitOfWork(ResumeDbContext context) : IUnitOfWork
 {
     /// <inheritdoc />
-    public async Task<T> InEinerTransaktionAsync<T>(
-        Func<CancellationToken, Task<T>> arbeit,
+    public async Task<T> InTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> work,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(arbeit);
+        ArgumentNullException.ThrowIfNull(work);
 
-        if (kontext.Database.CurrentTransaction is not null)
+        if (context.Database.CurrentTransaction is not null)
         {
             // Already inside one. Opening a second would either throw or
             // silently commit half the work early.
-            return await arbeit(cancellationToken);
+            return await work(cancellationToken);
         }
 
-        await using var klammer = await kontext.Database.BeginTransactionAsync(cancellationToken);
+        await using var scope = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var ergebnis = await arbeit(cancellationToken);
+        var result = await work(cancellationToken);
 
-        await kontext.SaveChangesAsync(cancellationToken);
-        await klammer.CommitAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await scope.CommitAsync(cancellationToken);
 
-        return ergebnis;
+        return result;
     }
 }
