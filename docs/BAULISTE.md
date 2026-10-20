@@ -104,16 +104,19 @@ nennt: Person ↔ alter Arbeitgeber auf der Plattform (Aufhebung).
 
 ## Vor dem Start (siehe `VISION-FRAGEN.md` und `VISION-FRAGEN-2.md`)
 
-- Geschäftsmodell (G1, G2, Q1) — **bewusst zurückgestellt, letzter Punkt**;
-  dazu der KI-Anbieter der Plattform im Betrieb und ob Menschen ihn per Abo
-  oder Kontingent bekommen (ADR-0051) — ohne dass ein Anschreiben am leeren
-  Kontingent abbricht
+- ~~Geschäftsmodell (G1, G2, Q1)~~ — **entschieden am 20./21.10.2026**
+  ([`GESCHAEFTSMODELL-FRAGEN.md`](GESCHAEFTSMODELL-FRAGEN.md)): Plattform
+  kostenlos, 500 € netto je Einstellung nach der Probezeit, KI über eigenen
+  Schlüssel oder KI-Guthaben bei uns (Stripe). **Die Bauliste daraus steht
+  dort** (Unterlagen vorausgewählt, KI nicht automatisch, Tokens messen,
+  Guthaben, Stripe, Firmen-KI-Zugang, Erfolgsgebühr, Preisseite/AGB)
 - Wer betreibt die Plattform (Q2) und wo läuft sie (Q3) — offen
-- Control Plane im Betrieb: Keycloak, echte Lizenz (I2, Q4)
-- Juristen-Liste J1–J17, **gesammelt vor dem Start** (Q7), dazu Impressum,
+- Control Plane im Betrieb: ~~Keycloak~~ (**lokal gebaut 20.10.2026**,
+  PR #102), echte Domain und gebundene Lizenz (I2, Q4)
+- Juristen-Liste J1–J20, **gesammelt vor dem Start** (Q7), dazu Impressum,
   Datenschutzerklärung, Nutzungsbedingungen
-- **Content-Security-Policy** für die Web-Oberfläche — es gibt keine; die Hosts
-  der Datei-Auswahl stehen in ADR-0054
+- ~~**Content-Security-Policy** für die Web-Oberfläche~~ — **gebaut
+  20.10.2026** (`docker/web-nginx.conf.template`, PR #100)
 
 ## Nach dem MVP
 
