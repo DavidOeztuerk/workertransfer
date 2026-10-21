@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.Applications.Infrastructure.CoverLetter;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Applications.Tests;
 
@@ -120,6 +121,35 @@ public sealed class CoverLetterStreamTests
         text.Should().Be("BETREFF: X\n---\nY");
         handler.Body.Should().Contain("\"stream\":true");
         handler.Body.Should().Contain("qwen2.5-coder:7b");
+        // Without it an OpenAI-compatible stream reports no tokens at all.
+        handler.Body.Should().Contain("\"include_usage\":true");
+    }
+
+    /// <summary>The streamed letter reports what it cost, once, at the end.</summary>
+    [Fact]
+    public async Task A_streamed_letter_reports_its_tokens()
+    {
+        var sse = """
+            event: message_start
+            data: {"type":"message_start","message":{"usage":{"input_tokens":2800,"output_tokens":1}}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"BETREFF: X\n---\nY"}}
+
+            event: message_delta
+            data: {"type":"message_delta","usage":{"output_tokens":1500}}
+
+            """;
+        var reported = new List<TokenUsage>();
+
+        var text = await HttpCoverLetterWriter.ReadStreamAsync(
+            "anthropic",
+            new MemoryStream(Encoding.UTF8.GetBytes(sse)),
+            TimeSpan.FromSeconds(5),
+            usage: reported.Add);
+
+        text.Should().Be("BETREFF: X\n---\nY");
+        reported.Should().Equal(new TokenUsage(2800, 1500));
     }
 
     [Fact]
