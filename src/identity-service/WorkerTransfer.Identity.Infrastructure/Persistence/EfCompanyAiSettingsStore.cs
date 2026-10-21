@@ -20,7 +20,7 @@ public sealed class EfCompanyAiSettingsStore(IdentityDbContext context, TimeProv
         return row is null
             ? CompanyAiSettings.Default(company)
             : CompanyAiSettings.Restore(
-                company, Provider(row.AiProvider), row.AiModel, row.AiKeyEncrypted, row.AiKeyTail);
+                company, Provider(row.AiProvider), row.AiModel, row.AiKeyEncrypted, row.AiKeyTail, row.AiBaseUrl);
     }
 
     /// <inheritdoc />
@@ -43,9 +43,11 @@ public sealed class EfCompanyAiSettingsStore(IdentityDbContext context, TimeProv
         {
             AiProvider.OpenAi => "openai",
             AiProvider.Anthropic => "anthropic",
+            AiProvider.OwnServer => "own",
             _ => "none"
         };
         row.AiModel = settings.Model;
+        row.AiBaseUrl = settings.OwnAddress;
         row.AiKeyEncrypted = settings.EncryptedKey;
         row.AiKeyTail = settings.KeyTail;
         row.UpdatedAt = clock.GetUtcNow().UtcDateTime;
@@ -56,6 +58,7 @@ public sealed class EfCompanyAiSettingsStore(IdentityDbContext context, TimeProv
     {
         "openai" => AiProvider.OpenAi,
         "anthropic" => AiProvider.Anthropic,
+        "own" => AiProvider.OwnServer,
         _ => AiProvider.None
     };
 }

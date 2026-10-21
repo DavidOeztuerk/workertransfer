@@ -187,6 +187,12 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<string>("AiBaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("ai_base_url");
+
                     b.Property<string>("AiKeyEncrypted")
                         .IsRequired()
                         .HasColumnType("text")

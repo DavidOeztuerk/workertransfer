@@ -9,7 +9,7 @@ using WorkerTransfer.Identity.Domain.Users;
 namespace WorkerTransfer.Identity.Application.Companies;
 
 /// <summary>Which model writes for a company — for showing, without the key.</summary>
-/// <param name="Provider">The provider as a label: none, openai, anthropic.</param>
+/// <param name="Provider">The provider as a label: none, openai, anthropic, own.</param>
 /// <param name="Address">Its address, set by the platform.</param>
 /// <param name="Model">Its model.</param>
 /// <param name="KeyPresent">Whether a key is stored.</param>
@@ -36,32 +36,51 @@ public sealed class CompanyAiHandler(ICompanyAiSettingsStore store)
     }
 
     internal static CompanyAiView View(CompanyAiSettings state) =>
-        new(SettingsHandler.Label(state.Provider),
+        new(Label(state.Provider),
             state.Address,
             state.Model,
             state.EncryptedKey.Length > 0,
             state.KeyTail);
+
+    /// <summary>The wire label; <c>own</c> exists only for companies.</summary>
+    internal static string Label(AiProvider provider) =>
+        provider == AiProvider.OwnServer ? "own" : SettingsHandler.Label(provider);
 }
 
 /// <summary>Set a company's provider and model — without the key.</summary>
 /// <param name="Company">Whose.</param>
-/// <param name="Provider">The provider as a label.</param>
-/// <param name="Model">Its model; empty takes the provider's default.</param>
-public sealed record SetCompanyAiCommand(TenantId Company, string Provider, string Model)
+/// <param name="Provider">The provider as a label: none, openai, anthropic, own.</param>
+/// <param name="Model">Its model; empty takes the provider's default (none for <c>own</c>).</param>
+/// <param name="Address">The company's own server — read only for <c>own</c>.</param>
+public sealed record SetCompanyAiCommand(TenantId Company, string Provider, string Model, string Address = "")
     : ICommandMessage<CompanyAiView>;
 
 /// <inheritdoc cref="SetCompanyAiCommand" />
-public sealed class SetCompanyAiHandler(ICompanyAiSettingsStore store)
+/// <remarks>
+/// The own server is checked against the domain identity proved at the
+/// founding (ADR-0019) — read here from the company, never from the request.
+/// </remarks>
+public sealed class SetCompanyAiHandler(ICompanyAiSettingsStore store, ICompanyRepository companies)
     : IRequestHandler<SetCompanyAiCommand, CompanyAiView>
 {
     /// <inheritdoc />
+    /// <exception cref="OwnServerRefused">The own server's address or model does not hold.</exception>
     public async Task<CompanyAiView> Handle(
         SetCompanyAiCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var state = await store.GetAsync(request.Company, cancellationToken);
-        state.SetAi(SettingsHandler.Provider(request.Provider), request.Model);
+
+        if (request.Provider == "own")
+        {
+            var company = await companies.FindByIdAsync(request.Company, cancellationToken);
+            state.SetOwnServer(request.Address, request.Model, company?.Domain.Value ?? string.Empty);
+        }
+        else
+        {
+            state.SetAi(SettingsHandler.Provider(request.Provider), request.Model);
+        }
 
         await store.SaveAsync(state, cancellationToken);
         return CompanyAiHandler.View(state);
@@ -108,8 +127,9 @@ public sealed record InternalCompanyAiAccessQuery(TenantId Company) : IQueryMess
 /// <inheritdoc cref="InternalCompanyAiAccessQuery" />
 /// <remarks>
 /// The same rule as for a person (<see cref="InternalAiAccessHandler"/>):
-/// without a key there is no own access, whatever provider is chosen, and the
-/// asking service takes the platform's model.
+/// without a key there is no own access, whatever cloud provider is chosen,
+/// and the asking service takes the platform's model. The company's own server
+/// is the one exception: it may answer without a key.
 /// </remarks>
 public sealed class InternalCompanyAiAccessHandler(ICompanyAiSettingsStore store, ISecrets secrets)
     : IRequestHandler<InternalCompanyAiAccessQuery, InternalAiAccess>
@@ -123,7 +143,9 @@ public sealed class InternalCompanyAiAccessHandler(ICompanyAiSettingsStore store
         var state = await store.GetAsync(request.Company, cancellationToken);
         var key = secrets.Decrypt(state.EncryptedKey) ?? string.Empty;
 
-        if (state.Provider == AiProvider.None || key.Length == 0 || state.Model.Length == 0)
+        // The own server may run without a key; a cloud provider never does.
+        if (state.Provider == AiProvider.None || state.Model.Length == 0
+            || (key.Length == 0 && state.Provider != AiProvider.OwnServer))
         {
             return InternalAiAccess.None;
         }

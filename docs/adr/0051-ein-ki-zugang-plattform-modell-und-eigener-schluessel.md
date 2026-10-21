@@ -80,9 +80,8 @@ ohne dass jemand nicht mehr alles machen kann. Das gehört zum Geschäftsmodell
 ## Ergänzung 21.10.2026 — der Schlüssel der Firma (Bauliste 6)
 
 Das Geschäftsmodell (`GESCHAEFTSMODELL-FRAGEN.md` B4) zieht den Schlüssel der
-Firma vor den Start. Gebaut ist die erste Hälfte, **Anthropic oder OpenAI mit
-dem Schlüssel der Firma**; der eigene Server unter der bestätigten Domain
-folgt als zweiter Schritt.
+Firma vor den Start: **Anthropic oder OpenAI mit dem Schlüssel der Firma, oder
+ihr eigener OpenAI-kompatibler Server** unter der bestätigten Domain.
 
 - **Er gehört der Firma, nicht einem Mitglied.** Er liegt in identity-service
   (`company_ai_settings`, verschlüsselt wie der einer Person), und der Satz
@@ -108,3 +107,23 @@ folgt als zweiter Schritt.
   ihn keine Kaskade.
 - Im Nachweis zählt das KI-Verzeichnis Firmen mit eigenem Schlüssel getrennt
   von Personen — gezählt, nie benannt.
+
+**Der eigene Server der Firma** (`own`) ist der einzige Anbieter mit getippter
+Adresse, und deshalb ist sie gebunden:
+
+- **https, ein Name statt einer IP-Adresse, und der Host liegt auf der
+  bestätigten Domain der Firma** (ADR-0019) oder darunter. Die Domain liest
+  identity aus der Firma, nie aus der Anfrage. Ein Schlüssel ist freiwillig,
+  ein Modell nicht.
+- **Die Domain darf nicht nach innen zeigen.** Ein Zugang der Firma geht in
+  jedem Dienst über den Client `company-model`, der beim Verbindungsaufbau nur
+  öffentliche Adressen zulässt (`ServiceDefaults/PublicAddress`, dieselbe
+  Prüfung wie bei den Feeds aus ADR-0052) und keiner Weiterleitung folgt.
+  Das Plattform-Modell behält seinen Client, denn das lokale Ollama liegt mit
+  Absicht innen.
+- **Die Egress-Grenze lernt den Host aus der Antwort von identity**, kurz vor
+  dem einen Aufruf, der ihn braucht (`CompanyAiEgress` um Noelias Richtlinie,
+  in jobs um `CompanyDomainEgress` herum). Eine Liste in der Konfiguration
+  wäre falsch: die Firma legt ihren Server an, nicht der Betreiber.
+- Eine Person kann ihn nicht wählen — ihre Einstellungen kennen `own` nicht.
+

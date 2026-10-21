@@ -1344,6 +1344,13 @@ const fr: Catalog = {
     providerHint: "Il n'est sollicité que lorsqu'un membre de l'équipe appuie sur un bouton de brouillon. Sans clé, c'est le modèle de la plateforme qui écrit.",
     keyHint: "Enregistrée chiffrée et jamais restituée — pas même aux administrateurs. Saisis-la à nouveau pour la changer, enregistre un champ vide pour la supprimer.",
     adminOnly: "Seul un administrateur configure l'accès IA de l'entreprise. Adresse-toi à une personne de l'équipe ayant ce rôle.",
+    providerOwn: "Serveur propre (compatible OpenAI)",
+    address: "Adresse du serveur",
+    addressHint: "L'adresse complète, par exemple https://ia.votre-entreprise.fr/v1/chat/completions — uniquement en https et sous votre domaine confirmé.",
+    ownModelHint: "Le modèle tel que votre serveur le nomme.",
+    ownSave: "Enregistrer le serveur",
+    ownRefused: "Cela ne fonctionne pas : l'adresse commence par https, nomme un hôte plutôt qu'une adresse IP et se trouve sous votre domaine confirmé. Un modèle est également nécessaire.",
+    ownKeyHint: "Nécessaire uniquement si votre serveur en demande une. Enregistrée chiffrée et jamais restituée.",
   },
 
   companyProfile: {
