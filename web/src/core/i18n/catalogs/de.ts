@@ -1346,6 +1346,13 @@ const de = {
     providerHint: "Gefragt wird nur, wenn jemand aus dem Team auf einen Entwurfs-Knopf drückt. Ohne Schlüssel schreibt das Plattform-Modell.",
     keyHint: "Wird verschlüsselt gespeichert und kommt nie zurück — auch nicht an Admins. Zum Ändern neu eintragen, zum Entfernen leer speichern.",
     adminOnly: "Den KI-Zugang der Firma stellt nur ein Admin ein. Wende dich an jemanden mit dieser Rolle im Team.",
+    providerOwn: "Eigener Server (OpenAI-kompatibel)",
+    address: "Adresse des Servers",
+    addressHint: "Die vollständige Adresse, etwa https://ki.eure-firma.de/v1/chat/completions — nur https und nur unter eurer bestätigten Domain.",
+    ownModelHint: "Das Modell, wie euer Server es nennt.",
+    ownSave: "Server speichern",
+    ownRefused: "So geht es nicht: Die Adresse beginnt mit https, nennt einen Namen statt einer IP-Adresse und liegt unter eurer bestätigten Domain. Ein Modell gehört dazu.",
+    ownKeyHint: "Nur nötig, wenn euer Server einen verlangt. Wird verschlüsselt gespeichert und kommt nie zurück.",
   },
 
   companyProfile: {

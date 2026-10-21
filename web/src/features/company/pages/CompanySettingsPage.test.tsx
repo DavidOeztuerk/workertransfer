@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -88,6 +89,39 @@ describe("the company settings", () => {
 
     expect(await screen.findByText(/stellt nur ein Admin ein/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Anbieter/)).not.toBeInTheDocument();
+  });
+
+  it("saves an own server only with its address and model, and names the rule when refused", async () => {
+    const NONE = { ...STORED, ai_provider: "none", ai_base_url: "", ai_model: "", ai_key_present: false, ai_key_tail: "" };
+    const calls = stubFetch((url, init) =>
+      init?.method === "PUT"
+        ? json(422, { title: "Request failed", detail: "invalid: ai_base_url", status: 422 })
+        : url.endsWith(`/companies/${TENANT}/ai`) ? json(200, NONE) : json(200, null),
+    );
+    renderWithStore(<CompanySettingsPage />, { auth: FOR_COMPANY });
+
+    await userEvent.click(await screen.findByLabelText(/Anbieter/));
+    await userEvent.click(await screen.findByRole("option", { name: "Eigener Server (OpenAI-kompatibel)" }));
+
+    // Choosing it alone saves nothing — it would only be refused.
+    expect(calls.some((call) => call.init?.method === "PUT")).toBe(false);
+    const save = screen.getByRole("button", { name: "Server speichern" });
+    expect(save).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/Adresse des Servers/), {
+      target: { value: "https://ki.andere-firma.de/v1/chat/completions" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Modell/), { target: { value: "qwen2.5:14b" } });
+    await userEvent.click(save);
+
+    await waitFor(() => expect(calls.some((call) => call.init?.method === "PUT")).toBe(true));
+    const sent = JSON.parse(String(calls.find((call) => call.init?.method === "PUT")!.init?.body));
+    expect(sent).toEqual({
+      ai_provider: "own",
+      ai_model: "qwen2.5:14b",
+      ai_base_url: "https://ki.andere-firma.de/v1/chat/completions",
+    });
+    expect(await screen.findByText(/unter eurer bestätigten Domain\. Ein Modell/)).toBeInTheDocument();
   });
 
   it("asks whoever acts as a person to switch to a company", async () => {

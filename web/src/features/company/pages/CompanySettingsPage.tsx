@@ -56,9 +56,11 @@ export function CompanySettingsPage() {
 /**
  * Who writes the company's drafts — and the key, which only goes in.
  *
- * <strong>No address field</strong>, as on the person's side: the address
- * belongs to the provider and is set by the platform, so a typed one cannot
- * send the team's drafts to any server.
+ * <strong>An address field only for the company's own server</strong>, and
+ * the server binds it: https, under the company's proven domain. For a cloud
+ * provider the address belongs to the provider and is set by the platform.
+ * The own server is saved with its own button, once address and model are
+ * there — choosing it alone changes nothing at the server.
  */
 function CompanyAiBlock({ tenantId }: { tenantId: string }) {
   const { t } = useTranslation();
@@ -67,6 +69,7 @@ function CompanyAiBlock({ tenantId }: { tenantId: string }) {
   const [aiKey, setAiKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [refused, setRefused] = useState(false);
 
   useEffect(() => {
     if (current.data?.ok) setAi(current.data.ai);
@@ -77,10 +80,32 @@ function CompanyAiBlock({ tenantId }: { tenantId: string }) {
   async function apply(part: Partial<CompanyAi>) {
     if (ai === null) return;
     const next = { ...ai, ...part };
-    const result = await saveCompanyAi(tenantId, { provider: next.provider, model: next.model });
-    setFailed(!result.ok);
+    const result = await saveCompanyAi(tenantId, {
+      provider: next.provider,
+      model: next.model,
+      address: next.address,
+    });
+    setRefused(!result.ok && result.reason === "invalid");
+    setFailed(!result.ok && result.reason !== "invalid");
     setSaved(result.ok);
     if (result.ok) setAi(result.ai);
+  }
+
+  function choose(provider: CompanyAiProvider) {
+    if (ai === null) return;
+    if (provider === "own") {
+      // Nothing is saved yet: an own server without address and model would
+      // only be refused. The button below saves it.
+      setAi({
+        ...ai,
+        provider,
+        model: ai.provider === "own" ? ai.model : "",
+        address: ai.provider === "own" ? ai.address : "",
+      });
+      setSaved(false);
+      return;
+    }
+    void apply({ provider });
   }
 
   async function storeKey() {
@@ -122,22 +147,54 @@ function CompanyAiBlock({ tenantId }: { tenantId: string }) {
               label={t("settings.provider")}
               value={ai.provider}
               helperText={t("companySettings.providerHint")}
-              onChange={(event) => void apply({ provider: event.target.value as CompanyAiProvider })}
+              onChange={(event) => choose(event.target.value as CompanyAiProvider)}
             >
               <MenuItem value="none">{t("settings.providerNone")}</MenuItem>
               <MenuItem value="anthropic">{t("settings.providerAnthropic")}</MenuItem>
               <MenuItem value="openai">{t("settings.providerOpenAi")}</MenuItem>
+              <MenuItem value="own">{t("companySettings.providerOwn")}</MenuItem>
             </TextField>
+
+            {ai.provider === "own" ? (
+              <>
+                <TextField
+                  fullWidth
+                  label={t("companySettings.address")}
+                  helperText={t("companySettings.addressHint")}
+                  value={ai.address}
+                  slotProps={{ htmlInput: { inputMode: "url" } }}
+                  onChange={(event) => setAi({ ...ai, address: event.target.value })}
+                />
+                <TextField
+                  label={t("settings.model")}
+                  helperText={t("companySettings.ownModelHint")}
+                  value={ai.model}
+                  onChange={(event) => setAi({ ...ai, model: event.target.value })}
+                />
+                <Box>
+                  <Button
+                    variant="contained"
+                    disabled={ai.address.trim() === "" || ai.model.trim() === ""}
+                    onClick={() => void apply({})}
+                  >
+                    {t("companySettings.ownSave")}
+                  </Button>
+                </Box>
+                {refused ? <Alert severity="error">{t("companySettings.ownRefused")}</Alert> : null}
+              </>
+            ) : null}
 
             {ai.provider !== "none" ? (
               <>
-                <TextField
-                  label={t("settings.model")}
-                  helperText={t(ai.provider === "anthropic" ? "settings.modelHintAnthropic" : "settings.modelHintOpenAi")}
-                  value={ai.model}
-                  onChange={(event) => setAi({ ...ai, model: event.target.value })}
-                  onBlur={() => void apply({ model: ai.model })}
-                />
+                {ai.provider !== "own" ? (
+                  <TextField
+                    label={t("settings.model")}
+                    helperText={t(ai.provider === "anthropic" ? "settings.modelHintAnthropic" : "settings.modelHintOpenAi")}
+                    value={ai.model}
+                    onChange={(event) => setAi({ ...ai, model: event.target.value })}
+                    onBlur={() => void apply({ model: ai.model })}
+                  />
+                ) : null}
 
                 <Box>
                   <TextField
@@ -147,7 +204,7 @@ function CompanyAiBlock({ tenantId }: { tenantId: string }) {
                     autoComplete="off"
                     value={aiKey}
                     onChange={(event) => setAiKey(event.target.value)}
-                    helperText={t("companySettings.keyHint")}
+                    helperText={t(ai.provider === "own" ? "companySettings.ownKeyHint" : "companySettings.keyHint")}
                   />
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 1.5, alignItems: "center" }}>
                     <Button variant="outlined" onClick={() => void storeKey()}>
