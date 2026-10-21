@@ -22,6 +22,7 @@ using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Scout.Contracts;
 using Noelia.Abstractions.Security.Checks;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Scout.Infrastructure;
 
@@ -88,23 +89,14 @@ public static class ScoutInfrastructure
         services.AddScoped<IEvidenceSource, HttpEvidenceSource>();
         services.AddScoped<IJobLookup, HttpJobLookup>();
 
-        // The null drafter is the default, not the fallback: without a deposited
-        // key no foreign service is called, and the service says so instead of
-        // handing out a template that looks like a suggestion — and that somebody
-        // would send to a human being.
+        // Always the HTTP drafter: a company with its own key drafts even when
+        // the platform has none (ADR-0051). Without either it says so.
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(draft.ApiKey))
-        {
-            services.AddScoped<IDrafter, NoDrafter>();
-        }
-        else
-        {
-            services.Configure<DraftSettings>(
-                configuration.GetSection(DraftSettings.Section));
-            services.AddScoped<IDrafter, HttpDrafter>();
-        }
+        services.Configure<DraftSettings>(configuration.GetSection(DraftSettings.Section));
+        services.AddCompanyAiAccess(configuration);
+        services.AddScoped<IDrafter, HttpDrafter>();
 
         services.AddScoped<IDelivery, HttpNotifier>();
         services.AddOutbox<ScoutDbContext>(configuration);

@@ -295,7 +295,7 @@ public sealed class ProbeDrafter : IDrafter
 
     /// <inheritdoc />
     public Task<string> DraftAsync(
-        ApproachSituation situation, CancellationToken cancellationToken = default)
+        ApproachSituation situation, TenantId company, CancellationToken cancellationToken = default)
     {
         Last = situation;
 

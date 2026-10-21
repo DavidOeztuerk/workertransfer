@@ -35,7 +35,7 @@ public static class JobEndpoints
                 return;
             }
 
-            if (actor.Acting is not Capacity.ForCompany)
+            if (actor.Acting is not Capacity.ForCompany company)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status403Forbidden,
@@ -45,10 +45,11 @@ public static class JobEndpoints
 
             try
             {
-                // The tenant_id is DELIBERATELY not passed on: the draft context
-                // has no field for it, so nothing can slip in either (ADR-0024).
+                // The tenant chooses whose model writes and goes no further:
+                // the draft context has no field for it (ADR-0024).
                 var text = await mediator.Send(
                     new DraftAdvertQuery(
+                        company.Tenant,
                         body.Title, body.Description, body.Skills ?? [],
                         body.Location, body.Wish),
                     cancellationToken);

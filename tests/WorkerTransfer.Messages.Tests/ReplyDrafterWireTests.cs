@@ -12,6 +12,8 @@ using WorkerTransfer.Messages.Application.Ports;
 using WorkerTransfer.Messages.Domain.Conversations;
 using WorkerTransfer.Messages.Infrastructure.Companies;
 using WorkerTransfer.Messages.Infrastructure.Draft;
+using WorkerTransfer.Contracts.Identity;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Messages.Tests;
 
@@ -29,7 +31,7 @@ public sealed class ReplyDrafterWireTests
                 Side.Person,
                 [new HistoryEntry(Side.Company, "Hallo Anna Muster, passt Ihnen Dienstag?")],
                 "Anna Muster", "de"),
-            new SubjectId(Guid.NewGuid()));
+            new SubjectId(Guid.NewGuid()), null);
 
         received.Should().NotContain("Anna").And.NotContain("Muster");
         received.Should().Contain("[PERSON_NAME]");
@@ -47,10 +49,44 @@ public sealed class ReplyDrafterWireTests
         var drafter = Drafter(provider.Port, identity: "http://127.0.0.1:1");
 
         var draft = await drafter.DraftAsync(
-            new ReplyContext(Side.Company, [], "Anna Muster", "de"), new SubjectId(Guid.NewGuid()));
+            new ReplyContext(Side.Company, [], "Anna Muster", "de"), new SubjectId(Guid.NewGuid()), new TenantId(Guid.NewGuid()));
 
         draft.Should().Be("Danke.");
         received.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_company_side_uses_its_own_key_when_an_admin_stored_one()
+    {
+        var platform = 0;
+        var own = 0;
+        using var platformProvider = Listen(_ => Interlocked.Increment(ref platform), "Plattform.");
+        using var ownProvider = Listen(_ => Interlocked.Increment(ref own), "Eigener Schlüssel.");
+
+        var access = new FixedCompanyAccess(new AiAccessV1(
+            "openai_compatible", $"http://127.0.0.1:{ownProvider.Port}/v1/chat/completions", "own-model", "own-key"));
+
+        var draft = await Drafter(platformProvider.Port, companyAi: access).DraftAsync(
+            new ReplyContext(Side.Company, [], "Anna Muster", "de"),
+            new SubjectId(Guid.NewGuid()), new TenantId(Guid.NewGuid()));
+
+        draft.Should().Be("Eigener Schlüssel.");
+        own.Should().Be(1);
+        platform.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_silent_company_lookup_is_refused_not_replaced_by_the_platform()
+    {
+        var platform = 0;
+        using var provider = Listen(_ => Interlocked.Increment(ref platform), "Plattform.");
+
+        var act = () => Drafter(provider.Port, companyAi: new FixedCompanyAccess(null, silent: true)).DraftAsync(
+            new ReplyContext(Side.Company, [], "Anna", "de"),
+            new SubjectId(Guid.NewGuid()), new TenantId(Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<DraftUnavailable>();
+        platform.Should().Be(0, "the company may have chosen against the platform's provider");
     }
 
     [Fact]
@@ -58,8 +94,8 @@ public sealed class ReplyDrafterWireTests
     {
         var act = () => new HttpReplyDrafter(
                 Factory(), Options.Create(new DraftSettings()), Options.Create(new IdentitySettings()),
-                NullLogger<HttpReplyDrafter>.Instance)
-            .DraftAsync(new ReplyContext(Side.Company, [], "Anna", "de"), new SubjectId(Guid.NewGuid()));
+                new NoCompanyAccess(), NullLogger<HttpReplyDrafter>.Instance)
+            .DraftAsync(new ReplyContext(Side.Company, [], "Anna", "de"), new SubjectId(Guid.NewGuid()), new TenantId(Guid.NewGuid()));
 
         await act.Should().ThrowAsync<DraftUnavailable>().WithMessage(DraftUnavailable.NoProvider);
     }
@@ -128,7 +164,7 @@ public sealed class ReplyDrafterWireTests
             .And.Contain("Gesundheitsdaten")
             .And.Contain("Platzhalter");
 
-    private static HttpReplyDrafter Drafter(int port, string identity = "") =>
+    private static HttpReplyDrafter Drafter(int port, string identity = "", ICompanyAiAccess? companyAi = null) =>
         new(Factory(),
             Options.Create(new DraftSettings
             {
@@ -137,7 +173,22 @@ public sealed class ReplyDrafterWireTests
                 Timeout = TimeSpan.FromSeconds(10)
             }),
             Options.Create(new IdentitySettings { BaseUrl = identity, Secret = identity.Length > 0 ? "s" : "" }),
+            companyAi ?? new NoCompanyAccess(),
             NullLogger<HttpReplyDrafter>.Instance);
+
+    /// <summary>A company that set no own access up.</summary>
+    private sealed class NoCompanyAccess : ICompanyAiAccess
+    {
+        public Task<AiAccessV1?> AccessAsync(Guid company, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AiAccessV1?>(null);
+    }
+
+    /// <summary>A company whose admin stored an access — or a lookup that stays silent.</summary>
+    private sealed class FixedCompanyAccess(AiAccessV1? access, bool silent = false) : ICompanyAiAccess
+    {
+        public Task<AiAccessV1?> AccessAsync(Guid company, CancellationToken cancellationToken = default) =>
+            silent ? throw new CompanyAiAccessSilent("silent in the test") : Task.FromResult(access);
+    }
 
     private static IHttpClientFactory Factory()
     {

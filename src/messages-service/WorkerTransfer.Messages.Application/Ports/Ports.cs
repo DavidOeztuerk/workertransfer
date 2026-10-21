@@ -104,13 +104,21 @@ public sealed class DraftUnavailable(string message) : Exception(message)
 public interface IReplyDrafter
 {
     /// <summary>A draft for <paramref name="context"/>'s side.</summary>
+    /// <param name="context">What goes into the prompt — and nothing else.</param>
     /// <param name="requestedBy">
     /// Who asked. On the person's side their own AI access is used, if they set
-    /// one up; otherwise and on the company's side the platform's.
+    /// one up; otherwise the platform's.
     /// </param>
+    /// <param name="company">
+    /// The company the caller acts for, or <c>null</c> as a person. On the
+    /// company's side its own key is used if an admin stored one; otherwise the
+    /// platform's (ADR-0051). It never reaches the prompt.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the call.</param>
     /// <exception cref="DraftUnavailable">No provider, or it is silent.</exception>
     Task<string> DraftAsync(
-        ReplyContext context, SubjectId requestedBy, CancellationToken cancellationToken = default);
+        ReplyContext context, SubjectId requestedBy, TenantId? company,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>The person's own wishes from her mandate (advisor-service).</summary>

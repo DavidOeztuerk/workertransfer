@@ -1,3 +1,4 @@
+using Noelia.Core.Identity;
 using WorkerTransfer.Jobs.Domain.Jobs;
 
 namespace WorkerTransfer.Jobs.Application.Ports;
@@ -84,7 +85,14 @@ public sealed record AdvertDraft(
 /// <summary>Writes a draft and keeps nothing of it.</summary>
 public interface IDrafter
 {
+    /// <param name="draft">What goes into the prompt — and nothing else.</param>
+    /// <param name="company">
+    /// Whose model writes: the company's own key if it stored one, otherwise
+    /// the platform's (ADR-0051). It selects the access and never reaches the
+    /// prompt — <see cref="AdvertDraft"/> has no field for it.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the call.</param>
     /// <exception cref="DraftUnavailable">No provider, or it stays silent.</exception>
     Task<string> DraftAsync(
-        AdvertDraft draft, CancellationToken cancellationToken = default);
+        AdvertDraft draft, TenantId company, CancellationToken cancellationToken = default);
 }

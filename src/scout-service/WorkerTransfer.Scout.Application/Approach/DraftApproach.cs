@@ -93,6 +93,6 @@ public sealed class ApproachHandler(
             request.Searched,
             request.Wish);
 
-        return await drafter.DraftAsync(situation, cancellationToken);
+        return await drafter.DraftAsync(situation, request.Company, cancellationToken);
     }
 }

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Noelia.Core.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,10 +20,14 @@ public sealed class ProbeDrafter : IDrafter
     /// <summary>What would last have gone out — that is the interesting question.</summary>
     public AdvertDraft? Last { get; private set; }
 
+    /// <summary>Whose model would have written.</summary>
+    public TenantId? Company { get; private set; }
+
     public Task<string> DraftAsync(
-        AdvertDraft draft, CancellationToken cancellationToken = default)
+        AdvertDraft draft, TenantId company, CancellationToken cancellationToken = default)
     {
         Last = draft;
+        Company = company;
         return Task.FromResult("We are looking for somebody for distributed systems.");
     }
 }
@@ -551,6 +556,9 @@ public class JobJourneyTests(Postgres postgres) : IAsyncLifetime
 
         prompt.Should().NotContain(company.ToString(), "no tenant_id");
         prompt.Should().Contain("shorter");
+
+        // Beside the prompt, the token's company chooses whose model writes.
+        _drafter.Company.Should().Be(new TenantId(company));
     }
 
     /// <summary>

@@ -46,8 +46,10 @@ public sealed class DraftSettings
 /// <remarks>
 /// <para><strong>Which model:</strong> on the person's side their own access
 /// from the account settings, if they set one up — a person who chose a local
-/// model chose it for every draft, not only for the cover letter. Otherwise,
-/// and always on the company's side, the platform's.</para>
+/// model chose it for every draft, not only for the cover letter. On the
+/// company's side the company's own key, if an admin stored one. Otherwise the
+/// platform's (ADR-0051). Each side asks only for its own access: a company
+/// draft never uses the person's key, and the reverse.</para>
 ///
 /// <para><strong>What leaves:</strong> <see cref="ReplyContext"/> and nothing
 /// else, with the person's name masked (E2). A redirect is not followed — the
@@ -57,6 +59,7 @@ public sealed class HttpReplyDrafter(
     IHttpClientFactory factory,
     IOptions<DraftSettings> settings,
     IOptions<IdentitySettings> identity,
+    ICompanyAiAccess companyAi,
     ILogger<HttpReplyDrafter> log) : IReplyDrafter, IAdvisor
 {
     /// <summary>The client's name.</summary>
@@ -70,13 +73,14 @@ public sealed class HttpReplyDrafter(
 
     /// <inheritdoc />
     public async Task<string> DraftAsync(
-        ReplyContext context, SubjectId requestedBy, CancellationToken cancellationToken = default)
+        ReplyContext context, SubjectId requestedBy, TenantId? company,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         var access = context.Writing == Side.Person
             ? await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform()
-            : Platform();
+            : await CompanyAccessAsync(company, cancellationToken) ?? Platform();
 
         return await AskAsync(access, "reply", ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken);
     }
@@ -261,6 +265,24 @@ public sealed class HttpReplyDrafter(
         _settings.ApiKey.Length == 0
             ? null
             : new AiAccessV1(_settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey);
+
+    /// <summary>The company's own access — or <c>null</c> when it set none up.</summary>
+    private async Task<AiAccessV1?> CompanyAccessAsync(TenantId? company, CancellationToken cancellationToken)
+    {
+        if (company is not { } tenant)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await companyAi.AccessAsync(tenant.Value, cancellationToken);
+        }
+        catch (CompanyAiAccessSilent)
+        {
+            throw new DraftUnavailable("identity-service (internal) is not reachable.");
+        }
+    }
 
     /// <summary>The person's own access — or <c>null</c> when they set none up.</summary>
     /// <remarks>

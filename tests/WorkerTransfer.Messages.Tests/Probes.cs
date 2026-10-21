@@ -179,7 +179,8 @@ public sealed class ProbeDrafter : IReplyDrafter
 
     /// <inheritdoc />
     public Task<string> DraftAsync(
-        ReplyContext context, SubjectId requestedBy, CancellationToken cancellationToken = default)
+        ReplyContext context, SubjectId requestedBy, TenantId? company,
+        CancellationToken cancellationToken = default)
     {
         if (Unavailable)
         {
