@@ -864,7 +864,7 @@ const de = {
     aiDidNotWrite:
       "Die KI hat diesen Text nicht geschrieben. Es ist kein Anbieter eingerichtet.",
     statusHint: {
-      open: "Noch kein Anschreiben. Schreib es selbst, oder lass die KI einen Entwurf machen — gesendet wird erst, wenn du freigibst.",
+      open: "Gesendet wird erst, wenn du freigibst — bis dahin sieht das Unternehmen nichts.",
       generating: "Die KI schreibt gerade einen Entwurf.",
       review:
         "Lies den Brief. Markiere Stellen und kommentiere, oder gib ihn frei, wenn er so bleiben soll.",

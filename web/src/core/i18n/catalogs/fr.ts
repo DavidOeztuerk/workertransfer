@@ -860,7 +860,7 @@ const fr: Catalog = {
     aiDidNotWrite:
       "Cette lettre n’a pas été écrite par le modèle. Aucun prestataire n’est configuré.",
     statusHint: {
-      open: "Pas encore de lettre. Rédigez-la vous-même ou laissez l’IA proposer un brouillon — rien ne part avant votre validation.",
+      open: "Rien ne part avant votre validation — d’ici là, l’entreprise ne voit rien.",
       generating: "L’IA rédige un brouillon.",
       review:
         "Lisez la lettre. Surlignez des passages et commentez, ou approuvez-la si elle doit rester ainsi.",

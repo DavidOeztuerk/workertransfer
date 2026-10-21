@@ -253,8 +253,8 @@ Ansprache, Initiativbewerbung oder Wechsel. Anwalt prüft.
 
 | # | Was | Größe | Vor dem Start? |
 |---|---|---|---|
-| 1 | **Unterlagen vorausgewählt**: alle hochgeladenen Unterlagen gehen standardmäßig mit, abwählbar je Bewerbung | S | ja |
-| 2 | **KI nicht mehr automatisch**: eine Bewerbung beginnt leer — „Mit KI schreiben (3 Punkte)" oder „Selbst schreiben"; auch die Sammelbewerbung fragt vorher | S–M | ja |
+| 1 | ~~**Unterlagen vorausgewählt**: alle hochgeladenen Unterlagen gehen standardmäßig mit, abwählbar je Bewerbung~~ | S | **gebaut 21.10.2026** |
+| 2 | ~~**KI nicht mehr automatisch**: eine Bewerbung beginnt leer — „Mit KI schreiben" oder „Selbst schreiben"; auch die Sammelbewerbung fragt vorher~~ | S–M | **gebaut 21.10.2026** — Zustand `open` in applications-service; der Hinweis „verbraucht 3 Punkte" kommt mit dem Guthaben (#4) |
 | 3 | **Tokens messen**: `ModelWire` liest `usage`, je Agent mitgeschrieben (Zahlen, nie Inhalt) — ersetzt die Schätzung, bevor ein Preis öffentlich wird | S | ja |
 | 4 | **KI-Guthaben**: Saldo je Konto (Person oder Firma), Reservierung beim Start eines Aufrufs und Abrechnung am Ende, feste Preise je Agent, Startguthaben, Verfall (Paket nie, Abo zum Monatsende); eigener Schlüssel verbraucht nichts | L | ja |
 | 5 | **Stripe**: Pakete (Checkout), Abo (Billing), Kundenportal, Webhooks → Guthaben; Stripe Tax; Rechnungen für Firmen mit USt-IdNr. | L | ja |

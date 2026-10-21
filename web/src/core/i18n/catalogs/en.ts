@@ -860,7 +860,7 @@ const en: Catalog = {
     aiDidNotWrite:
       "This letter was not written by the model. No writing-help provider is configured.",
     statusHint: {
-      open: "No cover letter yet. Write it yourself, or let the AI draft one — nothing is sent until you approve it.",
+      open: "Nothing is sent until you approve it — until then the company sees nothing.",
       generating: "The AI is drafting a letter.",
       review:
         "Read the letter. Highlight passages and comment, or approve it if it should stay as it is.",
