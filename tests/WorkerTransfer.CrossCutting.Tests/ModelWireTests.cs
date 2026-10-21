@@ -98,4 +98,49 @@ public sealed class ModelWireTests
     {
         ModelWire.Text(provider, json).Should().Be(expected);
     }
+
+    /// <summary>
+    /// The count the prices rest on (GESCHAEFTSMODELL C): both formats, and
+    /// nothing invented where a provider reports nothing.
+    /// </summary>
+    [Fact]
+    public void Both_formats_report_their_tokens()
+    {
+        ModelWire.Usage(ModelWire.OpenAiCompatible,
+                """{"choices":[{"message":{"content":"x"}}],"usage":{"prompt_tokens":3012,"completion_tokens":701}}""")
+            .Should().Be(new TokenUsage(3012, 701));
+
+        ModelWire.Usage(ModelWire.Anthropic,
+                """{"content":[{"type":"text","text":"x"}],"usage":{"input_tokens":2950,"output_tokens":1840}}""")
+            .Should().Be(new TokenUsage(2950, 1840));
+
+        ModelWire.Usage(ModelWire.OpenAiCompatible, """{"choices":[{"message":{"content":"x"}}]}""")
+            .Should().BeNull("a provider that reports nothing gets no invented count");
+    }
+
+    /// <summary>Anthropic splits the count over two events; OpenAI sends it in the last chunk.</summary>
+    [Fact]
+    public void A_stream_adds_its_tokens_event_by_event()
+    {
+        TokenUsage? anthropic = null;
+        anthropic = ModelWire.StreamUsage(ModelWire.Anthropic,
+            """{"type":"message_start","message":{"usage":{"input_tokens":2900,"output_tokens":1}}}""", anthropic);
+        anthropic = ModelWire.StreamUsage(ModelWire.Anthropic,
+            """{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}""", anthropic);
+        anthropic = ModelWire.StreamUsage(ModelWire.Anthropic,
+            """{"type":"message_delta","usage":{"output_tokens":1655}}""", anthropic);
+
+        anthropic.Should().Be(new TokenUsage(2900, 1655));
+
+        TokenUsage? openAi = null;
+        openAi = ModelWire.StreamUsage(ModelWire.OpenAiCompatible,
+            """{"choices":[{"delta":{"content":"Hi"}}]}""", openAi);
+        openAi.Should().BeNull();
+        openAi = ModelWire.StreamUsage(ModelWire.OpenAiCompatible,
+            """{"choices":[],"usage":{"prompt_tokens":3100,"completion_tokens":640}}""", openAi);
+
+        openAi.Should().Be(new TokenUsage(3100, 640));
+        ModelWire.StreamUsage(ModelWire.OpenAiCompatible, "not json", openAi).Should().Be(openAi);
+    }
 }
+

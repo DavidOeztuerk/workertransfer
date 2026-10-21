@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace WorkerTransfer.ServiceDefaults.Ai;
 
@@ -158,4 +159,121 @@ public static class ModelWire
 
         return null;
     }
+
+    /// <summary>The tokens of a non-streamed answer, or null when the provider did not report them.</summary>
+    /// <remarks>
+    /// OpenAI-compatible: <c>usage.prompt_tokens</c> / <c>usage.completion_tokens</c>;
+    /// Anthropic: <c>usage.input_tokens</c> / <c>usage.output_tokens</c> — the
+    /// thinking counts as output, which is what is billed.
+    /// </remarks>
+    public static TokenUsage? Usage(string provider, string json)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(json);
+
+        using var parsed = JsonDocument.Parse(json);
+        return UsageOf(provider, parsed.RootElement);
+    }
+
+    /// <summary>
+    /// What one server-sent event adds to the tokens counted so far.
+    /// </summary>
+    /// <remarks>
+    /// OpenAI-compatible streams report the usage in their last chunk, and only
+    /// when the request asked for it (<c>stream_options.include_usage</c>).
+    /// Anthropic splits it: the input arrives with <c>message_start</c>, the
+    /// output with <c>message_delta</c>. A payload that is no JSON or carries
+    /// nothing leaves the count as it was.
+    /// </remarks>
+    public static TokenUsage? StreamUsage(string provider, string payload, TokenUsage? sofar)
+    {
+        if (string.IsNullOrWhiteSpace(payload) || payload[0] != '{')
+        {
+            return sofar;
+        }
+
+        try
+        {
+            using var parsed = JsonDocument.Parse(payload);
+            var root = parsed.RootElement;
+
+            if (provider == Anthropic && root.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String)
+            {
+                var current = sofar ?? new TokenUsage(0, 0);
+                if (type.GetString() == "message_start"
+                    && root.TryGetProperty("message", out var message)
+                    && message.TryGetProperty("usage", out var startUsage))
+                {
+                    return current with { Input = Count(startUsage, "input_tokens") ?? current.Input };
+                }
+
+                if (type.GetString() == "message_delta" && root.TryGetProperty("usage", out var deltaUsage))
+                {
+                    return current with { Output = Count(deltaUsage, "output_tokens") ?? current.Output };
+                }
+
+                return sofar;
+            }
+
+            return UsageOf(provider, root) ?? sofar;
+        }
+        catch (JsonException)
+        {
+            return sofar;
+        }
+    }
+
+    /// <summary>
+    /// Writes down what one model call cost — the numbers and the agent, never
+    /// a word of what was asked or answered.
+    /// </summary>
+    /// <remarks>
+    /// <strong>This line IS the measurement</strong> the prices rest on
+    /// (<c>docs/GESCHAEFTSMODELL-FRAGEN.md</c>): one per call, per agent. A
+    /// metrics instrument would be the tidier place, but nothing here exports
+    /// custom meters, and an instrument nobody reads is the "registered,
+    /// present, without effect" this repository keeps finding.
+    /// </remarks>
+    public static void Record(ILogger logger, string agent, string provider, TokenUsage? usage)
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+
+        if (usage is not { } counted)
+        {
+            logger.LogInformation(
+                "Model call {Agent} via {ProviderLabel}: the provider reported no token usage", agent, provider);
+            return;
+        }
+
+        logger.LogInformation(
+            "Model call {Agent} via {ProviderLabel}: {InputTokens} tokens in, {OutputTokens} tokens out",
+            agent, provider, counted.Input, counted.Output);
+    }
+
+    private static TokenUsage? UsageOf(string provider, JsonElement root)
+    {
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var (inKey, outKey) = provider == Anthropic
+            ? ("input_tokens", "output_tokens")
+            : ("prompt_tokens", "completion_tokens");
+
+        return Count(usage, inKey) is { } input && Count(usage, outKey) is { } output
+            ? new TokenUsage(input, output)
+            : null;
+    }
+
+    private static int? Count(JsonElement usage, string key) =>
+        usage.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt32(out var count)
+            ? count
+            : null;
 }
+
+/// <summary>The tokens one model call consumed — numbers only.</summary>
+/// <param name="Input">What went in: instruction and context.</param>
+/// <param name="Output">What came out, the thinking included.</param>
+public readonly record struct TokenUsage(int Input, int Output);
+

@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WorkerTransfer.Applications.Application.Ports;
 using WorkerTransfer.ServiceDefaults.Ai;
@@ -109,7 +111,9 @@ public sealed class NoCoverLetterWriter : ICoverLetterWriter
 /// </para>
 /// </remarks>
 public sealed class HttpCoverLetterWriter(
-    IHttpClientFactory factory, IOptions<CoverLetterSettings> settings) : ICoverLetterWriter
+    IHttpClientFactory factory,
+    IOptions<CoverLetterSettings> settings,
+    ILogger<HttpCoverLetterWriter>? log = null) : ICoverLetterWriter
 {
     /// <summary>The name under which the client is registered.</summary>
     public const string ClientName = "cover-letter";
@@ -133,7 +137,7 @@ public sealed class HttpCoverLetterWriter(
         ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(context);
 
-        return AskMaskedAsync(access, context, Instruction(context), progress, cancellationToken);
+        return AskMaskedAsync(access, "cover_letter", context, Instruction(context), progress, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -166,7 +170,7 @@ public sealed class HttpCoverLetterWriter(
             builder.AppendLine($"{number + 1}. {comments[number]}");
         }
 
-        return AskMaskedAsync(access, context, builder.ToString(), progress, cancellationToken);
+        return AskMaskedAsync(access, "cover_letter_revision", context, builder.ToString(), progress, cancellationToken);
     }
 
     /// <summary>
@@ -196,6 +200,7 @@ public sealed class HttpCoverLetterWriter(
 
     private async Task<string> AskMaskedAsync(
         AiAccess access,
+        string agent,
         CoverLetterContext context,
         string instruction,
         Func<string, Task>? progress,
@@ -208,7 +213,7 @@ public sealed class HttpCoverLetterWriter(
             : fragment => progress(placeholders.RestoreFragment(fragment));
 
         var answer = await AskAsync(
-            access, placeholders.Mask(instruction), restoring, cancellationToken);
+            access, agent, placeholders.Mask(instruction), restoring, cancellationToken);
 
         return placeholders.Restore(answer);
     }
@@ -251,6 +256,7 @@ public sealed class HttpCoverLetterWriter(
 
     private async Task<string> AskAsync(
         AiAccess access,
+        string agent,
         string instruction,
         Func<string, Task>? progress,
         CancellationToken cancellationToken)
@@ -310,9 +316,11 @@ public sealed class HttpCoverLetterWriter(
             try
             {
                 await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                TokenUsage? spent = null;
                 var text = await ReadStreamAsync(
                     access.Provider, stream, _settings.Timeout,
-                    progress, cancellationToken);
+                    progress, usage: counted => spent = counted, cancellationToken: cancellationToken);
+                ModelWire.Record(log ?? NullLogger<HttpCoverLetterWriter>.Instance, agent, access.Provider, spent);
 
                 return text is { Length: > 0 }
                     ? text
@@ -346,6 +354,9 @@ public sealed class HttpCoverLetterWriter(
                     model = access.Model,
                     max_tokens = MaxTokens,
                     stream = true,
+                    // Without it an OpenAI-compatible stream reports no tokens,
+                    // and the prices rest on that count (ModelWire.Record).
+                    stream_options = new { include_usage = true },
                     messages = new[]
                     {
                         new { role = "system", content = CoverLetterContext.Rules },
@@ -398,10 +409,25 @@ public sealed class HttpCoverLetterWriter(
         Stream stream,
         TimeSpan stall,
         Func<string, Task>? progress = null,
+        Action<TokenUsage>? usage = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(stream);
+
+        // The tokens arrive beside the text — in the last chunk, or split over
+        // two Anthropic events — and are reported once, at the end, whatever
+        // way the reading ends.
+        TokenUsage? counted = null;
+        string Done(string result)
+        {
+            if (counted is { } spent)
+            {
+                usage?.Invoke(spent);
+            }
+
+            return result;
+        }
 
         using var stallToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         // The first token may take longer than the pause between two. Empty SSE
@@ -431,6 +457,7 @@ public sealed class HttpCoverLetterWriter(
                         break;
                     }
 
+                    counted = ModelWire.StreamUsage(provider, payload, counted);
                     await TakeDeltaAsync(
                         provider, payload, text, stallToken, stall, progress);
                     continue;
@@ -449,6 +476,7 @@ public sealed class HttpCoverLetterWriter(
                 // end.
                 if (row[0] == '{')
                 {
+                    counted = ModelWire.StreamUsage(provider, row, counted);
                     await TakeDeltaAsync(
                         provider, row, text, stallToken, stall, progress);
                     continue;
@@ -461,7 +489,7 @@ public sealed class HttpCoverLetterWriter(
         {
             if (text.Length > 0)
             {
-                return text.ToString();
+                return Done(text.ToString());
             }
 
             throw new CoverLetterUnavailable(
@@ -470,17 +498,18 @@ public sealed class HttpCoverLetterWriter(
 
         if (text.Length > 0)
         {
-            return text.ToString();
+            return Done(text.ToString());
         }
 
         if (raw.Length == 0)
         {
-            return string.Empty;
+            return Done(string.Empty);
         }
 
         using var parsed = JsonDocument.Parse(raw.ToString());
+        counted = ModelWire.Usage(provider, raw.ToString()) ?? counted;
 
-        return ReadText(provider, parsed.RootElement) ?? string.Empty;
+        return Done(ReadText(provider, parsed.RootElement) ?? string.Empty);
     }
 
     private static async Task TakeDeltaAsync(

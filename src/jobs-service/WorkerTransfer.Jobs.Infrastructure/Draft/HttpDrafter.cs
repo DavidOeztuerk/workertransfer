@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.Jobs.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Jobs.Infrastructure.Draft;
 
@@ -60,7 +62,7 @@ public sealed class NoDrafter : IDrafter
 
 /// <summary>Asks a model, once, and keeps nothing.</summary>
 public sealed class HttpDrafter(
-    IHttpClientFactory factory, IOptions<DraftSettings> settings) : IDrafter
+    IHttpClientFactory factory, IOptions<DraftSettings> settings, ILogger<HttpDrafter>? log = null) : IDrafter
 {
     private readonly DraftSettings _settings = settings.Value;
 
@@ -125,8 +127,9 @@ public sealed class HttpDrafter(
 
             try
             {
-                text = ModelWire.Text(
-                    _settings.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
+                var answer = await response.Content.ReadAsStringAsync(cancellationToken);
+                text = ModelWire.Text(_settings.Provider, answer);
+                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "job_advert", _settings.Provider, ModelWire.Usage(_settings.Provider, answer));
             }
             catch (JsonException)
             {
