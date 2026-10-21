@@ -365,7 +365,9 @@ function JobEditor({ jobId }: { jobId?: string }) {
                 <MenuItem value="hour">{t("jobs.periodHour")}</MenuItem>
               </TextField>
             </Box>
-            <Typography variant="body2" color="text.secondary">
+            {/* Set like the helper texts of the fields around it — at body
+                size it read as part of the form, not as a note to it. */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mx: 0.75, mt: -1 }}>
               {t("companyJobs.salaryHint")}
             </Typography>
             <TextField

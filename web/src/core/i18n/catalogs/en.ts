@@ -1531,7 +1531,7 @@ const en: Catalog = {
 
   assessments: {
     title: "Work samples",
-    lead: "A company may ask you to build something small. What it costs is stated up front — in hours.",
+    lead: "A company may ask you for a small work sample. How much time it takes is stated up front — in hours.",
     noDecline: "You need not accept anything, and there is no decline button: whoever does not want to, does nothing. The deadline passes, and nowhere is it recorded that you said no.",
     loading: "Loading work samples…",
     empty: "No work sample open",

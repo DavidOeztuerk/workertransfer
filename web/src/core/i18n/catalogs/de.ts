@@ -1540,7 +1540,7 @@ const de = {
    */
   assessments: {
     title: "Arbeitsproben",
-    lead: "Ein Unternehmen kann dich bitten, etwas Kleines zu bauen. Was das kostet, steht vorher da — in Stunden.",
+    lead: "Ein Unternehmen kann dich um eine kleine Arbeitsprobe bitten. Wie viel Zeit sie kostet, steht vorher da — in Stunden.",
     noDecline: "Du musst nichts annehmen, und es gibt keinen Absageknopf: wer nicht will, tut nichts. Die Frist läuft ab, und nirgends wird vermerkt, dass du abgelehnt hast.",
     loading: "Arbeitsproben werden geladen…",
     empty: "Keine Arbeitsprobe offen",

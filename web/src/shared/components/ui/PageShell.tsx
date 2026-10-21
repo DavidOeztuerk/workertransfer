@@ -28,12 +28,15 @@ export function PageShell({
       // Widths of our own instead of MUI's `sm`/`lg` (600/1200): those lay a
       // factor of two apart, and the frame jumped while paging. These two are
       // a fifth apart. The text column below is limited to 62ch.
+      //
+      // The wide one is exactly the header's and footer's (`lg`, 1200): at
+      // 1160 the page title began 20 px to the right of the logo above it.
       maxWidth={false}
       // Less at the bottom than at the top, on purpose: above the title the
       // air makes the beginning, below the last element it is only emptiness
       // before the footer.
       sx={{
-        maxWidth: narrow ? 960 : 1160,
+        maxWidth: narrow ? 960 : 1200,
         pt: { xs: 4, md: 7 },
         pb: { xs: 3, md: 4 },
       }}

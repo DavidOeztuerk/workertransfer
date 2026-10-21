@@ -454,7 +454,14 @@ export async function pickOption(
   label: RegExp | string,
   option: string
 ): Promise<void> {
-  await page.getByLabel(label).click();
+  const field = page.getByLabel(label);
+  // "Handeln als" lives in the account menu since 21.10.2026 (it ran over the
+  // company menu in the bar). A field that is not visible is opened there;
+  // closing the choice closes that menu again, chosen or not.
+  if (!(await field.isVisible())) {
+    await page.getByRole("button", { name: "Mein Konto" }).click();
+  }
+  await field.click();
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 
