@@ -13,7 +13,10 @@ public enum ProviderOrigin
     Operator,
 
     /// <summary>The person, in their account settings — one access per human being.</summary>
-    Person
+    Person,
+
+    /// <summary>A company, set by its admin — one access for the company's drafts.</summary>
+    Company
 }
 
 /// <summary>A provider as it is really in use in this instance.</summary>
@@ -28,7 +31,10 @@ public enum ProviderOrigin
 /// <param name="Label">The provider label: <c>anthropic</c>, <c>openai_compatible</c>.</param>
 /// <param name="Host">The host of its address — never the whole address, never a key.</param>
 /// <param name="Origin">Who set it up.</param>
-/// <param name="People">How many people entered it. With the operator: 0.</param>
+/// <param name="People">
+/// How many people entered it — with <see cref="ProviderOrigin.Company"/> how
+/// many companies. With the operator: 0.
+/// </param>
 public sealed record ProviderRow(
     string Label,
     string Host,
@@ -194,11 +200,17 @@ public sealed class ProviderCheck(IEnumerable<IProviderSource> sources) : ISecur
     {
         var jurisdiction = HostJurisdiction.Classify(row.Host);
 
-        return row.Origin == ProviderOrigin.Operator
-            ? $"{row.Label} auf {row.Host} ({Word(jurisdiction.Jurisdiction)}), vom "
-              + "Betreiber eingerichtet und für alle gültig"
-            : $"{row.People} Mensch(en) auf {row.Host} über {row.Label} "
-              + $"({Word(jurisdiction.Jurisdiction)})";
+        return row.Origin switch
+        {
+            ProviderOrigin.Operator =>
+                $"{row.Label} auf {row.Host} ({Word(jurisdiction.Jurisdiction)}), vom "
+                + "Betreiber eingerichtet und für alle gültig",
+            ProviderOrigin.Company =>
+                $"{row.People} Firma/Firmen auf {row.Host} über {row.Label} "
+                + $"({Word(jurisdiction.Jurisdiction)}), vom Admin der Firma eingerichtet",
+            _ => $"{row.People} Mensch(en) auf {row.Host} über {row.Label} "
+                 + $"({Word(jurisdiction.Jurisdiction)})"
+        };
     }
 
     private static string Word(Jurisdiction jurisdiction) => jurisdiction switch

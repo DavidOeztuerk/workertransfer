@@ -164,6 +164,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// <summary>Providers bound to an account (ADR-0053).</summary>
     public DbSet<ExternalLoginRow> ExternalLogins => Set<ExternalLoginRow>();
 
+    /// <summary>Which model writes for a company (ADR-0051, Bauliste 6).</summary>
+    public DbSet<CompanyAiSettingsRow> CompanyAiSettings => Set<CompanyAiSettingsRow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -346,6 +349,20 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.HasIndex(row => new { row.UserId, row.Provider }).IsUnique();
         });
 
+        modelBuilder.Entity<CompanyAiSettingsRow>(entity =>
+        {
+            entity.ToTable("company_ai_settings");
+            entity.HasKey(row => row.TenantId);
+            entity.Property(row => row.TenantId).HasColumnName("tenant_id");
+            entity.Property(row => row.AiProvider).HasColumnName("ai_provider").HasMaxLength(16);
+            entity.Property(row => row.AiModel).HasColumnName("ai_model").HasMaxLength(128);
+            entity.Property(row => row.AiKeyEncrypted).HasColumnName("ai_key_encrypted");
+            entity.Property(row => row.AiKeyTail).HasColumnName("ai_key_tail").HasMaxLength(8);
+            entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<TenantRow>().WithOne().HasForeignKey<CompanyAiSettingsRow>(row => row.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         base.OnModelCreating(modelBuilder);
     }
 }
@@ -471,6 +488,28 @@ public sealed class InvitationRow
     public DateTime ExpiresAt { get; set; }
 
     public DateTime? AcceptedAt { get; set; }
+}
+
+/// <summary>One row of <c>company_ai_settings</c> — a company's own AI key, encrypted.</summary>
+/// <remarks>
+/// No address column: the address belongs to the provider and is set by the
+/// platform (<c>AiProviders</c>), so a row cannot point anywhere else.
+/// </remarks>
+public sealed class CompanyAiSettingsRow
+{
+    public Guid TenantId { get; set; }
+
+    /// <summary>The provider as a label: none, openai, anthropic.</summary>
+    public string AiProvider { get; set; } = "none";
+
+    public string AiModel { get; set; } = string.Empty;
+
+    /// <summary>The key, encrypted. Never in the clear.</summary>
+    public string AiKeyEncrypted { get; set; } = string.Empty;
+
+    public string AiKeyTail { get; set; } = string.Empty;
+
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>One row of <c>external_logins</c> — a provider's id bound to an account (ADR-0053).</summary>

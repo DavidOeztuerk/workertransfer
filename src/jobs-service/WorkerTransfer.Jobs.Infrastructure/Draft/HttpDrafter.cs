@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Noelia.Core.Identity;
+using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.Jobs.Application.Ports;
 using WorkerTransfer.ServiceDefaults.Ai;
 
@@ -46,33 +48,42 @@ public sealed class DraftSettings
     public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
-/// <summary>The drafter when none is set up.</summary>
-/// <remarks>
-/// It delivers no template but says that it does not exist. A draft that does
-/// not come from the model but looks like it would be the worse answer.
-/// </remarks>
-public sealed class NoDrafter : IDrafter
-{
-    /// <inheritdoc />
-    public Task<string> DraftAsync(
-        AdvertDraft draft, CancellationToken cancellationToken = default) =>
-        // web/src/features/company/pages/CompanyJobNewPage.tsx (HELP_CASES) matches this sentence.
-        throw new DraftUnavailable("No draft provider is set up.");
-}
-
 /// <summary>Asks a model, once, and keeps nothing.</summary>
+/// <remarks>
+/// <strong>Which model:</strong> the company's own key if an admin stored one,
+/// otherwise the platform's (ADR-0051). A silent identity-service is refused,
+/// never replaced by the platform's provider.
+/// </remarks>
 public sealed class HttpDrafter(
-    IHttpClientFactory factory, IOptions<DraftSettings> settings, ILogger<HttpDrafter>? log = null) : IDrafter
+    IHttpClientFactory factory,
+    IOptions<DraftSettings> settings,
+    ICompanyAiAccess companyAi,
+    ILogger<HttpDrafter>? log = null) : IDrafter
 {
     private readonly DraftSettings _settings = settings.Value;
 
     /// <inheritdoc />
     public async Task<string> DraftAsync(
-        AdvertDraft draft, CancellationToken cancellationToken = default)
+        AdvertDraft draft, TenantId company, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(draft);
 
-        if (string.IsNullOrEmpty(_settings.ApiKey))
+        AiAccessV1? own;
+
+        try
+        {
+            own = await companyAi.AccessAsync(company.Value, cancellationToken);
+        }
+        catch (CompanyAiAccessSilent)
+        {
+            throw new DraftUnavailable("identity-service (internal) is not reachable.");
+        }
+
+        var access = own ?? (string.IsNullOrEmpty(_settings.ApiKey)
+            ? null
+            : new AiAccessV1(_settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey));
+
+        if (access is null)
         {
             // web/src/features/company/pages/CompanyJobNewPage.tsx (HELP_CASES) matches this sentence.
             throw new DraftUnavailable("No draft provider is set up.");
@@ -85,7 +96,7 @@ public sealed class HttpDrafter(
         // What goes out stands in AdvertDraft and nowhere else: no
         // tenant_id, no company name, nothing about a human being.
         using var request = ModelWire.Request(
-            _settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey,
+            access.Provider, access.BaseUrl, access.Model, access.Key,
             AdvertDraft.Rules, draft.Prompt, maxTokens: 800);
 
         HttpResponseMessage response;
@@ -128,8 +139,8 @@ public sealed class HttpDrafter(
             try
             {
                 var answer = await response.Content.ReadAsStringAsync(cancellationToken);
-                text = ModelWire.Text(_settings.Provider, answer);
-                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "job_advert", _settings.Provider, ModelWire.Usage(_settings.Provider, answer));
+                text = ModelWire.Text(access.Provider, answer);
+                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "job_advert", access.Provider, ModelWire.Usage(access.Provider, answer));
             }
             catch (JsonException)
             {

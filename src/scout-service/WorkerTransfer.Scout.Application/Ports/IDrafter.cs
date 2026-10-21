@@ -1,3 +1,4 @@
+using Noelia.Core.Identity;
 using WorkerTransfer.Scout.Domain.Searches;
 
 namespace WorkerTransfer.Scout.Application.Ports;
@@ -130,8 +131,16 @@ public sealed record ApproachSituation(
 /// </remarks>
 public interface IDrafter
 {
+    /// <param name="situation">What goes into the prompt — and nothing else.</param>
+    /// <param name="company">
+    /// Whose model writes: the company's own key if it stored one, otherwise
+    /// the platform's (ADR-0051). It selects the access and never reaches the
+    /// prompt.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the call.</param>
     /// <exception cref="DraftUnavailable">
     /// No provider set up, or it does not answer.
     /// </exception>
-    Task<string> DraftAsync(ApproachSituation situation, CancellationToken cancellationToken = default);
+    Task<string> DraftAsync(
+        ApproachSituation situation, TenantId company, CancellationToken cancellationToken = default);
 }

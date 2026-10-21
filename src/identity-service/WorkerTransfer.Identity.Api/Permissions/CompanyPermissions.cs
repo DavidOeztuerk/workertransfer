@@ -37,6 +37,13 @@ public static class CompanyPermissions
     /// <summary>Remove a member from one's own company.</summary>
     public const string Remove = "company.members.remove";
 
+    /// <summary>Set the company's own AI key and provider.</summary>
+    /// <remarks>
+    /// <c>admin</c>: it decides where the company's drafts are sent and who
+    /// pays for them — a decision that binds the company, not daily work.
+    /// </remarks>
+    public const string Ai = "company.ai";
+
     /// <summary>The policy name for a permission.</summary>
     public static string Policy(string permission) => Prefix + permission;
 }

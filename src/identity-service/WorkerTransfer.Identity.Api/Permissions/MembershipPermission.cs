@@ -47,7 +47,8 @@ public sealed class MembershipPermission(
     [
         CompanyPermissions.Invite,
         CompanyPermissions.WithdrawInvitation,
-        CompanyPermissions.Remove
+        CompanyPermissions.Remove,
+        CompanyPermissions.Ai
     ];
 
     /// <inheritdoc />

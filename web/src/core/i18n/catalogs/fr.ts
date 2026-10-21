@@ -61,6 +61,7 @@ const fr: Catalog = {
     ourTransfers: "Transferts",
     companyProfile: "Profil de l’entreprise",
     team: "Équipe",
+    companySettings: "Paramètres de l'entreprise",
     settingsMenu: "Affichage et langue",
     navigation: "Navigation",
     openMenu: "Ouvrir le menu",
@@ -1332,6 +1333,17 @@ const fr: Catalog = {
     sent: "Invitation envoyée.",
     sending: "Envoi…",
     inviteEmailInvalid: "Cela ne ressemble pas à une adresse e-mail. Vérifiez l’orthographe.",
+  },
+
+  companySettings: {
+    title: "Paramètres de l'entreprise",
+    lead: "Ce qu'un administrateur décide pour toute l'entreprise.",
+    companyOnly: "Seule une personne agissant pour une entreprise modifie ses paramètres. Passe à une entreprise dans le menu du compte.",
+    aiTitle: "Accès IA de l'entreprise",
+    aiLead: "Les annonces, les prises de contact depuis le scout et les réponses aux messages sont rédigées par le modèle de la plateforme. Avec votre propre clé, c'est votre fournisseur qui écrit — pour toute l'équipe.",
+    providerHint: "Il n'est sollicité que lorsqu'un membre de l'équipe appuie sur un bouton de brouillon. Sans clé, c'est le modèle de la plateforme qui écrit.",
+    keyHint: "Enregistrée chiffrée et jamais restituée — pas même aux administrateurs. Saisis-la à nouveau pour la changer, enregistre un champ vide pour la supprimer.",
+    adminOnly: "Seul un administrateur configure l'accès IA de l'entreprise. Adresse-toi à une personne de l'équipe ayant ce rôle.",
   },
 
   companyProfile: {

@@ -336,6 +336,10 @@ services:
       Sources__Greenhouse: https://boards-api.greenhouse.io
       Sources__Lever: https://api.lever.co
       Sources__Personio: jobs.personio.de
+      # Where a company's OWN key may reach (ADR-0051, Bauliste 6) — declared
+      # for the egress boundary.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
 
   - name: applications-service
     dir: applications
@@ -416,6 +420,11 @@ services:
       Jobs__BaseUrl: http://jobs-service:8006
       # "Your profile was discovered" (ADR-0033), via the outbox.
       Notifications__BaseUrl: http://notification-service:8010
+      # A company's own key drafts its approach (ADR-0051, Bauliste 6).
+      # `Identity__Secret` hangs on this line in _helpers.tpl.
+      Identity__BaseUrl: http://identity-service:8001
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
 
   - name: advisor-service
     dir: advisor

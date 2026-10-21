@@ -1,6 +1,9 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Noelia.Core.Identity;
+using WorkerTransfer.Contracts.Identity;
+using WorkerTransfer.ServiceDefaults.Ai;
 using JobsDraft = WorkerTransfer.Jobs.Infrastructure.Draft;
 using JobsPorts = WorkerTransfer.Jobs.Application.Ports;
 using ProfileDraft = WorkerTransfer.Profile.Infrastructure.Draft;
@@ -193,9 +196,10 @@ public class DraftErrorTests
 
             // The context carries no free text of the person, so the secret
             // travels as the headline — the field that does reach the prompt.
-            return new ScoutDraft.HttpDrafter(factory, Options.Create(scout))
+            return new ScoutDraft.HttpDrafter(factory, Options.Create(scout), new NoCompanyAccess())
                 .DraftAsync(
                     new ScoutPorts.ApproachSituation(Secret, ["Python"], ["Python"], Wish),
+                    new TenantId(Guid.NewGuid()),
                     token);
         }
 
@@ -205,10 +209,18 @@ public class DraftErrorTests
             Timeout = timeLimit
         };
 
-        return new JobsDraft.HttpDrafter(factory, Options.Create(jobs))
+        return new JobsDraft.HttpDrafter(factory, Options.Create(jobs), new NoCompanyAccess())
             .DraftAsync(
                 new JobsPorts.AdvertDraft("Title", Secret, ["Python"], "Berlin", Wish),
+                new TenantId(Guid.NewGuid()),
                 token);
+    }
+
+    /// <summary>A company without an own key: the platform's model answers.</summary>
+    private sealed class NoCompanyAccess : ICompanyAiAccess
+    {
+        public Task<AiAccessV1?> AccessAsync(Guid company, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AiAccessV1?>(null);
     }
 
     /// <summary>A factory that always hands out the same stub.</summary>

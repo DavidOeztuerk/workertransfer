@@ -86,6 +86,7 @@ public static class IdentityInfrastructure
         services.AddScoped<CreateCompany>();
         services.AddScoped<IInvitationRepository, EfInvitationRepository>();
         services.AddScoped<IAccountSettingsStore, EfAccountSettingsStore>();
+        services.AddScoped<ICompanyAiSettingsStore, EfCompanyAiSettingsStore>();
         services.AddScoped<IPostalAddresses, EfPostalAddresses>();
 
         // The master key is read ONCE at startup, not per request: if it is

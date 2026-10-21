@@ -76,3 +76,35 @@ ohne dass jemand nicht mehr alles machen kann. Das gehört zum Geschäftsmodell
   Anschreiben).
 - Ein 7B-Modell auf dem Laptop braucht für ein Anschreiben rund anderthalb
   Minuten.
+
+## Ergänzung 21.10.2026 — der Schlüssel der Firma (Bauliste 6)
+
+Das Geschäftsmodell (`GESCHAEFTSMODELL-FRAGEN.md` B4) zieht den Schlüssel der
+Firma vor den Start. Gebaut ist die erste Hälfte, **Anthropic oder OpenAI mit
+dem Schlüssel der Firma**; der eigene Server unter der bestätigten Domain
+folgt als zweiter Schritt.
+
+- **Er gehört der Firma, nicht einem Mitglied.** Er liegt in identity-service
+  (`company_ai_settings`, verschlüsselt wie der einer Person), und der Satz
+  oben bleibt wahr: der private Schlüssel eines Mitglieds bezahlt nie für die
+  Firma. Jede Seite fragt nur nach ihrem eigenen Zugang.
+- **Einstellen ist `admin`, lesen auch.** Der Schlüssel entscheidet, wohin die
+  Entwürfe des Teams gehen und wer sie bezahlt — das bindet die Firma.
+  `GET`/`PUT /companies/{id}/ai` und `PUT /companies/{id}/ai/key`; der
+  Schlüssel geht nur hin und kommt nie zurück, auch nicht an Admins.
+- **Dieselbe Regel wie bei der Person:** eigener Schlüssel, sonst das
+  Plattform-Modell; eine schweigende identity-service wird verweigert, nie
+  ersetzt. Gefragt wird über `GET /internal/companies/{id}/ai` je Entwurf, ohne
+  Zwischenspeicher — wer den Schlüssel entfernt, trifft schon den nächsten.
+- **Ein 404 der Tür ist kein „kein Schlüssel".** Sie antwortet jeder Firma mit
+  200 und verweigert nur ein falsches Geheimnis mit 404. Als „keiner" gelesen,
+  schickte ein falsch verdrahtetes Geheimnis die Entwürfe jeder Firma still an
+  den Anbieter der Plattform.
+- **Die Firma wählt nur, welches Modell schreibt.** Sie reist neben dem Kontext
+  und gelangt nie in den Prompt — `AdvertDraft` und `ApproachSituation`
+  bleiben ohne Feld für sie.
+- **Eine ruhende Firma behält keinen Schlüssel.** Löscht ihr letzter Admin sein
+  Konto, fällt der Schlüssel mit; ein Mandant wird nie gelöscht, also nähme
+  ihn keine Kaskade.
+- Im Nachweis zählt das KI-Verzeichnis Firmen mit eigenem Schlüssel getrennt
+  von Personen — gezählt, nie benannt.

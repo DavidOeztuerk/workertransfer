@@ -52,6 +52,13 @@
 #   DELETE /jobs/sources/{id}                 sie entfernen
 #   POST   /jobs/sources/{id}/fetch           jetzt abrufen
 #
+# Und seit dem 21.10.2026 der eigene KI-Schluessel der Firma (Bauliste 6) —
+# er entscheidet, wohin die Entwuerfe der Firma gehen und wer sie bezahlt:
+#
+#   GET    /companies/{id}/ai                 ansehen
+#   PUT    /companies/{id}/ai                 Anbieter und Modell
+#   PUT    /companies/{id}/ai/key             den Schluessel
+#
 # Und DREI verlangen seit ADR-0048 mindestens einen `recruiter` — den ersten
 # Kontakt zu einem Menschen, der sich nicht selbst gemeldet hat:
 #
@@ -257,6 +264,9 @@ gruppen:
       - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/invitations/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, mitglied: 403, firma: 403 }
       - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/members', ohne: 401, person: 404, mitglied: 404, firma: 404 }
       - { methode: DELETE, pfad: '/companies/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: GET, pfad: '/companies/00000000-0000-0000-0000-000000000001/ai', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: PUT, pfad: '/companies/00000000-0000-0000-0000-000000000001/ai', ohne: 401, person: 403, mitglied: 403, firma: 403 }
+      - { methode: PUT, pfad: '/companies/00000000-0000-0000-0000-000000000001/ai/key', ohne: 401, person: 403, mitglied: 403, firma: 403 }
       - { methode: POST, pfad: '/invitations/accept', ohne: 401, person: 422, mitglied: 422, firma: 422 }
 
   - name: 'Einwilligung — der Ledger'

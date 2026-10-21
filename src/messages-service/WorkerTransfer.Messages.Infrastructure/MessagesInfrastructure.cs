@@ -21,6 +21,7 @@ using WorkerTransfer.Messages.Infrastructure.Process;
 using WorkerTransfer.Messages.Infrastructure.Security;
 using WorkerTransfer.Outbox;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Messages.Infrastructure;
@@ -75,6 +76,7 @@ public static class MessagesInfrastructure
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IProcessLookup, HttpProcessLookup>();
         services.AddScoped<ICompanyMemberLookup, HttpCompanyMemberLookup>();
+        services.AddCompanyAiAccess(configuration);
         services.AddScoped<HttpReplyDrafter>();
         services.AddScoped<IReplyDrafter>(provider => provider.GetRequiredService<HttpReplyDrafter>());
         services.AddScoped<IAdvisor>(provider => provider.GetRequiredService<HttpReplyDrafter>());

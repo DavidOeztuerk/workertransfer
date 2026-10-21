@@ -161,6 +161,12 @@ public sealed class EfErasureLedger(IdentityDbContext context, ITokenSessionServ
                     set => set.SetProperty(row => row.Status, "dormant"),
                     cancellationToken);
 
+            // Nobody is left who may use or change the company's AI key, and a
+            // tenant is never deleted — so no cascade would ever take it.
+            await context.CompanyAiSettings
+                .Where(row => row.TenantId == company)
+                .ExecuteDeleteAsync(cancellationToken);
+
             dormant.Add(new TenantId(company));
         }
 

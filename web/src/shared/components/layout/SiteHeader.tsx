@@ -89,6 +89,7 @@ const COMPANY_MENU: (Route | "divider")[] = [
   "divider",
   { path: "/company/profile", labelKey: "header.companyProfile" },
   { path: "/company/team", labelKey: "header.team" },
+  { path: "/company/settings", labelKey: "header.companySettings" },
 ];
 
 /**

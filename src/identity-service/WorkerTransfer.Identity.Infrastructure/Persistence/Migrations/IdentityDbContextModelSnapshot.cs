@@ -181,6 +181,44 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", (string)null);
                 });
 
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.CompanyAiSettingsRow", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("AiKeyEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("ai_key_encrypted");
+
+                    b.Property<string>("AiKeyTail")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("ai_key_tail");
+
+                    b.Property<string>("AiModel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ai_model");
+
+                    b.Property<string>("AiProvider")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("ai_provider");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("company_ai_settings", (string)null);
+                });
+
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.ExternalLoginRow", b =>
                 {
                     b.Property<string>("Provider")
@@ -549,6 +587,15 @@ namespace WorkerTransfer.Identity.Infrastructure.Persistence.Migrations
                     b.HasIndex("DeliveredAt");
 
                     b.ToTable("outbox", (string)null);
+                });
+
+            modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.CompanyAiSettingsRow", b =>
+                {
+                    b.HasOne("WorkerTransfer.Identity.Infrastructure.Persistence.TenantRow", null)
+                        .WithOne()
+                        .HasForeignKey("WorkerTransfer.Identity.Infrastructure.Persistence.CompanyAiSettingsRow", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("WorkerTransfer.Identity.Infrastructure.Persistence.ExternalLoginRow", b =>

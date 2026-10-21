@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Noelia.Core.Identity;
+using WorkerTransfer.Contracts.Identity;
 using WorkerTransfer.Scout.Application.Ports;
 using WorkerTransfer.ServiceDefaults.Ai;
 
@@ -57,21 +59,6 @@ public sealed class DraftSettings
     public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
-/// <summary>The drafter when none is set up.</summary>
-/// <remarks>
-/// It is not silent and does not deliver a template either — it says that it
-/// does not exist. A draft that does not come from the model but looks like it
-/// would be the worse answer: somebody would take it for a suggestion and send
-/// it to a human being.
-/// </remarks>
-public sealed class NoDrafter : IDrafter
-{
-    /// <inheritdoc />
-    public Task<string> DraftAsync(
-        ApproachSituation situation, CancellationToken cancellationToken = default) =>
-        throw new DraftUnavailable("No draft provider is set up.");
-}
-
 /// <summary>Asks a model, once, and keeps nothing.</summary>
 /// <remarks>
 /// One call, one text. No second pass, no memory, no vector store — and no row
@@ -82,17 +69,39 @@ public sealed class NoDrafter : IDrafter
 public sealed class HttpDrafter(
     IHttpClientFactory factory,
     IOptions<DraftSettings> settings,
+    ICompanyAiAccess companyAi,
     ILogger<HttpDrafter>? log = null) : IDrafter
 {
     private readonly DraftSettings _settings = settings.Value;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The company's own key if an admin stored one, otherwise the platform's
+    /// (ADR-0051); a silent identity-service is refused, never replaced. Without
+    /// either it says so instead of handing out a template that looks like a
+    /// suggestion — and that somebody would send to a human being.
+    /// </remarks>
     public async Task<string> DraftAsync(
-        ApproachSituation situation, CancellationToken cancellationToken = default)
+        ApproachSituation situation, TenantId company, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(situation);
 
-        if (string.IsNullOrEmpty(_settings.ApiKey))
+        AiAccessV1? own;
+
+        try
+        {
+            own = await companyAi.AccessAsync(company.Value, cancellationToken);
+        }
+        catch (CompanyAiAccessSilent)
+        {
+            throw new DraftUnavailable("identity-service (internal) is not reachable.");
+        }
+
+        var access = own ?? (string.IsNullOrEmpty(_settings.ApiKey)
+            ? null
+            : new AiAccessV1(_settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey));
+
+        if (access is null)
         {
             throw new DraftUnavailable("No draft provider is set up.");
         }
@@ -105,7 +114,7 @@ public sealed class HttpDrafter(
         // name, no address, no SubjectId, no employer, no company name — and
         // no evidence.
         using var request = ModelWire.Request(
-            _settings.Provider, _settings.BaseUrl, _settings.Model, _settings.ApiKey,
+            access.Provider, access.BaseUrl, access.Model, access.Key,
             ApproachSituation.Rules, situation.Prompt, maxTokens: 400);
 
         HttpResponseMessage response;
@@ -146,8 +155,8 @@ public sealed class HttpDrafter(
             try
             {
                 var answer = await response.Content.ReadAsStringAsync(cancellationToken);
-                text = ModelWire.Text(_settings.Provider, answer);
-                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "scout_approach", _settings.Provider, ModelWire.Usage(_settings.Provider, answer));
+                text = ModelWire.Text(access.Provider, answer);
+                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "scout_approach", access.Provider, ModelWire.Usage(access.Provider, answer));
             }
             catch (JsonException)
             {

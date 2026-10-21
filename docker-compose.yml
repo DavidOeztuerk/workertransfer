@@ -374,6 +374,11 @@ services:
       Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
       Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # A company's own key drafts its advert instead of the platform's model
+      # (ADR-0051, Bauliste 6): fetched behind the shared secret, and the two
+      # hosts it may reach declared for the egress boundary.
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
       # Where a company's adverts come from (ADR-0052): the ATS' official
       # APIs. They stand here for the same reason as the model's address —
       # the egress boundary lets through what the configuration names.
@@ -563,6 +568,14 @@ services:
       Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}
       Draft__Provider: ${WORKERTRANSFER_AI_PROVIDER:-openai_compatible}
       Draft__Model: ${WORKERTRANSFER_AI_MODEL:-qwen2.5-coder:7b}
+      # A company's own key drafts its approach instead of the platform's
+      # model (ADR-0051, Bauliste 6): asked at identity-service behind the
+      # shared secret, and the two hosts it may reach declared for the egress
+      # boundary.
+      Identity__BaseUrl: http://identity-service:8001
+      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
+      Draft__AllowedTargets__0: https://api.anthropic.com
+      Draft__AllowedTargets__1: https://api.openai.com
     ports:
       - "8012:8012"
 

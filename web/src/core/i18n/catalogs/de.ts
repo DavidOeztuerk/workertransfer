@@ -64,6 +64,7 @@ const de = {
     ourTransfers: "Wechsel",
     companyProfile: "Unternehmensprofil",
     team: "Team",
+    companySettings: "Einstellungen der Firma",
     settingsMenu: "Darstellung und Sprache",
     navigation: "Navigation",
     openMenu: "Menü öffnen",
@@ -1334,6 +1335,17 @@ const de = {
     sent: "Einladung verschickt.",
     sending: "Wird verschickt…",
     inviteEmailInvalid: "Das sieht nicht nach einer E-Mail-Adresse aus. Prüf die Schreibweise.",
+  },
+
+  companySettings: {
+    title: "Einstellungen der Firma",
+    lead: "Was ein Admin für die ganze Firma entscheidet.",
+    companyOnly: "Die Einstellungen einer Firma ändert nur, wer für sie handelt. Wechsle im Kontomenü auf ein Unternehmen.",
+    aiTitle: "KI-Zugang der Firma",
+    aiLead: "Stellenanzeigen, Ansprachen aus dem Scout und Antworten in Nachrichten entwirft das Plattform-Modell. Mit einem eigenen Schlüssel schreibt stattdessen euer Anbieter — für alle im Team.",
+    providerHint: "Gefragt wird nur, wenn jemand aus dem Team auf einen Entwurfs-Knopf drückt. Ohne Schlüssel schreibt das Plattform-Modell.",
+    keyHint: "Wird verschlüsselt gespeichert und kommt nie zurück — auch nicht an Admins. Zum Ändern neu eintragen, zum Entfernen leer speichern.",
+    adminOnly: "Den KI-Zugang der Firma stellt nur ein Admin ein. Wende dich an jemanden mit dieser Rolle im Team.",
   },
 
   companyProfile: {

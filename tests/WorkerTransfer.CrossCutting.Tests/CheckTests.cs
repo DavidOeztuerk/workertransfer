@@ -179,6 +179,23 @@ public class CheckTests
         finding.Status.Should().Be(SecurityCheckStatus.Warning);
     }
 
+    /// <summary>A company's own key is counted as a company, never folded into the people.</summary>
+    [Fact]
+    public async Task The_provider_check_counts_companies_apart_from_people()
+    {
+        var finding = await new ProviderCheck(
+        [
+            new SampleSource(
+            [
+                new ProviderRow("anthropic", "api.anthropic.com", ProviderOrigin.Person, 2),
+                new ProviderRow("anthropic", "api.anthropic.com", ProviderOrigin.Company, 1)
+            ])
+        ]).RunAsync();
+
+        finding.Summary.Should().Contain("2 Mensch(en) auf api.anthropic.com");
+        finding.Summary.Should().Contain("1 Firma/Firmen auf api.anthropic.com");
+    }
+
     /// <summary>Not set up means: no row, not an empty one.</summary>
     [Fact]
     public async Task An_unconfigured_operator_provider_yields_no_row() =>

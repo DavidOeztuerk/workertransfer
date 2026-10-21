@@ -266,7 +266,8 @@ public sealed class ComposeReplyHandler(
             parties.PersonName,
             "de");
 
-        return await drafter.DraftAsync(context, request.Caller.Subject, cancellationToken);
+        return await drafter.DraftAsync(
+            context, request.Caller.Subject, request.Caller.Company, cancellationToken);
     }
 }
 

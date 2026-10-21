@@ -1,4 +1,5 @@
 using MediatR;
+using Noelia.Core.Identity;
 using WorkerTransfer.Jobs.Application.Messages;
 using WorkerTransfer.Jobs.Application.Ports;
 
@@ -15,6 +16,7 @@ namespace WorkerTransfer.Jobs.Application.Draft;
 /// </para>
 /// </remarks>
 public sealed record DraftAdvertQuery(
+    TenantId Company,
     string Title,
     string Description,
     IReadOnlyList<string> Skills,
@@ -33,11 +35,13 @@ public sealed class DraftAdvertHandler(IDrafter drafter)
         ArgumentNullException.ThrowIfNull(request);
 
         // Without tenant_id and without company name — the context class has no
-        // fields for them, so nothing can slip in either.
+        // fields for them, so nothing can slip in either. The company travels
+        // beside it, only to choose whose model writes.
         return drafter.DraftAsync(
             new AdvertDraft(
                 request.Title, request.Description, request.Skills,
                 request.Location, request.Wish),
+            request.Company,
             cancellationToken);
     }
 }

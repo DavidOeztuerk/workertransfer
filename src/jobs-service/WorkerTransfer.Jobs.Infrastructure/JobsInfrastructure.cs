@@ -16,6 +16,7 @@ using WorkerTransfer.Jobs.Infrastructure.Draft;
 using WorkerTransfer.Jobs.Infrastructure.Persistence;
 using WorkerTransfer.Jobs.Infrastructure.Withdrawal;
 using WorkerTransfer.ServiceDefaults;
+using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Jobs.Contracts;
 using Noelia.Abstractions.Security.Checks;
@@ -61,19 +62,14 @@ public static class JobsInfrastructure
 
         Sources(services, configuration);
 
-        // Without a deposited key no foreign service is called. That is the
-        // default and not a fallback.
+        // Always the HTTP drafter: a company with its own key drafts even when
+        // the platform has none. Without either, no foreign service is called
+        // and the drafter says so — the default, not a fallback.
         var draft = new DraftSettings();
         configuration.GetSection(DraftSettings.Section).Bind(draft);
 
-        if (string.IsNullOrEmpty(draft.ApiKey))
-        {
-            services.AddScoped<IDrafter, NoDrafter>();
-        }
-        else
-        {
-            services.AddScoped<IDrafter, HttpDrafter>();
-        }
+        services.AddCompanyAiAccess(configuration);
+        services.AddScoped<IDrafter, HttpDrafter>();
 
         services.AddCQRS(typeof(CreateJobCommand).Assembly);
         services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
