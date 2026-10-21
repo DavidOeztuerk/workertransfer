@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Noelia.Core.Identity;
 using MediatR;
 using WorkerTransfer.Identity.Application.Registration;
@@ -17,10 +18,15 @@ public sealed record InviteBody(string Email, string Role);
 /// <summary>What a caller sends to take an invitation up.</summary>
 public sealed record AcceptInvitationBody(string Token);
 
+/// <summary>What an admin sends to choose the company's AI provider — never the key.</summary>
+public sealed record CompanyAiBody(
+    [property: JsonPropertyName("ai_provider")] string? AiProvider,
+    [property: JsonPropertyName("ai_model")] string? AiModel);
+
 /// <summary><c>/companies</c>, <c>/me/companies</c> and <c>/invitations</c>.</summary>
 public static class CompanyEndpoints
 {
-    /// <summary>Maps the eight endpoints around companies.</summary>
+    /// <summary>Maps the eleven endpoints around companies.</summary>
     public static IEndpointRouteBuilder MapCompanyEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -243,6 +249,74 @@ public static class CompanyEndpoints
         })
         .RequireAuthorization(CompanyPermissions.Policy(CompanyPermissions.Remove));
 
+        // The company's own AI key (ADR-0051, Bauliste 6). All three are
+        // `admin`, reading included: the view says which provider the
+        // company's drafts go to, and that is the admin's decision to show.
+        company.MapGet("/ai", async (
+            Guid tenantId,
+            IMediator mediator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            var state = await mediator.Send(
+                new CompanyAiQuery(new TenantId(tenantId)), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(CompanyAiJson(state), cancellationToken);
+        })
+        .RequireAuthorization(CompanyPermissions.Policy(CompanyPermissions.Ai));
+
+        company.MapPut("/ai", async (
+            Guid tenantId,
+            CompanyAiBody body,
+            IMediator mediator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            var provider = (body.AiProvider ?? "none").Trim();
+            var model = (body.AiModel ?? string.Empty).Trim();
+
+            // Unknown is refused rather than read as "none": an admin who
+            // typed a provider we do not have would otherwise believe the
+            // company's drafts now go there.
+            if (provider is not ("none" or "openai" or "anthropic") || model.Length > MaxModelLength)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: ai_provider, ai_model");
+                return;
+            }
+
+            var state = await mediator.Send(
+                new SetCompanyAiCommand(new TenantId(tenantId), provider, model), cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(CompanyAiJson(state), cancellationToken);
+        })
+        .RequireAuthorization(CompanyPermissions.Policy(CompanyPermissions.Ai));
+
+        // The key separately, and with nothing returned. It travels one way.
+        company.MapPut("/ai/key", async (
+            Guid tenantId,
+            AiKeyBody body,
+            IMediator mediator,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if ((body.Key?.Length ?? 0) > MaxKeyLength)
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity,
+                    "Request failed", "invalid: key");
+                return;
+            }
+
+            await mediator.Send(
+                new SetCompanyAiKeyCommand(new TenantId(tenantId), body.Key ?? string.Empty),
+                cancellationToken);
+
+            context.Response.StatusCode = StatusCodes.Status204NoContent;
+        })
+        .RequireAuthorization(CompanyPermissions.Policy(CompanyPermissions.Ai));
+
         app.MapPost("/invitations/accept", async (
             AcceptInvitationBody body,
             IMediator mediator,
@@ -287,6 +361,22 @@ public static class CompanyEndpoints
 
         return app;
     }
+
+    /// <summary>The column holds 128 characters; longer is input, not an outage.</summary>
+    private const int MaxModelLength = 128;
+
+    /// <summary>Real keys are far shorter; the bound keeps a pasted file out of the column.</summary>
+    private const int MaxKeyLength = 512;
+
+    private static Dictionary<string, object> CompanyAiJson(CompanyAiView state) => new()
+    {
+        ["ai_provider"] = state.Provider,
+        ["ai_base_url"] = state.Address,
+        ["ai_model"] = state.Model,
+        // NOT the key — only that there is one, and its last four characters.
+        ["ai_key_present"] = state.KeyPresent,
+        ["ai_key_tail"] = state.KeyTail
+    };
 
     private static Dictionary<string, string?> InvitationJson(Invitation invitation) => new()
     {

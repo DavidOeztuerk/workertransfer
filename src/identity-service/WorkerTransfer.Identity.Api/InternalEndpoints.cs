@@ -189,6 +189,32 @@ public static class InternalEndpoints
                 cancellationToken);
         });
 
+        // The company's twin: which model writes for the company's seams
+        // (advert help, scout approach, company replies). The tenant comes from
+        // the asking service's verified token, never from a body.
+        app.MapGet("/internal/companies/{tenantId:guid}/ai", async (
+            Guid tenantId,
+            IMediator mediator,
+            IOptions<NotifySettings> settings,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!MayNotify(context, settings.Value))
+            {
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
+                return;
+            }
+
+            var aiAccess = await mediator.Send(
+                new InternalCompanyAiAccessQuery(new TenantId(tenantId)),
+                cancellationToken);
+
+            await context.Response.WriteAsJsonAsync(
+                new AiAccessV1(aiAccess.Provider, aiAccess.Address, aiAccess.Model, aiAccess.Key),
+                cancellationToken);
+        });
+
         return app;
     }
 

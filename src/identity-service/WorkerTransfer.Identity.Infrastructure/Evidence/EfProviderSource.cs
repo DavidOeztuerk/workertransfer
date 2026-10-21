@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using WorkerTransfer.Identity.Domain.Users;
 using WorkerTransfer.Identity.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults.Checks;
 
 namespace WorkerTransfer.Identity.Infrastructure.Evidence;
 
-/// <summary>Which AI providers the people of this instance have entered.</summary>
+/// <summary>Which AI providers the people and companies of this instance have entered.</summary>
 /// <remarks>
 /// <para><strong>This is the line no test can write.</strong>
 /// <c>Adr0022Tests</c> and <c>DraftBoundaryTests</c> check the tree; the AI
@@ -50,6 +51,16 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
             })
             .ToListAsync(ct);
 
+        // A company's key, counted like a person's — only where a key is
+        // stored, because a provider without one writes nothing. The address
+        // is the provider's, set by the platform, so it is derived rather
+        // than stored. The key column stands in the filter and is not selected.
+        var companies = await context.CompanyAiSettings
+            .Where(row => row.AiProvider != "none" && row.AiKeyEncrypted != "")
+            .GroupBy(row => row.AiProvider)
+            .Select(group => new { AiProvider = group.Key, Companies = group.Count() })
+            .ToListAsync(ct);
+
         return
         [
             .. groups
@@ -63,7 +74,21 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
                 })
                 .Where(group => group.Host.Length > 0)
                 .Select(group => new ProviderRow(
-                    group.AiProvider, group.Host, ProviderOrigin.Person, group.People))
+                    group.AiProvider, group.Host, ProviderOrigin.Person, group.People)),
+            .. companies
+                .Select(group => new
+                {
+                    group.AiProvider,
+                    group.Companies,
+                    Host = Uri.TryCreate(
+                        AiProviders.Address(group.AiProvider == "anthropic" ? AiProvider.Anthropic : AiProvider.OpenAi),
+                        UriKind.Absolute, out var target)
+                        ? target.Host
+                        : string.Empty
+                })
+                .Where(group => group.Host.Length > 0)
+                .Select(group => new ProviderRow(
+                    group.AiProvider, group.Host, ProviderOrigin.Company, group.Companies))
         ];
     }
 }
