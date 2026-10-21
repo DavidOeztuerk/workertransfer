@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # The Noelia Control Plane over the running stack, on http://localhost:8091.
 #
-#   make up && make control-plane          # start (or restart)
+#   make up && make control-plane          # start (or restart), local mode
+#   make up && make control-plane-oidc     # the same, signing in at Keycloak
 #   make control-plane-down                # stop
+#
+# The local mode makes every visitor from this machine an administrator. The
+# OIDC mode is the one the product runs in operation (VISION-FRAGEN-2 Q4):
+# sign-in at the local Keycloak (`scripts/keycloak.sh`), group "admins" mapped
+# to the role admin, nobody else let in.
 #
 # ---------------------------------------------------------------------------
 # WHY ON THE HOST AND NOT IN A CONTAINER
@@ -50,6 +56,10 @@ if [[ "${1:-}" == "--down" ]]; then
   exit 0
 fi
 
+MODE=local
+[[ "${1:-}" == "--oidc" ]] && MODE=oidc
+KEYCLOAK="https://localhost:8443/realms/workertransfer"
+
 [[ -f "$PROJECT" ]] || {
   red "No NoeliaControlPlane at $SOURCE — set NOELIA_CONTROL_PLANE_PFAD."; exit 1; }
 command -v dotnet >/dev/null || { red "dotnet is missing."; exit 1; }
@@ -91,11 +101,31 @@ DLL="$(dirname "$PROJECT")/bin/Release/net10.0/Noelia.ControlPlane.dll"
 cp "$(dirname "$PROJECT")/appsettings.json" "$STATE/appsettings.json"
 cp scripts/control-plane-fleet.json "$STATE/appsettings.Development.json"
 
+# Who may come in. Local: everybody from this machine. OIDC: whoever Keycloak
+# signs in and puts into "admins" — an unmapped group grants nothing.
+ACCESS=(ControlPlane__Access__AllowLocalDevelopment=true)
+if [[ "$MODE" == oidc ]]; then
+  [[ -f "$STATE/keycloak.env" ]] || { red "No Keycloak set up — \`make keycloak\` first."; exit 1; }
+  curl -fsS --max-time 3 --cacert "$STATE/keycloak-tls/cert.pem" \
+    "$KEYCLOAK/.well-known/openid-configuration" >/dev/null 2>&1 || {
+    red "Keycloak does not answer on $KEYCLOAK — \`make keycloak\` first."; exit 1; }
+  CLIENT_SECRET="$(grep -E '^CONTROL_PLANE_CLIENT_SECRET=' "$STATE/keycloak.env" | cut -d= -f2-)"
+  ACCESS=(
+    "ControlPlane__Access__Authority=$KEYCLOAK"
+    "ControlPlane__Access__ClientId=noelia-control-plane"
+    "ControlPlane__Access__ClientSecret=$CLIENT_SECRET"
+    "ControlPlane__Access__RoleClaim=groups"
+    "ControlPlane__Access__RoleMap__admins=admin"
+  )
+fi
+
 (
   cd "$STATE"
+  # `env` and not a prefix: the values travel as one array, and the secret
+  # stays out of this file's text.
+  env "${ACCESS[@]}" \
   ASPNETCORE_ENVIRONMENT=Development \
   ASPNETCORE_URLS="http://localhost:$PORT" \
-  ControlPlane__Access__AllowLocalDevelopment=true \
   ControlPlane__OperatorSecret="$SECRET" \
   ControlPlane__Licence="$LICENCE" \
   ControlPlane__HistoryPath="$STATE/fleet-history.db" \
@@ -113,6 +143,22 @@ for _ in $(seq 1 60); do
     tail -15 "$STATE/control-plane.log"; rm -f "$PID_FILE"; exit 1; }
   sleep 1
 done
+
+if [[ "$MODE" == oidc ]]; then
+  # Signed out, every page sends the browser to Keycloak — and building that
+  # address needs the discovery document, so a redirect there proves the
+  # control plane reached Keycloak and trusted its certificate. Whether it
+  # COLLECTS is measured in the local mode; here the pages need a sign-in.
+  location="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 20 "http://localhost:$PORT/")"
+  if [[ "$location" != "$KEYCLOAK/protocol/openid-connect/auth"* ]]; then
+    red "Signed out, / should lead to Keycloak and led to: ${location:-nowhere}"
+    tail -15 "$STATE/control-plane.log"
+    exit 1
+  fi
+  green "Control plane on http://localhost:$PORT — sign-in at Keycloak ($KEYCLOAK)"
+  grey  "User 'operator', password: CONTROL_PLANE_OPERATOR_PASSWORD in .control-plane/keycloak.env"
+  exit 0
+fi
 
 # "It answers" is not the promise. The promise is that it collects.
 coverage="$(curl -fsS --max-time 60 "http://localhost:$PORT/fleet.json" | python3 -c '
