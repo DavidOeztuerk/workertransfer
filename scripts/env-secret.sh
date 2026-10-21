@@ -5,6 +5,8 @@
 #
 #   scripts/env-secret.sh --clipboard KEY
 #       the value someone just copied in a provider's console (pbpaste)
+#   scripts/env-secret.sh --stdin KEY
+#       a public identifier read off a page (a client ID, an app ID)
 #   scripts/env-secret.sh --file KEY path/to/file
 #       the file as the value — Apple's .p8 key is stored as its base64 body
 #   scripts/env-secret.sh --google-json ID_KEY SECRET_KEY path/to/client_secret.json
@@ -62,6 +64,10 @@ case "${1:-}" in
     [[ $# -eq 2 ]] || { echo "Aufruf: $0 --clipboard KEY" >&2; exit 2; }
     pbpaste | write "$2"
     echo "Tipp: die Zwischenablage hält den Wert noch — kopier etwas anderes darüber."
+    ;;
+  --stdin)
+    [[ $# -eq 2 ]] || { echo "Aufruf: $0 --stdin KEY" >&2; exit 2; }
+    write "$2"
     ;;
   --file)
     [[ $# -eq 3 ]] || { echo "Aufruf: $0 --file KEY DATEI" >&2; exit 2; }
