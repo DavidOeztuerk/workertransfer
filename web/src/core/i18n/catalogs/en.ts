@@ -61,6 +61,7 @@ const en: Catalog = {
     ourTransfers: "Transfers",
     companyProfile: "Company profile",
     team: "Team",
+    companySettings: "Company settings",
     settingsMenu: "Appearance and language",
     navigation: "Navigation",
     openMenu: "Open menu",
@@ -1332,6 +1333,17 @@ const en: Catalog = {
     sent: "Invitation sent.",
     sending: "Sending…",
     inviteEmailInvalid: "That does not look like an email address. Check the spelling.",
+  },
+
+  companySettings: {
+    title: "Company settings",
+    lead: "What an admin decides for the whole company.",
+    companyOnly: "Only someone acting for a company changes its settings. Switch to a company in the account menu.",
+    aiTitle: "The company's AI access",
+    aiLead: "Job adverts, scout approaches and message replies are drafted by the platform's model. With your own key, your provider writes them instead — for everyone on the team.",
+    providerHint: "It is asked only when someone on the team presses a draft button. Without a key the platform's model writes.",
+    keyHint: "Stored encrypted and never handed back — not even to admins. Enter it again to change it, save it empty to remove it.",
+    adminOnly: "Only an admin sets up the company's AI access. Ask someone on the team with that role.",
   },
 
   companyProfile: {
