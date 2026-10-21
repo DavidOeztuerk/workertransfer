@@ -405,6 +405,9 @@ Arbeitsuchenden höchstens 2.000 €, von Firmen frei.
 der Person, für die der Berater arbeitet.
 
 **Antwort:** **D, 17.10.2026.** Weiter zurückgestellt — letzter Punkt vor dem Start.
+**Entschieden am 20./21.10.2026** in [`GESCHAEFTSMODELL-FRAGEN.md`](GESCHAEFTSMODELL-FRAGEN.md):
+Plattform kostenlos; Firmen zahlen 500 € netto je Einstellung, fällig nach der
+Probezeit; KI kostet für alle (eigener Schlüssel oder KI-Guthaben bei uns).
 **Idee dazu, 17.10.2026 (zur KI, ADR-0051):** Die Plattform hat **einen**
 KI-Anbieter (z. B. Anthropic), und Person wie Firma nutzen ihn per **Abo** oder
 über ein **gekauftes Kontingent**. Harte Bedingung: ein Anschreiben darf nie
@@ -516,6 +519,25 @@ J1–J13 aus Runde 1 und J14–J17 unten.
 - **Frage:** Wer ist verantwortlich, wenn eine Person ihre Daten über einen
   Schlüssel an einen KI-Dienst ihrer Wahl gibt — und wie weit reicht die
   Pflicht der Plattform danach?
+
+### J18. Erfolgsgebühr als private Arbeitsvermittlung (GESCHAEFTSMODELL B/D)
+
+- **Frage:** Ist die Plattform mit 500 € je Einstellung eine private
+  Arbeitsvermittlung (§§ 296 ff. SGB III) — welcher Vertrag mit der Firma ist
+  nötig, und hält eine Klausel „jede Einstellung binnen 12 Monaten nach dem
+  ersten Kontakt" und „Schweigen bis Probezeitende löst die Rechnung aus"?
+
+### J19. KI-Guthaben für Verbraucher
+
+- **Frage:** Darf Abo-Guthaben zum Monatsende verfallen, und wie lange muss
+  gekauftes Paket-Guthaben gültig bleiben? Wie lautet die Widerrufsbelehrung
+  für digitale Inhalte, die sofort genutzt werden?
+
+### J20. Empfehlungsprämien (Vitamin B, nach dem MVP)
+
+- **Frage:** Was muss die Plattform beachten, wenn sie Privatpersonen für eine
+  erfolgreiche Empfehlung bezahlt (Steuer beim Empfänger, § 22 Nr. 3 EStG;
+  Meldepflichten der Plattform; ab wann ist es gewerblich)?
 
 ---
 
