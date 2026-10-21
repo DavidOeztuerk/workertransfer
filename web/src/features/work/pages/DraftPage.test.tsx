@@ -111,7 +111,7 @@ function draw() {
 }
 
 describe("DraftPage", () => {
-  it("offers no editing on version 1 without a letter and offers Generieren", async () => {
+  it("offers no editing on version 1 without a letter and offers writing with AI", async () => {
     stubFetch((url) => {
       if (url.includes(`/applications/drafts/${ID}`)) return { body: DRAFT };
       if (url.includes("/resume") || url.includes("/documents")) return { body: [] };
@@ -123,12 +123,30 @@ describe("DraftPage", () => {
     expect(await screen.findByText("Noch kein Anschreiben.")).toBeInTheDocument();
     expect(screen.getByText(/zu lange nichts geliefert/i)).toBeInTheDocument();
     expect(screen.queryByText(/nicht eingerichtet/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Generieren/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mit KI schreiben/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Selbst schreiben/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Schreiben$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Bearbeiten/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Kommentar hinzufügen/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Kommentieren geht, sobald ein Text da ist/i)).toBeInTheDocument();
+  });
+
+  /** An open draft waits for the person: write it herself, or let the AI. */
+  it("offers both ways on an open draft and writes nothing by itself", async () => {
+    const calls: string[] = [];
+    stubFetch((url, init) => {
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.includes(`/applications/drafts/${ID}`)) return { body: { ...DRAFT, status: "open", error: "" } };
+      if (url.includes("/resume") || url.includes("/documents")) return { body: [] };
+      return { status: 404 };
+    });
+
+    draw();
+
+    expect(await screen.findByText(/Erst Freigeben und Senden machen daraus eine Bewerbung/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mit KI schreiben/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Selbst schreiben/i })).toBeInTheDocument();
+    expect(calls.some((call) => call.includes("/write"))).toBe(false);
   });
 
   it("always attaches the CV and offers adjusting instead of templates", async () => {

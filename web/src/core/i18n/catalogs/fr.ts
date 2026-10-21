@@ -756,6 +756,7 @@ const fr: Catalog = {
     comments_other: "{{count}} commentaires ouverts",
     error: "Erreur lors de la rédaction : {{error}}",
     status: {
+      open: "Ouvert",
       generating: "En cours de rédaction",
       review: "En relecture",
       needs_changes: "Modifications nécessaires",
@@ -764,7 +765,7 @@ const fr: Catalog = {
       failed: "Échec",
     },
     write: "Rédiger",
-    generate: "Générer",
+    generate: "Rédiger avec l’IA",
     revise: "Réviser",
     approve: "Approuver",
     send: "Envoyer",
@@ -839,8 +840,8 @@ const fr: Catalog = {
     emptyLetter: "Pas encore de lettre.",
     emptyLetterHint:
       "L’aide à la rédaction n’est pas configurée. Vous pouvez écrire la lettre vous-même — seuls Approuver et Envoyer en font une candidature.",
-    emptyLetterStart:
-      "Vous pouvez écrire la lettre vous-même ou la faire générer — seuls Approuver et Envoyer en font une candidature.",
+    emptyLetterStart: "Vous pouvez rédiger le texte vous-même ou le faire rédiger par l’IA — seuls la validation et l’envoi en font une candidature.",
+    emptyLetterOpen: "Rédigez-la vous-même ou laissez l’IA proposer un brouillon. Seuls la validation et l’envoi en font une candidature.",
     noPreview: "Pas encore de texte",
     writingFailed:
       "L’aide à la rédaction n’est pas configurée. Les brouillons existent — vous pouvez écrire la lettre vous-même.",
@@ -849,8 +850,8 @@ const fr: Catalog = {
     aiDidNotWrite:
       "Cette lettre n’a pas été écrite par le modèle. Aucun prestataire n’est configuré.",
     statusHint: {
-      generating:
-        "Pas encore de lettre. « Générer » demande l’aide à la rédaction.",
+      open: "Pas encore de lettre. Rédigez-la vous-même ou laissez l’IA proposer un brouillon — rien ne part avant votre validation.",
+      generating: "L’IA rédige un brouillon.",
       review:
         "Lisez la lettre. Surlignez des passages et commentez, ou approuvez-la si elle doit rester ainsi.",
       needs_changes:
@@ -925,6 +926,7 @@ const fr: Catalog = {
     clearSelection: "Annuler la sélection",
     select: "Sélectionner ce poste",
     applyToAll: "Postuler à tous",
+    prewrite: "Faire rédiger les lettres par l’IA",
     alreadyApplied: "Déjà postulé",
     openDraft: "Ouvrir le brouillon",
     progress: "{{fertig}} sur {{gesamt}} rédigés",

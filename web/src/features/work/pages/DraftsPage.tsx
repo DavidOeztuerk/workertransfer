@@ -31,6 +31,7 @@ const STATUS_COLOUR: Record<
   DraftStatus,
   "default" | "primary" | "warning" | "info" | "error"
 > = {
+  open: "default",
   generating: "warning",
   review: "info",
   needs_changes: "warning",

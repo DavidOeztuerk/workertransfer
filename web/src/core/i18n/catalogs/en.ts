@@ -756,6 +756,7 @@ const en: Catalog = {
     comments_other: "{{count}} open comments",
     error: "Error while writing: {{error}}",
     status: {
+      open: "Open",
       generating: "Writing",
       review: "Under review",
       needs_changes: "Changes needed",
@@ -764,7 +765,7 @@ const en: Catalog = {
       failed: "Failed",
     },
     write: "Write",
-    generate: "Generate",
+    generate: "Write with AI",
     revise: "Revise",
     approve: "Approve",
     send: "Send",
@@ -839,8 +840,8 @@ const en: Catalog = {
     emptyLetter: "No cover letter yet.",
     emptyLetterHint:
       "Writing help is not set up. You can write the letter yourself — only Approve and Send turn it into an application.",
-    emptyLetterStart:
-      "You can write the letter yourself or generate it — only Approve and Send turn it into an application.",
+    emptyLetterStart: "You can write the text yourself or let the AI write it — only approving and sending turn it into an application.",
+    emptyLetterOpen: "Write it yourself, or let the AI draft one. Only approving and sending turn it into an application.",
     noPreview: "No text yet",
     writingFailed:
       "Writing help is not set up. The drafts exist — you can write the letter yourself.",
@@ -849,8 +850,8 @@ const en: Catalog = {
     aiDidNotWrite:
       "This letter was not written by the model. No writing-help provider is configured.",
     statusHint: {
-      generating:
-        "No letter yet. “Generate” asks the writing help.",
+      open: "No cover letter yet. Write it yourself, or let the AI draft one — nothing is sent until you approve it.",
+      generating: "The AI is drafting a letter.",
       review:
         "Read the letter. Highlight passages and comment, or approve it if it should stay as it is.",
       needs_changes:
@@ -925,6 +926,7 @@ const en: Catalog = {
     clearSelection: "Clear selection",
     select: "Select this job",
     applyToAll: "Apply to all",
+    prewrite: "Have the AI draft the cover letters",
     alreadyApplied: "Already applied",
     openDraft: "Open draft",
     progress: "{{fertig}} of {{gesamt}} written",

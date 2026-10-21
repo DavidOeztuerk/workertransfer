@@ -1,14 +1,21 @@
 import { type MessageKey, failureKey } from "../../../shared/api/errors";
+import { getMyDocuments } from "../../person/api/resume";
 import type { Draft } from "../api/applications";
-import { createDrafts, writeDraft } from "../api/applications";
+import { chooseAttachments, createDrafts, writeDraft } from "../api/applications";
 
 /**
  * Turn jobs into drafts — the one place in the browser that does it.
  *
- * <strong>Two calls and not one.</strong> `POST /applications/drafts` only
- * creates (state <c>generating</c>); writing happens per draft via
- * <c>/write</c>. So every draft stays visible on its own, instead of a bulk
- * call silently swallowing half of them.
+ * <strong>The model writes only when asked.</strong> `POST /applications/drafts`
+ * creates open drafts; `write: true` then starts the writing per draft via
+ * <c>/write</c>. A writing costs the person's AI credit (GESCHAEFTSMODELL C),
+ * so it is never the default — and per draft, so every one stays visible on
+ * its own instead of a bulk call silently swallowing half of them.
+ *
+ * <strong>Every uploaded document goes along by default.</strong> Upload once,
+ * enclose everywhere; a document is deselected per application, not chosen
+ * each time. Only a fresh draft is filled — one the person already shaped
+ * keeps her choice.
  *
  * <strong>Why this lives here and not in a page.</strong> There were two ways
  * to an application — the job list and the career page — and the second went
@@ -50,7 +57,7 @@ export type ProgressReporter = (done: number, total: number) => void;
 
 export async function startDrafts(
   jobIds: string[],
-  report?: ProgressReporter,
+  { write = false, report }: { write?: boolean; report?: ProgressReporter } = {},
 ): Promise<DraftStart> {
   const result = await createDrafts(jobIds);
   if (!result.ok) {
@@ -58,8 +65,11 @@ export async function startDrafts(
   }
 
   const drafts = result.drafts;
+  await encloseEverything(drafts);
+  if (!write) return { ok: true, drafts, error: null };
+
   const open = drafts.filter(
-    (draft) => draft.status === "generating" || draft.status === "failed",
+    (draft) => draft.status === "open" || draft.status === "failed",
   );
 
   report?.(0, open.length);
@@ -96,4 +106,23 @@ export async function startDrafts(
   );
 
   return { ok: true, drafts, error: null };
+}
+
+/**
+ * All of the person's documents onto every fresh draft.
+ *
+ * A failure here costs nothing but convenience: the draft stands, and the
+ * documents can still be ticked on its page. It is therefore not reported.
+ */
+async function encloseEverything(drafts: Draft[]): Promise<void> {
+  const fresh = drafts.filter(
+    (draft) => draft.status === "open" && draft.documents.length === 0 && draft.body.trim() === "",
+  );
+  if (fresh.length === 0) return;
+
+  const documents = await getMyDocuments();
+  if (!documents.ok || documents.value.length === 0) return;
+
+  const ids = documents.value.map((document) => document.id);
+  await Promise.all(fresh.map((draft) => chooseAttachments(draft.id, true, ids)));
 }

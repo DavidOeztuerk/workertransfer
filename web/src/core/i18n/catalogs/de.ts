@@ -760,6 +760,7 @@ const de = {
     comments_other: "{{count}} offene Anmerkungen",
     error: "Fehler beim Schreiben: {{error}}",
     status: {
+      open: "Offen",
       generating: "Wird geschrieben",
       review: "Zur Prüfung",
       needs_changes: "Änderungen nötig",
@@ -768,7 +769,7 @@ const de = {
       failed: "Fehlgeschlagen",
     },
     write: "Schreiben",
-    generate: "Generieren",
+    generate: "Mit KI schreiben",
     revise: "Überarbeiten",
     approve: "Freigeben",
     send: "Senden",
@@ -843,8 +844,8 @@ const de = {
     emptyLetter: "Noch kein Anschreiben.",
     emptyLetterHint:
       "Die Entwurfshilfe ist nicht eingerichtet. Du kannst den Text selbst schreiben — erst Freigeben und Senden machen daraus eine Bewerbung.",
-    emptyLetterStart:
-      "Du kannst den Text selbst schreiben oder ihn generieren lassen — erst Freigeben und Senden machen daraus eine Bewerbung.",
+    emptyLetterStart: "Du kannst den Text selbst schreiben oder ihn von der KI schreiben lassen — erst Freigeben und Senden machen daraus eine Bewerbung.",
+    emptyLetterOpen: "Schreib es selbst, oder lass die KI einen Entwurf machen. Erst Freigeben und Senden machen daraus eine Bewerbung.",
     noPreview: "Noch kein Text",
     writingFailed:
       "Die Entwurfshilfe ist nicht eingerichtet. Die Entwürfe sind angelegt — den Text kannst du selbst schreiben.",
@@ -853,8 +854,8 @@ const de = {
     aiDidNotWrite:
       "Die KI hat diesen Text nicht geschrieben. Es ist kein Anbieter eingerichtet.",
     statusHint: {
-      generating:
-        "Noch kein Anschreiben. „Generieren“ fragt die Entwurfshilfe.",
+      open: "Noch kein Anschreiben. Schreib es selbst, oder lass die KI einen Entwurf machen — gesendet wird erst, wenn du freigibst.",
+      generating: "Die KI schreibt gerade einen Entwurf.",
       review:
         "Lies den Brief. Markiere Stellen und kommentiere, oder gib ihn frei, wenn er so bleiben soll.",
       needs_changes:
@@ -929,6 +930,7 @@ const de = {
     clearSelection: "Auswahl aufheben",
     select: "Stelle auswählen",
     applyToAll: "Für alle bewerben",
+    prewrite: "Anschreiben von der KI vorschreiben lassen",
     alreadyApplied: "Bereits beworben",
     openDraft: "Entwurf öffnen",
     createDrafts: "Entwürfe erstellen …",

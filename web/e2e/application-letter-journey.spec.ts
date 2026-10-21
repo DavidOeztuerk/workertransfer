@@ -69,7 +69,9 @@ test("select several → drafts → comment → release → send → folder with
   await expect(
     candidate.locator("li").filter({ hasText: jobTitle2 }).first(),
   ).toBeVisible();
-  await expect(candidate.getByText(/kein Anbieter|Fehlgeschlagen|Wird geschrieben/i).first()).toBeVisible({
+  // Nobody ticked "let the AI draft", so the drafts wait open — the model
+  // never starts by itself (GESCHAEFTSMODELL C).
+  await expect(candidate.getByText(/^Offen$/).first()).toBeVisible({
     timeout: 20_000,
   });
 
@@ -88,7 +90,7 @@ test("select several → drafts → comment → release → send → folder with
   await expect(candidate).toHaveURL(/\/applications\/drafts\/[0-9a-f-]{36}$/);
 
   await expect(candidate.getByText("Noch kein Anschreiben.")).toBeVisible();
-  await expect(candidate.getByRole("button", { name: /Generieren/i })).toBeVisible();
+  await expect(candidate.getByRole("button", { name: /Mit KI schreiben/i })).toBeVisible();
   await expect(candidate.getByRole("button", { name: /Selbst schreiben/i })).toBeVisible();
   await expect(candidate.getByRole("button", { name: /Bearbeiten/i })).toHaveCount(0);
   await expect(candidate.getByRole("button", { name: /^Schreiben$/i })).toHaveCount(0);
