@@ -146,10 +146,10 @@ export function SiteHeader() {
     >
       <Container
         maxWidth="lg"
-        // The same gutter in all three shells (header, content, footer): with
-        // its own, the sign-in button sticks to the right edge — most visible in
-        // a header, because it stands on every page.
-        sx={{ px: { xs: 2, sm: 3, md: 4 } }}
+        // The same gutter in all three shells (header, content, footer) comes
+        // from the theme (`MuiContainer`, `tokens/spacing.ts`): with its own,
+        // the sign-in button sticks to the right edge — most visible in a
+        // header, because it stands on every page.
       >
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
           <IconButton
@@ -193,7 +193,6 @@ export function SiteHeader() {
 
           {signedIn ? (
             <>
-              <CompanySwitcher />
               {actingForCompany ? <CompanyMenu /> : null}
               <AccountMenu />
             </>
@@ -218,13 +217,6 @@ export function SiteHeader() {
             {t("header.navigation")}
           </Typography>
         </Box>
-        {signedIn ? (
-          // The switch belongs on narrow screens too: before, a phone could
-          // not act for a company at all.
-          <Box sx={{ px: 2, pb: 1 }}>
-            <CompanySwitcher fullWidth />
-          </Box>
-        ) : null}
         <List sx={{ px: 1 }}>
           {[...routes, ...(actingForCompany ? COMPANY_MENU : [])].map((route, index) =>
             route === "divider" ? (
@@ -267,6 +259,9 @@ function NavLink({
       size="small"
       aria-current={active ? "page" : undefined}
       sx={{
+        // One line per entry: a wrapped "Unsere Stellen" made the bar two
+        // rows tall for one word.
+        whiteSpace: "nowrap",
         color: active ? "primary.main" : "text.secondary",
         backgroundColor: active ? "action.selected" : "transparent",
         fontWeight: active ? 620 : 560,
@@ -318,6 +313,7 @@ function AccountMenu() {
 
   const email = useAppSelector((state) => state.auth.session?.email ?? "");
   const actingForCompany = useAppSelector((state) => state.auth.session?.tenantId != null);
+  const hasCompanies = useAppSelector((state) => state.auth.memberships.length > 0);
   const { preferences, level, setLevel, close } = usePreferenceView(setAnchor);
 
   return (
@@ -352,6 +348,15 @@ function AccountMenu() {
             </Typography>
           ) : null}
         </Box>
+        {/* Who one acts as belongs to the account, and it stands here on every
+            width. In the bar it ran over the company menu at 1280 px with a
+            long company name, and on a phone it needed a second copy in the
+            drawer. Renders nothing without a membership. */}
+        {level === "main" && hasCompanies ? (
+          <Box sx={{ px: 2, pb: 1.5 }}>
+            <CompanySwitcher fullWidth onDone={close} />
+          </Box>
+        ) : null}
         <Divider />
 
         {level !== "main" ? (

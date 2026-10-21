@@ -65,7 +65,14 @@ export type ApplicationListResult =
   | { ok: true; applications: Application[] }
   | Failure<"failed" | "offline">;
 
-export type DraftStatus = "generating" | "review" | "needs_changes" | "approved" | "sent" | "failed";
+export type DraftStatus =
+  | "open"
+  | "generating"
+  | "review"
+  | "needs_changes"
+  | "approved"
+  | "sent"
+  | "failed";
 
 export interface DraftComment {
   id: string;

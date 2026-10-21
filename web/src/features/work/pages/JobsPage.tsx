@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Checkbox from "@mui/material/Checkbox";
@@ -153,6 +154,9 @@ export function JobsPage() {
    * selection anyway.
    */
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  // Off by default: a writing costs the person's AI credit, and nobody spends
+  // it by selecting jobs (GESCHAEFTSMODELL C).
+  const [prewrite, setPrewrite] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -247,8 +251,8 @@ export function JobsPage() {
     });
   }, []);
 
-  async function create(jobIds: string[], report?: ProgressReporter) {
-    const start = await startDrafts(jobIds, report);
+  async function create(jobIds: string[], options: { write?: boolean; report?: ProgressReporter } = {}) {
+    const start = await startDrafts(jobIds, options);
     if (!start.ok) {
       setBulkError(start.error === null ? null : t(start.error));
       return null;
@@ -283,7 +287,10 @@ export function JobsPage() {
         clearSelection();
         return;
       }
-      const drafts = await create(jobIds, (done, total) => setProgress({ done, total }));
+      const drafts = await create(jobIds, {
+        write: prewrite,
+        report: (done, total) => setProgress({ done, total }),
+      });
       if (drafts === null) return;
 
       clearSelection();
@@ -293,7 +300,7 @@ export function JobsPage() {
       setCreatingDrafts(false);
       setProgress(null);
     }
-  }, [signedIn, selectedJobs, navigate, clearSelection]);
+  }, [signedIn, selectedJobs, navigate, clearSelection, prewrite]);
 
   return (
     <PageShell title={t("jobs.title")}>
@@ -499,7 +506,18 @@ export function JobsPage() {
                     })
                   : t("jobs.selected", { count: selectedJobs.size })}
               </Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={prewrite}
+                    onChange={(event) => setPrewrite(event.target.checked)}
+                    disabled={creatingDrafts}
+                  />
+                }
+                label={t("jobs.prewrite")}
+                sx={{ mr: "auto", ml: { sm: 1 } }}
+              />
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", width: { xs: "100%", sm: "auto" } }}>
                 <Button
                   variant="outlined"
                   onClick={clearSelection}

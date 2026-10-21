@@ -227,4 +227,23 @@ describe("SiteHeader by context", () => {
     expect(screen.getByRole("menuitem", { name: "Bewerbungsentwürfe" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Arbeitsproben" })).toBeInTheDocument();
   });
+
+  /** Who one acts as is chosen at the account — never in the bar, where it ran over the company menu. */
+  it("offers the acting-as switch in the account menu, not in the bar", async () => {
+    const user = userEvent.setup();
+    renderWithStore(<SiteHeader />, {
+      auth: {
+        status: "authenticated",
+        session: anna(TENANT),
+        memberships: [{ id: TENANT, name: "Muster GmbH mit einem sehr langen Namen", role: "admin" }],
+      },
+    });
+
+    expect(screen.queryByRole("combobox", { name: "Handeln als" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Mein Konto" }));
+
+    expect(screen.getByRole("combobox", { name: "Handeln als" })).toBeInTheDocument();
+  });
 });
+

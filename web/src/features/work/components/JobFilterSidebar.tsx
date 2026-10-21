@@ -1,9 +1,11 @@
 import ClearIcon from "@mui/icons-material/ClearOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import TuneIcon from "@mui/icons-material/TuneOutlined";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
 import FormHelperText from "@mui/material/FormHelperText";
 import IconButton from "@mui/material/IconButton";
@@ -12,6 +14,9 @@ import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { GeolocationState } from "../../../shared/hooks/useGeolocation";
@@ -98,6 +103,25 @@ export function JobFilterSidebar({
   const hasPosition = geolocation.position !== null;
 
   /*
+   * FOLDED ON A PHONE.
+   *
+   * Beside the list the column costs nothing; above it, on a phone, its eight
+   * fields filled the whole first screen, and the first job began after a
+   * scroll — on the page whose only job is to show jobs. Below `md` the
+   * filters fold behind one button and fold away again after a search, so
+   * the answer is what one sees. `defaultMatches` keeps them open where no
+   * media query exists (tests), `noSsr` reads the real width at once and
+   * spares a phone the open-then-fold flicker.
+   */
+  const wide = useMediaQuery((theme: Theme) => theme.breakpoints.up("md"), {
+    noSsr: true,
+    defaultMatches: true,
+  });
+  const [open, setOpen] = useState(false);
+  const expanded = wide || open;
+  const bodyId = useId();
+
+  /*
    * ONE CENTRE IS ENOUGH, and the typed place is one too.
    *
    * The distance used to hang on the location button alone. Whoever types
@@ -139,9 +163,10 @@ export function JobFilterSidebar({
       onSubmit={(event: React.FormEvent) => {
         event.preventDefault();
         onSubmit();
+        if (!wide) setOpen(false);
       }}
       sx={{
-        p: 2.5,
+        p: { xs: 4, md: 5 },
         // THE SAME radius as a job card. `3` used to stand here, which gave
         // thirty pixels via `theme.shape` — the cards beside it have fourteen,
         // and two roundings side by side look like an accident. The value comes
@@ -153,12 +178,29 @@ export function JobFilterSidebar({
         top: { md: 24 },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: expanded ? 2 : 0, flexWrap: "wrap" }}>
         <TuneIcon fontSize="small" color="action" />
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {t("jobs.filter")}
+          {!expanded && activeCount > 0 ? ` (${activeCount})` : ""}
         </Typography>
-        {activeCount > 0 ? (
+        {!wide ? (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={expanded}
+            aria-controls={bodyId}
+            endIcon={
+              <ExpandMoreIcon
+                sx={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 140ms" }}
+              />
+            }
+          >
+            {expanded ? t("jobs.filterHide") : t("jobs.filterShow")}
+          </Button>
+        ) : null}
+        {activeCount > 0 && expanded ? (
           <Button
             size="small"
             variant="text"
@@ -170,6 +212,7 @@ export function JobFilterSidebar({
         ) : null}
       </Box>
 
+      <Collapse in={expanded} id={bodyId} unmountOnExit={false}>
       {activeCount > 0 ? (
         <Typography
           variant="caption"
@@ -326,6 +369,7 @@ export function JobFilterSidebar({
           {t("jobs.search")}
         </Button>
       </Box>
+      </Collapse>
     </Paper>
   );
 }

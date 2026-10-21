@@ -73,6 +73,7 @@ const STATUS_COLOUR: Record<
   DraftStatus,
   "default" | "primary" | "warning" | "info" | "error"
 > = {
+  open: "default",
   generating: "warning",
   review: "info",
   needs_changes: "warning",
@@ -232,7 +233,8 @@ export function DraftPage() {
   const resolvedComments = draft.comments.filter((c) => c.resolved);
   const empty = draft.body.trim() === "";
   const status: DraftStatus = draft.status;
-  const canWrite = (draft.status === "generating" || draft.status === "failed") && !writing;
+  const canWrite =
+    (draft.status === "open" || draft.status === "generating" || draft.status === "failed") && !writing;
   const canRevise =
     draft.status === "needs_changes" && openComments.length > 0 && !empty && !writing;
   const canApprove =
@@ -240,7 +242,7 @@ export function DraftPage() {
   const canSend = draft.status === "approved" && !writing;
   const canDelete = draft.status !== "sent";
   const canEdit = !empty && draft.status !== "sent" && draft.status !== "generating" && !writing;
-  const canSelfWrite = empty && draft.status === "failed" && !writing;
+  const canSelfWrite = empty && (draft.status === "failed" || draft.status === "open") && !writing;
   const canComment = !empty && draft.status !== "generating" && draft.status !== "sent" && !writing;
   const title = job.data?.title ?? (draft.subject || t("drafts.title"));
   const draftId = draft.id;
@@ -414,7 +416,7 @@ export function DraftPage() {
             ) : empty && !writing ? (
               <EmptyBlock
                 title={t("drafts.emptyLetter")}
-                hint={t(emptyLetterHintKey(draft.error))}
+                hint={t(status === "open" ? "drafts.emptyLetterOpen" : emptyLetterHintKey(draft.error))}
                 action={
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center" }}>
                     {canWrite ? (

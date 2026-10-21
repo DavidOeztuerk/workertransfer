@@ -48,12 +48,14 @@ const SWITCHES: {
   key: keyof NotificationPreferences;
   label: string;
   hint: string;
+  /** Only for somebody who belongs to a company — a person alone has no inbox there. */
+  companyOnly?: boolean;
 }[] = [
   { key: "market_request", label: "settings.marketLabel", hint: "settings.marketHint" },
   { key: "resume_request", label: "settings.resumeLabel", hint: "settings.resumeHint" },
   { key: "transfer_update", label: "settings.transferLabel", hint: "settings.transferHint" },
   { key: "application_update", label: "settings.applicationLabel", hint: "settings.applicationHint" },
-  { key: "application_received", label: "settings.receivedLabel", hint: "settings.receivedHint" },
+  { key: "application_received", label: "settings.receivedLabel", hint: "settings.receivedHint", companyOnly: true },
   { key: "profile_discovered", label: "settings.discoveredLabel", hint: "settings.discoveredHint" },
   { key: "advisor_conversation", label: "settings.advisorLabel", hint: "settings.advisorHint" },
   { key: "assessment_update", label: "settings.assessmentLabel", hint: "settings.assessmentHint" },
@@ -78,6 +80,7 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const session = useAppSelector((state) => state.auth.session);
   const status = useAppSelector((state) => state.auth.status);
+  const hasCompany = useAppSelector((state) => state.auth.memberships.length > 0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -150,7 +153,7 @@ export function SettingsPage() {
           ) : null}
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {SWITCHES.map((entry) => (
+            {SWITCHES.filter((entry) => !entry.companyOnly || hasCompany).map((entry) => (
               <ConsentSwitch
                 key={entry.key}
                 label={t(entry.label)}
@@ -380,6 +383,7 @@ function AiBlock() {
  */
 function RecordsBlock() {
   const { t } = useTranslation();
+  const hasCompany = useAppSelector((state) => state.auth.memberships.length > 0);
 
   return (
     <Card sx={{ mt: 3 }}>
@@ -409,9 +413,11 @@ function RecordsBlock() {
           </Button>
         </Box>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-          <strong>{t("settings.company")}.</strong> {t("settings.companyLead")}
-        </Typography>
+        {hasCompany ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+            <strong>{t("settings.company")}.</strong> {t("settings.companyLead")}
+          </Typography>
+        ) : null}
       </CardContent>
     </Card>
   );

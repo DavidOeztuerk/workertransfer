@@ -565,7 +565,7 @@ public class ApplicationJourneyTests(Postgres postgres) : IAsyncLifetime
 
         var draft = (await Json(created))[0];
         var id = draft.GetProperty("id").GetGuid();
-        draft.GetProperty("status").GetString().Should().Be("generating");
+        draft.GetProperty("status").GetString().Should().Be("open");
 
         var write = await browser.PostAsync($"/applications/drafts/{id}/write", null);
 
@@ -576,5 +576,36 @@ public class ApplicationJourneyTests(Postgres postgres) : IAsyncLifetime
         afterwards.GetProperty("status").GetString().Should().Be("failed");
         afterwards.GetProperty("body").GetString().Should().BeEmpty();
         afterwards.GetProperty("error").GetString().Should().Contain("No writing-help provider");
+    }
+
+    /// <summary>
+    /// A new draft is not written by itself — not on creation, not on a GET.
+    /// </summary>
+    /// <remarks>
+    /// The GET used to requeue every draft at <c>generating</c>
+    /// (<c>StartIfGenerating</c>), and a draft began there: every look at it
+    /// would have spent the person's AI credit.
+    /// </remarks>
+    [Fact]
+    public async Task A_new_draft_stays_open_until_the_person_chooses()
+    {
+        var job = _jobs.Publish(Guid.CreateVersion7());
+        var browser = AsPerson(Guid.CreateVersion7());
+
+        var created = await browser.PostAsJsonAsync(
+            "/applications/drafts", new { job_ids = new[] { job } });
+        var id = (await Json(created))[0].GetProperty("id").GetGuid();
+
+        (await Json(await browser.GetAsync($"/applications/drafts/{id}")))
+            .GetProperty("status").GetString().Should().Be("open");
+        (await Json(await browser.GetAsync("/applications/drafts")))[0]
+            .GetProperty("status").GetString().Should().Be("open");
+
+        var own = await browser.PatchAsJsonAsync(
+            $"/applications/drafts/{id}", new { subject = "Bewerbung", body = "Ich schreibe selbst." });
+        own.StatusCode.Should().Be(HttpStatusCode.OK, await own.Content.ReadAsStringAsync());
+
+        (await Json(await browser.GetAsync($"/applications/drafts/{id}")))
+            .GetProperty("status").GetString().Should().Be("review");
     }
 }

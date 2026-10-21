@@ -85,14 +85,27 @@ export function HitCard({
           </Box>
         ) : null}
 
-        <Approach hit={hit} />
-        <ConversationOpener subjectId={hit.subject_id} />
-        <ResumeRequestButton subjectId={hit.subject_id} />
-        <MarketAccess
-          subjectId={hit.subject_id}
-          requestRecord={marketRequest}
-          onChanged={onChanged}
-        />
+        {/* The four steps in ONE wrapping row, not four lines: stacked, a card
+            at 1100 px was mostly empty, and on a phone every hit cost a screen.
+            Whatever opens (the approach form, a notice) takes the full width. */}
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "flex-start",
+            columnGap: 1,
+            "& > *": { mb: 1 },
+          }}
+        >
+          <Approach hit={hit} />
+          <ConversationOpener subjectId={hit.subject_id} />
+          <ResumeRequestButton subjectId={hit.subject_id} />
+          <MarketAccess
+            subjectId={hit.subject_id}
+            requestRecord={marketRequest}
+            onChanged={onChanged}
+          />
+        </Box>
         <EvidenceList evidence={hit.evidence} state={hit.evidence_state} />
       </CardContent>
     </Card>
@@ -357,7 +370,7 @@ function Approach({ hit }: { hit: Hit }) {
   }
 
   return (
-    <Box sx={{ display: "grid", gap: 1.5, mb: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
+    <Box sx={{ display: "grid", gap: 1.5, mb: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 2, flexBasis: "100%" }}>
       <Typography variant="body2" color="text.secondary">
         {t("scout.approachHint")}
       </Typography>

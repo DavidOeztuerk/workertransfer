@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { Link as RouterLink } from "react-router-dom";
 import AddIcon from "@mui/icons-material/AddOutlined";
 import Chip from "@mui/material/Chip";
 import Button from "@mui/material/Button";
@@ -59,7 +60,6 @@ import { useAppDispatch, useAppSelector } from "../../../core/store/hooks";
 import { occupationalFieldSet } from "../../auth/store/authSlice";
 import { saveOccupationalField } from "../api/occupationalField";
 import { DraftHelp } from "../components/DraftHelp";
-import { CivilIdentity } from "../components/CivilIdentity";
 
 interface FormState {
   headline: string;
@@ -602,7 +602,23 @@ export function ProfilePage() {
       </Card>
 
       <EvidenceKinds field={occupationalField} />
-      <CivilIdentity />
+
+      {/* Name and address live in the settings, once: they are private
+          account data and never part of the profile — beside the release
+          switch above they read as if they were released with it. */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent sx={{ display: "grid", gap: 1.5, justifyItems: "start" }}>
+          <Typography variant="h3" component="h2">
+            {t("civilIdentity.title")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t("profile.civilIdentityElsewhere")}
+          </Typography>
+          <Button component={RouterLink} to="/settings" variant="outlined" size="small">
+            {t("profile.toSettings")}
+          </Button>
+        </CardContent>
+      </Card>
     </PageShell>
   );
 }

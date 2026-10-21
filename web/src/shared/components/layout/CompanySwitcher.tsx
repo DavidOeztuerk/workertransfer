@@ -17,7 +17,14 @@ import { actAsSelf, actForCompany } from "../../../features/auth/store/authThunk
  * still needs a new token — a person token cannot be computed out of a company
  * one.
  */
-export function CompanySwitcher({ fullWidth = false }: { fullWidth?: boolean }) {
+export function CompanySwitcher({
+  fullWidth = false,
+  onDone,
+}: {
+  fullWidth?: boolean;
+  /** Called when the choice closes — chosen or not — so a menu around it can close too. */
+  onDone?: () => void;
+}) {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const memberships = useAppSelector((state) => state.auth.memberships);
@@ -41,9 +48,13 @@ export function CompanySwitcher({ fullWidth = false }: { fullWidth?: boolean }) 
         else void dispatch(actForCompany(chosen));
       }}
       fullWidth={fullWidth}
-      // In the bar from the width the navigation shows; below it the drawer
-      // carries the same switch.
-      sx={fullWidth ? undefined : { width: 200, flexShrink: 0, display: { xs: "none", lg: "block" } }}
+      slotProps={{
+        select: {
+          onClose: () => onDone?.(),
+          // A long company name is cut, never pushed over its neighbours.
+          sx: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+        },
+      }}
     >
       <MenuItem value="">{t("header.myself")}</MenuItem>
       {memberships.map((company) => (

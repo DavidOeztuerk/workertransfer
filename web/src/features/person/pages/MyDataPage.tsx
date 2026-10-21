@@ -20,7 +20,20 @@ import {
 import type { MessageKey } from "../../../shared/api/errors";
 import { listMyConsentHistory, listMyConsents } from "../api/consent";
 import { getMyProfile } from "../api/profile";
-import { getMyCurriculumVitae, getMyResumeRequests } from "../api/resume";
+import {
+  getDocumentTerms,
+  getMyCurriculumVitae,
+  getMyDocuments,
+  getMyResumeRequests,
+} from "../api/resume";
+import { getAccountSettings } from "../api/accountSettings";
+import { getLinks } from "../../auth/api/externalLogin";
+import { getMandate, getMyConversations } from "../../work/api/advisor";
+import { getMyCases } from "../../work/api/assessments";
+import { getEmployerRoute } from "../../work/api/releases";
+import { getMyNotice } from "../../work/api/market";
+import { getDrafts } from "../../work/api/applications";
+import { getConversation, listConversations } from "../../messages/api/messages";
 import { getMyPortfolio } from "../api/portfolio";
 import { getMyConnection } from "../api/github";
 import { getNotificationPreferences } from "../api/notificationPreferences";
@@ -70,6 +83,17 @@ const SECTION_LABELS = {
   bewerbungen: "myData.sectionApplications",
   freigaben: "myData.sectionConsents",
   freigaben_verlauf: "myData.sectionConsentHistory",
+  dokumente: "myData.sectionDocuments",
+  dokument_begriffe: "myData.sectionDocumentTerms",
+  entwuerfe: "myData.sectionDrafts",
+  nachrichten: "myData.sectionMessages",
+  arbeitsproben: "myData.sectionAssessments",
+  mandat: "myData.sectionMandate",
+  berater_gespraeche: "myData.sectionAdvisorConversations",
+  kuendigungsfrist: "myData.sectionNotice",
+  arbeitgeber_weg: "myData.sectionEmployerRoute",
+  anmeldewege: "myData.sectionSignInWays",
+  einstellungen: "myData.sectionSettings",
 } as const satisfies Record<string, MessageKey>;
 
 type SectionName = keyof typeof SECTION_LABELS;
@@ -98,6 +122,17 @@ export function MyDataPage() {
         applications,
         consents,
         history,
+        documents,
+        documentTerms,
+        drafts,
+        conversations,
+        assessments,
+        mandate,
+        advisorConversations,
+        notice,
+        employerRoute,
+        signInWays,
+        settings,
       ] = await Promise.all([
         getNotificationPreferences(signal),
         getPostalAddress(signal),
@@ -112,6 +147,17 @@ export function MyDataPage() {
         listMyApplications(signal),
         listMyConsents(signal),
         listMyConsentHistory(signal),
+        getMyDocuments(signal),
+        getDocumentTerms(signal),
+        getDrafts(signal),
+        messagesWithText(signal),
+        getMyCases(signal),
+        getMandate(signal),
+        getMyConversations(signal),
+        getMyNotice(signal),
+        getEmployerRoute(signal),
+        getLinks(signal),
+        getAccountSettings(signal),
       ]);
 
       return {
@@ -164,6 +210,36 @@ export function MyDataPage() {
         freigaben_verlauf: section(
           history.ok,
           history.ok ? history.events : undefined,
+        ),
+        // The list of documents, not their bytes: those stay where they are and
+        // open from the CV page — a file of all certificates inlined would be
+        // megabytes of base64 nobody can read.
+        dokumente: section(documents.ok, documents.ok ? documents.value : undefined),
+        dokument_begriffe: section(documentTerms.ok, documentTerms.ok ? documentTerms.value : undefined),
+        entwuerfe: section(drafts.ok, drafts.ok ? drafts.drafts : undefined),
+        nachrichten: section(conversations !== null, conversations ?? undefined),
+        arbeitsproben: section(assessments.ok, assessments.ok ? assessments.items : undefined),
+        mandat: section(mandate.ok, mandate.ok ? mandate.mandate : undefined),
+        berater_gespraeche: section(
+          advisorConversations.ok,
+          advisorConversations.ok ? advisorConversations.items : undefined,
+        ),
+        kuendigungsfrist: section(notice.ok, notice.ok ? notice.notice : undefined),
+        arbeitgeber_weg: section(employerRoute.ok, employerRoute.ok ? employerRoute.route : undefined),
+        anmeldewege: section(signInWays.ok, signInWays.ok ? signInWays.links : undefined),
+        // Whether a key is stored, never the key or its tail: a secret in a
+        // downloaded file is one more copy of it, on a disk we do not know.
+        einstellungen: section(
+          settings !== null,
+          settings === null
+            ? undefined
+            : {
+                deleteAfterMonths: settings.deleteAfterMonths,
+                aiProvider: settings.provider,
+                aiModel: settings.model,
+                aiKeyStored: settings.keyPresent,
+                auditLog: settings.auditLog,
+              },
         ),
       };
     },
@@ -289,3 +365,21 @@ export function MyDataPage() {
     </PageShell>
   );
 }
+
+/**
+ * Every conversation with its messages — `null` when the list itself could not
+ * be read. A single conversation that fails stays in the list without its
+ * messages rather than taking the whole section down.
+ */
+async function messagesWithText(signal?: AbortSignal) {
+  const list = await listConversations(signal);
+  if (!list.ok) return null;
+
+  return Promise.all(
+    list.items.map(async (summary) => {
+      const conversation = await getConversation(summary.reference, signal, summary.kind);
+      return conversation.ok ? { ...summary, ...conversation.conversation } : summary;
+    }),
+  );
+}
+

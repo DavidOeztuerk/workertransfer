@@ -101,6 +101,14 @@ const en: Catalog = {
   overview: {
     title: "What needs you",
     lead: "Only things waiting on a decision from you. Whatever runs by itself is not here.",
+    leadCompany: "Only what waits for a decision from you. What runs by itself does not stand here.",
+    companyStartTitle: "Create your company profile",
+    companyStartText: "It stands beside every one of your jobs. Without a profile an advert stays anonymous — title and description, nothing else.",
+    companyStartButton: "Create company profile",
+    companyEmptyTitle: "Nothing is waiting for you right now.",
+    companyEmptyHint: "Post a job or search for people who released their profile to you.",
+    companyEmptyJob: "New job",
+    companyEmptyScout: "Search candidates",
     startTitle: "Create your profile",
     startText: "Without a profile nobody finds you. Even so, it becomes visible only once you release it — creating is not showing.",
     startButton: "Create profile",
@@ -261,7 +269,7 @@ const en: Catalog = {
     switchPortfolio: "Release my work",
     switchProfileHint: "Headline, text, location and your skills. Without this release no search finds you.",
     switchProfile: "Release profile",
-    visibleLead: "Three switches, each on its own. You can be approachable without showing your work.",
+    visibleLead: "Each switch on its own. You can be approachable without showing your work.",
     visibleTitle: "What companies may see",
     signInRequired: "Please <1>sign in</1> to see your releases.",
     lead: "This is where you grant and withdraw — both take effect at once. What is not listed here, nobody sees.",
@@ -304,6 +312,17 @@ const en: Catalog = {
     sectionApplications: "Applications",
     sectionConsents: "Releases",
     sectionConsentHistory: "History of releases",
+    sectionDocuments: "Documents (list)",
+    sectionDocumentTerms: "Terms found in your documents",
+    sectionDrafts: "Application drafts",
+    sectionMessages: "Messages",
+    sectionAssessments: "Work samples",
+    sectionMandate: "Advisor mandate",
+    sectionAdvisorConversations: "Advisor conversations",
+    sectionNotice: "Notice period",
+    sectionEmployerRoute: "Route through your employer",
+    sectionSignInWays: "Sign-in methods",
+    sectionSettings: "Account settings",
     sectionOther: "Further section",
   },
 
@@ -325,6 +344,8 @@ const en: Catalog = {
     relocate_nein: "No",
     relocate_offen: "It depends",
     title: "My profile",
+    toSettings: "Go to settings",
+    civilIdentityElsewhere: "They live in the settings — private, only for the letterhead and the folder, never in the profile.",
     signInRequired: "Please <1>sign in</1> to edit your profile.",
     lead: "At first nobody sees what you write here. It becomes visible only once you release it — and invisible the moment you withdraw that release.",
     loading: "Loading profile…",
@@ -338,7 +359,7 @@ const en: Catalog = {
     aboutMe: "About me",
     aboutMeHint: "Free text. What a CV does not convey.",
     location: "Location",
-    locationHint: "City or region you want to work in — not a street. The address for application letters is below.",
+    locationHint: "City or region you want to work in — not a street. The address for application letters lives in the settings.",
     skills: "Skills",
     skillsHint: "Comma-separated, for example: MIG/MAG, CNC, Excel. We unify spellings we know — “tig” becomes “WIG”. Anything we do not know stays exactly as you wrote it.",
     suggestionsTitle: "From your GitHub projects",
@@ -756,6 +777,7 @@ const en: Catalog = {
     comments_other: "{{count}} open comments",
     error: "Error while writing: {{error}}",
     status: {
+      open: "Open",
       generating: "Writing",
       review: "Under review",
       needs_changes: "Changes needed",
@@ -764,7 +786,7 @@ const en: Catalog = {
       failed: "Failed",
     },
     write: "Write",
-    generate: "Generate",
+    generate: "Write with AI",
     revise: "Revise",
     approve: "Approve",
     send: "Send",
@@ -839,8 +861,8 @@ const en: Catalog = {
     emptyLetter: "No cover letter yet.",
     emptyLetterHint:
       "Writing help is not set up. You can write the letter yourself — only Approve and Send turn it into an application.",
-    emptyLetterStart:
-      "You can write the letter yourself or generate it — only Approve and Send turn it into an application.",
+    emptyLetterStart: "You can write the text yourself or let the AI write it — only approving and sending turn it into an application.",
+    emptyLetterOpen: "Write it yourself, or let the AI draft one. Only approving and sending turn it into an application.",
     noPreview: "No text yet",
     writingFailed:
       "Writing help is not set up. The drafts exist — you can write the letter yourself.",
@@ -849,8 +871,8 @@ const en: Catalog = {
     aiDidNotWrite:
       "This letter was not written by the model. No writing-help provider is configured.",
     statusHint: {
-      generating:
-        "No letter yet. “Generate” asks the writing help.",
+      open: "Nothing is sent until you approve it — until then the company sees nothing.",
+      generating: "The AI is drafting a letter.",
       review:
         "Read the letter. Highlight passages and comment, or approve it if it should stay as it is.",
       needs_changes:
@@ -905,6 +927,7 @@ const en: Catalog = {
     missing: " (you are missing this)",
     filter: "Filters",
     filterReset: "Reset",
+    filterHide: "Hide filters",
     filterShow: "Show filters",
     activeFilters_one: "1 filter active",
     activeFilters_other: "{{count}} filters active",
@@ -925,6 +948,7 @@ const en: Catalog = {
     clearSelection: "Clear selection",
     select: "Select this job",
     applyToAll: "Apply to all",
+    prewrite: "Have the AI draft the cover letters",
     alreadyApplied: "Already applied",
     openDraft: "Open draft",
     progress: "{{fertig}} of {{gesamt}} written",
@@ -1518,7 +1542,7 @@ const en: Catalog = {
 
   assessments: {
     title: "Work samples",
-    lead: "A company may ask you to build something small. What it costs is stated up front — in hours.",
+    lead: "A company may ask you for a small work sample. How much time it takes is stated up front — in hours.",
     noDecline: "You need not accept anything, and there is no decline button: whoever does not want to, does nothing. The deadline passes, and nowhere is it recorded that you said no.",
     loading: "Loading work samples…",
     empty: "No work sample open",

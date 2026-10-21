@@ -18,6 +18,8 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import Link from "@mui/material/Link";
 import type { ApiError } from "../../../core/store/thunkHelpers";
+import { useAppSelector } from "../../../core/store/hooks";
+import { offersGitHub } from "../../../shared/lib/occupationalFields";
 import {
   GITHUB_VISIBILITY,
   type GrantedConsent,
@@ -120,6 +122,10 @@ export function ConsentsPage() {
   const connection =
     github.value?.ok === true ? github.value.value : null;
   const githubVerified = connection?.verified === true;
+  // The same rule as the account menu (ADR-0039): an electrician is not
+  // offered GitHub. It stays where it already means something — a connection,
+  // or a release still standing, which must stay reachable to be taken back.
+  const occupationalField = useAppSelector((state) => state.auth.session?.occupationalField ?? null);
 
   const toggle = useCallback(
     async (capability: string, on: boolean) => {
@@ -236,6 +242,7 @@ export function ConsentsPage() {
               onChange={(on) => void toggle(PORTFOLIO_VISIBILITY, on)}
             />
 
+            {offersGitHub(occupationalField) || connection !== null || holds(GITHUB_VISIBILITY) ? (
             <Box>
               <ConsentSwitch
                 label={t("consents.switchGithub")}
@@ -263,6 +270,7 @@ export function ConsentsPage() {
                 </Link>
               )}
             </Box>
+            ) : null}
           </Box>
         </CardContent>
       </Card>

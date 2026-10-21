@@ -384,7 +384,7 @@ describe("JobsPage", () => {
       job_id: jobId,
       subject: "",
       body: "",
-      status: "generating",
+      status: "open",
       shares_resume: false,
       documents: [],
       comments: [],
@@ -433,6 +433,10 @@ describe("JobsPage", () => {
     })) {
       await userEvent.click(box);
     }
+    // Opt-in: the AI writes only when the person asks for it.
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /Anschreiben von der KI vorschreiben lassen/i }),
+    );
     await userEvent.click(
       screen.getByRole("button", { name: /Für alle bewerben/i }),
     );
@@ -885,7 +889,7 @@ describe("JobsPage", () => {
     expect(screen.queryByRole("button", { name: /^Bewerben$/i })).toBeNull();
   });
 
-  it("creates a draft on applying and starts the writing", async () => {
+  it("creates an open draft on applying and writes nothing by itself", async () => {
     const spy = stubFetch((url, init) => {
       if (url.includes("/jobs/") || url.endsWith("/jobs") || url.includes("/jobs?")) {
         return { body: page([JOB]) };
@@ -943,7 +947,9 @@ describe("JobsPage", () => {
       expect(
         posts.some(([url]) => String(url).includes("/applications/drafts") && !String(url).includes("/write")),
       ).toBe(true);
-      expect(posts.some(([url]) => String(url).includes("/write"))).toBe(true);
     });
+    // A writing costs the person's AI credit — applying alone spends nothing.
+    const writes = spy.mock.calls.filter(([url]) => String(url).includes("/write"));
+    expect(writes).toHaveLength(0);
   });
 });

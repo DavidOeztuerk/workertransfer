@@ -4,8 +4,9 @@ namespace WorkerTransfer.Applications.Domain.Applications;
 
 /// <summary>Where a draft stands.</summary>
 /// <remarks>
-/// The way is <c>Generating → Review → (NeedsChanges ⇄ Review) → Approved →
-/// Sent</c>, plus <c>Failed</c> as an exit from <c>Generating</c>.
+/// The way is <c>Open → (Generating →) Review → (NeedsChanges ⇄ Review) →
+/// Approved → Sent</c>, plus <c>Failed</c> as an exit from <c>Generating</c>.
+/// From <c>Open</c> the person chooses: the model writes, or she does.
 /// <strong>There is no jump from Generating to Sent</strong>, and there must not
 /// be one: between the model and the company stand two acts of a human being
 /// (ADR-0034).
@@ -28,7 +29,17 @@ public enum DraftState
     Sent,
 
     /// <summary>The writing failed.</summary>
-    Failed
+    Failed,
+
+    /// <summary>Begun, and nobody writes until the person chooses.</summary>
+    /// <remarks>
+    /// <strong>The model never starts by itself</strong> (GESCHAEFTSMODELL C):
+    /// a writing costs the person's AI credit, so it begins with her click.
+    /// A draft that began at <c>Generating</c> was written on every GET —
+    /// <c>StartIfGenerating</c> requeues such a draft after a restart.
+    /// Appended last: the state lives as a word, but an ordinal nowhere moves.
+    /// </remarks>
+    Open
 }
 
 /// <summary>What was attempted on a draft.</summary>
@@ -276,11 +287,11 @@ public sealed class ApplicationDraft
     /// </summary>
     public DateTimeOffset? WritingStartedAt { get; private set; }
 
-    /// <summary>Begins a draft. The model does not write yet.</summary>
+    /// <summary>Begins a draft. Nobody writes yet — see <see cref="DraftState.Open"/>.</summary>
     public static ApplicationDraft Begin(
         Guid job, TenantId company, SubjectId subject, DateTimeOffset now) =>
         new(Guid.CreateVersion7(), job, company, subject, string.Empty, string.Empty,
-            DraftState.Generating, 1, string.Empty, true, [], [], now, now);
+            DraftState.Open, 1, string.Empty, true, [], [], now, now);
 
     /// <summary>The draft as rows hold it. Checks nothing.</summary>
     public static ApplicationDraft Restore(
@@ -311,7 +322,7 @@ public sealed class ApplicationDraft
     /// </remarks>
     public void StartWriting(DateTimeOffset now, bool clear = true)
     {
-        if (State is not (DraftState.Generating or DraftState.Failed
+        if (State is not (DraftState.Open or DraftState.Generating or DraftState.Failed
             or DraftState.NeedsChanges or DraftState.Review))
         {
             throw new DraftStepNotAllowed(State, DraftStep.Write);
@@ -427,7 +438,8 @@ public sealed class ApplicationDraft
     /// <exception cref="DraftStepNotAllowed">It has already gone out.</exception>
     public Comment AddComment(string? text, string? passage, DateTimeOffset now)
     {
-        if (State is DraftState.Sent or DraftState.Generating)
+        // Not on an open draft either: there is no text to comment on yet.
+        if (State is DraftState.Sent or DraftState.Generating or DraftState.Open)
         {
             throw new DraftStepNotAllowed(State, DraftStep.Comment);
         }
