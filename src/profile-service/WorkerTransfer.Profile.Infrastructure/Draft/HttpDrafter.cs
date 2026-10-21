@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Noelia.Core.Identity;
 using WorkerTransfer.Contracts.Identity;
-using WorkerTransfer.ServiceDefaults.Ai;
 using WorkerTransfer.Profile.Application.Ports;
+using WorkerTransfer.ServiceDefaults.Ai;
 
 namespace WorkerTransfer.Profile.Infrastructure.Draft;
 
@@ -92,7 +94,8 @@ public sealed class IdentitySettings
 public sealed class HttpDrafter(
     IHttpClientFactory factory,
     IOptions<DraftSettings> settings,
-    IOptions<IdentitySettings> identity) : IDrafter
+    IOptions<IdentitySettings> identity,
+    ILogger<HttpDrafter>? log = null) : IDrafter
 {
     /// <summary>The client's name for the internal door.</summary>
     public const string IdentityClient = "identity-internal";
@@ -162,8 +165,9 @@ public sealed class HttpDrafter(
 
             try
             {
-                text = ModelWire.Text(
-                    access.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
+                var answer = await response.Content.ReadAsStringAsync(cancellationToken);
+                text = ModelWire.Text(access.Provider, answer);
+                ModelWire.Record((log ?? NullLogger<HttpDrafter>.Instance), "profile_help", access.Provider, ModelWire.Usage(access.Provider, answer));
             }
             catch (JsonException)
             {

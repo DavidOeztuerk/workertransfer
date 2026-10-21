@@ -205,6 +205,14 @@ Plattform-Modell in der Sonnet-Klasse (≈ 2 $ / 10 $ je Mio. Tokens):
 | Antwortentwurf | 1.500 / 1.000 | ≈ 1,3 Cent | 1 |
 | Profilhilfe | 800 / 800 | ≈ 1,0 Cent | 1 |
 
+**Erste Messung (21.10.2026)**, lokales Modell `qwen2.5-coder:7b`, die knappen
+Testdaten von `make ai-check`: **Anschreiben 691 Tokens rein / 250 raus,
+Profilhilfe 192 / 11.** Die Schätzung oben liegt deutlich darüber — gewollt
+vorsichtig. Mit echten Lebensläufen steigt die Eingabe, und ein Modell, das vor
+dem Schreiben nachdenkt (Anthropic, `effort: low`), verbraucht mehr Ausgabe.
+**Vor der Preisseite** wird mit dem Anbieter im Betrieb und echten Profilen neu
+gemessen: `docker logs <dienst> | grep "Model call"`.
+
 Ein Guthaben-Punkt kostet uns damit **≈ 1–1,3 Cent**. Verkauft zu
 **≈ 2,5–3 Cent** (brutto) bleibt nach 19 % USt und Zahlungsgebühr auch dann
 etwas übrig, wenn jemand sein ganzes Guthaben in die teuerste Aktion steckt.
@@ -255,7 +263,7 @@ Ansprache, Initiativbewerbung oder Wechsel. Anwalt prüft.
 |---|---|---|---|
 | 1 | ~~**Unterlagen vorausgewählt**: alle hochgeladenen Unterlagen gehen standardmäßig mit, abwählbar je Bewerbung~~ | S | **gebaut 21.10.2026** |
 | 2 | ~~**KI nicht mehr automatisch**: eine Bewerbung beginnt leer — „Mit KI schreiben" oder „Selbst schreiben"; auch die Sammelbewerbung fragt vorher~~ | S–M | **gebaut 21.10.2026** — Zustand `open` in applications-service; der Hinweis „verbraucht 3 Punkte" kommt mit dem Guthaben (#4) |
-| 3 | **Tokens messen**: `ModelWire` liest `usage`, je Agent mitgeschrieben (Zahlen, nie Inhalt) — ersetzt die Schätzung, bevor ein Preis öffentlich wird | S | ja |
+| 3 | ~~**Tokens messen**: `ModelWire` liest `usage`, je Agent mitgeschrieben (Zahlen, nie Inhalt)~~ | S | **gebaut 21.10.2026** — eine Logzeile je Aufruf: `Model call <agent> via <anbieter>: N tokens in, M tokens out` |
 | 4 | **KI-Guthaben**: Saldo je Konto (Person oder Firma), Reservierung beim Start eines Aufrufs und Abrechnung am Ende, feste Preise je Agent, Startguthaben, Verfall (Paket nie, Abo zum Monatsende); eigener Schlüssel verbraucht nichts | L | ja |
 | 5 | **Stripe**: Pakete (Checkout), Abo (Billing), Kundenportal, Webhooks → Guthaben; Stripe Tax; Rechnungen für Firmen mit USt-IdNr. | L | ja |
 | 6 | **Firmen-KI-Zugang**: Schlüssel (Anthropic/OpenAI) und eigener Server — nur unter der bestätigten Firmendomain, https, öffentliche Adresse; Egress über `IEgressPolicy` wie bei ADR-0052 | M | ja |

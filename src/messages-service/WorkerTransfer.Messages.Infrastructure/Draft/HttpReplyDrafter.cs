@@ -78,7 +78,7 @@ public sealed class HttpReplyDrafter(
             ? await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform()
             : Platform();
 
-        return await AskAsync(access, ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken);
+        return await AskAsync(access, "reply", ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -93,7 +93,7 @@ public sealed class HttpReplyDrafter(
 
         var access = await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform();
 
-        return await AskAsync(access, AdviceContext.Rules, AdvicePrompt(context), context.PersonName, AdviceTokens, cancellationToken);
+        return await AskAsync(access, "advice", AdviceContext.Rules, AdvicePrompt(context), context.PersonName, AdviceTokens, cancellationToken);
     }
 
     /// <summary>Upper bound of the advice — 200 words fit.</summary>
@@ -101,7 +101,7 @@ public sealed class HttpReplyDrafter(
 
     /// <summary>One call, masked on the way out, restored on the way back.</summary>
     private async Task<string> AskAsync(
-        AiAccessV1? access, string rules, string prompt, string personName, int maxTokens,
+        AiAccessV1? access, string agent, string rules, string prompt, string personName, int maxTokens,
         CancellationToken cancellationToken)
     {
         if (access is null)
@@ -153,7 +153,9 @@ public sealed class HttpReplyDrafter(
 
             try
             {
-                text = ModelWire.Text(access.Provider, await response.Content.ReadAsStringAsync(cancellationToken));
+                var answer = await response.Content.ReadAsStringAsync(cancellationToken);
+                text = ModelWire.Text(access.Provider, answer);
+                ModelWire.Record(log, agent, access.Provider, ModelWire.Usage(access.Provider, answer));
             }
             catch (JsonException)
             {
