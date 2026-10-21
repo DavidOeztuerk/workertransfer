@@ -170,6 +170,7 @@ public sealed class EfDraftStore(ApplicationsDbContext context) : IDraftStore
     /// </remarks>
     public static string StateWord(DraftState state) => state switch
     {
+        DraftState.Open => "open",
         DraftState.Generating => "generating",
         DraftState.Review => "review",
         DraftState.NeedsChanges => "needs_changes",
@@ -181,6 +182,7 @@ public sealed class EfDraftStore(ApplicationsDbContext context) : IDraftStore
     /// <summary>The word as a state.</summary>
     public static DraftState ParseState(string? word) => word switch
     {
+        "open" => DraftState.Open,
         "review" => DraftState.Review,
         "needs_changes" => DraftState.NeedsChanges,
         "approved" => DraftState.Approved,

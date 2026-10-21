@@ -22,9 +22,62 @@ public sealed class DraftRulesTests
     {
         var draft = Begun();
 
+        draft.StartWriting(Now);
         draft.AcceptText("Application as a developer", "Dear Sir or Madam …", Now);
 
         return draft;
+    }
+
+    /// <summary>
+    /// <strong>The model never starts by itself.</strong> A writing costs the
+    /// person's AI credit, so a draft begins open and waits for her choice.
+    /// </summary>
+    [Fact]
+    public void A_draft_begins_open_and_nobody_writes()
+    {
+        var draft = Begun();
+
+        draft.State.Should().Be(DraftState.Open);
+        draft.WritingStartedAt.Should().BeNull();
+    }
+
+    /// <summary>From open, the person may write the letter herself.</summary>
+    [Fact]
+    public void From_open_one_writes_it_oneself()
+    {
+        var draft = Begun();
+
+        draft.EditByAuthor("Application", "I write it myself.", Now);
+
+        draft.State.Should().Be(DraftState.Review);
+        draft.Text.Should().Be("I write it myself.");
+    }
+
+    /// <summary>From open, the model may write — on her click.</summary>
+    [Fact]
+    public void From_open_the_model_writes_on_request()
+    {
+        var draft = Begun();
+
+        draft.StartWriting(Now);
+
+        draft.State.Should().Be(DraftState.Generating);
+        draft.WritingStartedAt.Should().Be(Now);
+    }
+
+    /// <summary>An open draft has no text — no comment, no approval, no model answer.</summary>
+    [Fact]
+    public void An_open_draft_takes_no_comment_and_no_model_answer()
+    {
+        var draft = Begun();
+
+        var comment = () => draft.AddComment("Shorter.", "Dear", Now);
+        var answer = () => draft.AcceptText("Application", "Dear Sir.", Now);
+        var approve = () => draft.Approve(Now);
+
+        comment.Should().Throw<DraftStepNotAllowed>();
+        answer.Should().Throw<DraftStepNotAllowed>();
+        approve.Should().Throw<DraftStepNotAllowed>();
     }
 
     /// <summary>
@@ -159,6 +212,7 @@ public sealed class DraftRulesTests
     {
         var draft = Begun();
 
+        draft.StartWriting(Now);
         draft.AcceptText("Subject", "", Now);
 
         var attempt = () => draft.Approve(Now);
