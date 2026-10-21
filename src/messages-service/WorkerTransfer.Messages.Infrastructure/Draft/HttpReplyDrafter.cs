@@ -78,11 +78,20 @@ public sealed class HttpReplyDrafter(
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        var companyOwn = context.Writing == Side.Company
+            ? await CompanyAccessAsync(company, cancellationToken)
+            : null;
+
         var access = context.Writing == Side.Person
             ? await OwnAccessAsync(requestedBy, cancellationToken) ?? Platform()
-            : await CompanyAccessAsync(company, cancellationToken) ?? Platform();
+            : companyOwn ?? Platform();
 
-        return await AskAsync(access, "reply", ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken);
+        // A company's own access goes through the client that reaches public
+        // addresses only: its server lies under its domain, and that domain
+        // must not point inside.
+        var clientName = companyOwn is null ? ClientName : HttpCompanyAiAccess.ModelClientName;
+
+        return await AskAsync(access, "reply", ReplyContext.Rules, Prompt(context), context.PersonName, MaxTokens, cancellationToken, clientName);
     }
 
     /// <inheritdoc />
@@ -106,7 +115,7 @@ public sealed class HttpReplyDrafter(
     /// <summary>One call, masked on the way out, restored on the way back.</summary>
     private async Task<string> AskAsync(
         AiAccessV1? access, string agent, string rules, string prompt, string personName, int maxTokens,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string clientName = ClientName)
     {
         if (access is null)
         {
@@ -116,7 +125,7 @@ public sealed class HttpReplyDrafter(
         var placeholders = new Placeholders();
         placeholders.AddPersonName(personName);
 
-        using var client = factory.CreateClient(ClientName);
+        using var client = factory.CreateClient(clientName);
         client.Timeout = _settings.Timeout;
 
         using var request = ModelWire.Request(

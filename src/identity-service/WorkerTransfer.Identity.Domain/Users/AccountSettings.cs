@@ -24,7 +24,14 @@ public enum AiProvider
     OpenAi,
 
     /// <summary>Anthropic, with the person's own key.</summary>
-    Anthropic
+    Anthropic,
+
+    /// <summary>
+    /// A company's own OpenAI-compatible server, under its proven domain —
+    /// for companies only (ADR-0051 Ergänzung). A person cannot choose it: a
+    /// typed address would send her texts to any server.
+    /// </summary>
+    OwnServer
 }
 
 /// <summary>What each provider's address and default model are.</summary>
