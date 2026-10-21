@@ -106,4 +106,17 @@ describe("the session gate", () => {
 
     expect(screen.getByTestId("where")).toHaveTextContent("/verify");
   });
+
+  /** The footer offers both to a visitor — they must not send her to the home page. */
+  it.each(["/checklists", "/salaries"])("keeps %s for a visitor", async (route) => {
+    renderWithStore(<SessionGate><Where /></SessionGate>, {
+      auth: { status: "anonymous", session: null },
+      route,
+    });
+
+    await act(async () => notifySessionExpired());
+
+    expect(screen.getByTestId("where")).toHaveTextContent(route);
+  });
 });
+

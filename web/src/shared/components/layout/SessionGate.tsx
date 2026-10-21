@@ -21,6 +21,10 @@ const PUBLIC_PATHS = [
   "/verify",
   "/invitation",
   "/jobs",
+  // The footer offers both to visitors; missing here, they sent a visitor to
+  // the home page (found 21.10.2026 by reviewing every page signed out).
+  "/checklists",
+  "/salaries",
   "/imprint",
   "/privacy",
   "/terms",
