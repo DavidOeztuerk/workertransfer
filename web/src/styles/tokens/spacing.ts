@@ -7,6 +7,16 @@
  */
 export const spacingUnit = 4;
 
+/**
+ * The side gutter of every page, in spacing units: 16 / 24 / 32 px.
+ *
+ * ONE value for header, content and footer. Written per component it was
+ * `{ xs: 2, sm: 3, md: 4 }` everywhere — meant as 16/24/32 px on an 8px
+ * grid, measured as 8/12/16 px on this 4px one: on a phone the cards almost
+ * touched the edge while the logo sat further in.
+ */
+export const gutter = { xs: 4, sm: 6, md: 8 } as const;
+
 /** Radii. Generous but not playful — it remains a working tool. */
 export const radius = {
   sm: 6,

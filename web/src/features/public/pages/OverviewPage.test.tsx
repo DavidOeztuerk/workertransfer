@@ -37,7 +37,9 @@ function answer(byPath: Record<string, Answer>) {
     const path = new URL(url).pathname;
     asked.push(path);
     const reply = byPath[path] ?? { body: [] };
-    return new Response(JSON.stringify(reply.body ?? []), {
+    // `null` is a real answer here ("no profile yet"), so only a missing body
+    // falls back to the empty list.
+    return new Response(JSON.stringify("body" in reply ? reply.body : []), {
       status: reply.status ?? 200,
     });
   });
@@ -209,8 +211,10 @@ describe("OverviewPage", () => {
     expect(asked).toHaveLength(0);
   });
 
+  // The wire says "none yet" as 200 with null — measured at profile-service;
+  // a test that stubbed 404 stayed green while the hint never appeared.
   it("points a new account at its first step: the profile", async () => {
-    answer({ "/profiles/me": { status: 404, body: { title: "Not found" } } });
+    answer({ "/profiles/me": { body: null } });
     renderWithStore(<OverviewPage />, { auth: SIGNED_IN });
 
     expect(await screen.findByRole("link", { name: "Profil anlegen" })).toHaveAttribute("href", "/profile");
@@ -225,10 +229,23 @@ describe("OverviewPage", () => {
   });
 
   it("does not ask a company about a person's profile", async () => {
-    const asked = answer({ "/profiles/me": { status: 404, body: {} } });
+    const asked = answer({ "/profiles/me": { status: 404, body: {} }, "/companies/me/profile": { body: { display_name: "Muster" } } });
     renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
 
-    await screen.findByText("Gerade wartet nichts auf dich.");
+    await screen.findByText("Gerade wartet nichts auf euch.");
     expect(asked).not.toContain("/profiles/me");
+    // A company has no releases of its own — its next steps are its own.
+    expect(screen.queryByRole("link", { name: "Meine Freigaben" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Neue Stelle" })).toHaveAttribute("href", "/company/jobs/new");
+  });
+
+  it("points a new company at its company profile", async () => {
+    answer({ "/companies/me/profile": { body: null } });
+    renderWithStore(<OverviewPage />, { auth: FOR_COMPANY });
+
+    expect(await screen.findByRole("link", { name: "Unternehmensprofil anlegen" })).toHaveAttribute(
+      "href",
+      "/company/profile",
+    );
   });
 });

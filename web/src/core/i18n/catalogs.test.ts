@@ -84,6 +84,9 @@ describe("the catalogues", () => {
       "en:appearance.system",
       "en:header.github",
       "en:header.team",
+      // The page took the menu's word ("Team") instead of "Mannschaft" on
+      // 21.10.2026 — one name for one place.
+      "en:team.title",
       "en:header.navigation",
       "fr:header.navigation",
       "fr:consents.areaProfile",

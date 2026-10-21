@@ -41,7 +41,11 @@ export function ConsentSwitch({
         }
         label={label}
       />
-      {hint ? <FormHelperText sx={{ ml: 0 }}>{hint}</FormHelperText> : null}
+      {/* Under the label, not under the switch: MUI's switch is 58 px wide and
+          the label pulls 11 px back, so its text begins at 47 px. A hint flush
+          with the switch read as a separate paragraph, and in a list of nine
+          the eye lost which hint belongs to which line. */}
+      {hint ? <FormHelperText sx={{ ml: "47px", mt: 0 }}>{hint}</FormHelperText> : null}
     </Box>
   );
 }

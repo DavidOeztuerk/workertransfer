@@ -36,7 +36,6 @@ export function PageShell({
         maxWidth: narrow ? 960 : 1160,
         pt: { xs: 4, md: 7 },
         pb: { xs: 3, md: 4 },
-        px: { xs: 2, sm: 3, md: 4 },
       }}
     >
       <Box

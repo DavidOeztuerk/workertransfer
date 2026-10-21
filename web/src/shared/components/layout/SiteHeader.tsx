@@ -146,10 +146,10 @@ export function SiteHeader() {
     >
       <Container
         maxWidth="lg"
-        // The same gutter in all three shells (header, content, footer): with
-        // its own, the sign-in button sticks to the right edge — most visible in
-        // a header, because it stands on every page.
-        sx={{ px: { xs: 2, sm: 3, md: 4 } }}
+        // The same gutter in all three shells (header, content, footer) comes
+        // from the theme (`MuiContainer`, `tokens/spacing.ts`): with its own,
+        // the sign-in button sticks to the right edge — most visible in a
+        // header, because it stands on every page.
       >
         <Toolbar disableGutters sx={{ gap: 2, minHeight: { xs: 60, md: 66 } }}>
           <IconButton

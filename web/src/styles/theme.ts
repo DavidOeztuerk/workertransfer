@@ -9,7 +9,7 @@ import {
   semantic,
   surfaces,
 } from "./tokens/colors";
-import { elevation, layer, motion, radius, size, spacingUnit } from "./tokens/spacing";
+import { elevation, gutter, layer, motion, radius, size, spacingUnit } from "./tokens/spacing";
 import { fontFamily, monoFamily, scale } from "./tokens/typography";
 
 /**
@@ -75,6 +75,24 @@ export const getThemeOptions = (mode: PaletteMode): ThemeOptions => {
     },
 
     components: {
+      // Every Container carries the page gutter (`tokens/spacing.ts`), so a
+      // new page cannot start with MUI's own 8 px.
+      MuiContainer: {
+        styleOverrides: {
+          root: ({ theme }) => ({
+            paddingLeft: theme.spacing(gutter.xs),
+            paddingRight: theme.spacing(gutter.xs),
+            [theme.breakpoints.up("sm")]: {
+              paddingLeft: theme.spacing(gutter.sm),
+              paddingRight: theme.spacing(gutter.sm),
+            },
+            [theme.breakpoints.up("md")]: {
+              paddingLeft: theme.spacing(gutter.md),
+              paddingRight: theme.spacing(gutter.md),
+            },
+          }),
+        },
+      },
       MuiCssBaseline: {
         styleOverrides: {
           ":root": { colorScheme: mode },

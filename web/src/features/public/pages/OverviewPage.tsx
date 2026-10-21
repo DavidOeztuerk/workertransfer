@@ -16,7 +16,7 @@ import {
 } from "../../../shared/components/ui";
 import { useAppSelector } from "../../../core/store/hooks";
 import { type PendingTasks, getPendingTasks } from "../api/pendingTasks";
-import { hasOwnProfile } from "../api/ownProfile";
+import { hasOwnCompanyProfile, hasOwnProfile } from "../api/ownProfile";
 
 interface Entry {
   key: string;
@@ -127,13 +127,14 @@ export function OverviewPage() {
   const [current, setCurrent] = useState<PendingTasks | null>(null);
   const [profile, setProfile] = useState<boolean | null>(null);
 
-  // The first step of a new account. Asked only of a person: a company has
-  // no profile of this kind, and its own start lies at the company profile.
+  // The first step of a new account: for a person her profile, for a company
+  // its company profile — the shop window every advert shows beside it.
   useEffect(() => {
-    if (status !== "authenticated" || forCompany) return;
+    if (status !== "authenticated") return;
 
     const abort = new AbortController();
-    void hasOwnProfile(abort.signal).then((exists) => {
+    setProfile(null);
+    void (forCompany ? hasOwnCompanyProfile : hasOwnProfile)(abort.signal).then((exists) => {
       if (!abort.signal.aborted) setProfile(exists);
     });
     return () => abort.abort();
@@ -173,17 +174,27 @@ export function OverviewPage() {
     <PageShell
       title={t("overview.title")}
       narrow
-      lead={t("overview.lead")}
+      lead={t(forCompany ? "overview.leadCompany" : "overview.lead")}
     >
-      {!forCompany && profile === false ? (
-        <Card sx={{ mb: 3 }} component="section" aria-label={t("overview.startTitle")}>
+      {profile === false ? (
+        <Card
+          sx={{ mb: 3 }}
+          component="section"
+          aria-label={t(forCompany ? "overview.companyStartTitle" : "overview.startTitle")}
+        >
           <CardContent sx={{ display: "grid", gap: 1.5, justifyItems: "start" }}>
             <Typography variant="h3" component="h2">
-              {t("overview.startTitle")}
+              {t(forCompany ? "overview.companyStartTitle" : "overview.startTitle")}
             </Typography>
-            <Typography color="text.secondary">{t("overview.startText")}</Typography>
-            <Button component={RouterLink} to="/profile" variant="contained">
-              {t("overview.startButton")}
+            <Typography color="text.secondary">
+              {t(forCompany ? "overview.companyStartText" : "overview.startText")}
+            </Typography>
+            <Button
+              component={RouterLink}
+              to={forCompany ? "/company/profile" : "/profile"}
+              variant="contained"
+            >
+              {t(forCompany ? "overview.companyStartButton" : "overview.startButton")}
             </Button>
           </CardContent>
         </Card>
@@ -198,15 +209,34 @@ export function OverviewPage() {
       ) : null}
 
       {current !== null && nothing && !current.incomplete ? (
-        <EmptyBlock
-          title={t("overview.emptyTitle")}
-          hint={t("overview.emptyHint")}
-          action={
-            <Button component={RouterLink} to="/consents" variant="outlined">
-              {t("overview.emptyButton")}
-            </Button>
-          }
-        />
+        forCompany ? (
+          // A company has no releases of its own — "Meine Freigaben" here sent
+          // it to a person's page. Its next steps are its own.
+          <EmptyBlock
+            title={t("overview.companyEmptyTitle")}
+            hint={t("overview.companyEmptyHint")}
+            action={
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "center" }}>
+                <Button component={RouterLink} to="/company/jobs/new" variant="outlined">
+                  {t("overview.companyEmptyJob")}
+                </Button>
+                <Button component={RouterLink} to="/scout" variant="outlined">
+                  {t("overview.companyEmptyScout")}
+                </Button>
+              </Box>
+            }
+          />
+        ) : (
+          <EmptyBlock
+            title={t("overview.emptyTitle")}
+            hint={t("overview.emptyHint")}
+            action={
+              <Button component={RouterLink} to="/consents" variant="outlined">
+                {t("overview.emptyButton")}
+              </Button>
+            }
+          />
+        )
       ) : null}
 
       {mine.length > 0 ? (

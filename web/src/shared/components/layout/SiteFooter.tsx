@@ -41,7 +41,7 @@ export function SiteFooter() {
         bgcolor: "background.paper",
       }}
     >
-      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 7 }, px: { xs: 2, sm: 3, md: 4 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 7 } }}>
         <Box
           sx={{
             display: "grid",

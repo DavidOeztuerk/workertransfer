@@ -82,7 +82,7 @@ afterEach(() => {
 describe("a failed load reads in German", () => {
   const cases: [string, () => ReactElement, string, string?][] = [
     ["the job list", () => <CompanyJobsPage />, "Die Liste ließ sich nicht laden."],
-    ["the team", () => <CompanyTeamPage />, "Die Mannschaft ließ sich nicht laden."],
+    ["the team", () => <CompanyTeamPage />, "Das Team ließ sich nicht laden."],
     ["the transfers", () => <CompanyTransfersPage />, "Die Liste ließ sich nicht laden."],
     ["the applications", () => <CompanyApplicationsPage />, "Die Liste ließ sich nicht laden."],
     ["the scout", () => <ScoutPage />, "Die Suche ist fehlgeschlagen."],

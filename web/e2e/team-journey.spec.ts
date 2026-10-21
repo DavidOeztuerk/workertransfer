@@ -59,7 +59,7 @@ test("an invitation lets exactly the invited person in", async ({ browser }) => 
 
   // And the list stands on the team page — the open invitation has to show up
   // there, otherwise submitting only produced a message.
-  await admin.getByRole("link", { name: /Zurück zur Mannschaft/i }).click();
+  await admin.getByRole("link", { name: /Zurück zum Team/i }).click();
   await expect(admin.getByTestId("invitation-list").getByText(colleagueEmail)).toBeVisible();
 
   const token = await invitationTokenFor(colleagueEmail);
