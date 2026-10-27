@@ -133,7 +133,7 @@ services:
       # from initdb (ADR-0004 forbids a shared one).
       POSTGRES_DB: identity
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/initdb:/docker-entrypoint-initdb.d:ro
@@ -173,8 +173,8 @@ services:
     container_name: workertransfer-mailpit
     restart: unless-stopped
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 5s
@@ -242,7 +242,7 @@ services:
       mailpit:
         condition: service_healthy
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
 
   consent-service:
     <<: *service
@@ -253,7 +253,7 @@ services:
       ASPNETCORE_URLS: "http://0.0.0.0:8002"
       ConnectionStrings__consent: Host=postgres;Port=5432;Database=consent;Username=worker;Password=worker
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
 
   profile-service:
     <<: *service
@@ -294,7 +294,7 @@ services:
       Draft__AllowedTargets__0: https://api.anthropic.com
       Draft__AllowedTargets__1: https://api.openai.com
     ports:
-      - "8003:8003"
+      - "127.0.0.1:8003:8003"
 
   resume-service:
     <<: *service
@@ -325,7 +325,7 @@ services:
     volumes:
       - resume-document-store:/data/document-store
     ports:
-      - "8004:8004"
+      - "127.0.0.1:8004:8004"
 
   portfolio-service:
     <<: *service
@@ -340,7 +340,7 @@ services:
     volumes:
       - portfolio-data:/var/lib/workertransfer/portfolio
     ports:
-      - "8005:8005"
+      - "127.0.0.1:8005:8005"
 
   jobs-service:
     <<: *service
@@ -387,7 +387,7 @@ services:
       Sources__Lever: https://api.lever.co
       Sources__Personio: jobs.personio.de
     ports:
-      - "8006:8006"
+      - "127.0.0.1:8006:8006"
 
   applications-service:
     <<: *service
@@ -441,7 +441,7 @@ services:
       Lookup__Resume: http://resume-service:8004
       Lookup__Companies: http://companies-service:8008
     ports:
-      - "8007:8007"
+      - "127.0.0.1:8007:8007"
 
   companies-service:
     <<: *service
@@ -465,7 +465,7 @@ services:
       Identity__BaseUrl: http://identity-service:8001
       Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
-      - "8008:8008"
+      - "127.0.0.1:8008:8008"
 
   transfer-service:
     <<: *service
@@ -490,7 +490,7 @@ services:
       Notifications__BaseUrl: http://notification-service:8010
       Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
-      - "8009:8009"
+      - "127.0.0.1:8009:8009"
 
   notification-service:
     <<: *service
@@ -503,7 +503,7 @@ services:
       Identity__BaseUrl: http://identity-service:8001
       Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
-      - "8010:8010"
+      - "127.0.0.1:8010:8010"
 
   github-service:
     <<: *service
@@ -528,7 +528,7 @@ services:
       # OAuth sign-in ended in "github is unreachable".
       GitHub__OAuth__AuthorizeUrl: https://github.com
     ports:
-      - "8011:8011"
+      - "127.0.0.1:8011:8011"
   scout-service:
     <<: *service
     container_name: workertransfer-scout
@@ -577,7 +577,7 @@ services:
       Draft__AllowedTargets__0: https://api.anthropic.com
       Draft__AllowedTargets__1: https://api.openai.com
     ports:
-      - "8012:8012"
+      - "127.0.0.1:8012:8012"
 
   advisor-service:
     <<: *service
@@ -611,7 +611,7 @@ services:
       Notifications__BaseUrl: http://notification-service:8010
       Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
-      - "8013:8013"
+      - "127.0.0.1:8013:8013"
 
   assessment-service:
     <<: *service
@@ -642,7 +642,7 @@ services:
       # shown, never fetched — a service that fetched it would carry an address
       # chosen by a stranger into a server request.
     ports:
-      - "8014:8014"
+      - "127.0.0.1:8014:8014"
 
   messages-service:
     <<: *service
@@ -683,7 +683,7 @@ services:
       Draft__AllowedTargets__0: https://api.anthropic.com
       Draft__AllowedTargets__1: https://api.openai.com
     ports:
-      - "8015:8015"
+      - "127.0.0.1:8015:8015"
 
   gateway:
     <<: *service
