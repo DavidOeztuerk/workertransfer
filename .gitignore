@@ -79,3 +79,4 @@ kon.txt
 # The local control plane's state: history, signing key, operator journal,
 # its own key ring. Machine-local, and the signing key never belongs in git.
 .control-plane/
+.monarch/local/
