@@ -5,7 +5,7 @@ kind: main
 rank: A
 severity: medium
 risk_tags: [infra, auth]
-state: proposed
+state: in_review
 findings: [D5, N-1, WT-5]
 scope:
   repo: workertransfer
@@ -18,7 +18,7 @@ dod:
   - Login-Bremse kann nicht mehr über Dienstports umgangen werden (nur Gateway von außen)
 boss: "make control-plane zeigt 15/15 + Skript-Probe: Dienstport von Nicht-Loopback-IP nicht erreichbar"
 evidence: ["docker-compose.yml:136,176-177,245,256,297,…,686", "src/shared/…/ServiceFoundation.cs:280-284", "07-warden-workertransfer.md D5, N-1"]
-board: { provider: github, issue: 113 }
+board: { provider: github, issue: 113, pr: 110 }
 ---
 # Compose: Dienst-, Postgres- und Mailpit-Ports nur auf Loopback
 
