@@ -150,3 +150,9 @@ Aufbau: Host mit `Internal:Callers:<name>:Secret` für alle 10 Aufrufer mit unte
 - **E3 → Begleit-Quest Q-0043** (Rank A, Scope `Makefile`, `.env.example`, `tests/WorkerTransfer.CrossCutting.Tests/EnvironmentFileTests.cs`), damit `make env` und der Env-Test mit den Secrets je Aufrufer weiter funktionieren.
 
 Status danach: überarbeitet nach Design-Review Phase 1; E1–E3 entschieden, E4 und Scope offen (User).
+
+## 10. Entscheidungen nach Design-Review Phase 1 (projects-74 im Auftrag des Users, 28.10.2026, 21:20)
+- **E4 → (a), eng gefasst (B1 bestätigt):** `MayNotify` in notification (`NotificationEndpoints.cs:194ff`) prüft `MailSettings.Secret` = `Identity__Secret`, also denselben Wert, den `HttpMailer` an identity sendet. notification bekommt ein **eigenes eingehendes Setting**; die 7 Sender bleiben unverändert und senden weiter ihren bisherigen Wert. `Identity__Secret` von notification wird `S_notification`. Geändert werden nur Settings und Bindung in notification sowie Compose/Helm. Tests: die 7 Sender erhalten mit ihrem Wert weiter 202; identity lehnt den alten gemeinsamen Wert an **allen** Türen mit 404 ab; `S_notification` öffnet nur D1.
+- **Scope (B5) → Ersatz-Quest:** Q-0001 ist abgebrochen (Scope aus Backlog-Import unvollständig, Design-Review B1/B5, Bezug Monarch #16). Umsetzung in **Q-0043** (Scope: bisheriger Q-0001-Scope + `IdentityInfrastructure.cs`, `Mail/NotifySettings.cs`, neuer Ordner `Api/Internal/**` unter identity, notification Settings/Bindung, `Makefile`, `.env.example`, `EnvironmentFileTests.cs`, `docs/adr/**`). Die geplante Begleit-Quest entfällt. Folge-Quests: **Q-0044** Einwilligungsprüfung in identity, **Q-0045** KI-Broker.
+
+Status: überarbeitet nach Design-Review Phase 1; E4 und Scope entschieden; Delta-Review (zweite und letzte Design-Runde) ausstehend.
