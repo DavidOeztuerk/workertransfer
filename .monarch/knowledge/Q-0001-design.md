@@ -1,6 +1,6 @@
 # Q-0001 Design: `/internal/*` je Tür eigenes Recht
 
-**Status: vorgeschlagen (Design-Review Warden ausstehend)**
+**Status: überarbeitet nach Design-Review Phase 1; offen: E4, Scope (User)**
 
 Gate G-0001, Rank A, Tags auth/pii, Befund WT-1. Nur Design, kein Code geändert. Pfade relativ zum Repo-Wurzelverzeichnis; `ID` = `src/identity-service/WorkerTransfer.Identity.Api`.
 
@@ -11,9 +11,9 @@ Prüfstelle überall identisch: `MayNotify` (`ID/InternalEndpoints.cs:221-232`, 
 | # | Methode, Pfad | Quelle | Liefert | Einstufung |
 |---|---|---|---|---|
 | D1 | POST `/internal/notify` | NotifyEndpoints.cs:38 | 202, nichts; löst Mail an Konto aus | nur Auslösen |
-| D2 | GET `/internal/companies/{t}` | InternalEndpoints.cs:101 | Firmenname, bewiesene Domain | Firmendaten, geringes pii |
+| D2 | GET `/internal/companies/{t}` | InternalEndpoints.cs:101 | Firmenname, bewiesene Domain | Firmendaten, geringes pii (jede ID abfragbar) |
 | D3 | GET `/internal/companies/{t}/members` | :29 | Subject-IDs aller Mitglieder | pii (pseudonym, ganze Belegschaft) |
-| D4 | GET `/internal/companies/{t}/members/{s}/role` | :64 | Rolle eines Mitglieds | pii (gering), Berechtigungsfrage |
+| D4 | GET `/internal/companies/{t}/members/{s}/role` | :64 | Rolle eines Mitglieds | **pii mittel, Orakel**: bei beliebiger ID verrät D4, wer in welcher Firma arbeitet (6 Aufrufer) |
 | D5 | GET `/internal/account/{s}/identity` | :141 | Klarname und E-Mail eines beliebigen Kontos | **pii, höchste Stufe** (Kommentar :129) |
 | D6 | GET `/internal/account/{s}/ai` | :169 | Provider, Adresse, Modell, **entschlüsselter KI-Schlüssel** der Person (`Settings.cs:193`: `secrets.Decrypt`) | **KI-Schlüssel** |
 | D7 | GET `/internal/companies/{t}/ai` | :195 | dasselbe für die Firma (`InternalCompanyAiAccessQuery`) | **KI-Schlüssel** |
@@ -50,8 +50,8 @@ Beide Dateien definieren `MayNotify` doppelt; der Scope erlaubt Zusammenlegen.
 **(a) Eigenes Shared Secret je Aufrufer, Rechte je Tür in fester Tabelle im Code.**
 Identity hält pro Aufrufer ein Secret. Das präsentierte Secret wird gegen alle Aufrufer-Secrets in konstanter Zeit verglichen (kein früher Abbruch) und ergibt den Aufrufer-Namen; eine statische Tabelle Tür → erlaubte Aufrufer entscheidet, sonst 404. Die Tabelle steht bewusst im Code, nicht in Konfiguration, damit ein Konfigfehler kein Recht verbreitert.
 - Aufwand: klein bis mittel. Eine gemeinsame Prüfklasse in identity (ersetzt zwei `MayNotify`), Settings-Klasse, Compose/Helm/Makefile. **Aufrufer-Code bleibt unverändert**, wenn die Wire-Form (`X-Notify-Secret`, `Identity__Secret`) bleibt; nur der Wert je Dienst ist ein anderer.
-- Sicherheit: Notify-Secret öffnet nur D1; Kompromittierung eines Dienstes öffnet nur dessen Türen; Aufrufer im Log erkennbar. Bleibt Bearer-Geheimnis ohne Ablauf und ohne Bindung an die Anfrage.
-- Betrieb: 10 neue Secrets, Rotation je Aufrufer (zwei Slots, Abschnitt 6).
+- Sicherheit: Notify-Secret öffnet nur D1; ein gestohlenes `S_<dienst>` öffnet über `/internal` nur die Türen dieses Dienstes; Aufrufer im Log erkennbar. Das gilt **nur für diese Schicht**: Wer einen Dienst vollständig kompromittiert, hat nach N-3 ohnehin DB-Superuser und Master-Key (Q-0002, Q-0010 offen) und braucht `/internal` nicht. Der Gewinn betrifft gestohlene oder fehlgeleitete Secrets und Fehlgebrauch, nicht die Übernahme eines Dienstes. Bleibt Bearer-Geheimnis ohne Ablauf und ohne Bindung an die Anfrage.
+- Betrieb: 10 neue Secrets, Rotation je Aufrufer über den Slot `SecretPrevious` (Abschnitt 6).
 
 **(a-min) Ein Secret je Tür-Gruppe** (notify, D2-D4, D5, D6+D7): nur 4 Secrets, aber D6/D7 bleiben für 5 Dienste offen und der Aufrufer ist nicht erkennbar. Erfüllt „Mail-Dienst liest keine Schlüssel“, nicht „nur Berechtigte“. Verworfen.
 
@@ -63,11 +63,16 @@ Identity hält pro Aufrufer ein Secret. Das präsentierte Secret wird gegen alle
 - (c2) HMAC-signierte Anfragen (Aufrufer, Methode, Pfad, Zeitstempel): bindet das Credential an die Tür, kein Replay; Aufrufer-Code in 10 Diensten nötig. Zwischenstufe zu (b).
 - (c3) KI-Schlüssel nicht mehr herausgeben: ein Dienst führt die KI-Aufrufe aus (Broker). Löst E1 strukturell, ist aber ein Umbau über 5 Dienste und eine eigene Quest.
 
-**Empfehlung: (a) jetzt**, mit zwei Slots je Aufrufer-Secret, Rechtetabelle im Code und unveränderter Wire-Form; (b) oder (c2) als spätere Quest, sobald Q-0035 entschieden ist. Begründung: schließt WT-1 im Sinne „Notify öffnet nur Notify“ und „fremdes Secret → 404“ ohne Code in den 10 Diensten (außerhalb des Scopes), nutzt die vorhandene Secret-Mechanik (Makefile, Helm `keepOrMake`) und ist rückbaubar. Grenze: es bleiben Bearer-Secrets (Abschnitt 8).
+**Empfehlung: (a) jetzt**, mit Rotationsslot `SecretPrevious` (nur identity), Rechtetabelle im Code und unveränderter Wire-Form; (b) oder (c2) als spätere Quest, sobald Q-0035 entschieden ist. Begründung: schließt WT-1 im Sinne „Notify öffnet nur Notify“ und „fremdes Secret → 404“ ohne Code in den 10 Diensten (außerhalb des Scopes), nutzt die vorhandene Secret-Mechanik (Makefile, Helm `keepOrMake`) und ist rückbaubar. Grenze: es bleiben Bearer-Secrets (Abschnitt 8).
 
 ## 5. Zielbild
 
-Credential = aufruferspezifisches Secret `S_<dienst>`, präsentiert im bestehenden Header `X-Notify-Secret` (Name irreführend, später umbenennen). Alle anderen Fälle (kein Header, unbekanntes Secret, bekanntes Secret ohne Recht, leere Konfiguration) = **404** mit demselben ProblemDetails wie heute, damit nichts über die Existenz verraten wird.
+Credential = aufruferspezifisches Secret `S_<dienst>`, präsentiert im bestehenden Header `X-Notify-Secret` (Name irreführend, später umbenennen). Alle anderen Fälle (kein Header, unbekanntes Secret, bekanntes Secret ohne Recht, leere Konfiguration) = **404**, damit nichts über die Existenz verraten wird.
+
+**404-Vertrag (B4).** Heute hat identity weder Fallback noch StatusCodePages; `GET /internal/notify` liefert 405, D1 liefert 400, weil `NotifyBodyV1` vor der Secret-Prüfung gebunden wird (`NotifyEndpoints.cs:39`). Neu:
+- Ein Fallback `/internal/{**rest}` für alle Methoden liefert dasselbe 404 wie eine abgelehnte Tür.
+- Die Secret-Prüfung läuft **vor** dem Body-Binding (Endpoint-Filter je Tür); fehlender oder kaputter Body ohne Berechtigung ergibt 404, nie 400.
+- Referenz ist die Antwort „ohne Header“ auf dieselbe Tür; alle anderen Ablehnungen sind byte-gleich bis auf die `correlationId`.
 
 | Tür | Berechtigte Aufrufer | Credential |
 |---|---|---|
@@ -85,12 +90,13 @@ Folge: `S_notification` öffnet nur D1. scout, resume, companies sehen D5/D6 nic
 
 ## 6. Konfiguration
 
-Neu in identity: `Internal__Callers__<name>__Secret` und `__SecretNext` (zwei Slots für Rotation), nach der Konvention „Property-Name = Env-Key“ (`NotifySettings.cs:16`).
+Neu in identity: `Internal__Callers__<name>__Secret` und `__SecretPrevious` (nur identity, optional, Default leer; Rotationsslot), nach der Konvention „Property-Name = Env-Key“ (`NotifySettings.cs:16`).
 - `docker-compose.yml`: neue Variablen `WORKERTRANSFER_INTERNAL_SECRET_<DIENST>` (10 Stück, `:?missing` wie bisher). Identity bekommt alle 10; jeder Aufrufer bekommt **nur seinen** als `Identity__Secret` (statt der gemeinsamen Variable). `Notify__Secret` am identity entfällt (notification ist normaler Aufrufer); am profile-service bleibt `Notify__Secret` (dessen eigene Tür, Grenzen).
-- `deploy/helm/workertransfer`: `values.yaml` `secrets.internalSecrets.<dienst>`; `templates/secret.yaml` Schlüssel `WORKER_INTERNAL_SECRET_<DIENST>` über `keepOrMake`; `_helpers.tpl`: `Identity__Secret` je `$svc.name` aus dem eigenen Schlüssel, identity erhält alle.
+- `deploy/helm/workertransfer`: `values.yaml` `secrets.internalSecrets.<dienst>`; `templates/secret.yaml` Schlüssel `WORKER_INTERNAL_SECRET_<DIENST>` über `keepOrMake` (nur Hauptschlüssel, nie `SecretPrevious`); `_helpers.tpl`: `Identity__Secret` je `$svc.name` aus dem eigenen Schlüssel, identity erhält alle.
 - `Makefile:100` und `.env.example` müssen die neuen Variablen erzeugen bzw. führen; `tests/WorkerTransfer.CrossCutting.Tests/EnvironmentFileTests.cs:86` listet die erwarteten Schlüssel. **Alle drei liegen außerhalb des Scopes** (E3).
-- Übergang: ADR-0045 hält fest, die Plattform sei nicht in Betrieb (Annahme verfällt mit dem ersten echten Konto). Daher Hartschnitt in einem PR ohne Altpfad. Falls doch Betrieb: erst identity mit dem Altwert als `SecretNext` aller Aufrufer ausrollen, dann Aufrufer umstellen, dann Altwert entfernen.
-- Rotation: neues Secret in `SecretNext`, Aufrufer umstellen, dann `Secret` := neuer Wert, `SecretNext` leeren. Identity akzeptiert beide Slots. Ein leerer Slot ist nie ein Treffer.
+- Übergang: ADR-0045 hält fest, die Plattform sei nicht in Betrieb (Annahme verfällt mit dem ersten echten Konto). Daher Hartschnitt in einem PR ohne Altpfad. Falls doch Betrieb: erst identity mit dem Altwert als `SecretPrevious` aller Aufrufer ausrollen, dann Aufrufer umstellen, dann `SecretPrevious` leeren.
+- **Rotation (B2).** Heute lesen Aufrufer und der identity-Slot `Secret` dieselbe Variable; ein Wechsel öffnet ein 404-Fenster. Neu: ein Slot `Internal__Callers__<name>__SecretPrevious`, nur bei identity, optional, Default leer. Ablauf: im selben Deploy `SecretPrevious` := alter Wert und `Secret` := neuer Wert, dann Rollout-Restart, dann `SecretPrevious` leeren. Identity akzeptiert dazwischen beide Werte; ein leerer Slot ist nie ein Treffer.
+- **Helm-Besonderheiten.** `keepOrMake` (`_helpers.tpl:36-44`) liefert bei vorhandenem Schlüssel immer den alten Wert und kann einen Slot nie leeren; `SecretPrevious` kommt deshalb direkt aus `values` (leer = nicht gesetzt), nicht über `keepOrMake`. Eine Secret-Änderung startet keine Pods neu (`services.yaml:46`: nur checksum/env); der Rollout-Restart ist ein expliziter Schritt (`kubectl rollout restart`) und gehört ins Runbook.
 - Migrationen: **keine** (keine Datenbankänderung); Migrations-Pfade sind ausgeschlossen.
 
 ## 7. Testplan
@@ -99,12 +105,23 @@ Projekt: `tests/WorkerTransfer.Identity.Tests` (existiert; `WebApplicationFactor
 
 Aufbau: Host mit `Internal:Callers:<name>:Secret` für alle 10 Aufrufer mit unterscheidbaren Werten (`secret-notification`, `secret-jobs`, …). Hilfsmethode `As(caller)` setzt `X-Notify-Secret`.
 
-- **Negativ je Tür (7):** Theorie Türen × (kein Header, unbekanntes Secret, Secret eines nicht berechtigten Aufrufers, leeres Secret) erwartet 404 mit demselben Body wie bei unbekanntem Pfad.
-- **Positiv je Tür (7):** je ein berechtigter Aufrufer erhält 200 bzw. 202 mit den erwarteten Daten (D4 liefert bei Nichtmitglied weiterhin `200 null`).
-- **Boss `InternalEndpoints_NotifySecret_CannotReadIdentityOrAiKey`:** Konto mit hinterlegtem KI-Schlüssel und Firma mit Firmenschlüssel anlegen (Konstante wie `CompanyAiTests.cs:26`); mit `secret-notification` und zusätzlich mit dem alten `Notify:Secret`-Wert D5, D6, D7 aufrufen; erwartet 404, und der Body enthält weder Name, E-Mail noch Schlüssel. Gegenproben: `secret-advisor` auf D5 → 200, `secret-profile` auf D6 → 200, `secret-notification` auf D1 → 202. Der Test ist gegen den heutigen Code rot (TDD).
-- **Wächter-Test:** über `EndpointDataSource` alle Routen mit Präfix `/internal/` enumerieren; jede muss in der Rechtetabelle stehen, sonst rot (verhindert neue ungeschützte Türen).
-- **Rotation:** `SecretNext` wird akzeptiert, beide Slots gleichzeitig; leere Slots öffnen nichts.
-- Ledger-Prüfung: Test erst nach Entscheidung E2.
+- **Volle Matrix (Theory):** 7 Türen × 10 Aufrufer plus „unbekannter Aufrufer“; laut Tabelle erlaubt → 200/202, sonst 404. Zusätzlich je Tür: kein Header, leeres Secret. Erwartete Daten je Tür mindestens einmal geprüft (D4 liefert bei Nichtmitglied weiterhin `200 null`).
+- **404-Vertrag:** falsche Methode (z. B. `GET /internal/notify`) und fehlender oder kaputter Body auf D1 ohne Berechtigung → 404, byte-gleich zur Antwort „ohne Header“ bis auf die `correlationId`; unbekannter Pfad unter `/internal/` ebenso.
+- **Konsistenztest gegen compose** (in Identity.Tests, liest `docker-compose.yml`): jeder Aufrufer bekommt genau seine eigene Variable als `Identity__Secret`, keine Variable doppelt, kein `Identity__Secret` zeigt auf NOTIFY.
+- **Boss `InternalEndpoints_NotifySecret_CannotReadIdentityOrAiKey`:** Konto mit hinterlegtem KI-Schlüssel und Firma mit Firmenschlüssel anlegen (Konstante wie `CompanyAiTests.cs:26`); `Notify:Secret` auf den **veralteten** Wert setzen und damit sowie mit `secret-notification` D5, D6, D7 aufrufen; erwartet 404, im Body weder Name, E-Mail noch Schlüssel. Gegenproben: `secret-advisor` auf D5 → 200, `secret-profile` auf D6 → 200, `secret-notification` auf D1 → 202. Der Test ist gegen den heutigen Code rot (TDD).
+- **Wächter-Test, beide Richtungen:** Route → Tabelle (jede Route unter `/internal/` über `EndpointDataSource` steht in der Rechtetabelle) und Tabelle → Route (jeder Eintrag hat eine reale Route).
+- **Rotation:** `SecretPrevious` und `Secret` gleichzeitig gültig; leere Slots öffnen nichts; zwei gleiche nicht-leere Werte → kein Start.
+- **Fail-open in den Aufrufern (Grenze, Follow-up F1):** Mehrere Aufrufer werten ein 404 still als „nichts da“. D6: profile `HttpDrafter.cs:217-219`, applications `HttpAiAccessLookup.cs:98-100`, messages `HttpReplyDrafter.cs:322-324` fallen auf das Plattformmodell zurück. D2: advisor-Ausschluss `HttpLookups.cs:141-146`, `ConversationCommands.cs:115-117`. Ein falsches oder rotiertes Secret fällt dort nicht auf, sondern ändert still das Verhalten. Aufrufer-Code liegt außerhalb des Scopes; **F1**: 404 von identity in diesen Aufrufern als Fehler behandeln. Der Testplan prüft nur identity-seitig.
+- Ledger-Prüfung: Q-0044, nicht Teil dieser Quest.
+
+## Auflagen Warden (Phase 1)
+
+1. Die Prüfung läuft am Endpunkt (Metadaten oder Filter je Tür), nie über ein Pfadpräfix.
+2. SHA-256 über präsentierten Wert und alle Slots, `FixedTimeEquals` auf 32 Byte, alle Slots ohne frühen Abbruch, genau ein Headerwert; ein leerer Slot oder Header ist nie ein Treffer.
+3. Beim Start prüfen: Aufrufernamen nur aus der Codetabelle, als feste Properties; alle nicht-leeren Werte paarweise verschieden, sonst kein Start.
+4. Im Log nur Aufrufer und Tür, nie den Wert, ein Präfix oder einen Hash.
+5. Hermetische Tests: alle 10 Slots setzen. Der Boss-Test setzt `Notify:Secret` auf den veralteten Wert und erwartet 404 auf D5/D6/D7 ohne Name, E-Mail oder Schlüssel im Body. Der Wächter-Test prüft beide Richtungen (Route ↔ Tabelle).
+6. Helm: Schlüssel je `$svc.name` mit `required`, `existingSecret` dokumentiert, ein Render-Test „kein Pod trägt fremde Schlüssel“, die CrossCutting-Suite läuft mit.
 
 ## 8. Offene Fragen, Annahmen, Grenzen
 
@@ -113,11 +130,16 @@ Aufbau: Host mit `Internal:Callers:<name>:Secret` für alle 10 Aufrufer mit unte
 - **E2 Ledger-Prüfung in identity:** erfordert Consent-Client in identity und Änderung von advisor und transfer (Tenant-Parameter, Token-Weitergabe), außerhalb des Scopes. Entweder Scope erweitern oder den DoD-Punkt in eine Folge-Quest verschieben.
 - **E3 Scope-Erweiterung:** `Makefile`, `.env.example`, `tests/WorkerTransfer.CrossCutting.Tests/EnvironmentFileTests.cs`, ggf. ADR unter `docs/adr`. Ohne sie bricht `make env` bzw. der Env-Test.
 
+- **E4 (offen, User): notification-service hat eine Doppelrolle (B1).** Seine eigene Tür `/internal/notifications` prüft gegen `MailSettings.Secret` = `Identity__Secret` (`notification-service/…/Api/NotificationEndpoints.cs:50,194`, `…/Mail/HttpMailer.cs:18,24`). Mit `S_notification` bekämen die 7 Sender dort 404. Optionen: (a) Scope um notification-service erweitern, mit eigenem eingehenden Secret für diese Tür; Änderung an einem weiteren Dienst, Compose/Helm um ein Secret größer. (b) Als Grenze festhalten: notification-service bleibt unverändert, seine Tür bleibt bei einem Wert, den die Sender kennen, und der Punkt steht offen im PR; kein Zusatzaufwand, aber `S_notification` kann so nicht zugleich der eigene Aufrufer-Wert für D1 sein, ohne dass die 7 Sender ihn kennen.
+- **Scope (offen, User; B5).** Zusätzlich benötigt: `IdentityInfrastructure.cs:54`, `NotifySettings.cs` und eventuell neue Dateien. Die DoD-Zeilen zu „ein Dienst“ und zur Ledger-Prüfung sind durch E1/E2 überholt. Festhalten: **Q-0043 vor oder mit dem Q-0001-Code**, sonst bricht `:?missing` `make up` und CI (`.github/workflows/ci.yml:139,264`).
+
 **Annahmen:** Plattform nicht live (ADR-0045), daher Hartschnitt; Wire-Header `X-Notify-Secret` bleibt vorerst; Aufrufer-Code der Dienste wird nicht angefasst; Grep deckt nur `src/**` ab, Aufrufer außerhalb des Repos sind unbekannt; nicht geprüft, ob die Consent-API Aufrufe ohne Personen-Token zulässt.
 
 **Grenzen (nicht gelöst):**
 - Secrets bleiben unbefristete Bearer-Geheimnisse; wer einen Dienst vollständig übernimmt, hat dessen Türen. Bindung an die Anfrage, Ablauf und Audience erst mit (b)/(c2).
-- Ein berechtigter Aufrufer kann jede Subject-ID abfragen (D5, D6): „nur Konten mit Einwilligung“ ist erst mit E2 durchgesetzt.
+- Ein berechtigter Aufrufer kann jede ID abfragen, nicht nur bei D5/D6, sondern auch bei D3, D4 (verrät, wer wo arbeitet, 6 Aufrufer) und D7: „nur Konten mit Einwilligung“ ist erst mit Q-0044 durchgesetzt, und D3/D4/D7 auch dort nur teilweise.
+- Die Rechte je Tür begrenzen gestohlene Secrets, nicht die Übernahme eines Dienstes (DB-Superuser und Master-Key je Dienst bis Q-0002/Q-0010).
+- Fail-open in Aufrufern bei 404 (F1, Abschnitt 7).
 - Andere Secret-Türen bleiben: profile-service `/internal` (`Notify__Secret`, `src/profile-service/WorkerTransfer.Profile.Api/InternalEndpoints.cs:134`, scout als Aufrufer), notification-service-Türen (`NotificationEndpoints.cs:21`, 7 Sender mit `Notifications__Secret`), Evidence- und Erasure-Türen (Q-0004 u. a.).
 - Netz-Isolation (Q-0003) und Master-Key-Trennung (Q-0002, Q-0010) sind nicht Teil dieses Designs.
 - Der Header-Name `X-Notify-Secret` bleibt irreführend, bis die Aufrufer angefasst werden dürfen.
@@ -127,4 +149,4 @@ Aufbau: Host mit `Internal:Callers:<name>:Secret` für alle 10 Aufrufer mit unte
 - **E2 → eigene Folge-Quest.** Die Ledger-Prüfung in identity (Consent-Client, Änderungen in advisor und transfer) ist **Q-0044**. Q-0001 schließt ohne sie; die Lücke steht offen im PR (Grenze: berechtigte Aufrufer können jede Subject-ID abfragen).
 - **E3 → Begleit-Quest Q-0043** (Rank A, Scope `Makefile`, `.env.example`, `tests/WorkerTransfer.CrossCutting.Tests/EnvironmentFileTests.cs`), damit `make env` und der Env-Test mit den Secrets je Aufrufer weiter funktionieren.
 
-Status danach: vorgeschlagen, Entscheidungen E1–E3 getroffen; Design-Review Warden ausstehend.
+Status danach: überarbeitet nach Design-Review Phase 1; E1–E3 entschieden, E4 und Scope offen (User).
