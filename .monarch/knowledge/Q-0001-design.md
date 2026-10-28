@@ -121,3 +121,10 @@ Aufbau: Host mit `Internal:Callers:<name>:Secret` für alle 10 Aufrufer mit unte
 - Andere Secret-Türen bleiben: profile-service `/internal` (`Notify__Secret`, `src/profile-service/WorkerTransfer.Profile.Api/InternalEndpoints.cs:134`, scout als Aufrufer), notification-service-Türen (`NotificationEndpoints.cs:21`, 7 Sender mit `Notifications__Secret`), Evidence- und Erasure-Türen (Q-0004 u. a.).
 - Netz-Isolation (Q-0003) und Master-Key-Trennung (Q-0002, Q-0010) sind nicht Teil dieses Designs.
 - Der Header-Name `X-Notify-Secret` bleibt irreführend, bis die Aufrufer angefasst werden dürfen.
+
+## 9. Entscheidungen des Users (28.10.2026, 20:45)
+- **E1 → Aufrufer je Tür.** D6/D7 lassen nur die heute belegten Aufrufer durch (Abschnitt 5); alle anderen, insbesondere notification, erhalten 404. Damit ist das Ziel der Quest erfüllt (ein Mail-Dienst liest keine Schlüssel). „Genau ein Dienst“ für KI-Schlüssel ist Folge-Quest **Q-0045** (KI-Broker).
+- **E2 → eigene Folge-Quest.** Die Ledger-Prüfung in identity (Consent-Client, Änderungen in advisor und transfer) ist **Q-0044**. Q-0001 schließt ohne sie; die Lücke steht offen im PR (Grenze: berechtigte Aufrufer können jede Subject-ID abfragen).
+- **E3 → Begleit-Quest Q-0043** (Rank A, Scope `Makefile`, `.env.example`, `tests/WorkerTransfer.CrossCutting.Tests/EnvironmentFileTests.cs`), damit `make env` und der Env-Test mit den Secrets je Aufrufer weiter funktionieren.
+
+Status danach: vorgeschlagen, Entscheidungen E1–E3 getroffen; Design-Review Warden ausstehend.
