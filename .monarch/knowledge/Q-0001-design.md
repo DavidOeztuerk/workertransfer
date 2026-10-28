@@ -172,3 +172,6 @@ Status: überarbeitet nach Design-Review Phase 1; E4 und Scope entschieden; Delt
 11. Feste Properties unter `Internal:Callers` in identity, damit ComposeKeyTests unverändert grün bleibt; die CrossCutting-Suite läuft mit.
 
 Status: Design nach Delta-Review vollständig; **Freigabe durch den User selbst ausstehend** (Warden-Auflage: §10 stammt von einem Agenten).
+
+## 12. Umsetzung über Noelia 7.1 (Entscheid projects-74 mit dem User, 28.10.2026 ~22:00)
+Umsetzung über **Noelia 7.1 (M2M + Rechte je Tür)**: Ausstellen von Service-Tokens und Empfänger-Policy „nur Aufrufer X, Y“ je Endpoint kommen als geteilte Infrastruktur aus Noelia. **Q-0043 wird nach dem Release als Übernahme neu zugeschnitten** (Design-Delta, Warden-Delta, Freigabe durch den User, TDD). Inventar, Rechtetabelle, E1/E4 und Testplan dieser Notiz bleiben gültig. Q-0043 wird bis dahin nicht gestartet.
