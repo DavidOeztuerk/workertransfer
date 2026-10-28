@@ -156,3 +156,19 @@ Status danach: überarbeitet nach Design-Review Phase 1; E1–E3 entschieden, E4
 - **Scope (B5) → Ersatz-Quest:** Q-0001 ist abgebrochen (Scope aus Backlog-Import unvollständig, Design-Review B1/B5, Bezug Monarch #16). Umsetzung in **Q-0043** (Scope: bisheriger Q-0001-Scope + `IdentityInfrastructure.cs`, `Mail/NotifySettings.cs`, neuer Ordner `Api/Internal/**` unter identity, notification Settings/Bindung, `Makefile`, `.env.example`, `EnvironmentFileTests.cs`, `docs/adr/**`). Die geplante Begleit-Quest entfällt. Folge-Quests: **Q-0044** Einwilligungsprüfung in identity, **Q-0045** KI-Broker.
 
 Status: überarbeitet nach Design-Review Phase 1; E4 und Scope entschieden; Delta-Review (zweite und letzte Design-Runde) ausstehend.
+
+## 11. Korrekturen nach Delta-Review (Warden, 28.10.2026) – ersetzen ältere Stellen
+- **Ersetzt §5 (Mechanismus vor Body-Binding):** In Minimal APIs laufen Endpoint-Filter erst nach der Bindung. Deshalb: **D1 hat keinen gebundenen Body-Parameter**; der Body wird erst nach der Secret-Prüfung gelesen. Endpoint-Filter je Tür nur für die GET-Türen D2–D7. Der 404-Vertragstest (falsche Methode, kaputter/fehlender Body) entscheidet.
+- **Ersetzt §6 (Übergang „Altwert als SecretPrevious aller Aufrufer“):** entfällt (verstieße gegen Auflage 3 und ergäbe die Vereinigung aller Rechte). Bei Betrieb: **Hartschnitt im Wartungsfenster**. Die Plattform ist laut ADR-0045 nicht live.
+- **Überholt durch §10:** Statuszeile oben, §6 „Alle drei außerhalb des Scopes“, §8 „E4/Scope offen“, §9 „E3 → Begleit-Quest Q-0043“ (Q-0043 ist jetzt die Ersatz-Quest mit vollem Scope).
+- **Scope-Hinweise:** identity `Program.cs` liegt nicht im Scope → der Fallback `/internal/{**rest}` liegt in `MapInternalEndpoints`. Helm läuft in CI nur im images-Job (`ci.yml:393-397`, `make k8s-lint`) → die Render-Prüfung gehört ins Makefile, nicht in einen .NET-Test.
+- **Follow-up F1 (ohne Quest):** advisor-Ausschluss bei D2 bleibt fail-open (`HttpLookups.cs:141-146`); weder Q-0044 noch Q-0045 decken es ab → eigene Quest nach Q-0043.
+
+### Auflagen für den Code (Ergänzung zu 1–6)
+7. Das eingehende Setting in notification hat **keinen Rückfall** auf `Identity__Secret`. Tests: `Identity:Secret`-Wert an `/internal/notifications` → 404, eingehender Wert → 202, leeres eingehendes Setting → 404.
+8. Der Konsistenztest gegen compose prüft zusätzlich: Der Eingang von notification nutzt dieselbe Variable wie die 7 `Notifications__Secret`, nicht die eigene `Identity__Secret`. Keine `WORKERTRANSFER_INTERNAL_SECRET_*` kommt doppelt vor.
+9. Helm: `SecretPrevious` ist ein optionaler Schlüssel im Secret-Objekt (aus `values`, ohne keepOrMake, `secretKeyRef optional: true`), nie ein Klartext-`value:`. Die Prüfung „kein Pod trägt fremde Schlüssel“ läuft in `make k8s-lint`.
+10. Fallback `/internal/{**rest}` in `MapInternalEndpoints`; der Wächter-Test nimmt den Fallback ausdrücklich aus.
+11. Feste Properties unter `Internal:Callers` in identity, damit ComposeKeyTests unverändert grün bleibt; die CrossCutting-Suite läuft mit.
+
+Status: Design nach Delta-Review vollständig; **Freigabe durch den User selbst ausstehend** (Warden-Auflage: §10 stammt von einem Agenten).
