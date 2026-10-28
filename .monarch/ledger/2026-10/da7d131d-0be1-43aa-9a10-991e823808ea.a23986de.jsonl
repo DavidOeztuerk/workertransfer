@@ -1,0 +1,2 @@
+{"seq":1,"at":"2026-10-28T16:28:20.035245+00:00","actor":"hook","type":"ToolUsed","payload":{"tool":"Bash"},"prevHash":"genesis:da7d131d-0be1-43aa-9a10-991e823808ea.a23986de","hash":"0d97fe21b2d8d89fe43ed15e1f40e5028011d647546ade3f55f11017c1f2e92d"}
+{"seq":2,"at":"2026-10-28T16:28:32.976913+00:00","actor":"hook","type":"ToolUsed","payload":{"tool":"Bash"},"prevHash":"0d97fe21b2d8d89fe43ed15e1f40e5028011d647546ade3f55f11017c1f2e92d","hash":"0cdafe60c2b9cc1a11306f8982b732aea93ca37cdc4e1af97811ae643e3456d4"}
