@@ -266,7 +266,7 @@ Ansprache, Initiativbewerbung oder Wechsel. Anwalt prüft.
 | 3 | ~~**Tokens messen**: `ModelWire` liest `usage`, je Agent mitgeschrieben (Zahlen, nie Inhalt)~~ | S | **gebaut 21.10.2026** — eine Logzeile je Aufruf: `Model call <agent> via <anbieter>: N tokens in, M tokens out` |
 | 4 | **KI-Guthaben**: Saldo je Konto (Person oder Firma), Reservierung beim Start eines Aufrufs und Abrechnung am Ende, feste Preise je Agent, Startguthaben, Verfall (Paket nie, Abo zum Monatsende); eigener Schlüssel verbraucht nichts | L | ja |
 | 5 | **Stripe**: Pakete (Checkout), Abo (Billing), Kundenportal, Webhooks → Guthaben; Stripe Tax; Rechnungen für Firmen mit USt-IdNr. | L | ja |
-| 6 | **Firmen-KI-Zugang**: ~~Schlüssel (Anthropic/OpenAI)~~ und eigener Server — nur unter der bestätigten Firmendomain, https, öffentliche Adresse; Egress über `IEgressPolicy` wie bei ADR-0052 | M | **Schlüssel gebaut 21.10.2026** (`/company/settings`, ADR-0051 Ergänzung); der eigene Server steht noch aus |
+| 6 | ~~**Firmen-KI-Zugang**: Schlüssel (Anthropic/OpenAI) und eigener Server — nur unter der bestätigten Firmendomain, https, öffentliche Adresse; Egress über `IEgressPolicy` wie bei ADR-0052~~ | M | **gebaut 21.10.2026** (`/company/settings`, ADR-0051 Ergänzung) |
 | 7 | **Plattform-Modell im Betrieb**: ein gehosteter Anbieter statt Ollama; Ollama bleibt Entwicklung | S | ja |
 | 8 | **Erfolgsgebühr**: Einstellung mit Start und Probezeit (Firma trägt ein, Person bestätigt), Erinnerung vor dem Ende, Rechnung über Stripe; Wechsel zählen; 12-Monats-Fenster ab erstem Kontakt | L | ja |
 | 9 | **Preisseite, AGB, Widerrufsbelehrung** für digitale Inhalte; Preise in der Oberfläche | M | ja, mit dem Anwalt |

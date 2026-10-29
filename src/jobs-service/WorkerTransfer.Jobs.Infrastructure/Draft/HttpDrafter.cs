@@ -89,7 +89,10 @@ public sealed class HttpDrafter(
             throw new DraftUnavailable("No draft provider is set up.");
         }
 
-        using var client = factory.CreateClient(nameof(HttpDrafter));
+        // A company's own access goes through the client that reaches public
+        // addresses only — its server lies under its domain, and that domain
+        // must not point inside.
+        using var client = factory.CreateClient(own is null ? nameof(HttpDrafter) : HttpCompanyAiAccess.ModelClientName);
 
         client.Timeout = _settings.Timeout;
 

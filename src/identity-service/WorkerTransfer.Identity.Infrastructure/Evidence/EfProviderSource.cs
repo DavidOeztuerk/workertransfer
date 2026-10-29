@@ -56,9 +56,16 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
         // is the provider's, set by the platform, so it is derived rather
         // than stored. The key column stands in the filter and is not selected.
         var companies = await context.CompanyAiSettings
-            .Where(row => row.AiProvider != "none" && row.AiKeyEncrypted != "")
+            .Where(row => (row.AiProvider == "openai" || row.AiProvider == "anthropic") && row.AiKeyEncrypted != "")
             .GroupBy(row => row.AiProvider)
             .Select(group => new { AiProvider = group.Key, Companies = group.Count() })
+            .ToListAsync(ct);
+
+        // A company's own server needs no key, and its host is its own.
+        var ownServers = await context.CompanyAiSettings
+            .Where(row => row.AiProvider == "own" && row.AiBaseUrl != "")
+            .GroupBy(row => row.AiBaseUrl)
+            .Select(group => new { AiBaseUrl = group.Key, Companies = group.Count() })
             .ToListAsync(ct);
 
         return
@@ -88,7 +95,18 @@ public sealed class EfProviderSource(IServiceProvider provider) : IProviderSourc
                 })
                 .Where(group => group.Host.Length > 0)
                 .Select(group => new ProviderRow(
-                    group.AiProvider, group.Host, ProviderOrigin.Company, group.Companies))
+                    group.AiProvider, group.Host, ProviderOrigin.Company, group.Companies)),
+            .. ownServers
+                .Select(group => new
+                {
+                    group.Companies,
+                    Host = Uri.TryCreate(group.AiBaseUrl, UriKind.Absolute, out var target)
+                        ? target.Host
+                        : string.Empty
+                })
+                .Where(group => group.Host.Length > 0)
+                .Select(group => new ProviderRow(
+                    "openai_compatible", group.Host, ProviderOrigin.Company, group.Companies))
         ];
     }
 }

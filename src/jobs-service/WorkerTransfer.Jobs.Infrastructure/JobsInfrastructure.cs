@@ -94,7 +94,7 @@ public static class JobsInfrastructure
         services.AddHttpClient(HttpCompanySite.ClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
-                ConnectCallback = HttpCompanySite.PublicOnly,
+                ConnectCallback = PublicAddress.ConnectAsync,
                 AllowAutoRedirect = false
             });
 
