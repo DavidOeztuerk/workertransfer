@@ -1,0 +1,1 @@
+{"seq":1,"at":"2026-10-29T22:27:46.530349+00:00","actor":"cli","type":"ManaSnapshotTaken","payload":{"reason":"mana","known":true,"fiveHourUsedPct":15,"fiveHourResetsAt":1793323800,"sevenDayUsedPct":60,"sevenDayResetsAt":1793790000,"stale":false},"prevHash":"genesis:cli-20261029.a23986de","hash":"7aff41aacd5523293189b955d3af34f4ca471b37a28421f1daab9fefd0e1ae2e"}
