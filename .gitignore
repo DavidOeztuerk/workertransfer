@@ -80,3 +80,5 @@ kon.txt
 # its own key ring. Machine-local, and the signing key never belongs in git.
 .control-plane/
 .monarch/local/
+# One worktree per gate (Monarch, standard rule 2), inside the project.
+.claude/worktrees/
