@@ -22,7 +22,7 @@ src/
   scout-service/  advisor-service/  assessment-service/  messages-service/
   gateway/            Ocelot — the single entrance
   shared/             ServiceDefaults, Outbox, Skills, DocumentStore, Contracts.{Identity,Consent,Erasure}
-tests/                nineteen suites, one per service plus Gateway, Outbox, Skills, DocumentStore, CrossCutting
+tests/                twenty suites, one per service plus Gateway, Outbox, Skills, DocumentStore, CrossCutting
 web/                  the React app — deliberately not under src/, and the WHOLE frontend
 deploy/  docker/  scripts/  docs/  bugs/
 ```
@@ -131,7 +131,7 @@ Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuG
 
 ## Docker and Kubernetes
 
-- **One image for all fourteen entry points** (ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
+- **One image for all sixteen entry points** (fifteen services and the gateway, ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
 - **`curl` is in the runtime image** so the container can answer its own healthcheck. The probe used to be `dotnet --version`, which can never work without an SDK (exit 155) — every service read `unhealthy` while serving fine.
 - **One probe in the `x-service` anchor** for all fourteen services and the gateway, asking `/health/live`, port derived from `ASPNETCORE_URLS` so no second list can drift.
 - **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`.

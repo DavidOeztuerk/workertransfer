@@ -16,7 +16,7 @@ It was a Python monorepo until August 2026; **everything Python is gone**. The A
 
 ```
 src/            fifteen services, gateway/, shared/
-tests/          nineteen test projects
+tests/          twenty test projects
 web/            the React app — deliberately not under src/
 docs/  bugs/  deploy/  docker/  scripts/  .github/
 WorkerTransfer.slnx  Directory.Build.props  Directory.Packages.props  NuGet.Config

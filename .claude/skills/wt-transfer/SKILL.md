@@ -9,7 +9,7 @@ Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liner stays there.
 
 ### The way to the current employer: two consents, and a negotiation between companies
 
-Built 16.10.2026 under [ADR-0050](docs/adr/0050-der-alte-arbeitgeber-mit-zwei-zustimmungen.md) (VISION-FRAGEN C1, C3, D1). It ends the transfer draft's "the platform never contacts the employer" — **only** where both allow it.
+Built 16.10.2026 under [ADR-0050](../../../docs/adr/0050-der-alte-arbeitgeber-mit-zwei-zustimmungen.md) (VISION-FRAGEN C1, C3, D1). It ends the transfer draft's "the platform never contacts the employer" — **only** where both allow it.
 
 - **The employer's half** is a company setting, `admin`, visible nowhere outside the company, without a word like "insolvency". It decides only whether a *new* inquiry may be made.
 - **The person's half: naming the employer IS the consent.** She does it on the employer's careers page; `employer_routes` (a `SubjectKeyedTable`) is only the pointer, the consent is `employer.route:tenant:<X>` in the ledger, asked at every company read and step (ADR-0013). Closing the route deletes "works at X" and ends running negotiations. Without both halves every company sees **one 404** — no route, employer not asking, consent revoked, own employer: told apart, each would say where she works.

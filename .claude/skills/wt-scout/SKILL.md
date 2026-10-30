@@ -90,7 +90,7 @@ the **occupational field** never becomes a filter — it contradicts ADR-0039
 already carries MIG/WIG/CNC/SPS; **availability** is not filtered, because the
 market status has its own release and filtering by it would reveal
 approachability without asking; and the **radius** is built as
-[ADR-0041](docs/adr/0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md) —
+[ADR-0041](../../../docs/adr/0041-entfernung-ist-eine-frage-zwischen-zwei-aussagen.md) —
 a person states how far they will commute (10/25/50/100/egal), an advert states
 its attendance, and the two make a **tick**, never a kilometre figure and never
 a filter that removes somebody. `?stelle=<id>` on the search adds the tick and
@@ -107,7 +107,7 @@ the purpose before deciding to build it.**
 
 ### Still not built: nothing from that draft
 
-[`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0034 is the cover-letter agent, ADR-0035 the application folder.
+[`docs/SCOUT-UND-BERATER.md`](../../../docs/SCOUT-UND-BERATER.md) is a **draft**. The inventory in [`docs/SCOUT-UND-BERATER-BESTAND.md`](../../../docs/SCOUT-UND-BERATER-BESTAND.md) measured what already exists and **refutes parts of that draft**. ADR-0034 is the cover-letter agent, ADR-0035 the application folder.
 
 **All three services of that draft are now built**: `scout-service` (ADR-0036), `advisor-service` (ADR-0037) and `assessment-service` (ADR-0042), 11.09.2026 — each has its own section above.
 
