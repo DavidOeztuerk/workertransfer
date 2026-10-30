@@ -19,5 +19,6 @@ scope:
   exclude: []
 estimate: { session_pct: 35, weekly_pct: 6, gold_usd: 0 }
 boss: "Überschriften-Abgleich alt → neu ohne Lücke, CLAUDE.md ≤ ~20 KB, CI auf develop grün"
+board: { pr: 131 }
 ---
 # WT – CLAUDE.md auf den Kern, Aufgabenwissen in Skills, Geschichte nach docs

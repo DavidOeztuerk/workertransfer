@@ -5,8 +5,8 @@ description: Use when changing or debugging WorkerTransfer's CI (`.github/workfl
 
 # CI and restore
 
-Moved verbatim from `CLAUDE.md` (30.10.2026). The binding rules — branch flow,
-no `continue-on-error`, no Dependabot — stay there. How CI first went green on
+Moved verbatim from `CLAUDE.md` (30.10.2026). The binding rules — branch flow
+and the `hotfix/` prefix, no `continue-on-error`, no Dependabot — stay there. How CI first went green on
 the .NET branch (09.09.2026, four fixes) is history and lives in
 `docs/GESCHICHTE.md`.
 
@@ -32,5 +32,8 @@ Before that it lived in GitHub Packages, and that cost a whole evening of CI —
 
 **There is no `dependabot.yml`** (deleted 08.08.2026). This job is the only thing that asks.
 
-The branch flow and the hotfix backmerge (`hotfix/…`, never `fix/…`) stand in
-`CLAUDE.md`, „Branches and the one path back".
+### Branches and the one path back
+
+The binding short form stands in `CLAUDE.md`; this is the mechanism.
+
+A **hotfix** is the single exception: it branches off `main`, merges into `main`, and never passes through develop. `.github/workflows/backmerge.yml` carries it back, and its trigger is deliberately narrow — a *merged* PR into main whose head branch starts with **`hotfix/`**. The name is load-bearing: call it `fix/…` and the run never fires, so the correction silently stays out of develop. It pushes to develop only on a fast-forward; otherwise it prepares `hotfix-backmerge/main-to-develop` and puts a compare link in the run summary. A real conflict turns the run **red** rather than reporting green while the fix is missing.

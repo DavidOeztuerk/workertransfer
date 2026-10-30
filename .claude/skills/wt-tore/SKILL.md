@@ -1,6 +1,6 @@
 ---
 name: wt-tore
-description: Use when running builds, tests, migrations or counter-probes in the WorkerTransfer repository — encodes the six traps that have cost real time (build+test contention, solution-wide dotnet test, missing migrations, missing AsTracking, non-compiling counter-probes, loose E2E selectors), plus Docker being off, building images while testing, `--no-incremental` after a revert, a counter-probe that does not fall, and an E2E run against a cold stack.
+description: Use when running builds, tests, migrations or counter-probes in the WorkerTransfer repository, or writing a repository's `SaveAsync` — encodes the six traps that have cost real time (build+test contention, solution-wide dotnet test, missing migrations, missing AsTracking, non-compiling counter-probes, loose E2E selectors), plus Docker being off, building images while testing, `--no-incremental` after a revert, a counter-probe that does not fall, an E2E run against a cold stack, and testing a service-to-service body (`NotificationWireTests`).
 ---
 
 # Die sechs Fallen dieses Repositoriums
@@ -63,7 +63,11 @@ actionTimeout (15 s), `expect(...).toBeVisible()` das größere Budget.
 verschoben worden („Persistence" und „Conventions that bite"); die verbindliche
 Kurzform steht dort weiter.*
 
-## Zu Falle 4: warum der Anlegepfad sie verdeckt (aus `### Persistence`)
+## Zu Falle 3 und 4: Wanderungen und das Speichern (aus `### Persistence`)
+
+EF Core, one `DbContext` per service, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations live under `src/<service>/…Infrastructure/Persistence/Migrations` and are applied at startup by `ServiceDefaults.SchemaMigration`, which retries **only transient failures** for one minute. That narrowness matters: an earlier version caught everything, and a schema error became a minute of retries ending in a misleading `type … already exists`.
+
+**And the save itself needs `.AsTracking()`, because every context runs `QueryTrackingBehavior.NoTracking`.** A repository that reads a row, assigns to it and relies on `SaveChanges` writes *nothing* — the row came back detached, the assignments go nowhere, and the caller still gets its `204`. Measured 09.09.2026 on `PUT /resumes/me/documents/{id}/as-cv`: 204 returned, the kind stayed `sonstiges`.
 
 **The insert path hides it**, because `Add` always tracks. So it surfaces only at the first *mutating* caller, which may arrive months after the repository was written — `EfUnterlagenSpeicher` (today `EfDocumentRecordStore`) was the only one of nineteen without `AsTracking()`, and had no mutating caller until then. When you write a `SaveAsync`, the read inside it takes `.AsTracking()`; when you review one, that is the line to look for.
 

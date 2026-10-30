@@ -1,6 +1,6 @@
 ---
 name: wt-scout
-description: Use when working on WorkerTransfer's scout-service or anything that searches for people — `/scout`, the OR search, the internal profile search door, evidence fetched to a hit, stored searches, `profile_discovered`, the scout per advert (`/scout/jobs/{id}/candidates`), the radius tick (ADR-0041), filters that were decided against, or the approach draft. Also for `docs/SCOUT-UND-BERATER.md`, which is a draft.
+description: Use when working on WorkerTransfer's scout-service or anything that searches for people — `/scout`, the OR search, the internal profile search door, evidence fetched to a hit, stored searches, `profile_discovered`, the scout per advert (`/scout/jobs/{id}/candidates`), the radius tick (ADR-0041), filters that were decided against, or the approach draft. Also for `docs/SCOUT-UND-BERATER.md`, which is a draft, and for the `application_received` mail to a company's members.
 ---
 
 # scout-service

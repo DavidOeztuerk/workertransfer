@@ -43,3 +43,7 @@ Three things are load-bearing:
 `/delete-account` is where the promise is made to a person: it states **before** the button what disappears, that it is **not immediate**, and the uncomfortable part out loud — *the application you were hired through disappears from the company's list too*. It promises no exception, because in the default there is none. Confirmation is two deliberate steps with a differently worded second button — no typed word, no cooling-off period, no re-entered password: whoever wants to delete may. Afterwards it says "läuft", never "erledigt", and shows no progress bar. One trap: the page clears the session on success, so the shell re-renders it with no principal — the accepted state must take precedence over the login prompt, or the person sees "Bitte anmelden" right after deleting their account.
 
 The ledger survives as the **proof**: the grant/revoke chain stays, one DELETE row per capability ever held is appended, and reasons and metadata are cleared. The argument is not "we may retain" but that nothing maps subject id → person afterwards.
+
+## Tables keyed by the person (from `### Persistence`)
+
+`SubjectKeyedTable` is an EF annotation put on tables whose *key* is the person (`profiles`, `portfolios`, `github_connections`, `resumes`, `notification_preferences`, `market_status`). It exists so the erasure guard can recognise them: those tables have no `subject_id` column, because the id *is* the subject, and a guard looking only for column names would miss exactly the tables that hold the most.

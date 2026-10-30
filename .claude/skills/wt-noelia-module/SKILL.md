@@ -1,6 +1,6 @@
 ---
 name: wt-noelia-module
-description: Use when adding, removing, excluding or questioning a Noelia module in WorkerTransfer's composition (`UseDefaults()`, `.Without(module, reason)`, the startup report), the egress boundary and `SovereignPlatform` (allowed hosts, `Draft__AllowedTargets__*`, `EgressDeniedException`), Noelia's log masking, a Noelia version bump, or replacing a hand-built piece (`ProblemDetailsMiddleware`, `Outbox`, `HealthProbes.cs`) with Noelia's.
+description: Use when adding, removing, excluding or questioning a Noelia module in WorkerTransfer's composition (`UseDefaults()`, `.Without(module, reason)`, the startup report), the egress boundary and `SovereignPlatform` (allowed hosts, `Draft__AllowedTargets__*`, `EgressDeniedException`, connecting to a host that comes from data via `ServiceDefaults/PublicAddress`), Noelia's log masking, writing a FluentValidation validator, input sanitization (a 400 where a 422 was expected), HttpClient time limits (`TimeLimitTests`), a Noelia version bump or a `bugs/` ticket, or replacing a hand-built piece (`ProblemDetailsMiddleware`, `Outbox`, `HealthProbes.cs`) with Noelia's.
 ---
 
 # The Noelia modules in WorkerTransfer
@@ -8,6 +8,16 @@ description: Use when adding, removing, excluding or questioning a Noelia module
 Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liners stay there.
 How the switch from Girder to Noelia went (ADR-0045, three API changes over
 twelve versions) is in `docs/GESCHICHTE.md`.
+
+## ServiceDefaults and CQRS (from `### Layering` and `### CQRS`)
+
+`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because fourteen services answering it fourteen ways would be fourteen chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
+
+Mediator via Noelia's `AddCQRS`, but with **our own `ICommandMessage` / `IQueryMessage` markers** over MediatR's `IRequest`, defined per service in `Application/Messages/`. This is deliberate: Noelia's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransactionBehavior` wraps **commands only** — a query has nothing to commit.
+
+## A Noelia bug (from `## Conventions that bite`)
+
+- **No detour around a Noelia bug.** Write the code correctly, leave the test red, file a ticket in `bugs/` with a reproduction free of WorkerTransfer code, move on. Everything in `bugs/` must go green once the bug is fixed, without anyone reverting code.
 
 ## Log masking (from `### Errors`)
 

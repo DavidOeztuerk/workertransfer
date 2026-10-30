@@ -1,6 +1,6 @@
 ---
 name: wt-identity
-description: Use when working on who a caller is in WorkerTransfer — identity-service, tokens and their exact claim set, the `access` cookie, tenant and `Capacity` (person vs. company), switching capacity (`/auth/company/{id}`, `/auth/self`), registration and company creation, invitations, the roles `member` < `recruiter` < `admin` and which routes need which, the internal role door, or signing in with Google, Microsoft or Apple.
+description: Use when working on who a caller is in WorkerTransfer — identity-service, tokens and their exact claim set, the `access` cookie, tenant and `Capacity` (person vs. company), switching capacity (`/auth/company/{id}`, `/auth/self`), registration and company creation, invitations, the roles `member` < `recruiter` < `admin` and which routes need which, identity's internal doors (role, company, person) and who may call them, or signing in with Google, Microsoft or Apple.
 ---
 
 # Request context, roles and sign-in
@@ -8,6 +8,7 @@ description: Use when working on who a caller is in WorkerTransfer — identity-
 Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liners stay there.
 
 - `docs/adr/0053-anmelden-mit-fremden-konten.md` — signing in with Google, Microsoft, Apple; never linked by the address. 18.10.2026.
+- identity's two other internal doors — `GET /internal/companies/{tenantId}` (name, proven domain) and `GET /internal/account/{subjectId}/identity` (civil name, email; ADR-0038) — are described in `wt-advisor`, where they came from. Their rule holds for every caller: the secret proves that a *service* asks, not that it *may*; the ledger check is fetched **before** the call.
 
 ### Request context
 

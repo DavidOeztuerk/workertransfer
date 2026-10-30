@@ -1,11 +1,17 @@
 ---
 name: wt-frontend
-description: Use when changing WorkerTransfer's React app under `web/` — MUI theme and design tokens, the header and navigation per role, "Handeln als", routes and their paths, the i18n catalogues (de/en/fr) and error keys, the account language, the letter-data cache in `kontext.ts`, Vitest or the Playwright journeys in `web/e2e/`.
+description: Use when changing WorkerTransfer's React app under `web/` — MUI theme and design tokens, the header and navigation per role, "Handeln als", routes and their paths, the i18n catalogues (de/en/fr) and error keys, the account language, the letter-data cache in `kontext.ts`, Vitest or the Playwright journeys in `web/e2e/`, or anything the shipped UI's Content-Security-Policy (`docker/web-nginx.conf.template`) would refuse — a foreign script, font or fetch.
 ---
 
 # The frontend (`web/`)
 
 Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liners stay there.
+The shipped UI's Content-Security-Policy and the nginx header trap are in
+`wt-resume-documents` („Files from Google Drive and Dropbox").
+
+## Where `web/` sits (from `### The layout, so nobody guesses`)
+
+`web/` is **not** under `src/` and is not moving: it is frontend rather than a leftover, and `src/` means .NET here. It is also the *whole* frontend now — `apps/`, `packages/ui`, the pnpm workspace, turbo and the root `package.json` are gone, and `web/` carries its own lockfile. Anything that still says `apps/web` or `packages/ui` is describing the predecessor.
 
 ### Frontend
 

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**This file holds only what every session needs.** Task knowledge lives in skills under `.claude/skills/`, history in [`docs/GESCHICHTE.md`](docs/GESCHICHTE.md). A short rule here is **binding**; the skill named beside it (`→ wt-…`) holds the reason — read it before you change that area.
+**This file holds only what every session needs.** Task knowledge lives in skills under `.claude/skills/`, history in [`docs/GESCHICHTE.md`](docs/GESCHICHTE.md). A short rule here is **binding**; the skill named beside it (`→ wt-…`) holds the reason — read it before you change that area. A reference `CLAUDE.md, <section>` in code leads through the heading of that name, here or in a skill.
 
 ## What this is
 
@@ -10,7 +10,7 @@ WorkerTransfer is a consent-first talent-mobility platform (applications, direct
 
 Fifteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 
-The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
+It was a Python monorepo until August 2026; **everything Python is gone**. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern** — where one names a Python path, it names the decision. `docs/MIGRATION-STAND.md` records what was *measured*; read it before assuming a shape is arbitrary.
 
 ### The layout, so nobody guesses
 
@@ -23,7 +23,7 @@ WorkerTransfer.slnx  Directory.Build.props  Directory.Packages.props  NuGet.Conf
 package.json  pnpm-lock.yaml  pnpm-workspace.yaml  turbo.json  tsconfig.base.json
 ```
 
-`web/` is **not** under `src/` and is not moving: it is frontend rather than a leftover, and `src/` means .NET here. It is also the *whole* frontend now — `apps/`, `packages/ui`, the pnpm workspace, turbo and the root `package.json` are gone, and `web/` carries its own lockfile. Anything that still says `apps/web` or `packages/ui` is describing the predecessor.
+`web/` is the *whole* frontend, deliberately not under `src/`, with its own lockfile; anything that says `apps/web` or `packages/ui` describes the predecessor. → `wt-frontend`
 
 ### The services
 
@@ -60,11 +60,8 @@ Konto hier liegt, gilt wieder, was `MIGRATION.md` §*„Before the first Noelia
 process starts"* sagt — `docs/AUFTRAG-NOELIA-UMSTIEG.md` bleibt genau dafür im
 Baum stehen.
 
-**Eine Versionsnummer hinter „Girder" ist Geschichte, kein Verweis.** „Girder
-4.3.0 hatte einen Substring-Fehler in seiner Maskierung" bleibt stehen: eine
-Messung an einer veröffentlichten Version umzubenennen hieße, sie zu fälschen.
-Wo unten eine Messung „Girder 4.4.0" nennt, ist sie vor dem 20.09.2026
-entstanden.
+**Eine Versionsnummer hinter „Girder" ist Geschichte, kein Verweis** — eine
+Messung an einer veröffentlichten Version wird nicht umbenannt.
 
 ```bash
 make analyze          # noelia analyze über die Zusammensetzung; steht in `make validate`
@@ -143,7 +140,7 @@ Every GitHub request carries a `User-Agent`; evidence stores topics and the lang
 
 `feature → develop → main`, never a feature branch straight into main.
 
-A **hotfix** is the single exception: it branches off `main`, merges into `main`, and never passes through develop. `.github/workflows/backmerge.yml` carries it back, and its trigger is deliberately narrow — a *merged* PR into main whose head branch starts with **`hotfix/`**. The name is load-bearing: call it `fix/…` and the run never fires, so the correction silently stays out of develop. It pushes to develop only on a fast-forward; otherwise it prepares `hotfix-backmerge/main-to-develop` and puts a compare link in the run summary. A real conflict turns the run **red** rather than reporting green while the fix is missing.
+A **hotfix** is the single exception: it branches off `main`, merges into `main`, and its branch **must** start with **`hotfix/`** — `backmerge.yml` fires on that prefix only, so a `fix/…` branch never comes back to develop. → `wt-ci`
 
 ## Architecture
 
@@ -160,11 +157,11 @@ One project per layer, per service, without exception:
 
 Repository *interfaces* live in Domain, implementations in Infrastructure. Commands, queries and handlers live in Application. **All wiring is behind one `Add<Service>Infrastructure()`** per service — its composition root (ADR-0003, and deliberately not a fluent `PlatformBuilder`).
 
-`ServiceDefaults.AddWorkerTransferDefaults()` is the one call every service makes. What is in it is there because fourteen services answering it fourteen ways would be fourteen chances to answer it wrong: how a token is verified, what a failure looks like on the wire, the order of the pipeline. What is *not* in it is everything that is a decision — which database, which repositories, whether there is a cache, whether there is an outbox. Those stay in each service's own composition root, where a reader can see them.
+`ServiceDefaults.AddWorkerTransferDefaults()` holds only what must not differ between services (token check, wire format of a failure, pipeline order); every decision — database, repositories, cache, outbox — stays in the service's own composition root. → `wt-noelia-module`
 
 ### CQRS
 
-Mediator via Noelia's `AddCQRS`, but with **our own `ICommandMessage` / `IQueryMessage` markers** over MediatR's `IRequest`, defined per service in `Application/Messages/`. This is deliberate: Noelia's `ICommand<T>` carries its own error envelope, which would be a second one beside RFC 9457, and two shapes for "what went wrong" is exactly the divergence that later gets papered over in the UI. `TransactionBehavior` wraps **commands only** — a query has nothing to commit.
+**Our own `ICommandMessage` / `IQueryMessage`** (per service in `Application/Messages/`) over MediatR's `IRequest`, never Noelia's `ICommand<T>` — a second error envelope beside RFC 9457. `TransactionBehavior` wraps **commands only**. → `wt-noelia-module`
 
 ### Errors
 
@@ -172,14 +169,15 @@ RFC 9457 problem documents, everywhere, from `ServiceDefaults.ProblemDetailsMidd
 
 An endpoint filter that has already written a response must return `Results.Empty`, never `null`: with headers sent, the framework writes a JSON null after them, which tears the connection on a POST-with-body and is invisible on a GET except in the log.
 
-**Naming a log property `Email` would make it unreadable.** → `wt-noelia-module`
+**A validator message names the rule, never the value** — `ValidationBehavior` logs it, and FluentValidation's defaults insert `{PropertyValue}`. **Naming a log property `Email` would make it unreadable.** → `wt-noelia-module`
 
 ### Request context
 
 Correlation and tenant flow through the request, set by middleware in `ServiceDefaults`. **Tenant identity must never come from a browser header in production.**
 
 - **A tenant is a company, and a natural person has none** (ADR-0017, `Capacity`). The consent ledger has no tenant column by design — do not "fix" that.
-- The client names the company, the server decides: `POST /auth/company/{id}` checks membership before it mints a tenant. The token's claim set is pinned **complete**; roles are never in it; it leaves only as the `httpOnly` cookie. Every service accepts a `Bearer` header **or** the `access` cookie.
+- The client names the company, the server decides: `POST /auth/company/{id}` checks membership before it mints a tenant. The token's claim set is pinned **complete**; roles are never in it; it leaves only as the `httpOnly` cookie. Every service accepts a `Bearer` header **or** the `access` cookie. Only identity-service holds `Jwt__PrivateKey`; every other service holds the public key alone (ADR-0046).
+- **An internal door behind the shared secret proves that a *service* asks, not that it *may*** — the caller fetches the ledger check first.
 - **Hiding is not access control.** Company rights are checked at the endpoint, before the body; the role is read per request, uncached; `member` < `recruiter` < `admin`, **in doubt, `member`**; **a silent role lookup answers 503, never 403**.
 - Register and resend answer identically whether or not the address is known; a company is created at registration and nowhere else.
 
@@ -187,13 +185,13 @@ Correlation and tenant flow through the request, set by middleware in `ServiceDe
 
 ### Persistence
 
-EF Core, one `DbContext` per service, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations live under `src/<service>/…Infrastructure/Persistence/Migrations` and are applied at startup by `ServiceDefaults.SchemaMigration`, which retries **only transient failures** for one minute. That narrowness matters: an earlier version caught everything, and a schema error became a minute of retries ending in a misleading `type … already exists`.
+EF Core, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations apply at startup and retry **only transient failures**.
 
 **Aggregates come back detached from the repositories.** A mutation reaches the database only via an explicit save. Forgetting it costs nothing at test time and silently loses the write in production.
 
-**And the save itself needs `.AsTracking()`, because every context runs `QueryTrackingBehavior.NoTracking`.** A repository that reads a row, assigns to it and relies on `SaveChanges` writes *nothing* — the row came back detached, the assignments go nowhere, and the caller still gets its `204`. Measured 09.09.2026 on `PUT /resumes/me/documents/{id}/as-cv`: 204 returned, the kind stayed `sonstiges`. → `wt-tore`, trap 4
+**And the save itself needs `.AsTracking()`**, because every context runs `NoTracking` — without it nothing is written and the caller still gets its `204`. → `wt-tore`, traps 3 and 4
 
-`SubjectKeyedTable` is an EF annotation put on tables whose *key* is the person (`profiles`, `portfolios`, `github_connections`, `resumes`, `notification_preferences`, `market_status`). It exists so the erasure guard can recognise them: those tables have no `subject_id` column, because the id *is* the subject, and a guard looking only for column names would miss exactly the tables that hold the most.
+A table whose key *is* the person carries `SubjectKeyedTable`, or the erasure guard does not see it. → `wt-consent`
 
 ### The outbox
 
@@ -207,7 +205,7 @@ The table deliberately holds **no content**, only a user id and a kind. An outbo
 
 ### `SovereignPlatform` — angenommen, und die Hosts kommen aus der Konfiguration
 
-The egress guard **refuses**. Allowed hosts are **derived from configuration, never listed in code**; AI targets are declared by the operator in `Draft__AllowedTargets__*`. Noelia's audit trail is refused — ours is `EfAuditTrail`, in the transaction. → `wt-noelia-module`
+The egress guard **refuses**. Allowed hosts are **derived from configuration, never listed in code**; AI targets are declared by the operator in `Draft__AllowedTargets__*`. **A host that comes from data connects only through `ServiceDefaults/PublicAddress`** — public addresses at connect time, no redirect off the domain. Noelia's audit trail is refused — ours is `EfAuditTrail`, in the transaction. → `wt-noelia-module`
 
 ### Und dieselbe Frage an unseren Eigenbau
 
@@ -256,14 +254,14 @@ These are the parts that are easy to undo by "cleaning up". Each has a reason, a
 - **Sharing rule**: only domain-neutral, transport-independent, non-business code goes in `src/shared/`. Profile, company, job, transfer, contract, application and matching models stay inside the owning service. `Contracts.*` holds versioned boundary DTOs, never a shared domain model.
 - **A service-to-service body is a typed contract, never an anonymous object.** → `wt-tore`
 - **No secrets, tokens, CVs, contracts or raw source code in the repo or in logs.**
-- **No detour around a Noelia bug.** Write the code correctly, leave the test red, file a ticket in `bugs/` with a reproduction free of WorkerTransfer code, move on. Everything in `bugs/` must go green once the bug is fixed, without anyone reverting code.
+- **No detour around a Noelia bug** — correct code, a red test, a ticket in `bugs/`. → `wt-noelia-module`
 - **Run counter-probes, and make sure the break actually compiles** — a build error reads in the output like a passing test.
 - **After a counter-probe, build with `--no-incremental`** — and after the *revert*, not only after the patch. → `wt-tore`
 - **A counter-probe that does not fall reveals a weak test, not correct code.** → `wt-tore`
 - **Docker must be running**, or the integration suites skip themselves — and a skipped integration test looks exactly like a passing one. `scripts/test-dotnet.sh` prints the counts for this reason.
 - **Never build images and run tests at the same time.** They contend, and the failure looks like a test failure.
 - **And a cold stack is the *other* cause with the same symptom** — run the same suite on the unchanged tree, and **do not raise the timeout**. → `wt-tore`
-- **A comment earns its place when its absence would let someone build a defect back in. Everything else retells the code.** A reason lives at the line, not in an ADR. → `docs/GESCHICHTE.md`
+- **A comment earns its place when its absence would let someone build a defect back in. Everything else retells the code.** A reason lives at the line, not in an ADR; comments are never thinned with a mechanical filter; a copy of a reason goes only per site, never per pattern. Derivation: `docs/GESCHICHTE.md`
 - New cross-cutting architectural decisions get an ADR in `docs/adr/`.
 
 ## Skills

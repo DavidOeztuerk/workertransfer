@@ -1,12 +1,22 @@
 # Geschichte aus der CLAUDE.md
 
 Am 30.10.2026 ist die `CLAUDE.md` auf den Kern verkleinert worden (Gate G-0015).
-Was dort Geschichte war und keine Regel, steht seither hier — **wörtlich**, in der
-Sprache des Abschnitts. Die Regeln, die aus diesen Geschichten folgen, stehen
-weiter als kurze Zeilen in der `CLAUDE.md`; das Aufgabenwissen in den Skills unter
+Was dort Geschichte oder Herleitung war, steht seither hier — **wörtlich**, in der
+Sprache des Abschnitts. Die Regeln, die daraus folgen, stehen als kurze,
+verbindliche Zeilen in der `CLAUDE.md`; das Aufgabenwissen in den Skills unter
 `.claude/skills/`.
 
+## What this is
+
+The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
+
 ## Der Umstieg auf Noelia ist gefahren (ADR-0045)
+
+**Eine Versionsnummer hinter „Girder" ist Geschichte, kein Verweis.** „Girder
+4.3.0 hatte einen Substring-Fehler in seiner Maskierung" bleibt stehen: eine
+Messung an einer veröffentlichten Version umzubenennen hieße, sie zu fälschen.
+Wo unten eine Messung „Girder 4.4.0" nennt, ist sie vor dem 20.09.2026
+entstanden.
 
 Der Auftrag sah zwölf Sprünge vor, weil **5.0 eine Datenwanderung ist** —
 Sitzungen, Widerrufe, der Passwort-Pfeffer, die Prüfspur. **Gefahren wurde ein
