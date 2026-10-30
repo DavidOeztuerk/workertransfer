@@ -8,15 +8,26 @@ verbindliche Zeilen in der `CLAUDE.md`; das Aufgabenwissen in den Skills unter
 
 ## What this is
 
-The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](docs/adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
+The repository was a Python (`uv`) monorepo until August 2026 and was translated by hand, service by service. **Everything Python is gone**: no `pyproject.toml`, no `uv.lock`, no `apps/<service>`, no `packages/worker-*`, no alembic, ruff, mypy or pytest. `docs/MIGRATION-STAND.md` records what was decided along the way and, more usefully, what was *measured* — read it before assuming a shape is arbitrary. The ADRs in [`docs/adr/`](adr/) predate the migration and **still govern**: they hold the reasons, and reasons do not change language. Where an ADR names a Python path, read it as naming the decision, not the file.
+
+*(aus `## Conventions that bite`)*
+
+- **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`. There is no Python here any more; if a command in an old document says `uv`, `ruff`, `mypy`, `pytest` or `alembic`, that document is describing the predecessor.
 
 ## Der Umstieg auf Noelia ist gefahren (ADR-0045)
+
+**Girder und Noelia sind dieselbe Codelinie.** `MIGRATION.md:781` im
+Noelia-Baum heißt *„4.4.3 code line → Noelia 5.0.0"*, und das ist die einzige
+Tür zwischen den beiden Identitäten.
 
 **Eine Versionsnummer hinter „Girder" ist Geschichte, kein Verweis.** „Girder
 4.3.0 hatte einen Substring-Fehler in seiner Maskierung" bleibt stehen: eine
 Messung an einer veröffentlichten Version umzubenennen hieße, sie zu fälschen.
 Wo unten eine Messung „Girder 4.4.0" nennt, ist sie vor dem 20.09.2026
 entstanden.
+
+*(„Unten" war die alte `CLAUDE.md`; diese Messungen stehen heute im Skill
+`wt-noelia-module`.)*
 
 Der Auftrag sah zwölf Sprünge vor, weil **5.0 eine Datenwanderung ist** —
 Sitzungen, Widerrufe, der Passwort-Pfeffer, die Prüfspur. **Gefahren wurde ein

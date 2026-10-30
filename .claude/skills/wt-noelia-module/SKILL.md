@@ -6,7 +6,8 @@ description: Use when adding, removing, excluding or questioning a Noelia module
 # The Noelia modules in WorkerTransfer
 
 Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liners stay there.
-How the switch from Girder to Noelia went (ADR-0045, three API changes over
+A measurement below that names „Girder 4.4.0" was taken before 20.09.2026 — the
+version number is history, not a reference. How the switch from Girder to Noelia went (ADR-0045, three API changes over
 twelve versions) is in `docs/GESCHICHTE.md`.
 
 ## ServiceDefaults and CQRS (from `### Layering` and `### CQRS`)

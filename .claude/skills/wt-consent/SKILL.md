@@ -1,6 +1,6 @@
 ---
 name: wt-consent
-description: Use when touching WorkerTransfer's consent ledger, visibility or account erasure — consent-service and its endpoints (`/check`, `/check-batch`, `/consent/me`), anything that reads a capability before showing data, the 404/403/503 meanings in profile- and resume-service, resume requests, certificates' own capability, `POST /account/erasure` and its cascade, `ErasureRecipient.Services`, `Retention.*`, or the `/delete-account` page.
+description: Use when touching WorkerTransfer's consent ledger, visibility or account erasure — consent-service and its endpoints (`/check`, `/check-batch`, `/consent/me`), anything that reads a capability before showing data, the 404/403/503 meanings in profile- and resume-service, resume requests, certificates' own capability, `POST /account/erasure` and its cascade, `ErasureRecipient.Services`, `Retention.*`, a new table keyed by the person (`SubjectKeyedTable`), or the `/delete-account` page.
 ---
 
 # Consent, visibility, erasure

@@ -1,6 +1,6 @@
 ---
 name: wt-ai-seam
-description: Use when touching any place WorkerTransfer calls a language model — profile help, advert help, cover letters, reply drafts, the AI advisor, the scout approach — or the AI access rules: a person's or company's own key, the company's own server (`own`), the platform's model (Ollama until the start), `ModelWire`, `Draft__*` and `WORKERTRANSFER_AI_*`, placeholders for known values, `make ai-check`, or anything that would store a prompt or answer.
+description: Use when touching any place WorkerTransfer calls a language model — profile help, advert help, cover letters, reply drafts, the AI advisor, the scout approach — or the AI access rules (a person's or company's own key, the company's own server (`own`), the platform's model (Ollama until the start), `ModelWire`, `Draft__*` and `WORKERTRANSFER_AI_*`), placeholders for known values, `make ai-check`, or anything that would store a prompt or answer.
 ---
 
 # The AI seam (ADR-0024, ADR-0051)

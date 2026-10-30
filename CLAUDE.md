@@ -51,9 +51,7 @@ The vision documents in [`docs/vision/`](docs/vision/) describe a much larger fu
 
 ## Der Umstieg auf Noelia ist gefahren (ADR-0045)
 
-**Girder und Noelia sind dieselbe Codelinie.** `MIGRATION.md:781` im
-Noelia-Baum heißt *„4.4.3 code line → Noelia 5.0.0"*, und das ist die einzige
-Tür zwischen den beiden Identitäten.
+**Girder und Noelia sind dieselbe Codelinie.** → `docs/GESCHICHTE.md`
 
 **Diese Entscheidung hat ein Verfallsdatum.** Am Tag, an dem das erste echte
 Konto hier liegt, gilt wieder, was `MIGRATION.md` §*„Before the first Noelia
@@ -177,7 +175,7 @@ Correlation and tenant flow through the request, set by middleware in `ServiceDe
 
 - **A tenant is a company, and a natural person has none** (ADR-0017, `Capacity`). The consent ledger has no tenant column by design — do not "fix" that.
 - The client names the company, the server decides: `POST /auth/company/{id}` checks membership before it mints a tenant. The token's claim set is pinned **complete**; roles are never in it; it leaves only as the `httpOnly` cookie. Every service accepts a `Bearer` header **or** the `access` cookie. Only identity-service holds `Jwt__PrivateKey`; every other service holds the public key alone (ADR-0046).
-- **An internal door behind the shared secret proves that a *service* asks, not that it *may*** — the caller fetches the ledger check first.
+- **An internal door behind the shared secret proves that a *service* asks, not that it *may*** — the permission is decided by the caller, one line higher; for personal data that is the ledger, before anything is shown.
 - **Hiding is not access control.** Company rights are checked at the endpoint, before the body; the role is read per request, uncached; `member` < `recruiter` < `admin`, **in doubt, `member`**; **a silent role lookup answers 503, never 403**.
 - Register and resend answer identically whether or not the address is known; a company is created at registration and nowhere else.
 
@@ -225,7 +223,7 @@ Every route in `ocelot.json` needs an entry in [`docs/routenkarte.yml`](docs/rou
 
 ## The rules that carry the design
 
-These are the parts that are easy to undo by "cleaning up". Each has a reason, and the reason is the point. Every line is binding; its skill holds the reason.
+These are the parts that are easy to undo by "cleaning up". Each has a reason, and the reason is the point.
 
 - **Consent is read synchronously and never cached (ADR-0013)** — a withdrawal takes effect on the very next read; `/check-batch` changes nothing about that; `/check` carries no reason; there is no `POST /consent/delete`. → `wt-consent`
 - **Visibility lives in the ledger, nowhere else (ADR-0020)** — **404** hidden or absent (byte-identical), **403** no active company, **503** the ledger is silent; the request is not the permission. → `wt-consent`
@@ -249,7 +247,7 @@ These are the parts that are easy to undo by "cleaning up". Each has a reason, a
 ## Conventions that bite
 
 - **Code is written in English. All of it, backend and frontend.** The wire and the database never move in a rename, and **a settings property name IS the environment key** — rename it everywhere in one pass or not at all, then run `ComposeKeyTests`. → `wt-naming`
-- **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`. There is no Python here any more; if a command in an old document says `uv`, `ruff`, `mypy`, `pytest` or `alembic`, that document is describing the predecessor.
+- **Package managers are `dotnet`/NuGet and `pnpm`.** Never `npm`, never `yarn`.
 - **Warnings are errors** (`Directory.Build.props`). Central package management via `Directory.Packages.props` — versions go there, not into a `.csproj`.
 - **Sharing rule**: only domain-neutral, transport-independent, non-business code goes in `src/shared/`. Profile, company, job, transfer, contract, application and matching models stay inside the owning service. `Contracts.*` holds versioned boundary DTOs, never a shared domain model.
 - **A service-to-service body is a typed contract, never an anonymous object.** → `wt-tore`
