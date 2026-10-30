@@ -356,6 +356,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(row => row.TenantId).HasColumnName("tenant_id");
             entity.Property(row => row.AiProvider).HasColumnName("ai_provider").HasMaxLength(16);
             entity.Property(row => row.AiModel).HasColumnName("ai_model").HasMaxLength(128);
+            entity.Property(row => row.AiBaseUrl).HasColumnName("ai_base_url").HasMaxLength(512);
             entity.Property(row => row.AiKeyEncrypted).HasColumnName("ai_key_encrypted");
             entity.Property(row => row.AiKeyTail).HasColumnName("ai_key_tail").HasMaxLength(8);
             entity.Property(row => row.UpdatedAt).HasColumnName("updated_at");
@@ -492,17 +493,21 @@ public sealed class InvitationRow
 
 /// <summary>One row of <c>company_ai_settings</c> — a company's own AI key, encrypted.</summary>
 /// <remarks>
-/// No address column: the address belongs to the provider and is set by the
-/// platform (<c>AiProviders</c>), so a row cannot point anywhere else.
+/// The address stands only for the company's own server (<c>own</c>); for a
+/// cloud provider it belongs to the provider and is set by the platform
+/// (<c>AiProviders</c>), so such a row cannot point anywhere else.
 /// </remarks>
 public sealed class CompanyAiSettingsRow
 {
     public Guid TenantId { get; set; }
 
-    /// <summary>The provider as a label: none, openai, anthropic.</summary>
+    /// <summary>The provider as a label: none, openai, anthropic, own.</summary>
     public string AiProvider { get; set; } = "none";
 
     public string AiModel { get; set; } = string.Empty;
+
+    /// <summary>The company's own server, under its proven domain; empty otherwise.</summary>
+    public string AiBaseUrl { get; set; } = string.Empty;
 
     /// <summary>The key, encrypted. Never in the clear.</summary>
     public string AiKeyEncrypted { get; set; } = string.Empty;

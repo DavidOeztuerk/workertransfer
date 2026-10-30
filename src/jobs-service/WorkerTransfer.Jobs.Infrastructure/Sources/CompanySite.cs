@@ -157,67 +157,6 @@ public sealed class HttpCompanySite(
         var dot = host.IndexOf('.', StringComparison.Ordinal);
         return dot > 0 && host.IndexOf('.', dot + 1) > 0 ? host[(dot + 1)..] : host;
     }
-
-    /// <summary>Connects only to a public address (ADR-0052).</summary>
-    public static async ValueTask<Stream> PublicOnly(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-
-        var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
-
-        // All of them public, or none is used: a host that also resolves inside
-        // is the trick, not an accident.
-        if (addresses.Length == 0 || !addresses.All(IsPublic))
-        {
-            throw new HttpRequestException("The host does not resolve to public addresses only.");
-        }
-
-        var socket = new Socket(addresses[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-
-        try
-        {
-            await socket.ConnectAsync(new IPEndPoint(addresses[0], context.DnsEndPoint.Port), cancellationToken);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
-
-    /// <summary>Whether an address lies outside every internal range.</summary>
-    public static bool IsPublic(IPAddress address)
-    {
-        ArgumentNullException.ThrowIfNull(address);
-
-        if (address.IsIPv4MappedToIPv6)
-        {
-            address = address.MapToIPv4();
-        }
-
-        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
-        {
-            return false;
-        }
-
-        if (address.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            var first = address.GetAddressBytes()[0];
-            return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast
-                     || (first & 0xfe) == 0xfc);
-        }
-
-        var b = address.GetAddressBytes();
-        return !(b[0] == 10
-                 || b[0] == 0
-                 || b[0] == 127
-                 || (b[0] == 172 && b[1] is >= 16 and <= 31)
-                 || (b[0] == 192 && b[1] == 168)
-                 || (b[0] == 169 && b[1] == 254)
-                 || (b[0] == 100 && b[1] is >= 64 and <= 127)
-                 || b[0] >= 224);
-    }
 }
 
 /// <summary>identity-service's internal door, for the company's proven domain.</summary>

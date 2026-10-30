@@ -21,7 +21,8 @@ public sealed record AcceptInvitationBody(string Token);
 /// <summary>What an admin sends to choose the company's AI provider — never the key.</summary>
 public sealed record CompanyAiBody(
     [property: JsonPropertyName("ai_provider")] string? AiProvider,
-    [property: JsonPropertyName("ai_model")] string? AiModel);
+    [property: JsonPropertyName("ai_model")] string? AiModel,
+    [property: JsonPropertyName("ai_base_url")] string? AiBaseUrl = null);
 
 /// <summary><c>/companies</c>, <c>/me/companies</c> and <c>/invitations</c>.</summary>
 public static class CompanyEndpoints
@@ -274,11 +275,13 @@ public static class CompanyEndpoints
         {
             var provider = (body.AiProvider ?? "none").Trim();
             var model = (body.AiModel ?? string.Empty).Trim();
+            var address = (body.AiBaseUrl ?? string.Empty).Trim();
 
             // Unknown is refused rather than read as "none": an admin who
             // typed a provider we do not have would otherwise believe the
             // company's drafts now go there.
-            if (provider is not ("none" or "openai" or "anthropic") || model.Length > MaxModelLength)
+            if (provider is not ("none" or "openai" or "anthropic" or "own")
+                || model.Length > MaxModelLength || address.Length > MaxAddressLength)
             {
                 await ProblemDetailsMiddleware.Write(
                     context, StatusCodes.Status422UnprocessableEntity,
@@ -286,10 +289,20 @@ public static class CompanyEndpoints
                 return;
             }
 
-            var state = await mediator.Send(
-                new SetCompanyAiCommand(new TenantId(tenantId), provider, model), cancellationToken);
+            try
+            {
+                var state = await mediator.Send(
+                    new SetCompanyAiCommand(new TenantId(tenantId), provider, model, address), cancellationToken);
 
-            await context.Response.WriteAsJsonAsync(CompanyAiJson(state), cancellationToken);
+                await context.Response.WriteAsJsonAsync(CompanyAiJson(state), cancellationToken);
+            }
+            catch (OwnServerRefused refused)
+            {
+                // The field, never the value — and the UI explains the rule:
+                // https, a name, under the company's proven domain.
+                await ProblemDetailsMiddleware.Write(
+                    context, StatusCodes.Status422UnprocessableEntity, "Request failed", refused.Message);
+            }
         })
         .RequireAuthorization(CompanyPermissions.Policy(CompanyPermissions.Ai));
 
@@ -367,6 +380,9 @@ public static class CompanyEndpoints
 
     /// <summary>Real keys are far shorter; the bound keeps a pasted file out of the column.</summary>
     private const int MaxKeyLength = 512;
+
+    /// <summary>The column holds 512 characters.</summary>
+    private const int MaxAddressLength = 512;
 
     private static Dictionary<string, object> CompanyAiJson(CompanyAiView state) => new()
     {

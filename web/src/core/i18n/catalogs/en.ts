@@ -1344,6 +1344,13 @@ const en: Catalog = {
     providerHint: "It is asked only when someone on the team presses a draft button. Without a key the platform's model writes.",
     keyHint: "Stored encrypted and never handed back — not even to admins. Enter it again to change it, save it empty to remove it.",
     adminOnly: "Only an admin sets up the company's AI access. Ask someone on the team with that role.",
+    providerOwn: "Own server (OpenAI-compatible)",
+    address: "Server address",
+    addressHint: "The full address, e.g. https://ai.your-company.com/v1/chat/completions — https only, and only under your confirmed domain.",
+    ownModelHint: "The model as your server names it.",
+    ownSave: "Save server",
+    ownRefused: "That does not work: the address starts with https, names a host instead of an IP address and lies under your confirmed domain. A model is needed too.",
+    ownKeyHint: "Only needed if your server asks for one. Stored encrypted and never handed back.",
   },
 
   companyProfile: {

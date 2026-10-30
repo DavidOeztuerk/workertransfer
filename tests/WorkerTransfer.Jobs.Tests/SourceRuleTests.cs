@@ -5,6 +5,7 @@ using Noelia.Infrastructure.Sovereignty;
 using WorkerTransfer.Jobs.Domain.Jobs;
 using WorkerTransfer.Jobs.Domain.Sources;
 using WorkerTransfer.Jobs.Infrastructure.Sources;
+using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Jobs.Tests;
 
@@ -154,7 +155,7 @@ public sealed class SourceRuleTests
     [InlineData("2606:4700::1111", true)]
     public void A_company_host_must_resolve_to_a_public_address(string address, bool reachable)
     {
-        HttpCompanySite.IsPublic(IPAddress.Parse(address)).Should().Be(reachable);
+        PublicAddress.IsPublic(IPAddress.Parse(address)).Should().Be(reachable);
     }
 
     [Fact]

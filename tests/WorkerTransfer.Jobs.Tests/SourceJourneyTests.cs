@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using WorkerTransfer.ServiceDefaults.Ai;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -266,7 +267,10 @@ public class SourceJourneyTests(Postgres postgres) : IAsyncLifetime
 
         // And the egress boundary has learned the domain — nothing else.
         var egress = _service.Services.GetRequiredService<IEgressPolicy>();
-        egress.Should().BeOfType<CompanyDomainEgress>("the widened policy must be the one Noelia's guard resolves");
+        // Widened twice, through Noelia's interface each time: the company feeds
+        // inside, the companies' own model servers around them (ADR-0051).
+        egress.Should().BeOfType<CompanyAiEgress>("the widened policy must be the one Noelia's guard resolves")
+            .Which.Inner.Should().BeOfType<CompanyDomainEgress>();
         egress.IsAllowed(new Uri("https://careers.acme.example/jobs.json")).Should().BeTrue();
         egress.IsAllowed(new Uri("https://other.example/jobs.json")).Should().BeFalse();
         egress.IsAllowed(new Uri("https://acme.jobs.personio.de/xml")).Should().BeTrue();

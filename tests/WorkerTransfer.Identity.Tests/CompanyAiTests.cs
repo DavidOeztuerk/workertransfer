@@ -168,6 +168,83 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_own_server_under_the_proven_domain_is_handed_out_without_a_key()
+    {
+        var (boss, company, domain) = await FounderWithDomain();
+        var address = $"https://llm.{domain}/v1/chat/completions";
+
+        var saved = await boss.PutAsJsonAsync($"/companies/{company}/ai",
+            new { ai_provider = "own", ai_model = "qwen2.5:14b", ai_base_url = address });
+        saved.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var view = JsonDocument.Parse(await saved.Content.ReadAsStringAsync()).RootElement;
+        view.GetProperty("ai_provider").GetString().Should().Be("own");
+        view.GetProperty("ai_base_url").GetString().Should().Be(address);
+
+        var service = _service.CreateClient();
+        service.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        var access = JsonDocument.Parse(
+            await (await service.GetAsync($"/internal/companies/{company}/ai")).Content.ReadAsStringAsync()).RootElement;
+
+        access.GetProperty("provider").GetString().Should().Be("openai_compatible");
+        access.GetProperty("base_url").GetString().Should().Be(address);
+        access.GetProperty("model").GetString().Should().Be("qwen2.5:14b");
+        access.GetProperty("key").GetString().Should().BeEmpty("an own server may run without one");
+    }
+
+    /// <summary>
+    /// The address is typed, so it is bound: https, a name, a host on the
+    /// company's PROVEN domain. Each line is a way to point the team's drafts
+    /// elsewhere — or inside.
+    /// </summary>
+    [Theory]
+    [InlineData("http://llm.{0}/v1/chat/completions")]
+    [InlineData("https://llm.other-company.example/v1/chat/completions")]
+    [InlineData("https://evil{0}/v1/chat/completions")]
+    [InlineData("https://10.0.0.5/v1/chat/completions")]
+    [InlineData("https://[fd00::1]/v1/chat/completions")]
+    [InlineData("https://user@llm.{0}/v1/chat/completions")]
+    [InlineData("not an address")]
+    public async Task An_own_server_off_the_proven_domain_is_refused(string template)
+    {
+        var (boss, company, domain) = await FounderWithDomain();
+
+        var answer = await boss.PutAsJsonAsync($"/companies/{company}/ai", new
+        {
+            ai_provider = "own",
+            ai_model = "qwen2.5:14b",
+            ai_base_url = string.Format(System.Globalization.CultureInfo.InvariantCulture, template, domain)
+        });
+
+        answer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await answer.Content.ReadAsStringAsync()).Should().Contain("ai_base_url");
+    }
+
+    [Fact]
+    public async Task An_own_server_needs_its_model()
+    {
+        var (boss, company, domain) = await FounderWithDomain();
+
+        var answer = await boss.PutAsJsonAsync($"/companies/{company}/ai",
+            new { ai_provider = "own", ai_base_url = $"https://llm.{domain}/v1/chat/completions" });
+
+        answer.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await answer.Content.ReadAsStringAsync()).Should().Contain("ai_model");
+    }
+
+    /// <summary>The own server is a company's choice; a person's settings know no such provider.</summary>
+    [Fact]
+    public async Task A_person_cannot_choose_an_own_server()
+    {
+        var (boss, _, _) = await FounderWithDomain();
+
+        await boss.PutAsJsonAsync("/account/settings", new { delete_after_months = (int?)null, ai_provider = "own" });
+
+        var settings = JsonDocument.Parse(await (await boss.GetAsync("/account/settings")).Content.ReadAsStringAsync());
+        settings.RootElement.GetProperty("ai_provider").GetString().Should().Be("none");
+    }
+
+    [Fact]
     public async Task An_unknown_provider_is_refused_not_read_as_none()
     {
         var (boss, company) = await Founder();
@@ -264,6 +341,15 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
         var boss = await Person(Address("boss", NewDomain()), company: "Schweißtechnik GmbH");
         var mine = JsonDocument.Parse(await (await boss.GetAsync("/me/companies")).Content.ReadAsStringAsync());
         return (boss, mine.RootElement[0].GetProperty("id").GetString()!);
+    }
+
+    private async Task<(HttpClient Browser, string Company, string Domain)> FounderWithDomain()
+    {
+        var boss = await Person(Address("boss", NewDomain()), company: "Schweißtechnik GmbH");
+        var mine = JsonDocument.Parse(await (await boss.GetAsync("/me/companies")).Content.ReadAsStringAsync());
+        return (boss,
+            mine.RootElement[0].GetProperty("id").GetString()!,
+            mine.RootElement[0].GetProperty("domain").GetString()!);
     }
 
     private async Task<HttpClient> Member(HttpClient boss, string company)

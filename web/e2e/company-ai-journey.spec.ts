@@ -49,3 +49,28 @@ test("an admin stores the company's own key, and it never comes back", async ({ 
   await expect(page.getByLabel(/Schlüssel/)).toHaveValue("");
   expect(await page.content()).not.toContain(key);
 });
+
+test("an own server is taken only under the company's proven domain", async ({ page }) => {
+  const domain = uniqueCompanyDomain();
+  const email = uniqueEmail(domain);
+  const companyName = `E2E Server ${Date.now()}`;
+
+  await registerAndConfirm(page, email, "E2E Admin", companyName);
+  await login(page, email);
+  await switchToCompany(page, companyName);
+  await page.goto("/company/settings");
+
+  await expect(page.getByLabel(/Anbieter/i)).toBeVisible();
+  await pickOption(page, /Anbieter/i, "Eigener Server (OpenAI-kompatibel)");
+  await page.getByLabel(/Adresse des Servers/).fill("https://ki.not-this-company.example/v1/chat/completions");
+  await page.getByLabel(/^Modell/).fill("qwen2.5:14b");
+  await page.getByRole("button", { name: "Server speichern" }).click();
+  await expect(page.getByText(/liegt unter eurer bestätigten Domain/)).toBeVisible();
+
+  await page.getByLabel(/Adresse des Servers/).fill(`https://ki.${domain}/v1/chat/completions`);
+  await page.getByRole("button", { name: "Server speichern" }).click();
+  await expect(page.getByText("Gespeichert.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel(/Adresse des Servers/)).toHaveValue(`https://ki.${domain}/v1/chat/completions`);
+});
