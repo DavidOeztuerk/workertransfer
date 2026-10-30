@@ -3,7 +3,7 @@ id: Q-0054
 gate: G-0015
 kind: main
 rank: B
-state: in_progress
+state: cleared
 dod:
   - Neue CLAUDE.md höchstens etwa 20 KB; enthält nur, was jede Session braucht: was WT ist, Layout, wichtigste Befehle, Architektur-Regeln kurz, je eine verbindliche Zeile pro tragender Regel mit Verweis, Conventions that bite, Docs-Karte
   - Jede
