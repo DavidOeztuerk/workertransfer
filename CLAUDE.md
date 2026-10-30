@@ -81,7 +81,7 @@ Verlauf: `docs/GESCHICHTE.md`. → `wt-noelia-module`
 Everything has a `make` target, and the target is the twin of what CI runs. `make help` lists them.
 
 ```bash
-make env            # FIRST, in a fresh clone: writes .env and rolls three secrets
+make env            # FIRST, in a fresh clone: writes .env, rolls four secrets and generates the token key pair
 make check          # the gate: build, then test, then the frontend — fail-fast
 make build          # dotnet build. Warnings are errors (Directory.Build.props)
 make test           # the suites, ONE AT A TIME (see below)
