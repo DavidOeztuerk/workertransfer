@@ -1,10 +1,10 @@
 # AGENTS.md
 
-The short reference. `CLAUDE.md` carries the reasons; this file carries the commands and the rules in one line each. When the two disagree, `CLAUDE.md` is right.
+The short reference. `CLAUDE.md` and its skills under `.claude/skills/` carry the reasons; this file carries the commands and the rules in one line each. When the two disagree, `CLAUDE.md` is right.
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Girder 4.4.0** (a shared foundation library from GitHub Packages) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Noelia 7.0.1** (a shared foundation library from nuget.org) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 
@@ -19,15 +19,15 @@ src/
   profile-service/  resume-service/  portfolio-service/  jobs-service/
   applications-service/  companies-service/  transfer-service/
   notification-service/  github-service/
-  scout-service/  advisor-service/  assessment-service/
+  scout-service/  advisor-service/  assessment-service/  messages-service/
   gateway/            Ocelot — the single entrance
   shared/             ServiceDefaults, Outbox, Skills, DocumentStore, Contracts.{Identity,Consent,Erasure}
-tests/                nineteen suites, one per service plus Gateway, Outbox, Skills, DocumentStore, CrossCutting
+tests/                twenty suites, one per service plus Gateway, Outbox, Skills, DocumentStore, CrossCutting
 web/                  the React app — deliberately not under src/, and the WHOLE frontend
 deploy/  docker/  scripts/  docs/  bugs/
 ```
 
-Fourteen services plus the gateway. Ports 8001–8014, gateway on 8090.
+Fifteen services plus the gateway. Ports 8001–8015, gateway on 8090.
 
 ## The order of checks (binding; `make check` runs it)
 
@@ -116,7 +116,7 @@ Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuG
 
 ## The route map
 
-`docs/routenkarte.yml` — every endpoint through the gateway with its expected answer in four principals (no token / person without company / acting for a company as `member` / as `admin`). The fourth column is the one that makes `admin` vs `member` checkable; eight routes demand an `admin`.
+`docs/routenkarte.yml` — every endpoint through the gateway with its expected answer in four principals (no token / person without company / acting for a company as `member` / as `admin`). The fourth column is the one that makes `admin` vs `member` checkable; nineteen routes demand an `admin`.
 
 - `RouteMapTests` (gateway suite, no stack) pins that the map is **complete**: a new route without an entry goes red. The map's keys stay German; the suite binds them by `[YamlMember(Alias = …)]`, so a renamed key empties its column silently.
 - `scripts/route-map.sh` (`make route-map`, needs `make up`) drives the answers. A script and not a suite: a suite without a stack skips itself, and a skipped test looks like a passing one.
@@ -125,13 +125,13 @@ Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuG
 ## Gateway
 
 - Ocelot 25; `ocelot.json` carries its reasoning in `//` comments (the JSON config provider skips them).
-- **`Sec-Fetch-Dest: document` routes to the SPA**, as *middleware* — in Ocelot a literal path beats a placeholder regardless of `Priority`, so a catch-all could never win against `/jobs`. Behind one origin `/jobs` is both an API prefix and a page; clicking works, only deep links and reloads broke, with raw JSON. Do not replace it with a path list.
+- **The gateway serves the API and nothing else** (ADR-0040). The `Sec-Fetch-Dest: document` routing to the SPA is gone since 11.09.2026; the UI has its own origin (`:5173`), and CORS names both.
 - Health probes are middleware too — Ocelot terminates the pipeline, so a `MapGet` behind it never runs.
 - Route order is pinned by `RouteOrderTests` against a **reversed** fixture; a probe that only equalised priorities stayed green by accident of file order.
 
 ## Docker and Kubernetes
 
-- **One image for all fourteen entry points** (ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
+- **One image for all sixteen entry points** (fifteen services and the gateway, ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
 - **`curl` is in the runtime image** so the container can answer its own healthcheck. The probe used to be `dotnet --version`, which can never work without an SDK (exit 155) — every service read `unhealthy` while serving fine.
 - **One probe in the `x-service` anchor** for all fourteen services and the gateway, asking `/health/live`, port derived from `ASPNETCORE_URLS` so no second list can drift.
 - **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`.
@@ -160,4 +160,4 @@ Five paths, per origin, per minute, configured in `ocelot.json` beside the route
 
 [`docs/SCOUT-UND-BERATER.md`](docs/SCOUT-UND-BERATER.md) sketches `scout-service`, `advisor-service` and `assessment-service` with their conditions, interface rules and four Playwright journeys. It is intent, like [`docs/vision/`](docs/vision/). **Each needs its own ADR first.**
 
-`scout-service` **is built** (ADR-0036, 11.09.2026) and replaced `GET /candidates`, which is gone — endpoint, route, client and UI. The search lives at `/scout`. `advisor-service` **is built too** (ADR-0037, 11.09.2026): the mandate is four values, the three stages live in the ledger and nowhere else, and the pages are `/advisor` and `/company/advisor`. Assessment has neither ADR nor code. **No agent builds assessment** without being asked for it by name.
+`scout-service` **is built** (ADR-0036, 11.09.2026) and replaced `GET /candidates`, which is gone — endpoint, route, client and UI. The search lives at `/scout`. `advisor-service` **is built too** (ADR-0037, 11.09.2026): the mandate is four values, the three stages live in the ledger and nowhere else, and the pages are `/advisor` and `/company/advisor`. `assessment-service` **is built** as well (ADR-0042, 11.09.2026), and so is `messages-service` (ADR-0047, 07.10.2026).
