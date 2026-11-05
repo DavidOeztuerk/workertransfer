@@ -79,6 +79,11 @@ public class InternalDoorTests(Postgres postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_correctly_signed_token_of_an_unknown_service_opens_nothing() =>
+        (await Send(With(TokenShape.Service("stranger", ServiceAudiences.Notification))))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+    [Fact]
     public async Task A_token_for_another_audience_opens_nothing() =>
         (await Send(With(TokenShape.Service("transfer", ServiceAudiences.Identity))))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);

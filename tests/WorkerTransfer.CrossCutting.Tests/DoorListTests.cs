@@ -52,6 +52,9 @@ public sealed class DoorListTests
     private static readonly Regex Hole = new(
         @"\{[^}]*\}", RegexOptions.None, TimeSpan.FromSeconds(5));
 
+    private static readonly Regex ClientVariable = new(
+        "WORKERTRANSFER_M2M_[A-Z]+_SECRET(_HASH)?", RegexOptions.None, TimeSpan.FromSeconds(5));
+
     private static string Root => RepositoryRoot.Find();
 
     private static IEnumerable<string> Sources(string service) =>
@@ -117,7 +120,7 @@ public sealed class DoorListTests
         sites.Should().Equal("ServiceCalls.cs");
     }
 
-    private static YamlMappingNode Environment(string service)
+    private static Dictionary<string, string> Environment(string service)
     {
         using var reader = new StreamReader(Path.Combine(Root, "docker-compose.yml"));
         var yaml = new YamlStream();
@@ -125,11 +128,35 @@ public sealed class DoorListTests
 
         var services = (YamlMappingNode)((YamlMappingNode)yaml.Documents[0].RootNode)["services"];
 
-        return (YamlMappingNode)((YamlMappingNode)services[service + "-service"])["environment"];
+        return Flattened((YamlMappingNode)((YamlMappingNode)services[service + "-service"])["environment"]);
     }
 
-    private static string? Value(YamlMappingNode environment, string key) =>
-        environment.Children.TryGetValue(key, out var node) ? ((YamlScalarNode)node).Value : null;
+    /// <summary>What a service really gets: its own keys over what it merges in.</summary>
+    /// <remarks>
+    /// YamlStream keeps <c>&lt;&lt;</c> as an ordinary key. Reading past it leaves the
+    /// shared anchor unseen, and a value there reaches every service.
+    /// </remarks>
+    private static Dictionary<string, string> Flattened(YamlMappingNode mapping)
+    {
+        var result = mapping.Children.TryGetValue("<<", out var merged)
+            ? Flattened((YamlMappingNode)merged)
+            : new Dictionary<string, string>();
+
+        foreach (var (key, value) in mapping.Children)
+        {
+            var name = ((YamlScalarNode)key).Value!;
+
+            if (name != "<<")
+            {
+                result[name] = ((YamlScalarNode)value).Value ?? string.Empty;
+            }
+        }
+
+        return result;
+    }
+
+    private static string? Value(Dictionary<string, string> environment, string key) =>
+        environment.GetValueOrDefault(key);
 
     public static TheoryData<string> Services() => new(RepositoryRoot.Services());
 
@@ -155,13 +182,30 @@ public sealed class DoorListTests
         }
     }
 
+    /// <summary>The value decides, under whatever key it stands.</summary>
+    [Theory]
+    [MemberData(nameof(Services))]
+    public void No_key_of_a_service_carries_a_client_value_of_another(string service)
+    {
+        var carried = Environment(service).Values
+            .SelectMany(value => ClientVariable.Matches(value).Select(match => match.Value))
+            .Distinct();
+
+        IEnumerable<string> expected = service == "identity"
+            ? ServiceClients.All.Select(client => $"WORKERTRANSFER_M2M_{client.ToUpperInvariant()}_SECRET_HASH")
+            : ServiceClients.All.Contains(service)
+                ? [$"WORKERTRANSFER_M2M_{service.ToUpperInvariant()}_SECRET"]
+                : [];
+
+        carried.Should().BeEquivalentTo(expected);
+    }
+
     /// <summary>A hash opens nothing, and it stays with the issuer all the same.</summary>
     [Theory]
     [MemberData(nameof(Services))]
     public void Identity_alone_holds_the_hashes(string service)
     {
-        var hashes = Environment(service).Children.Keys
-            .Select(key => ((YamlScalarNode)key).Value!)
+        var hashes = Environment(service).Keys
             .Where(key => key.EndsWith("_SECRET_HASH", StringComparison.Ordinal))
             .ToList();
 
@@ -223,5 +267,56 @@ public sealed class DoorListTests
 
         ServiceClientSecret.IsWellFormed(lines[0]).Should().BeTrue();
         lines[1].Should().Be(ServiceClientSecret.HashOf(lines[0]));
+    }
+
+    /// <summary>
+    /// A file saved without a last newline is ordinary, and its last line may be
+    /// somebody's third-party secret. The first key added must not land on it.
+    /// </summary>
+    [Fact]
+    public async Task Adding_the_pairs_leaves_a_file_without_a_last_newline_intact()
+    {
+        var file = Path.GetTempFileName();
+
+        try
+        {
+            await File.WriteAllTextAsync(file, "THIRD_PARTY_SECRET=keep-me");
+
+            (await AddPairs(file)).Should().Be(0);
+
+            var lines = await File.ReadAllLinesAsync(file);
+
+            lines[0].Should().Be("THIRD_PARTY_SECRET=keep-me");
+
+            foreach (var client in ServiceClients.All.Select(client => client.ToUpperInvariant()))
+            {
+                lines.Should().ContainSingle(line => line.StartsWith($"WORKERTRANSFER_M2M_{client}_SECRET=", StringComparison.Ordinal));
+                lines.Should().ContainSingle(line => line.StartsWith($"WORKERTRANSFER_M2M_{client}_SECRET_HASH=", StringComparison.Ordinal));
+            }
+
+            (await AddPairs(file)).Should().Be(0, "a second run finds whole pairs");
+            (await File.ReadAllLinesAsync(file)).Should().Equal(lines);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    private static async Task<int> AddPairs(string file)
+    {
+        var start = new ProcessStartInfo("bash")
+        {
+            ArgumentList = { "scripts/env-m2m.sh", file },
+            WorkingDirectory = Root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        using var shell = Process.Start(start)!;
+        await Task.WhenAll(shell.StandardOutput.ReadToEndAsync(), shell.StandardError.ReadToEndAsync());
+        await shell.WaitForExitAsync();
+
+        return shell.ExitCode;
     }
 }

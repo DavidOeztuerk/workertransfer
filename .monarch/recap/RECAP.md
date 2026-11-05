@@ -1,19 +1,27 @@
 # RECAP
 
 ## Stand
-- Zeitpunkt: 2026-11-05T09:25:19Z
+- Zeitpunkt: 2026-11-05T14:16:49Z
 - Plan: Pro
-- Mana 5h: 12% (Limit 90%, Reset 2026-11-05T12:20:00Z)
-- Mana 7d: 38% (Limit 96%, Reset 2026-11-11T11:00:00Z)
+- Mana 5h: 77% (Limit 90%, Reset 2026-11-05T17:20:00Z)
+- Mana 7d: 55% (Limit 96%, Reset 2026-11-11T11:00:00Z)
 - Limits: 5h 90%, 7d 96% (adaptive)
 
 ## Aktiv
-- keine aktive Quest
+- Gate G-0001 · Quest Q-0043 [A] · Phase in_progress
 
 ## Erledigt
 - Q-0003 [A] verified: Compose: Dienst-, Postgres- und Mailpit-Ports nur auf Loopback - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587642, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587701, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587195, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587636, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587439
 
 ## Offen
+- Q-0043: Design-Delta (Notiz §13, ADR-0057) nach Warden-Runde umgesetzt
+- Q-0043: Noelia auf 7.1.1 (7.1.0 weist jeden Türaufruf hinter UseTokenRevocation ab); identity stellt Dienst-Tokens aus (11 Clients, Audiences identity, notification, profile), ohne Gateway-Route
+- Q-0043: Jede /internal-Tür trägt ihre feste Aufruferliste: 7 in identity, 1 in notification (E4, Entscheid des Users vom 05.11.), 2 in profile; je Gruppe ein Fallback, jede Ablehnung ist dasselbe 404
+- Q-0043: KI-Schlüssel-Türen D6/D7 nur für die belegten Aufrufer (E1); alle anderen 404
+- Q-0043: WORKERTRANSFER_NOTIFY_SECRET, X-Notify-Secret, Notify__Secret, Identity__Secret, Notifications__Secret und Profile__Secret sind entfernt
+- Q-0043: Ist kein Token zu bekommen, nimmt der Aufrufer denselben Weg wie bei einem schweigenden Dienst (503, nie 500); der Client company-site trägt nie ein Token
+- Q-0043: Compose, Helm, make env, .env.example und CI angepasst; ein Pod trägt nur sein eigenes Secret
+- Q-0043: Matrix Türen × Aufrufer + unbekannt, Wächter Route ↔ Tabelle, Konsistenztest gegen compose; je Dienst ein Test über die echte Client-Fabrik; Tests rot → grün
 - Q-0054: Neue CLAUDE.md höchstens etwa 20 KB; enthält nur, was jede Session braucht: was WT ist, Layout, wichtigste Befehle, Architektur-Regeln kurz, je eine verbindliche Zeile pro tragender Regel mit Verweis, Conventions that bite, Docs-Karte
 - Q-0054: Jede
 - Q-0054: Inhalt verschoben, nicht umgeschrieben; Sprache je Abschnitt unverändert
@@ -25,7 +33,7 @@
 - Q-0054: develop vor und nach dem Merge grün
 
 ## Nächster konkreter Schritt
-Warten, bis Noelia mit dem Fix zu Major 1 veröffentlicht ist. Danach: NoeliaVersion und DoD von Q-0043 auf die Fix-Version; ADR-0057 nachziehen (Major 2, Minor 3-7, Datum 29.10. streichen, weil ungeprüft, 48 statt 49 Testdateien); Warden-Delta-Runde; dann quest accept Q-0043 und TDD; danach Q-0002, Q-0004, gate merge. Keine Quest ist akzeptiert.
+Q-0043 steht in_progress, Commit 65347f94 ist gepusht: 2125 Tests grün, 0 übersprungen, neun Gegenproben gefallen. Als Nächstes: 1. CI von PR 110 prüfen. 2. Warden-Code-Runde über 65347f94 (major fixen, minor als Issue). 3. quest submit. 4. Ticket aus .monarch/knowledge/bug-pruefung-der-tueren-laeuft-vor-den-routen.md nach bugs/ legen und daraus das Noelia-Issue per --body-file anlegen; Monarch-Issue aus .monarch/knowledge/issue-monarch-sed-fehlalarm.md ebenso, Body vorher aus .monarch heraus kopieren. 5. Q-0002: Design als ADR, Warden-Runde, per gate_plan den Scope um src/shared und bugs erweitern. Fakten: alle 15 Dienste tragen den Master-Key nur für ihren Schlüsselring, die KI-Schlüssel liest nur identity; initdb-SQL legt alle Datenbanken für worker an. 6. Q-0004, gate merge, aufräumen.
 
 ## Offene Entscheidungen
-- Entscheid des Users 05.11.2026: erst Noelia. Der Fix läuft in einer eigenen Noelia-Session, dort entstehen Issue und roter Test; in WT kein bugs-Ticket, kein Noelia-Issue, kein Test, keine Quest. Q-0002 und Q-0004 ruhen, bis Noelia veröffentlicht ist. | Warden-Designrunde ADR-0057, Runde 1: reject, Delta-Runde reicht. Nur Major 1 ist vom Orchestrator im Quelltext nachgeprüft, die übrigen Belege stammen vom Warden. | Major 1: Jeder berechtigte Türaufruf endet in 401. UseTokenRevocation und UseNoeliaPrincipal laufen nach UseAuthorization und weisen die Dienst-Identität ohne sub ab (ServiceFoundation.cs:486-493; Noelia TokenRevocationMiddleware.cs:44,84; PrincipalFactory.cs:23; ServiceTokenIssuer.cs:98-105; Harness endet bei UseNoelia: ServiceCallerHarness.cs:117). Folge: D4 antwortet überall 503, D8 verbrennt Outbox-Versuche. Auflage: Fix in Noelia, DoD von 7.1.0 anheben, kein Pfad-Bypass in WT, UseTokenRevocation bleibt; die Ausnahme bindet an AuthenticationType NoeliaService, nie an fehlendes sub. Laufzeitprobe fehlt. | Major 2: Token-Verdrahtung ist nur für company-site getestet; Stub-Factories umgehen die Handlerkette (NotificationWireTests.cs:196, CompanyKeyTests.cs:250). Ein vergessenes AddServiceCall ergibt 404, das advisor als nichts da liest (HttpLookups.cs:141); ohne UseServiceTokenClient wirft CreateClient außerhalb des try, also 500 statt 503 (HttpCompanyRoles.cs:81). Auflage: ein Test je Dienst über die echte Factory; Türclients tragen ein Token der richtigen Audience, alle anderen keins (company-model, ats, cover-letter, reply-draft, HttpDrafter, und der Client des GitHub-Dienstes). | Minor 3: jobs braucht neben identity-internal auch identity-roles (D4) und identity-company-ai (D7) (CompanyAiAccess.cs:240); Auflage: Tabelle Dienst, Clientname, Audience ins ADR. | Minor 4: k8s-up.sh:113-117 entscheidet nach Existenz des Secrets, eine Release ohne M2M-Schlüssel liefert leere Werte und required bricht ab; Auflage: je Schlüssel prüfen; HELM_PROBE (Makefile:167-168) braucht alle 22 Werte. | Minor 5: Regex in EnvironmentFileTests.cs:66-67 endet auf SECRET, _SECRET_HASH fällt durch den Leer-Wächter; Auflage: Muster erweitern; make env-m2m ergänzt nur ganze Paare und meldet halbe laut. | Minor 6: D8 hängt neu an identity, ein Ausfall über die Tokenlaufzeit verbraucht die zehn Versuche (OutboxDispatcher.cs:20), die Zeile bleibt, die Mail nicht; Auflage: im ADR benennen oder Tokenfehler nicht zählen. | Minor 7: HttpMailer.cs:94 lässt TaskCanceledException durch, D8 antwortet dann 500, der Token-Abruf verlängert die Strecke; Auflage: abfangen; AddServiceCall fängt nur ServiceTokenUnavailableException, nie OperationCanceledException. | Bestätigt vom Warden: D1-D10 stimmen, companies und jobs kommen über AddAdminPermissions zu D4; 15 Identity-Testdateien brauchen alle elf Hashes. | Frühere Entscheidungen: E4 neu (User, 05.11.2026): alle /internal-Türen bekommen Aufruferlisten, das alte Notify-Secret entfällt, assessment wird 11. Client. Die Vorlage liegt im Risk-Tag infra statt secrets (Änderung des Owners, Commit 7456c03a); im PR als Lockerung mit Begründung nennen.
+- Noelia-Fehler gefunden und ohne WT-Code reproduziert: noelia.m2m.caller-policy läuft beim Start vor den Routen, der Bericht zeigt für identity Fail, nach dem Start Pass mit 7 Türen. CI ist nicht betroffen, make evidence-check lokal rot für identity. Kein Umweg in WT (bugs/README.md). Der Ticket-Text liegt in .monarch/knowledge/bug-pruefung-der-tueren-laeuft-vor-den-routen.md; bugs/ liegt außerhalb des Scopes von Q-0043, gh darf keinen .monarch-Pfad nennen. Der User muss entscheiden, ob vor dem Merge ein Noelia 7.1.2 nötig ist.

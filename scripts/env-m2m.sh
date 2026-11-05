@@ -23,6 +23,10 @@ set_value() {
     awk -v k="$key" -v v="$value" 'index($0, k "=") == 1 { print k "=" v; next } { print }' "$file" > "$tmp"
   else
     cat "$file" > "$tmp"
+    # Without a last newline the key would land on the value of the last line.
+    if [ -n "$(tail -c1 "$tmp")" ]; then
+      printf '\n' >> "$tmp"
+    fi
     printf '%s=%s\n' "$key" "$value" >> "$tmp"
   fi
   cat "$tmp" > "$file"

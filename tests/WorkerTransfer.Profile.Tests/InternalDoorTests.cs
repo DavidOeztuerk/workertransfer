@@ -1,11 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Noelia.Abstractions.Security.Checks;
 using Noelia.Infrastructure.Security.ServiceTokens;
+using WorkerTransfer.Profile.Application.Ports;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.Tests.Shared;
 
@@ -33,6 +37,8 @@ public class InternalDoorTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Secret", "erasure-secret");
             host.UseSetting("environment", "Development");
+            host.ConfigureTestServices(services =>
+                services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => new ProbeGate())));
         });
 
         return Task.CompletedTask;
@@ -51,10 +57,20 @@ public class InternalDoorTests(Postgres postgres) : IAsyncLifetime
         return client;
     }
 
-    /// <summary>
-    /// The search answers an entitled caller with a page. The single profile
-    /// answers 404 for an id that does not exist, so the search is what tells.
-    /// </summary>
+    private async Task<Guid> SomeProfile()
+    {
+        var subject = Guid.CreateVersion7();
+
+        var response = await With(TokenShape.Person(subject)).PutAsJsonAsync(
+            new Uri("/profiles/me", UriKind.Relative),
+            new { headline = "Developer", bio = "", location = "Berlin", remote_ok = true, skills = Array.Empty<string>() });
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+
+        return subject;
+    }
+
+    /// <summary>The search answers an entitled caller with a page.</summary>
     [Theory]
     [MemberData(nameof(EveryClient))]
     public async Task The_search_opens_for_scout_and_for_nobody_else(string client)
@@ -64,6 +80,35 @@ public class InternalDoorTests(Postgres postgres) : IAsyncLifetime
 
         response.StatusCode.Should().Be(
             client == ServiceClients.Scout ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// The profile has to exist: for an absent one scout gets a 404 too, and a door
+    /// that answers 404 to everybody would pass whoever stands on its list.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EveryClient))]
+    public async Task The_single_profile_opens_for_scout_and_for_nobody_else(string client)
+    {
+        var subject = await SomeProfile();
+
+        var response = await With(TokenShape.Service(client, ServiceAudiences.Profile))
+            .GetAsync(new Uri($"/internal/profiles/{subject}", UriKind.Relative));
+
+        response.StatusCode.Should().Be(
+            client == ServiceClients.Scout ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_correctly_signed_token_of_an_unknown_service_opens_nothing()
+    {
+        var subject = await SomeProfile();
+        var stranger = With(TokenShape.Service("stranger", ServiceAudiences.Profile));
+
+        (await stranger.GetAsync(new Uri("/internal/profiles/search", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await stranger.GetAsync(new Uri($"/internal/profiles/{subject}", UriKind.Relative)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
