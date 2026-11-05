@@ -64,6 +64,7 @@ public static class ResumeInfrastructure
         services.AddKeyRing<ResumeDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IResumeStore, EfResumeStore>();

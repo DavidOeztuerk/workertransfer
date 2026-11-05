@@ -9,7 +9,7 @@ Moved verbatim from `CLAUDE.md` (30.10.2026). The binding one-liners stay there.
 
 ### Configuration comes from the environment
 
-`make env` is the first command in a fresh clone. It copies `.env.example` — which is complete, one comment per key — and **rolls four secrets** with `openssl rand -base64 32` and generates the token key pair. `.env` is git-ignored; `.env.example` ships with the secrets **empty**.
+`make env` is the first command in a fresh clone. It copies `.env.example` — which is complete, one comment per key — and **rolls three secrets** with `openssl rand -base64 32`, generates the token key pair and makes the eleven service client pairs (`scripts/env-m2m.sh`, ADR-0057). **A secret and its hash belong together:** an `.env` from before 05.11.2026 gets them from `make env-m2m`, which adds whole pairs, overwrites nothing and names a half pair instead of completing it. `.env` is git-ignored; `.env.example` ships with the secrets **empty**.
 
 That emptiness is the point. A built-in default *is* the secret, and it then lives in git. `docker-compose.yml` therefore uses `${WORKERTRANSFER_JWT_SECRET:?…}`, not `${…:-dev-only-secret}`: without a value, compose aborts and **names the missing variable**. Noelia does the same at its own most important place — `JWT_SECRET` beats `JwtSettings:Secret`, and if both are absent it throws a `ConfigurationException` naming the key.
 

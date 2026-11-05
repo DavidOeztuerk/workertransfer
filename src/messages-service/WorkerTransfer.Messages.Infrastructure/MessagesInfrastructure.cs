@@ -69,6 +69,8 @@ public static class MessagesInfrastructure
         services.AddKeyRing<MessagesDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpCompanyMemberLookup.ClientName).AddServiceCall(ServiceAudiences.Identity);
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<ICallerToken, HttpCallerToken>();

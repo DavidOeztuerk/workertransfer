@@ -18,7 +18,6 @@ namespace WorkerTransfer.Notification.Tests;
 [Collection(PostgresCollection.Name)]
 public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
 
     private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeMailer _mailer = new();
@@ -35,7 +34,6 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:BaseUrl", "http://identity.test");
-            host.UseSetting("Identity:Secret", NotifySecret);
             host.UseSetting("Erasure:Secret", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
@@ -63,10 +61,11 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     }
 
     private Task<HttpResponseMessage> Notify(
-        Guid subject, string kind = "market_request", string secret = NotifySecret)
+        Guid subject, string kind = "market_request", string? token = null)
     {
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", token ?? TokenShape.Service("transfer", "notification"));
         return browser.PostAsJsonAsync("/internal/notifications", new { user_id = subject, kind = kind });
     }
 
@@ -323,7 +322,7 @@ public class NotificationJourneyTests(Postgres postgres) : IAsyncLifetime
     {
         var anna = Guid.CreateVersion7();
 
-        var response = await Notify(anna, secret: "guessed");
+        var response = await Notify(anna, token: "guessed");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         _mailer.Requested.Should().BeEmpty();

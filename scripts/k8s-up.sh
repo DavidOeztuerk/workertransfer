@@ -124,11 +124,40 @@ else
   echo "  Key pair freshly generated (P-256)."
 fi
 
+# The service clients (ADR-0057). Decided PER PAIR and not by whether the Secret
+# exists: a release from before them has the object without these keys, and
+# taking that over would hand the chart empty values, which `required` refuses.
+# A half pair is rolled anew, because a second half made now would not fit.
+# shellcheck source=scripts/m2m-pair.sh
+. "$(dirname "$0")/m2m-pair.sh"
+
+stored() {
+  # `|| true`: on a first run there is no Secret, and under `set -e` with
+  # pipefail a failed lookup would end this script.
+  { kubectl get secret "$RELEASE-secrets" -o jsonpath="{.data.$1}" 2>/dev/null || true; } | base64 -d
+}
+
+m2m_args=()
+for client in $M2M_CLIENTS; do
+  name=$(printf %s "$client" | tr '[:lower:]' '[:upper:]')
+  secret=$(stored "WORKER_M2M_${name}_SECRET")
+  hash=$(stored "WORKER_M2M_${name}_SECRET_HASH")
+
+  if [ -z "$secret" ] || [ -z "$hash" ]; then
+    pair=$(m2m_pair)
+    secret=$(printf '%s\n' "$pair" | sed -n 1p)
+    hash=$(printf '%s\n' "$pair" | sed -n 2p)
+  fi
+
+  m2m_args+=(--set "secrets.m2m.$client.secret=$secret" --set "secrets.m2m.$client.hash=$hash")
+done
+
 helm upgrade --install "$RELEASE" "$CHART" \
   --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
   --set aiKey="${WORKERTRANSFER_AI_KEY:-}" \
   --set secrets.jwtPrivateKey="$jwt_private" \
   --set secrets.jwtPublicKey="$jwt_public" \
+  "${m2m_args[@]}" \
   --wait --timeout 12m
 
 # ---------------------------------------------------------------------------

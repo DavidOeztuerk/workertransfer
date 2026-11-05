@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Advisor.Api.Authorization;
 using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Advisor.Api;
@@ -16,11 +17,12 @@ const string serviceName = "advisor-service";
 // No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.NotUsed);
+    ArtificialIntelligence.NotUsed,
+    noelia => noelia.UseServiceTokenClient());
 
 // The first contact to a person is a recruiter's (ADR-0048). Who that is,
-// identity-service's membership table says per request (`Identity__BaseUrl`,
-// `Identity__Secret`); without them the route answers 503, not 403.
+// identity-service's membership table says per request (`Identity__BaseUrl`);
+// without an answer the route says 503, not 403.
 builder.Services.AddCompanyPermissions(
     builder.Configuration, [], [AdvisorPermissions.Open]);
 

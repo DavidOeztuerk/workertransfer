@@ -301,7 +301,7 @@ public sealed class HttpReplyDrafter(
     /// </remarks>
     private async Task<AiAccessV1?> OwnAccessAsync(SubjectId subject, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_identity.BaseUrl) || string.IsNullOrEmpty(_identity.Secret))
+        if (string.IsNullOrEmpty(_identity.BaseUrl))
         {
             return null;
         }
@@ -311,7 +311,6 @@ public sealed class HttpReplyDrafter(
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_identity.BaseUrl), $"/internal/account/{subject.Value}/ai"));
-        request.Headers.Add("X-Notify-Secret", _identity.Secret);
 
         HttpResponseMessage response;
 

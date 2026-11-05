@@ -47,8 +47,9 @@ cd web && pnpm e2e                 # the Playwright journeys (needs `make up`)
 ## Commands
 
 ```bash
-make env            # FIRST in a fresh clone: writes .env, rolls four secrets,
-                    #   and generates the ECDSA token key pair
+make env            # FIRST in a fresh clone: writes .env, rolls the secrets,
+                    #   generates the ECDSA token key pair and the service clients
+make env-m2m        # an .env from before 05.11.2026: adds the missing client pairs
 make check          # the gate, fail-fast
 make build / test   # .NET only, in that order
 make check-web      # pnpm check + test + build

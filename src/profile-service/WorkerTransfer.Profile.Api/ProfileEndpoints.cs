@@ -55,7 +55,7 @@ public sealed record DraftBody(string Wish);
 /// <c>GET /candidates</c> stood here and fell: scout-service is its successor,
 /// and two searches side by side would be two truths (ADR-0036 decision 1).
 /// What is needed of it now lies behind <c>/internal/profiles/search</c> —
-/// behind the shared secret, without a gateway route, and without a ledger
+/// a door without a gateway route and without a ledger
 /// check, because that stands one level higher.
 /// </remarks>
 public static class ProfileEndpoints

@@ -5,9 +5,9 @@ namespace WorkerTransfer.Transfer.Application.Ports;
 /// <summary>identity-service did not answer. No result — a system state, 503.</summary>
 public sealed class IdentitySilent(string reason, Exception? cause = null) : Exception(reason, cause);
 
-/// <summary>identity-service's internal doors, behind the shared secret (ADR-0050).</summary>
+/// <summary>identity-service's internal doors (ADR-0050).</summary>
 /// <remarks>
-/// <para><strong>The secret proves that a service asks, not that it may.</strong>
+/// <para><strong>The door proves that this service asks, not that it may.</strong>
 /// The person's name goes to her employer only after the ledger has said that
 /// the route to that employer is open; the handler asks the ledger first, and
 /// whoever calls this for something else fetches that check along with it.</para>

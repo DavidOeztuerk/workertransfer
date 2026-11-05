@@ -35,7 +35,6 @@ public class FullNameTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            host.UseSetting("Notify:Secret", "notify-secret");
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>

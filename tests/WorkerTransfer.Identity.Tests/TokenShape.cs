@@ -1,10 +1,14 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Noelia.Core.Identity;
 using Noelia.Infrastructure.Models;
 using Noelia.Infrastructure.Security;
 using Noelia.Infrastructure.Security.Keys;
+using Noelia.Infrastructure.Security.ServiceTokens;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using WorkerTransfer.Identity.Infrastructure.Security;
 
 namespace WorkerTransfer.Identity.Tests;
@@ -45,6 +49,33 @@ internal static class TokenShape
             Options.Create(settings),
             new KeyRing([key], key),
             NullLogger<JwtService>.Instance));
+    }
+
+    /// <summary>
+    /// A service token signed with the real key — for a caller the issuer would
+    /// never serve, which the real endpoint therefore cannot produce.
+    /// </summary>
+    internal static string ServiceToken(string client, string audience)
+    {
+        using var curve = ECDsa.Create();
+        curve.ImportPkcs8PrivateKey(Convert.FromBase64String(PrivateKey), out _);
+
+        var token = new JwtSecurityTokenHandler().CreateJwtSecurityToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer,
+            Audience = audience,
+            TokenType = ServiceTokenDefaults.TokenType,
+            Claims = new Dictionary<string, object>
+            {
+                [ServiceTokenDefaults.CallerClaim] = client,
+                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString()
+            },
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(
+                new ECDsaSecurityKey(curve) { KeyId = KeyId }, SecurityAlgorithms.EcdsaSha256)
+        });
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     internal static JsonElement Payload(string jwt)

@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Api\WorkerTransfer.Identity.Api.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Application\WorkerTransfer.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\identity-service\WorkerTransfer.Identity.Domain\WorkerTransfer.Identity.Domain.csproj" />

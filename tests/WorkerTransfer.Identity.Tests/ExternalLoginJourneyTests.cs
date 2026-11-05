@@ -49,7 +49,6 @@ public class ExternalLoginJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", Web);
-            host.UseSetting("Notify:Secret", "notify-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
             {

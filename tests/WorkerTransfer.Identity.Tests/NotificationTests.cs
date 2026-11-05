@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
@@ -38,7 +39,6 @@ public sealed class MailRecord : IMailSender
 [Collection(PostgresCollection.Name)]
 public class NotificationTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
     private const string Password = "secret-and-long-enough";
 
     private WebApplicationFactory<Program> _service = null!;
@@ -56,7 +56,6 @@ public class NotificationTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));
@@ -76,10 +75,11 @@ public class NotificationTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Browser() =>
         _service.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
 
-    private Task<HttpResponseMessage> Notify(Guid subject, string secret = NotifySecret)
+    private Task<HttpResponseMessage> Notify(Guid subject, string? token = null)
     {
         var browser = Browser();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", token ?? TokenShape.ServiceToken("notification", "identity"));
         return browser.PostAsJsonAsync("/internal/notify", new { user_id = subject });
     }
 

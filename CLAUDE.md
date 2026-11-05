@@ -76,7 +76,8 @@ Verlauf: `docs/GESCHICHTE.md`. → `wt-noelia-module`
 Everything has a `make` target, and the target is the twin of what CI runs. `make help` lists them.
 
 ```bash
-make env            # FIRST, in a fresh clone: writes .env, rolls four secrets and generates the token key pair
+make env            # FIRST, in a fresh clone: writes .env, rolls the secrets, generates the token key pair and the service clients
+make env-m2m        # an .env from before 05.11.2026: adds the missing client pairs, overwrites nothing
 make check          # the gate: build, then test, then the frontend — fail-fast
 make build          # dotnet build. Warnings are errors (Directory.Build.props)
 make test           # the suites, ONE AT A TIME (see below)
@@ -175,7 +176,8 @@ Correlation and tenant flow through the request, set by middleware in `ServiceDe
 
 - **A tenant is a company, and a natural person has none** (ADR-0017, `Capacity`). The consent ledger has no tenant column by design — do not "fix" that.
 - The client names the company, the server decides: `POST /auth/company/{id}` checks membership before it mints a tenant. The token's claim set is pinned **complete**; roles are never in it; it leaves only as the `httpOnly` cookie. Every service accepts a `Bearer` header **or** the `access` cookie. Only identity-service holds `Jwt__PrivateKey`; every other service holds the public key alone (ADR-0046).
-- **An internal door behind the shared secret proves that a *service* asks, not that it *may*** — the permission is decided by the caller, one line higher; for personal data that is the ledger, before anything is shown.
+- **A door names its callers in code (ADR-0057)**: `RequireServiceCaller(...)`, one `/internal` group with one fallback per service, every refusal the same empty 404. A caller holds a short-lived token through `AddServiceCall(audience)`, on a client of its own, never the default one. → `wt-identity`
+- **An internal door proves that a named *service* asks, not that it *may*** — the permission is decided by the caller, one line higher; for personal data that is the ledger, before anything is shown.
 - **Hiding is not access control.** Company rights are checked at the endpoint, before the body; the role is read per request, uncached; `member` < `recruiter` < `admin`, **in doubt, `member`**; **a silent role lookup answers 503, never 403**.
 - Register and resend answer identically whether or not the address is known; a company is created at registration and nowhere else.
 

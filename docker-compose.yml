@@ -105,7 +105,7 @@ x-environment: &environment
   # Without it each service honours an old token until it expires.
   ConnectionStrings__valkey: valkey:6379
   # The shared secret of the erasure cascade (ADR-0027 4.4). EXPRESSLY A
-  # DIFFERENT ONE from the notification's: "may trigger a mail" and "may erase
+  # DIFFERENT ONE from the services' tokens: "may trigger a mail" and "may erase
   # everything about a person" must not be the same paper. EMPTY would mean:
   # the endpoint is shut.
   Erasure__Secret: ${WORKERTRANSFER_ERASURE_SECRET:?missing — `make env` writes a .env and rolls it}
@@ -113,7 +113,7 @@ x-environment: &environment
   # MEANS LOSING THEM — there is no versioning.
   WORKERTRANSFER_SECRETS_KEY: ${WORKERTRANSFER_SECRETS_KEY:?missing — `make env` writes a .env and rolls it}
   # The door in front of every service's evidence (ADR-0044). EXPRESSLY A THIRD
-  # PAPER, beside the notification's and the erasure's: whoever may trigger a
+  # PAPER, beside the services' tokens and the erasure's: whoever may trigger a
   # mail need not learn which AI providers this instance uses. EMPTY would
   # mean: the door is shut, and /noelia/… answers 404.
   # Without a fleet name a collector sees fourteen single services instead of
@@ -187,6 +187,19 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: identity
+      # ONLY THE HASHES, and only here (ADR-0057). A hash opens nothing; each
+      # secret lies with its own service alone.
+      NOELIA_M2M_CLIENT_ADVISOR_SECRET_HASH: ${WORKERTRANSFER_M2M_ADVISOR_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_APPLICATIONS_SECRET_HASH: ${WORKERTRANSFER_M2M_APPLICATIONS_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_ASSESSMENT_SECRET_HASH: ${WORKERTRANSFER_M2M_ASSESSMENT_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_COMPANIES_SECRET_HASH: ${WORKERTRANSFER_M2M_COMPANIES_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_JOBS_SECRET_HASH: ${WORKERTRANSFER_M2M_JOBS_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_MESSAGES_SECRET_HASH: ${WORKERTRANSFER_M2M_MESSAGES_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_NOTIFICATION_SECRET_HASH: ${WORKERTRANSFER_M2M_NOTIFICATION_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_PROFILE_SECRET_HASH: ${WORKERTRANSFER_M2M_PROFILE_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_RESUME_SECRET_HASH: ${WORKERTRANSFER_M2M_RESUME_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_SCOUT_SECRET_HASH: ${WORKERTRANSFER_M2M_SCOUT_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
+      NOELIA_M2M_CLIENT_TRANSFER_SECRET_HASH: ${WORKERTRANSFER_M2M_TRANSFER_SECRET_HASH:?missing — `make env-m2m` adds the pair to an existing .env}
       # THE ONLY SERVICE WITH THE PRIVATE KEY. A second one would be a second
       # place that can create an acting principal, and nothing further down
       # could tell the two apart.
@@ -197,7 +210,6 @@ services:
       Mail__Port: "1025"
       Mail__Sender: noreply@workertransfer.local
       Mail__WebUrl: ${WORKERTRANSFER_WEB_URL:-http://localhost:8090}
-      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Erasure__BaseUrls__consent: http://consent-service:8002
       Erasure__BaseUrls__profile: http://profile-service:8003
       Erasure__BaseUrls__resume: http://resume-service:8004
@@ -261,6 +273,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: profile
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: profile
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_PROFILE_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8003"
       ConnectionStrings__profile: Host=postgres;Port=5432;Database=profile;Username=worker;Password=worker
       Consent__BaseUrl: http://consent-service:8002
@@ -272,7 +289,6 @@ services:
       # door says 404, and an empty hit list looks like "there is nobody".
       # Measured exactly like that on 11.09.2026 — twelve E2E journeys red, the
       # route map green, because the status codes were right.
-      Notify__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The AI seam. EMPTY is valid and the default: without a key the
       # platform has no model, and the UI says so (ADR-0024). That is why `:-`
       # and not `:?` — a missing key must not stop the stack, unlike the three
@@ -290,7 +306,6 @@ services:
       # model (ADR-0051): fetched behind the shared secret, and the two hosts
       # it may reach declared for the egress boundary.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Draft__AllowedTargets__0: https://api.anthropic.com
       Draft__AllowedTargets__1: https://api.openai.com
     ports:
@@ -302,16 +317,19 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: resume
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: resume
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_RESUME_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8004"
       ConnectionStrings__resume: Host=postgres;Port=5432;Database=resume;Username=worker;Password=worker
       # Who may ask a person for their CV: at least a `recruiter` (ADR-0048),
       # read from identity-service's membership table per request. Without
       # these two lines the request route answers 503 — rightly, and visibly.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # Where the certificates lie. A VOLUME and not a folder in the image: an
       # `up -d --build` replaces the container, and the files would be gone
       # with it — while their rows stayed in the database. Exactly this
@@ -348,6 +366,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: jobs
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: jobs
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_JOBS_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8006"
       ConnectionStrings__jobs: Host=postgres;Port=5432;Database=jobs;Username=worker;Password=worker
       # The role lookup. Who is `admin` is decided by identity-service's
@@ -360,7 +383,6 @@ services:
       # also because the egress boundary derives its allowed hosts from the
       # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The AI seam. EMPTY is valid and the default: without a key the
       # platform has no model, and the UI says so (ADR-0024). That is why `:-`
       # and not `:?` — a missing key must not stop the stack, unlike the three
@@ -395,16 +417,19 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: applications
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: applications
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_APPLICATIONS_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8007"
       ConnectionStrings__applications: Host=postgres;Port=5432;Database=applications;Username=worker;Password=worker
       Consent__BaseUrl: http://consent-service:8002
       Jobs__BaseUrl: http://jobs-service:8006
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # A company's members — the same address and the same secret as the
       # notification path. A company has no mailbox.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The cover-letter agent. Empty means: NOTHING is called, and the UI says
       # so — instead of showing an empty draft somebody releases by accident
       # (ADR-0034).
@@ -451,6 +476,11 @@ services:
       # No /erasure: this service holds nothing about a natural person
       # (ADR-0027 2).
       SERVICE_DIR: companies
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: companies
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_COMPANIES_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8008"
       ConnectionStrings__companies: Host=postgres;Port=5432;Database=companies;Username=worker;Password=worker
       # The role lookup. Who is `admin` is decided by identity-service's
@@ -463,7 +493,6 @@ services:
       # also because the egress boundary derives its allowed hosts from the
       # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "127.0.0.1:8008:8008"
 
@@ -473,6 +502,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: transfer
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: transfer
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_TRANSFER_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8009"
       ConnectionStrings__transfer: Host=postgres;Port=5432;Database=transfer;Username=worker;Password=worker
       # The role lookup. Who is `admin` is decided by identity-service's
@@ -485,10 +519,8 @@ services:
       # also because the egress boundary derives its allowed hosts from the
       # configuration (ServiceFoundation.cs).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Consent__BaseUrl: http://consent-service:8002
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "127.0.0.1:8009:8009"
 
@@ -498,10 +530,14 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: notification
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: notification
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_NOTIFICATION_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8010"
       ConnectionStrings__notification: Host=postgres;Port=5432;Database=notification;Username=worker;Password=worker
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "127.0.0.1:8010:8010"
 
@@ -535,6 +571,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: scout
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: scout
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_SCOUT_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8012"
       ConnectionStrings__scout: Host=postgres;Port=5432;Database=scout;Username=worker;Password=worker
       # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
@@ -548,7 +589,6 @@ services:
       # WITHOUT these two lines /scout/candidates answers 503: "not set up" must
       # not look like "there is nobody".
       Profile__BaseUrl: http://profile-service:8003
-      Profile__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The evidence. github-service, NOT github.com: this service never asks
       # GitHub itself.
       GitHub__BaseUrl: http://github-service:8011
@@ -560,7 +600,6 @@ services:
       # "Your profile was discovered" (ADR-0033) — via the outbox, free of
       # content, and the message names no company.
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The draft of an approach. Empty means: NOTHING is called, and the UI
       # says so — instead of showing an empty draft somebody sends to a person
       # by accident (ADR-0024).
@@ -573,7 +612,6 @@ services:
       # shared secret, and the two hosts it may reach declared for the egress
       # boundary.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       Draft__AllowedTargets__0: https://api.anthropic.com
       Draft__AllowedTargets__1: https://api.openai.com
     ports:
@@ -585,6 +623,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: advisor
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: advisor
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_ADVISOR_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8013"
       ConnectionStrings__advisor: Host=postgres;Port=5432;Database=advisor;Username=worker;Password=worker
       # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
@@ -601,7 +644,6 @@ services:
       # company's domain (so an exclusion can take effect) and a person's civil
       # name (only from stage 3, and only AFTER the ledger has confirmed it).
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The handover of the agreement. The triangle consensus stands THERE and
       # is not rebuilt here: transfer-service checks itself whether the market
       # status is released and the person approachable.
@@ -609,7 +651,6 @@ services:
       # "A company has opened a conversation" — via the outbox, free of content,
       # and the message names no company (ADR-0025).
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
     ports:
       - "127.0.0.1:8013:8013"
 
@@ -619,6 +660,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: assessment
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: assessment
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_ASSESSMENT_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8014"
       ConnectionStrings__assessment: Host=postgres;Port=5432;Database=assessment;Username=worker;Password=worker
       # EVERY TARGET OF THIS SERVICE STANDS HERE, AND BECAUSE IT HAS TO STAND
@@ -637,7 +683,6 @@ services:
       # content (ADR-0025). No task text and no evaluation travel along: the
       # mail may land in the current employer's mailbox.
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # EXPRESSLY NOT ENTERED: the address a person submits. It is stored and
       # shown, never fetched — a service that fetched it would carry an address
       # chosen by a stranger into a server request.
@@ -650,6 +695,11 @@ services:
     environment:
       <<: *environment
       SERVICE_DIR: messages
+      # Who this service is at the doors of the others (ADR-0057). Per service and
+      # not in the anchor: a host named here passes the egress boundary.
+      NOELIA_M2M_TOKEN_ENDPOINT: http://identity-service:8001/m2m/token
+      NOELIA_M2M_CLIENT_ID: messages
+      NOELIA_M2M_CLIENT_SECRET: ${WORKERTRANSFER_M2M_MESSAGES_SECRET:?missing — `make env-m2m` adds the pair to an existing .env}
       ASPNETCORE_URLS: "http://0.0.0.0:8015"
       ConnectionStrings__messages: Host=postgres;Port=5432;Database=messages;Username=worker;Password=worker
       # One conversation per process (ADR-0047). WHO BELONGS TO IT is asked of
@@ -669,10 +719,8 @@ services:
       # person's own AI access for their drafts. The same door and secret as
       # everywhere.
       Identity__BaseUrl: http://identity-service:8001
-      Identity__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # "A message arrived" — via the outbox, free of content (ADR-0025).
       Notifications__BaseUrl: http://notification-service:8010
-      Notifications__Secret: ${WORKERTRANSFER_NOTIFY_SECRET:?missing — `make env` writes a .env and rolls it}
       # The reply drafts. Empty key means: no draft, and the UI says so.
       Draft__ApiKey: ${WORKERTRANSFER_AI_KEY:-}
       Draft__BaseUrl: ${WORKERTRANSFER_AI_URL:-http://host.docker.internal:11434/v1/chat/completions}

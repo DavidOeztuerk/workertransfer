@@ -62,7 +62,7 @@ public sealed class CompanyAiAccessSilent : Exception
 /// side: without <c>Identity__BaseUrl</c> there is nobody to ask, and the seam
 /// writes with the platform's model or not at all. <strong>A 404 is NOT
 /// "none":</strong> the door answers every company with 200 and refuses only a
-/// wrong secret with 404 — read as "none", a mis-wired secret would send every
+/// wrong caller with 404 — read as "none", a mis-wired service would send every
 /// company's drafts to the platform's provider, and nobody would notice.</para>
 /// </remarks>
 public sealed class HttpCompanyAiAccess(
@@ -81,14 +81,12 @@ public sealed class HttpCompanyAiAccess(
     /// </summary>
     public const string ModelClientName = "company-model";
 
-    private const string SecretHeader = "X-Notify-Secret";
-
     private readonly CompanyRoleSettings _settings = settings.Value;
 
     /// <inheritdoc />
     public async Task<AiAccessV1?> AccessAsync(Guid company, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl) || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             return null;
         }
@@ -103,7 +101,6 @@ public sealed class HttpCompanyAiAccess(
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
                 new Uri(new Uri(_settings.BaseUrl), $"/internal/companies/{company}/ai"));
-            request.Headers.Add(SecretHeader, _settings.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }
@@ -122,7 +119,7 @@ public sealed class HttpCompanyAiAccess(
         {
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                throw new CompanyAiAccessSilent("identity-service (internal) refused the secret.");
+                throw new CompanyAiAccessSilent("identity-service (internal) refused this caller.");
             }
 
             if (!response.IsSuccessStatusCode)
@@ -228,7 +225,7 @@ public static class CompanyAiAccessExtensions
 {
     /// <summary>Wires <see cref="ICompanyAiAccess"/> to identity-service's internal door.</summary>
     /// <param name="services">The container.</param>
-    /// <param name="configuration">Where <c>Identity:BaseUrl</c> and <c>Identity:Secret</c> come from.</param>
+    /// <param name="configuration">Where <c>Identity:BaseUrl</c> comes from.</param>
     /// <returns>The container.</returns>
     public static IServiceCollection AddCompanyAiAccess(
         this IServiceCollection services, IConfiguration configuration)
@@ -237,7 +234,7 @@ public static class CompanyAiAccessExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.Configure<CompanyRoleSettings>(configuration.GetSection(CompanyRoleSettings.Section));
-        services.AddHttpClient(HttpCompanyAiAccess.ClientName);
+        services.AddHttpClient(HttpCompanyAiAccess.ClientName).AddServiceCall(ServiceAudiences.Identity);
         services.TryAddScoped<ICompanyAiAccess, HttpCompanyAiAccess>();
 
         services.AddHttpClient(HttpCompanyAiAccess.ModelClientName)

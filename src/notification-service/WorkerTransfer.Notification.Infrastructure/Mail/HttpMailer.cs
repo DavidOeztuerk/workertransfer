@@ -6,10 +6,10 @@ using WorkerTransfer.Notification.Application.Ports;
 
 namespace WorkerTransfer.Notification.Infrastructure.Mail;
 
-/// <summary>Where identity-service answers, and what identifies us as us.</summary>
+/// <summary>Where identity-service answers.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone leaves
+/// <c>Identity__Timeout</c>); renaming one alone leaves
 /// its value on the default, silently.
 /// </remarks>
 public sealed class MailSettings
@@ -19,9 +19,6 @@ public sealed class MailSettings
 
     /// <summary>The base address of identity-service.</summary>
     public string BaseUrl { get; set; } = string.Empty;
-
-    /// <summary>The shared secret. Expressly not the erasure's.</summary>
-    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long a call may take.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
@@ -54,11 +51,10 @@ public sealed class HttpMailer(
     /// <inheritdoc />
     public async Task SendAsync(SubjectId subject, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl)
-            || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            // No secret, no attempt: the endpoint would be shut anyway, and a
-            // call into the void costs a timeout at every case.
+            // No address, no attempt: a call into the void costs a timeout at
+            // every case.
             return;
         }
 
@@ -79,8 +75,6 @@ public sealed class HttpMailer(
                 Content = JsonContent.Create(new { user_id = subject.Value })
             };
 
-            request.Headers.Add("X-Notify-Secret", _settings.Secret);
-
             using var response = await client.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
@@ -91,11 +85,13 @@ public sealed class HttpMailer(
                     "identity-service answered with {Code}", (int)response.StatusCode);
             }
         }
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (Exception error) when (
+            error is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // Swallows every error. That is the purpose, not carelessness —
             // the throttle is already set, this message is lost, and that is
-            // the right direction.
+            // the right direction. A time limit is such an error and arrives as
+            // a cancellation; only the caller's own abort goes through.
             log.LogWarning(
                 "The notification could not be triggered ({Kind})", error.GetType().Name);
         }

@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Domain\WorkerTransfer.Notification.Domain.csproj" />
     <ProjectReference Include="..\..\src\notification-service\WorkerTransfer.Notification.Infrastructure\WorkerTransfer.Notification.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+    <Compile Include="..\Shared\ServiceCallProbe.cs" Link="ServiceCallProbe.cs" />
+  </ItemGroup>
 </Project>

@@ -8,11 +8,10 @@ using WorkerTransfer.Messages.Application.Ports;
 
 namespace WorkerTransfer.Messages.Infrastructure.Companies;
 
-/// <summary>identity-service's internal door, and the paper that opens it.</summary>
+/// <summary>Where identity-service's internal door is.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Timeout</c>, <c>Identity__Secret</c>); renaming one alone
-/// leaves its value on the default, silently.
+/// <c>Identity__Timeout</c>); renaming one alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class IdentitySettings
 {
@@ -24,9 +23,6 @@ public sealed class IdentitySettings
 
     /// <summary>How long to wait.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>The services' shared secret. Empty shuts the door.</summary>
-    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>A company's members, from identity-service.</summary>
@@ -44,9 +40,9 @@ public sealed class HttpCompanyMemberLookup(
     public async Task<IReadOnlyList<SubjectId>> MembersAsync(
         TenantId company, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl) || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new ProcessLookupSilent("Identity:BaseUrl or Identity:Secret is not set.");
+            throw new ProcessLookupSilent("Identity:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
@@ -55,7 +51,6 @@ public sealed class HttpCompanyMemberLookup(
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             new Uri(new Uri(_settings.BaseUrl), $"/internal/companies/{company.Value}/members"));
-        request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
         HttpResponseMessage response;
 

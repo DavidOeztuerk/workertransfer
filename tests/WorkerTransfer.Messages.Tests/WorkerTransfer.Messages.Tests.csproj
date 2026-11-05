@@ -32,4 +32,8 @@
     <ProjectReference Include="..\..\src\applications-service\WorkerTransfer.Applications.Contracts\WorkerTransfer.Applications.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+    <Compile Include="..\Shared\ServiceCallProbe.cs" Link="ServiceCallProbe.cs" />
+  </ItemGroup>
 </Project>

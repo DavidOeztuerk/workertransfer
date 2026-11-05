@@ -216,10 +216,10 @@ public sealed class InternalAiAccessHandler(
 public sealed record InternalPerson(string Name, string Email);
 
 /// <summary>
-/// What a human being is called — for advisor-service, behind the secret.
+/// What a human being is called — for advisor-service, through its door.
 /// </summary>
 /// <remarks>
-/// <para><strong>The secret is not the whole permission here.</strong> It
+/// <para><strong>The list is not the whole permission here.</strong> It
 /// proves that a service is asking, not that it may ask. The permission stands
 /// in the ledger, and advisor-service fetches it <em>before</em> this call:
 /// stage 3 is the capability <c>advisor.identity:tenant:&lt;id&gt;</c>

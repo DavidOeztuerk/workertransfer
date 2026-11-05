@@ -12,9 +12,8 @@ namespace WorkerTransfer.Applications.Infrastructure.Companies;
 /// <summary>Where identity-service answers internal questions.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Identity__BaseUrl</c>, <c>Identity__Timeout</c>,
-/// <c>Identity__Secret</c>); renaming one alone leaves its value on the default,
-/// silently.
+/// (<c>Identity__BaseUrl</c>, <c>Identity__Timeout</c>); renaming one alone leaves
+/// its value on the default, silently.
 /// </remarks>
 public sealed class CompanyMemberSettings
 {
@@ -30,15 +29,11 @@ public sealed class CompanyMemberSettings
     /// line <c>HttpClient</c>'s default applies: a HUNDRED seconds.
     /// </remarks>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>The same secret as <c>Notifications:Secret</c>.</summary>
-    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Asks identity-service over the internal wire.</summary>
 /// <remarks>
-/// Calls <c>GET /internal/companies/{tenantId}/members</c>, with the same shared
-/// secret header as the notification path. Reads the shared contract — never an
+/// Calls <c>GET /internal/companies/{tenantId}/members</c>. Reads the shared contract — never an
 /// anonymous object, never a second type with the same fields.
 /// </remarks>
 public sealed class HttpCompanyMemberLookup(
@@ -48,8 +43,6 @@ public sealed class HttpCompanyMemberLookup(
 {
     /// <summary>The name under which the client is registered.</summary>
     public const string ClientName = "identity-internal";
-
-    private const string SecretHeader = "X-Notify-Secret";
 
     private readonly CompanyMemberSettings _settings = settings.Value;
 
@@ -63,11 +56,6 @@ public sealed class HttpCompanyMemberLookup(
             throw new CompanyLookupSilent("Identity:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Secret))
-        {
-            throw new CompanyLookupSilent("Identity:Secret is not set.");
-        }
-
         using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Timeout;
 
@@ -78,7 +66,6 @@ public sealed class HttpCompanyMemberLookup(
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
                 new Uri(new Uri(_settings.BaseUrl), $"/internal/companies/{company.Value}/members"));
-            request.Headers.Add(SecretHeader, _settings.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }
@@ -98,7 +85,7 @@ public sealed class HttpCompanyMemberLookup(
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new CompanyLookupSilent(
-                    "identity-service (internal) unreachable or secret invalid.");
+                    "identity-service (internal) unreachable or refused this caller.");
             }
 
             if (!response.IsSuccessStatusCode)

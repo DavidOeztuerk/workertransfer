@@ -11,8 +11,8 @@ namespace WorkerTransfer.Advisor.Infrastructure.Lookup;
 /// <summary>Where identity-service has its internal doors.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone leaves
-/// its value on the default, silently.
+/// <c>Identity__Timeout</c>); renaming one alone leaves its value on the default,
+/// silently.
 /// </remarks>
 public sealed class LookupSettings
 {
@@ -26,9 +26,6 @@ public sealed class LookupSettings
     /// only here in the code would be refused, and without a log line.
     /// </remarks>
     public string BaseUrl { get; set; } = string.Empty;
-
-    /// <summary>The shared secret of the internal doors.</summary>
-    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -48,14 +45,14 @@ internal sealed record PersonResponseV1(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("email")] string? Email);
 
-/// <summary>Asks identity-service — behind the shared secret.</summary>
+/// <summary>Asks identity-service — as this service, through its doors.</summary>
 /// <remarks>
 /// <para><strong>Two doors, two very different questions.</strong> The company
 /// lookup names a domain, so that an exclusion can take effect at all; the
 /// person lookup names a civil name, and it is called only <em>after</em> the
 /// ledger has confirmed stage 3.</para>
 ///
-/// <para>With the service secret and not with the caller's token: the caller
+/// <para>With the service's token and not with the caller's: the caller
 /// here is the <em>company</em>, and it must not be able to fetch a human
 /// being's civil name on its own authority. What it may do is decided one line
 /// higher by the ledger — and that is why this door is so narrow: two fields,
@@ -68,8 +65,6 @@ public sealed class HttpLookups(
 {
     /// <summary>The name the client is registered under.</summary>
     public const string ClientName = "identity";
-
-    private const string SecretHeader = "X-Notify-Secret";
 
     private readonly LookupSettings _settings = settings.Value;
 
@@ -95,17 +90,16 @@ public sealed class HttpLookups(
             response.Email ?? string.Empty);
     }
 
-    /// <summary>A GET behind the secret. <c>null</c> means "does not exist".</summary>
+    /// <summary>A GET through a door. <c>null</c> means "does not exist".</summary>
     private async Task<T?> ReadAsync<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl)
-            || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // Not configured is a SYSTEM state and not a statement about a
             // human being. Answering `null` quietly would mean "this company
             // does not exist" here — and an exclusion would then never apply.
-            throw new LookupSilent("Identity:BaseUrl or :Secret is not set.");
+            throw new LookupSilent("Identity:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
@@ -113,8 +107,6 @@ public sealed class HttpLookups(
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
-
-        request.Headers.Add(SecretHeader, _settings.Secret);
 
         HttpResponseMessage response;
 
@@ -140,7 +132,7 @@ public sealed class HttpLookups(
         {
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                // The door answers 404 even when the secret does not match —
+                // The door answers 404 even when it refuses this caller —
                 // deliberately, so that it does not give itself away through a
                 // method. Here it therefore only means: no information.
                 return null;

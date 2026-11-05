@@ -70,6 +70,8 @@ public static class ApplicationsInfrastructure
         services.AddKeyRing<ApplicationsDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpCompanyMemberLookup.ClientName).AddServiceCall(ServiceAudiences.Identity);
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IApplicationStore, EfApplicationStore>();

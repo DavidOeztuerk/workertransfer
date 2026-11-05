@@ -31,4 +31,8 @@
     <ProjectReference Include="..\..\src\advisor-service\WorkerTransfer.Advisor.Infrastructure\WorkerTransfer.Advisor.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+    <Compile Include="..\Shared\ServiceCallProbe.cs" Link="ServiceCallProbe.cs" />
+  </ItemGroup>
 </Project>

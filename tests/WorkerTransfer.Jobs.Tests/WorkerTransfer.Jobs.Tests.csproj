@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\src\jobs-service\WorkerTransfer.Jobs.Infrastructure\WorkerTransfer.Jobs.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\profile-service\WorkerTransfer.Profile.Domain\WorkerTransfer.Profile.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+    <Compile Include="..\Shared\ServiceCallProbe.cs" Link="ServiceCallProbe.cs" />
+  </ItemGroup>
 </Project>

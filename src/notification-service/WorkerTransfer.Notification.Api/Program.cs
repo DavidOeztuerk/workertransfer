@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Notification.Api;
 using WorkerTransfer.Notification.Infrastructure;
 using WorkerTransfer.Notification.Infrastructure.Persistence;
@@ -14,7 +15,10 @@ const string serviceName = "notification-service";
 // No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.NotUsed);
+    ArtificialIntelligence.NotUsed,
+    noelia => noelia
+        .UseServiceTokenClient()
+        .UseServiceCallers(ServiceAudiences.Notification));
 
 builder.Services.AddNotificationInfrastructure(
     builder.Configuration,

@@ -9,11 +9,10 @@ using WorkerTransfer.Transfer.Application.Ports;
 
 namespace WorkerTransfer.Transfer.Infrastructure.Identity;
 
-/// <summary>identity-service's internal doors, and the paper that opens them.</summary>
+/// <summary>Where identity-service's internal doors are.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>) — the same two the role
-/// lookup reads; renaming one alone leaves its value on the default, silently.
+/// <c>Identity__Timeout</c>) — the same two the role lookup reads; renaming one alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class IdentitySettings
 {
@@ -23,15 +22,12 @@ public sealed class IdentitySettings
     /// <summary>The base address of identity-service.</summary>
     public string BaseUrl { get; set; } = string.Empty;
 
-    /// <summary>The services' shared secret. Empty shuts the door.</summary>
-    public string Secret { get; set; } = string.Empty;
-
     /// <summary>How long to wait.</summary>
     /// <remarks>Without it <c>HttpClient</c> waits a hundred seconds — a hanging call, not a timeout.</remarks>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
-/// <summary>Asks identity-service — with the service secret, never with a company's token.</summary>
+/// <summary>Asks identity-service — with the service's token, never with a company's.</summary>
 public sealed class HttpIdentityLookup(
     IHttpClientFactory factory,
     IOptions<IdentitySettings> settings,
@@ -39,8 +35,6 @@ public sealed class HttpIdentityLookup(
 {
     /// <summary>The client's name.</summary>
     public const string ClientName = "identity-internal";
-
-    private const string SecretHeader = "X-Notify-Secret";
 
     private readonly IdentitySettings _settings = settings.Value;
 
@@ -62,22 +56,21 @@ public sealed class HttpIdentityLookup(
         return read is null ? [] : [.. read.Members.Select(member => new SubjectId(member.SubjectId))];
     }
 
-    /// <summary>A GET behind the secret. <c>null</c> means "does not exist".</summary>
+    /// <summary>A GET through a door. <c>null</c> means "does not exist".</summary>
     private async Task<T?> ReadAsync<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl) || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
             // Not configured is a SYSTEM state, never "this company does not
             // exist" — that would turn a missing line in compose into a 404.
-            throw new IdentitySilent("Identity:BaseUrl or Identity:Secret is not set.");
+            throw new IdentitySilent("Identity:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
         client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
-        request.Headers.Add(SecretHeader, _settings.Secret);
 
         HttpResponseMessage response;
 

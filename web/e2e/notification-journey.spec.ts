@@ -2,9 +2,9 @@
 //
 // The integration test proves the content on the in-process sending path. Here
 // it runs over SMTP to Mailpit, as in production: identity-service writes,
-// transfer-service triggered it, and in between lies real HTTP with the shared
-// secret. A missing `WORKERTRANSFER_NOTIFY_SECRET` in one of the two containers
-// would be visible on no other level.
+// transfer-service triggered it, and in between lies real HTTP with real service
+// tokens. A missing client secret in one of the two containers would be visible
+// on no other level.
 
 import { expect, test } from "@playwright/test";
 

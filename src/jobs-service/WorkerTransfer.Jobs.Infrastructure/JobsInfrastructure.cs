@@ -55,6 +55,7 @@ public static class JobsInfrastructure
         services.AddKeyRing<JobsDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpCompanyDomains.ClientName).AddServiceCall(ServiceAudiences.Identity);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IJobStore, EfJobStore>();

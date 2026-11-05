@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Profile.Api;
 using WorkerTransfer.Profile.Infrastructure;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
@@ -17,7 +18,10 @@ const string serviceName = "profile-service";
 // the two apart.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.Used);
+    ArtificialIntelligence.Used,
+    noelia => noelia
+        .UseServiceTokenClient()
+        .UseServiceCallers(ServiceAudiences.Profile));
 
 builder.Services.AddProfileInfrastructure(
     builder.Configuration,

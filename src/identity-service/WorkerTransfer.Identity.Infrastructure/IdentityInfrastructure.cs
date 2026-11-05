@@ -51,8 +51,6 @@ public static class IdentityInfrastructure
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.Configure<NotifySettings>(
-            configuration.GetSection(NotifySettings.Section));
         services.Configure<MailSettings>(configuration.GetSection(MailSettings.Section));
 
         // bcrypt reads AND writes. During the migration it had to, so the

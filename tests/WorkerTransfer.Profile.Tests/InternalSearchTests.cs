@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -30,7 +31,6 @@ namespace WorkerTransfer.Profile.Tests;
 [Collection(PostgresCollection.Name)]
 public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
 
     private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeGate _gate = new();
@@ -46,7 +46,6 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Secret", "erasure-secret");
-            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Scoped<IConsentGate>(_ => _gate)));
@@ -64,10 +63,10 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
     /// <summary>Without the secret the door does not exist.</summary>
     /// <remarks>
     /// 404 and not 401: a 401 would confirm that the endpoint exists. And a wrong
-    /// secret answers exactly like none at all.
+    /// token answers exactly like none at all.
     /// </remarks>
     [Fact]
-    public async Task Without_the_secret_the_door_does_not_exist()
+    public async Task Without_a_token_the_door_does_not_exist()
     {
         var without = await _service.CreateClient().GetAsync(
             new Uri("/internal/profiles/search", UriKind.Relative));
@@ -75,7 +74,7 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
         without.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         var wrong = _service.CreateClient();
-        wrong.DefaultRequestHeaders.Add("X-Notify-Secret", "off-target");
+        wrong.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "off-target");
 
         (await wrong.GetAsync(new Uri("/internal/profiles/search", UriKind.Relative)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -176,7 +175,8 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
     public async Task An_unknown_profile_is_a_404()
     {
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.Service("scout", "profile"));
 
         (await browser.GetAsync(new Uri($"/internal/profiles/{Guid.NewGuid()}", UriKind.Relative)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -208,7 +208,8 @@ public class InternalSearchTests(Postgres postgres) : IAsyncLifetime
     private async Task<JsonElement> Internal(string path)
     {
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.Service("scout", "profile"));
 
         var response = await browser.GetAsync(new Uri(path, UriKind.Relative));
 

@@ -50,9 +50,9 @@ public sealed record ApplicantNameV1(
 
 /// <summary>Asks applications-service with the caller's own token.</summary>
 /// <remarks>
-/// <strong>The caller's token, not a service secret.</strong> The question is
+/// <strong>The caller's token, not a service token.</strong> The question is
 /// "may THIS caller see the application", and only the caller's token can ask
-/// it. A secret would answer "a service may" — true and useless.
+/// it. A service token would answer "a service may" — true and useless.
 /// </remarks>
 public sealed class HttpProcessLookup(
     IHttpClientFactory factory,

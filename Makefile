@@ -9,7 +9,7 @@ DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e e2e ai-check \
         fix dev env up down images route-map analyze evidence evidence-check \
-        control-plane control-plane-oidc control-plane-down keycloak keycloak-down k8s-up k8s-down k8s-lint k8s-seed clean
+        env-m2m control-plane control-plane-oidc control-plane-down keycloak keycloak-down k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # This list.
 	@# `0-9` in the pattern, otherwise k8s-up/-down/-seed/-lint are missing —
@@ -86,7 +86,7 @@ ai-check:  # Does the platform's model answer? Profile help and a cover letter, 
 fix:  # Format.
 	dotnet format $(DOTNET_SLN)
 
-env:  # Create .env: roll four secrets, generate the token key pair.
+env:  # Create .env: roll the secrets, generate the token key pair and the service clients.
 	@# The first command in a fresh clone. After it, `make up` runs.
 	@#
 	@# The secrets stand EMPTY in .env.example — a built-in default would be
@@ -97,7 +97,7 @@ env:  # Create .env: roll four secrets, generate the token key pair.
 		echo "To roll again: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_NOTIFY_SECRET WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_EVIDENCE_SECRET; do \
+		for s in WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_EVIDENCE_SECRET; do \
 			value=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
 			awk -v k="$$s" -v v="$$value" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
@@ -112,9 +112,15 @@ env:  # Create .env: roll four secrets, generate the token key pair.
 			tmp=$$(mktemp); \
 			awk -v k="$$k" -v v="$$v" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
-		echo ".env created: four secrets rolled, one key pair generated."; \
+		bash scripts/env-m2m.sh .env; \
+		echo ".env created: three secrets rolled, one key pair generated."; \
 		echo "It is ignored and does not belong in git."; \
 	fi
+
+env-m2m:  # Add missing service client pairs to an existing .env (ADR-0057).
+	@# `make env` leaves an existing .env alone, because it carries third-party
+	@# secrets. This adds only what is missing and overwrites nothing.
+	@bash scripts/env-m2m.sh .env
 
 up:  # The whole stack locally: Postgres, Mailpit, fourteen services, gateway, UI.
 	docker compose up -d --build
@@ -160,16 +166,18 @@ images:  # Build both shipped images. The local twin of the CI job.
 		-t workertransfer-dotnet:local .
 	docker build -f docker/web-prod.Dockerfile -t workertransfer/web:local .
 
-# The two key values are THROWAWAY values and are called that. The chart
+# The key and client values are THROWAWAY values and are called that. The chart
 # demands them (`required`), because a rolled pair does not fit together — but
 # here it is only rendered, never applied. Without them this target does not
 # check the chart to the end.
+M2M_CLIENTS = advisor applications assessment companies jobs messages notification profile resume scout transfer
 HELM_PROBE = --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
-	--set secrets.jwtPrivateKey=throwaway --set secrets.jwtPublicKey=throwaway
+	--set secrets.jwtPrivateKey=throwaway --set secrets.jwtPublicKey=throwaway \
+	$(foreach client,$(M2M_CLIENTS),--set secrets.m2m.$(client).secret=throwaway --set secrets.m2m.$(client).hash=throwaway)
 
 k8s-lint:  # Check the chart without a cluster: helm lint + render.
 	helm lint deploy/helm/workertransfer $(HELM_PROBE)
-	helm template deploy/helm/workertransfer $(HELM_PROBE) > /dev/null
+	helm template deploy/helm/workertransfer $(HELM_PROBE) | bash scripts/k8s-render-check.sh
 	@echo "Chart renders."
 
 clean:  # Build and test leftovers.

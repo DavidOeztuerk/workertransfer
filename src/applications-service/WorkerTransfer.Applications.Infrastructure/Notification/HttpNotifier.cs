@@ -5,12 +5,11 @@ using WorkerTransfer.Outbox;
 
 namespace WorkerTransfer.Applications.Infrastructure.Notification;
 
-/// <summary>Where notifications go, and what identifies them as ours.</summary>
+/// <summary>Where notifications go.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Notifications__BaseUrl</c>, <c>Notifications__Timeout</c>,
-/// <c>Notifications__Secret</c>); renaming one alone leaves its value on the
-/// default, silently.
+/// (<c>Notifications__BaseUrl</c>, <c>Notifications__Timeout</c>); renaming one
+/// alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class NotificationSettings
 {
@@ -28,13 +27,6 @@ public sealed class NotificationSettings
     /// hangs the caller with it.
     /// </remarks>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>The shared secret. Expressly not the erasure's.</summary>
-    /// <remarks>
-    /// Empty means: nothing is delivered — as a <em>failure</em>, so the row
-    /// stays due instead of counting as sent.
-    /// </remarks>
-    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Hands an intent to notification-service.</summary>
@@ -60,11 +52,6 @@ public sealed class HttpNotifier(
             throw new InvalidOperationException("Notifications:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Secret))
-        {
-            throw new InvalidOperationException("Notifications:Secret is not set.");
-        }
-
         using var client = factory.CreateClient(nameof(HttpNotifier));
 
         client.Timeout = _settings.Timeout;
@@ -82,8 +69,6 @@ public sealed class HttpNotifier(
                 // after ten attempts, not a single mail.
                 new { user_id = recipient.Value, kind = kind })
         };
-
-        request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
         using var response = await client.SendAsync(request, cancellationToken);
 

@@ -4,8 +4,8 @@ namespace WorkerTransfer.Contracts.Identity;
 
 /// <summary>Who a company is: a name and a proven domain.</summary>
 /// <remarks>
-/// <para>The answer of <c>GET /internal/companies/{tenantId}</c>, behind the
-/// shared secret and without a gateway route.</para>
+/// <para>The answer of <c>GET /internal/companies/{tenantId}</c>, a door
+/// without a gateway route.</para>
 ///
 /// <para><strong>The domain is the reason this contract exists.</strong> A
 /// person may exclude companies and names them by their domain (ADR-0037). It

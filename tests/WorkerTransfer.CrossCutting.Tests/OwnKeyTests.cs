@@ -25,7 +25,7 @@ public sealed class OwnKeyTests
         new(
             new Factory(recorder),
             Options.Create(new ProfileDraft.DraftSettings { ApiKey = "ollama", BaseUrl = Platform }),
-            Options.Create(new ProfileDraft.IdentitySettings { BaseUrl = "http://identity-service:8001", Secret = "s" }));
+            Options.Create(new ProfileDraft.IdentitySettings { BaseUrl = "http://identity-service:8001" }));
 
     private static Task<string> Draft(ProfileDraft.HttpDrafter drafter) =>
         drafter.DraftAsync(

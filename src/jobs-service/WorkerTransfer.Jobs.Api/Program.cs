@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Jobs.Api;
 using WorkerTransfer.Jobs.Api.Authorization;
 using WorkerTransfer.Jobs.Infrastructure;
@@ -15,7 +16,8 @@ const string serviceName = "jobs-service";
 
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.Used);
+    ArtificialIntelligence.Used,
+    noelia => noelia.UseServiceTokenClient());
 
 // Two acts bind this company to the outside — putting an advert up and taking
 // it down. Who may do that is decided by identity-service's MEMBERSHIP TABLE,

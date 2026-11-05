@@ -350,8 +350,8 @@ public static class ServiceFoundation
                 // We have one: `/auth/login`, `/auth/register`,
                 // `/auth/session`, the careers page under
                 // `/companies/by-slug/{k}`, the health probes — and the service
-                // entrances behind a secret header instead of behind a token
-                // (`/notifications`, `/erasure`, `/internal/notify`).
+                // entrances that do not answer to a person's token (`/erasure`
+                // behind a secret header, the doors under `/internal`).
                 //
                 // Measured what it costs: with it, `POST /notifications` answers
                 // 401 in Noelia's envelope although the secret header is right —

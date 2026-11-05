@@ -80,6 +80,8 @@ public static class ScoutInfrastructure
         services.AddKeyRing<ScoutDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpProfileSearch.Client).AddServiceCall(ServiceAudiences.Profile);
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<ISearchStore, EfSearchStore>();

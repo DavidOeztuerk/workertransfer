@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Messages.Api;
 using WorkerTransfer.Messages.Infrastructure;
@@ -15,7 +16,8 @@ const string serviceName = "messages-service";
 // No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.Used);
+    ArtificialIntelligence.Used,
+    noelia => noelia.UseServiceTokenClient());
 
 // The first contact to a person is a recruiter's (ADR-0048); answering in a
 // running conversation is every member's.

@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Companies.Api;
 using WorkerTransfer.Companies.Api.Authorization;
 using WorkerTransfer.Companies.Infrastructure;
@@ -16,7 +17,8 @@ const string serviceName = "companies-service";
 // No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.NotUsed);
+    ArtificialIntelligence.NotUsed,
+    noelia => noelia.UseServiceTokenClient());
 
 // The employer profile is how the company presents itself and stands
 // publicly — writing it demands an `admin`. Who that is, the MEMBERSHIP TABLE

@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Assessment.Api;
 using WorkerTransfer.Assessment.Infrastructure;
 using WorkerTransfer.Assessment.Infrastructure.Persistence;
@@ -14,7 +15,8 @@ const string serviceName = "assessment-service";
 // No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.NotUsed);
+    ArtificialIntelligence.NotUsed,
+    noelia => noelia.UseServiceTokenClient());
 
 builder.Services.AddAssessmentInfrastructure(
     builder.Configuration,

@@ -54,6 +54,7 @@ public static class NotificationInfrastructure
         services.AddKeyRing<NotificationDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpMailer.ClientName).AddServiceCall(ServiceAudiences.Identity);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IPreferenceStore, EfPreferenceStore>();

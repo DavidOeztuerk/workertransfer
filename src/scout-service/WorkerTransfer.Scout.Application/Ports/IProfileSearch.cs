@@ -54,7 +54,7 @@ public sealed record ProfileHitPage(IReadOnlyList<ProfileHit> Items, string? Nex
 /// <see cref="IConsentGate"/> and for the whole page at once — that is the hard
 /// part of <c>GET /candidates</c>, carried over and not reinvented (ADR-0036
 /// decision 1). The call therefore goes through a service-to-service door
-/// behind the shared secret and has no gateway route.</para>
+/// and has no gateway route.</para>
 /// </remarks>
 public interface IProfileSearch
 {

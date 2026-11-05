@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.ServiceDefaults;
 using WorkerTransfer.ServiceDefaults.Roles;
 using WorkerTransfer.Transfer.Api;
@@ -16,7 +17,8 @@ const string serviceName = "transfer-service";
 // No AsIssuer(): only identity-service holds the private half.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.NotUsed);
+    ArtificialIntelligence.NotUsed,
+    noelia => noelia.UseServiceTokenClient());
 
 // Two actions bind the company: an offer (date and fee) and the completion.
 // Who may take them, the MEMBERSHIP TABLE of identity-service decides, per

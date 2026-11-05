@@ -27,16 +27,6 @@ public sealed class NotificationSettings
     /// hangs the caller along with it.
     /// </remarks>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
-
-    /// <summary>
-    /// The shared secret. Expressly a different one from the erasure secret.
-    /// </summary>
-    /// <remarks>
-    /// "May trigger a mail" and "may delete everything about a person" must not
-    /// be the same piece of paper. Empty means nothing is delivered — and as a
-    /// <em>failure</em>, so the row stays due instead of counting as sent.
-    /// </remarks>
-    public string Secret { get; set; } = string.Empty;
 }
 
 /// <summary>Hands one intent to notification-service.</summary>
@@ -62,11 +52,6 @@ public sealed class HttpNotifier(
             throw new InvalidOperationException("Notifications:BaseUrl is not configured.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Secret))
-        {
-            throw new InvalidOperationException("Notifications:Secret is not configured.");
-        }
-
         using var client = factory.CreateClient(nameof(HttpNotifier));
 
         client.Timeout = _settings.Timeout;
@@ -84,8 +69,6 @@ public sealed class HttpNotifier(
                 // after ten attempts, not a single mail.
                 new { user_id = recipient.Value, kind = kind })
         };
-
-        request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
         using var response = await client.SendAsync(request, cancellationToken);
 

@@ -64,7 +64,7 @@ public sealed class EnvironmentFileTests
 
     /// <summary>What reads as a secret by its name: a secret, a key, a token.</summary>
     private static readonly Regex SecretName = new(
-        "(SECRET|SECRETS_KEY|PRIVATE_KEY|PUBLIC_KEY|TOKEN|API_KEY)$",
+        "(SECRET|SECRET_HASH|SECRETS_KEY|PRIVATE_KEY|PUBLIC_KEY|TOKEN|API_KEY)$",
         RegexOptions.None,
         TimeSpan.FromSeconds(5));
 
@@ -83,10 +83,14 @@ public sealed class EnvironmentFileTests
     [
         "WORKERTRANSFER_JWT_PRIVATE_KEY",
         "WORKERTRANSFER_JWT_PUBLIC_KEY",
-        "WORKERTRANSFER_NOTIFY_SECRET",
         "WORKERTRANSFER_ERASURE_SECRET",
         "WORKERTRANSFER_SECRETS_KEY",
-        "WORKERTRANSFER_EVIDENCE_SECRET"
+        "WORKERTRANSFER_EVIDENCE_SECRET",
+        .. ServiceClients.All.SelectMany(client => new[]
+        {
+            $"WORKERTRANSFER_M2M_{client.ToUpperInvariant()}_SECRET",
+            $"WORKERTRANSFER_M2M_{client.ToUpperInvariant()}_SECRET_HASH"
+        })
     ];
 
     public static TheoryData<string> Secrets => new(SecretNames());
