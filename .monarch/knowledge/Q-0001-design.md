@@ -175,3 +175,13 @@ Status: Design nach Delta-Review vollständig; **Freigabe durch den User selbst 
 
 ## 12. Umsetzung über Noelia 7.1 (Entscheid projects-74 mit dem User, 28.10.2026 ~22:00)
 Umsetzung über **Noelia 7.1 (M2M + Rechte je Tür)**: Ausstellen von Service-Tokens und Empfänger-Policy „nur Aufrufer X, Y“ je Endpoint kommen als geteilte Infrastruktur aus Noelia. **Q-0043 wird nach dem Release als Übernahme neu zugeschnitten** (Design-Delta, Warden-Delta, Freigabe durch den User, TDD). Inventar, Rechtetabelle, E1/E4 und Testplan dieser Notiz bleiben gültig. Q-0043 wird bis dahin nicht gestartet.
+
+## 13. Design-Delta Übernahme Noelia 7.1 (05.11.2026) – ersetzt §4–§6 und §11 im Mechanismus
+Das Design steht in `docs/adr/0057-tueren-mit-aufruferliste.md`. Hier nur, was sich gegenüber dieser Notiz ändert.
+- **E4 neu entschieden (User, 05.11.2026): alle Türen auf Aufruferlisten.** Ersetzt §10 E4 (a). notification (D8) und profile (D9, D10) kommen zur Tabelle dazu; `WORKERTRANSFER_NOTIFY_SECRET` entfällt ganz. assessment wird 11. Client.
+- **Entfällt:** `Internal__Callers__*`, `SecretPrevious` (Rotation jetzt `NOELIA_M2M_CLIENT_<ID>_SECRET_HASH_PREVIOUS`), die eigene Prüfklasse, D1 ohne Body-Parameter (§11; die Autorisierung läuft jetzt vor der Bindung). Auflagen 1–3, 5, 7 und 10 sind damit durch Noelia oder durch E4 überholt; 4, 6, 8, 9, 11 gelten sinngemäß.
+- **Neu gefunden, nicht in der Notiz:** `ServiceTokenUnavailableException` ist keine `HttpRequestException` (→ `AddServiceCall`); der Standard-Client trägt kein Token, jeder Aufruf braucht einen benannten Client; sprig kann den Hash nicht bilden (→ `required`, `k8s-up.sh`); `.Without(RateLimiting)` trägt für `/m2m/token` nicht.
+- **Rechtetabelle am 05.11. gegen den Code geprüft:** D1–D3, D5–D10 per Grep bestätigt. D4: `AddCompanyPermissions(` steht direkt nur in advisor, resume, messages, transfer; companies und jobs laufen über den Wrapper in `AdminPermissions.cs:101`, **beim Bau noch einmal belegen**.
+- **Test-Aufwand:** 49 Testdateien setzen `Jwt:PublicKey` je Wirt. `UseServiceTokenClient` liest seine drei Werte beim Komponieren; erst EINE Reihe fahren (Erinnerung „Pflichtkonfiguration bricht Tests UND Pods“). Vorschlag: je Testprojekt eine Stelle statt je Wirt, beim Bau entscheiden.
+- **Scope:** Q-0043 per `gate_plan` am 05.11. neu zugeschnitten (alle Aufrufer, Tests, Compose, Helm, CI).
+- **Mana:** `quest accept Q-0043` am 05.11. um 02:2x UTC vom Guard verweigert (5h 72 % + 45 % + 5 %). Die Quest startet nach dem Reset.

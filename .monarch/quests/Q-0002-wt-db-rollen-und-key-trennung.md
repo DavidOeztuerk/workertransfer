@@ -9,7 +9,7 @@ state: proposed
 findings: [N-3, WT-5, WT-10]
 scope:
   repo: workertransfer
-  include: ["docker-compose.yml", "deploy/helm/**", "docker/**", "src/shared/**/SecretStore.cs", "src/shared/**/KeyRing.cs", "scripts/**"]
+  include: ["docker-compose.yml", "deploy/helm/**", "docker/**", "src/shared/**/SecretStore.cs", "src/shared/**/KeyRing.cs", "scripts/**", "Makefile", ".env.example", ".github/workflows/ci.yml", "tests/**", "docs/**"]
   exclude: []
 estimate: { session_pct: 25, weekly_pct: 3, gold_usd: 0 }
 dod:

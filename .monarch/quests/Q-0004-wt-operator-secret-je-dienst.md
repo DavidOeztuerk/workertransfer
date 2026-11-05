@@ -9,7 +9,7 @@ state: proposed
 findings: [D4]
 scope:
   repo: workertransfer
-  include: ["docker-compose.yml", "deploy/helm/**/_helpers.tpl", "scripts/control-plane.sh", "scripts/control-plane-fleet.json", "Makefile"]
+  include: ["docker-compose.yml", "deploy/helm/**", "scripts/control-plane.sh", "scripts/control-plane-fleet.json", "Makefile", ".env.example", ".github/workflows/ci.yml", "tests/**", "docs/**"]
   exclude: []
 estimate: { session_pct: 8, weekly_pct: 1, gold_usd: 0 }
 dod:
