@@ -9,14 +9,17 @@ state: proposed
 findings: [N-3, WT-5, WT-10]
 scope:
   repo: workertransfer
-  include: ["docker-compose.yml", "deploy/helm/**", "docker/**", "src/shared/**/SecretStore.cs", "src/shared/**/KeyRing.cs", "scripts/**", "Makefile", ".env.example", ".github/workflows/ci.yml", "tests/**", "docs/**"]
-  exclude: []
-estimate: { session_pct: 25, weekly_pct: 3, gold_usd: 0 }
+  include: ["docker-compose.yml", "deploy/helm/**", "docker/**", "src/**", "scripts/**", "Makefile", ".env.example", ".github/workflows/ci.yml", "tests/**", "docs/**", "bugs/**", "Directory.Packages.props", "CLAUDE.md", "AGENTS.md", ".claude/skills/**", ".claude/commands/**"]
+  exclude: ["**/Migrations/**"]
+estimate: { session_pct: 40, weekly_pct: 6, gold_usd: 0 }
 dod:
-  - Je Dienst eigene DB-Rolle mit Rechten nur auf die eigene Datenbank
-  - Master-Key nur in Diensten, die verschlüsselte Daten wirklich lesen; Schlüssel je Zweck getrennt
-  - Postgres-Superuser nicht mehr in Connection-Strings; Helm ohne festes Passwort
-  - Migrationsweg für bestehende lokale Volumes beschrieben
+  - ADR-0058 nach Warden-Runde umgesetzt
+  - Je Dienst eigene DB-Rolle, Eigentümer nur der eigenen Datenbank; CONNECT für PUBLIC entzogen, auch auf postgres und template1
+  - Der Superuser hat kein Netz-Login mehr, auch auf bestehenden Volumes (Entscheid des Users vom 05.11.); kein Superuser in Connection-Strings; Helm ohne festes Passwort
+  - WORKERTRANSFER_SECRETS_KEY nur bei identity, gespeicherte KI-Schlüssel bleiben lesbar; der Schlüsselbund hat je Dienst einen eigenen Schlüssel
+  - make db-roles stellt ein bestehendes Volume um: Eigentümer je Objekt, eine Transaktion je Datenbank, Bund einmalig geleert (Entscheid des Users vom 05.11.), Fachdaten unverändert, wiederholbar
+  - Boss und Migrationstest laufen gegen das echte Skript und die echten Migrationen und überspringen nicht
+  - Compose, Helm, make env, .env.example, CI, Doku angepasst; Noelia-Ticket liegt in bugs/
 boss: "CrossServiceDbAccess_Denied (Dienst A kann identity-DB nicht lesen) grün in CI"
 evidence: ["docker-compose.yml:130-136 + 15× Username=worker", "deploy/helm/…/values.yaml:112-120", "src/shared/…/KeyRing.cs:58", "07-warden-workertransfer.md N-3"]
 board: { provider: github, issue: 112 }

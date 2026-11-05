@@ -5,7 +5,7 @@ kind: main
 rank: A
 severity: high
 risk_tags: [auth, pii]
-state: in_progress
+state: in_review
 findings: [WT-1]
 scope:
   repo: workertransfer
