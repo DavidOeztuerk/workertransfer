@@ -4,7 +4,7 @@ The short reference. `CLAUDE.md` and its skills under `.claude/skills/` carry th
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Noelia 7.0.1** (a shared foundation library from nuget.org) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Noelia 7.1.1** (a shared foundation library from nuget.org) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 

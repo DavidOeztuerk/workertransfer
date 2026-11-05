@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.0.1** — a shared foundation library of this author's, from nuget.org — plus a React app.
+WorkerTransfer is a consent-first talent-mobility platform (applications, direct recruiting, employment transfers, AI-assisted career workflows). It is **.NET 10 on [Noelia](https://github.com/DavidOeztuerk) 7.1.1** — a shared foundation library of this author's, from nuget.org — plus a React app.
 
 Fifteen services and a gateway live under `src/`, their tests under `tests/`, the React app in `web/`.
 

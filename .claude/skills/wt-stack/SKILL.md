@@ -37,6 +37,6 @@ Adding a service is three steps and no new Dockerfile: its database in `scripts/
 - **Only the connection is registered, never `AddRedisConnection`**, which also installs a distributed cache as a side effect (`Revocation.cs`).
 - **Without the key, Staging and Production refuse to start**; elsewhere — the test hosts — revocations stay in the process. Test tokens therefore carry `jti` and `iat` like real ones: the check refuses a token without them.
 
-Revoking a single *session* did not work in Noelia 7.0.0 (`bugs/sitzungswiderruf-liest-sid.md`); fixed in 7.0.1, which this tree uses. Nothing here revokes single sessions yet.
+Revoking a single *session* did not work in Noelia 7.0.0 (`bugs/sitzungswiderruf-liest-sid.md`); fixed in 7.0.1. Nothing here revokes single sessions yet.
 
 **`curl` is in the runtime image on purpose.** Docker's healthcheck asks from *inside* the container, and the aspnet runtime image ships no curl, no wget, no nc; `sh` is dash and cannot do `/dev/tcp`. The probe used to be `dotnet --version`, which can *never* succeed on a runtime image (no SDK, exit 155) — every service reported `unhealthy` for months while answering perfectly, and a probe that is always red is worse than none. One probe now lives in the `x-service` anchor, covers all fourteen services *and* the gateway, asks `/health/live`, and derives the port from `ASPNETCORE_URLS` so no second list of ports can drift. Kubernetes does not need any of this — there the kubelet asks over HTTP from outside.

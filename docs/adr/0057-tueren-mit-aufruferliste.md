@@ -1,14 +1,22 @@
 # ADR-0057: Türen mit Aufruferliste — Dienst-Tokens statt eines geteilten Secrets
 
-**Status:** vorgeschlagen (05.11.2026), Warden-Runde steht aus
+**Status:** vorgeschlagen (05.11.2026), Fassung 2 nach Warden-Runde 1, Delta-Runde steht aus
 **Betrifft:** identity-service, notification-service, profile-service, die elf aufrufenden Dienste, `src/shared/WorkerTransfer.ServiceDefaults`, Compose, Helm, `make env`, CI
-**Verwandt:** ADR-0045 (Noelia, Plattform nicht live), ADR-0046 (nur identity hält den privaten Schlüssel), ADR-0056 (Ports nur auf Loopback), Noelia ADR-0002 (Dienst-zu-Dienst-Rechte), Gate G-0001, Quest Q-0043, Design-Notiz `.monarch/knowledge/Q-0001-design.md` §13
+**Verwandt:** ADR-0045 (Noelia, Plattform nicht live), ADR-0046 (nur identity hält den privaten Schlüssel), ADR-0056 (Ports nur auf Loopback), Noelia ADR-0002 (Dienst-zu-Dienst-Rechte), Noelia ADR-0003 (Dienst-Tokens hinter der Tür), Gate G-0001, Quest Q-0043, Design-Notiz `.monarch/knowledge/Q-0001-design.md` §13
+
+## In einfacher Sprache
+
+Heute öffnet ein einziges Passwort alle internen Türen der Plattform. Wer das Passwort eines Dienstes hat, der nur Mails auslösen soll, kann damit auch Klarnamen und KI-Schlüssel lesen.
+
+Künftig holt sich jeder Dienst bei identity ein kurzlebiges Ausweis-Token, und jede Tür nennt im Code, welche Dienste hinein dürfen. Für alle anderen sieht die Tür aus, als gäbe es sie nicht. Für Nutzer ändert sich nichts, solange alles läuft. Fällt identity aus, antworten die Dienste, wie sie es bei einem schweigenden Dienst schon heute tun.
 
 ## Warum es dieses ADR gibt
 
 Gemessen am 05.11.2026 in `docker-compose.yml`: `WORKERTRANSFER_NOTIFY_SECRET` steht an zwanzig Stellen, unter vier Namen (`Identity__Secret` zehnmal, `Notifications__Secret` siebenmal, `Notify__Secret` zweimal, `Profile__Secret` einmal). Derselbe Wert öffnet alle zehn `/internal`-Routen der Plattform. Zwei davon geben entschlüsselte KI-Schlüssel heraus, eine den Klarnamen und die E-Mail-Adresse eines beliebigen Kontos. Ein Dienst, der nur Mails auslösen soll, kann also alles lesen, was diese Türen hergeben. Das ist Befund WT-1.
 
-Die Design-Notiz wollte das am 28.10. mit einem eigenen Secret je Aufrufer lösen und hat die Umsetzung dann zurückgestellt, weil Noelia dieselbe Frage als geteilten Baustein beantworten sollte. Noelia 7.1.0 liegt seit dem 29.10. auf nuget.org. Dieses ADR beschreibt die Übernahme; Inventar, Rechtetabelle und E1 der Notiz gelten weiter.
+Die Design-Notiz wollte das am 28.10. mit einem eigenen Secret je Aufrufer lösen und hat die Umsetzung dann zurückgestellt, weil Noelia dieselbe Frage als geteilten Baustein beantworten sollte. Das Ergebnis liegt als Noelia 7.1.1 auf nuget.org. Dieses ADR beschreibt die Übernahme; Inventar, Rechtetabelle und E1 der Notiz gelten weiter.
+
+**Es muss 7.1.1 sein, nicht 7.1.0.** In 7.1.0 endete jeder berechtigte Türaufruf in 401, sobald `UseTokenRevocation()` und `UseNoeliaPrincipal()` hinter der Autorisierung liefen, und genau so steht es in `ServiceFoundation.cs`. Der Fix liegt in Noelia (dort ADR-0003). `UseTokenRevocation()` bleibt, und WorkerTransfer baut keinen Pfad-Bypass. An einer Tür ist `ICurrentPrincipal.Current` jetzt `null`; ein Türhandler darf also keine Person lesen.
 
 ## Die Entscheidung
 
@@ -35,9 +43,44 @@ D8 bis D10 sind gegenüber der Notiz neu. Das ist die Entscheidung des Users zu 
 
 **Jede Ablehnung ist dasselbe 404, und zwar ohne Rumpf.** Das weicht bewusst von der Regel ab, dass jede Antwort ein Problemdokument trägt. Die Türen waren bisher Problemdokumente, künftig schreibt Noelias Dekorierer nur den Status. Ein Fallback je Gruppe sorgt dafür, dass eine falsche Methode oder ein unbekannter Pfad genauso antwortet wie eine verschlossene Tür. Die Autorisierung läuft vor der Bindung, deshalb entfällt der Umbau von D1 aus §11 der Notiz: Ein kaputter Rumpf eines Unberechtigten erreicht den Binder nicht mehr. Bleibt nach innen die Korrelation im Header, nach außen verrät die Antwort nichts.
 
-**Ist kein Token zu bekommen, schweigt der Dienst, er stürzt nicht ab.** `ServiceTokenUnavailableException` erbt von `Exception`, die Aufrufer fangen aber `HttpRequestException` und übersetzen das in ihre Schweige-Fehler, an denen die Zusagen hängen: Eine schweigende Rollenabfrage antwortet 503, nie 403. Ungefangen würde daraus ein 500. Statt zwanzig `catch`-Blöcke anzufassen, kommt in `ServiceDefaults` genau eine Erweiterung `AddServiceCall(audience)`, die vor `AddServiceToken(audience)` einen Handler setzt und die Ausnahme in eine `HttpRequestException` übersetzt. Jeder Aufrufer nutzt nur diese Erweiterung.
+**Ist kein Token zu bekommen, schweigt der Dienst, er stürzt nicht ab.** `ServiceTokenUnavailableException` erbt von `Exception`, die Aufrufer fangen aber `HttpRequestException` und übersetzen das in ihre Schweige-Fehler, an denen die Zusagen hängen: Eine schweigende Rollenabfrage antwortet 503, nie 403. Ungefangen würde daraus ein 500. Statt zwanzig `catch`-Blöcke anzufassen, kommt in `ServiceDefaults` genau eine Erweiterung `AddServiceCall(audience)`, die vor `AddServiceToken(audience)` einen Handler setzt und die Ausnahme in eine `HttpRequestException` übersetzt. Jeder Aufrufer nutzt nur diese Erweiterung. Der Handler fängt nur `ServiceTokenUnavailableException`, nie `OperationCanceledException`: Eine abgelaufene Zeit bleibt eine abgelaufene Zeit, und die Aufrufer behandeln sie schon heute als Schweigen.
 
-**Das Token hängt an einem eigenen benannten Client, nie am Standard-Client.** Die meisten Dienste rufen heute `CreateClient()` mit frei gewählten Namen auf `AddHttpClient()` auf. Künftig registriert jeder Aufruf seinen Namen ausdrücklich. Der Client `company-site` von jobs ruft fremde Hosts und darf nie ein Token tragen; das Token von jobs hängt an `identity-internal`. Ein Token an einem Client, der auch fremde Adressen ruft, wäre der schlimmste Fehler, den dieser Umbau machen kann.
+**Vergisst ein Dienst das Modul, startet er nicht.** Ohne `UseServiceTokenClient()` fehlt `IServiceTokenSource`, und `CreateClient` würfe beim ersten Aufruf, in `HttpCompanyRoles.cs:81` außerhalb des `try`, also 500 statt 503. Deshalb trägt `AddServiceCall` einen Startwächter ein: Fehlt die Quelle, bricht der Start ab und nennt das Modul.
+
+**Auch die Zeit bleibt eine Schweige-Antwort.** `HttpMailer.cs:94` lässt heute jede `OperationCanceledException` durch, und ein Timeout ist eine. D8 antwortet dann 500, und der Token-Abruf verlängert genau diese Strecke. Der Filter unterscheidet künftig wie alle anderen Aufrufer: Abgebrochen hat nur, wer selbst abgebrochen hat.
+
+**Das Token hängt an einem eigenen benannten Client, nie am Standard-Client.** Die meisten Dienste rufen heute `CreateClient()` mit frei gewählten Namen auf `AddHttpClient()` auf. Künftig registriert jeder Aufruf seinen Namen ausdrücklich. Der Client `company-site` von jobs ruft fremde Hosts und darf nie ein Token tragen; das Token von jobs hängt an `identity-internal`, `identity-roles` und `identity-company-ai`. Ein Token an einem Client, der auch fremde Adressen ruft, wäre der schlimmste Fehler, den dieser Umbau machen kann.
+
+Das sind alle Clients mit Token:
+
+| Dienst | Client | Audience | Türen |
+|---|---|---|---|
+| advisor | `identity` | identity | D2, D5 |
+| advisor | `identity-roles` | identity | D4 |
+| advisor | `HttpNotifier` | notification | D8 |
+| applications | `identity-internal` | identity | D3, D6 |
+| applications | `HttpNotifier` | notification | D8 |
+| assessment | `HttpNotifier` | notification | D8 |
+| companies | `identity-roles` | identity | D4 |
+| jobs | `identity-internal` | identity | D2 |
+| jobs | `identity-roles` | identity | D4 |
+| jobs | `identity-company-ai` | identity | D7 |
+| messages | `identity-internal` | identity | D3, D6 |
+| messages | `identity-roles` | identity | D4 |
+| messages | `identity-company-ai` | identity | D7 |
+| messages | `HttpNotifier` | notification | D8 |
+| notification | `identity` | identity | D1 |
+| profile | `identity-internal` | identity | D6 |
+| resume | `identity-roles` | identity | D4 |
+| resume | `HttpNotifier` | notification | D8 |
+| scout | `identity-company-ai` | identity | D7 |
+| scout | `profile` | profile | D9, D10 |
+| scout | `HttpNotifier` | notification | D8 |
+| transfer | `identity-internal` | identity | D2, D3, D5 |
+| transfer | `identity-roles` | identity | D4 |
+| transfer | `HttpNotifier` | notification | D8 |
+
+Jeder andere Client trägt keines, namentlich `company-site`, `company-model`, `ats`, `cover-letter`, `reply-draft`, der Client `HttpDrafter` von profile, jobs und scout, `github`, `github-oauth`, `consent`, `lookup`, `jobs`, `transfer`, `applications` und `own-facts`.
 
 **Der Token-Endpoint bekommt eine eigene Bremse.** `.Without(RateLimiting)` begründet sich damit, dass ein Dienst hinter dem Gateway nur das Gateway als Herkunft sieht. Für `/m2m/token` gilt das nicht, denn die Dienste rufen ihn direkt und jeder hat eine eigene Adresse. identity ruft deshalb selbst `AddRateLimiter` und `UseRateLimiter` auf, nur für diesen Endpoint, je Herkunft 600 Anfragen in der Minute. Das ist eine Flutbremse, keine Ratebremse, denn 256 Bit errät niemand. Normalbetrieb sind elf Dienste mal höchstens drei Audiences alle fünf Minuten. Ohne Bremse meldete der Check `noelia.m2m.caller-policy` dauerhaft eine Warnung.
 
@@ -45,7 +88,15 @@ D8 bis D10 sind gegenüber der Notiz neu. Das ist die Entscheidung des Users zu 
 
 **Secret und Hash entstehen immer gemeinsam.** Zwei unabhängig gewürfelte Hälften passen nicht zusammen, wie beim Schlüsselpaar. `make env` erzeugt je Client ein Secret und seinen Hash nach dem Rezept aus Noelia ADR-0002 §4. In Helm geht das nicht über `keepOrMake`, weil sprig `sha256sum` nur als Hex liefert und Noelia Base64url verlangt. Die Werte sind daher `required` und kommen aus `scripts/k8s-up.sh`, genau wie das Schlüsselpaar. Identity hält nur die Hashes, jeder Dienst nur sein eigenes Secret. `NOELIA_M2M_TOKEN_ENDPOINT` steht je Dienst und nicht im Anker `x-environment`, sonst dürften auch consent, github und portfolio über die Egress-Grenze zu identity.
 
-Eine vorhandene `.env` hat die neuen Werte nicht, und `make env` lässt sie unberührt, weil sie Drittanbieter-Secrets trägt. Dafür kommt `make env-m2m`, das nur fehlende Einträge ergänzt und nichts überschreibt.
+Eine vorhandene `.env` hat die neuen Werte nicht, und `make env` lässt sie unberührt, weil sie Drittanbieter-Secrets trägt. Dafür kommt `make env-m2m`, das nur fehlende Einträge ergänzt und nichts überschreibt. Es ergänzt immer ganze Paare. Findet es eine einzelne Hälfte, meldet es den Namen laut und ändert an diesem Paar nichts, denn eine neu gewürfelte zweite Hälfte passte nicht zur ersten.
+
+`scripts/k8s-up.sh` entscheidet je Schlüssel, nicht nach dem Dasein des Secret-Objekts. Eine Release, die vor diesem Umbau entstand, hat das Objekt, aber keine M2M-Werte; übernommen ergäbe das leere Werte, und `required` bräche ab. Vorhandene Paare werden übernommen, fehlende neu gewürfelt. `HELM_PROBE` im Makefile braucht alle 22 Wegwerfwerte, sonst prüft `make k8s-lint` den Chart nicht zu Ende.
+
+Der Wächter in `EnvironmentFileTests` erkennt ein Secret am Namen, und sein Muster endet auf `SECRET`. Die Hashes enden auf `_SECRET_HASH` und fielen durch die Prüfung „in der Vorlage leer“. Das Muster wird erweitert.
+
+## Was das kostet
+
+**D8 hängt jetzt an identity.** Bisher lief eine Benachrichtigung auch, wenn identity schwieg. Künftig braucht der Sender ein Token. Ein Ausfall kürzer als die Restlaufzeit des Tokens fällt nicht auf. Dauert er länger, zählt die Outbox Fehlversuche: Das Intervall verdoppelt sich von 5 Sekunden bis 5 Minuten, zehn Versuche sind nach rund 25 Minuten verbraucht (`DeliveryLimits.Standard`). Die Zeile bleibt liegen und abfragbar, die Mail geht aber nicht mehr raus. Das ist dieselbe Folge wie ein Ausfall von notification selbst, nur kommt identity als zweite Ursache dazu. Tokenfehler nicht zu zählen hieße, sie an sieben Sendern von anderen Fehlern zu unterscheiden. Das entscheidet dieses ADR dagegen.
 
 ## Was verworfen wurde
 
@@ -53,7 +104,7 @@ Das eigene Secret je Aufrufer aus §5 der Notiz wäre mit weniger Umbau ausgekom
 
 Das eigene eingehende Secret für notification (E4 vom 28.10.) hätte sieben Sender weiter ein Geheimnis teilen lassen. Wer einen von ihnen übernimmt, könnte sich als jeder andere ausgeben.
 
-Ein `IServiceTokenSource`-Stub im Produktionscode für Testwirte ist verworfen: Die Pflichtwerte werden in den Tests gesetzt, damit der Start in Tests derselbe ist wie im Betrieb.
+Ein `IServiceTokenSource`-Stub im Produktionscode für Testwirte ist verworfen: Die Pflichtwerte werden in den Tests gesetzt, damit der Start in Tests derselbe ist wie im Betrieb. Gesetzt werden sie je Testprojekt an einer Stelle, nicht in jedem der 48 Wirte.
 
 ## Was dieses ADR NICHT entscheidet
 
@@ -65,4 +116,4 @@ F1 bleibt offen, wird aber kleiner: Ein falsches Secret fällt jetzt beim Token-
 
 ## Die Zusagen als Tests
 
-`InternalEndpoints_NotifySecret_CannotReadIdentityOrAiKey` ist der Boss: Mit dem alten Header und mit einem Token von notification antworten D5, D6 und D7 mit 404, und im Rumpf stehen weder Name noch Adresse noch Schlüssel. Eine Matrix prüft alle zehn Türen gegen elf Clients und einen unbekannten Aufrufer. Ein Wächter hält Route und Tabelle in beiden Richtungen zusammen. Ein Test in CrossCutting leitet aus dem Quelltext ab, welcher Dienst welche Tür ruft, und vergleicht das mit der Tabelle; so fällt ein vergessener Aufrufer im Build auf und nicht als stilles 404 im Betrieb. Ein Test belegt, dass `company-site` kein Token trägt. Ein Test belegt, dass eine verweigerte Token-Ausgabe an D4 zu 503 führt und nicht zu 500. Der Konsistenztest gegen compose prüft, dass jeder Dienst nur sein eigenes Secret trägt und nur identity die Hashes. `make k8s-lint` prüft dasselbe am gerenderten Chart.
+`InternalEndpoints_NotifySecret_CannotReadIdentityOrAiKey` ist der Boss: Mit dem alten Header und mit einem Token von notification antworten D5, D6 und D7 mit 404, und im Rumpf stehen weder Name noch Adresse noch Schlüssel. Eine Matrix prüft alle zehn Türen gegen elf Clients und einen unbekannten Aufrufer. Ein Wächter hält Route und Tabelle in beiden Richtungen zusammen. Ein Test in CrossCutting leitet aus dem Quelltext ab, welcher Dienst welche Tür ruft, und vergleicht das mit der Tabelle; so fällt ein vergessener Aufrufer im Build auf und nicht als stilles 404 im Betrieb. **Je Dienst läuft ein Test über die echte Client-Fabrik des echten `Program`.** Die Stub-Fabriken der vorhandenen Tests umgehen die Handlerkette und könnten ein vergessenes `AddServiceCall` nie sehen; ein solcher Client bekäme von der Tür ein 404, das advisor als „nichts da“ liest (`HttpLookups.cs:141`). Der Test sendet über jeden Client der Tabelle oben und prüft am primären Handler das Token und seine Audience, und über jeden anderen Client des Dienstes, dass kein Token dabei ist. Ein Test belegt, dass eine verweigerte Token-Ausgabe an D4 zu 503 führt und nicht zu 500. Ein Test belegt, dass ein Dienst mit `AddServiceCall`, aber ohne `UseServiceTokenClient()`, nicht startet. Ein Test belegt, dass ein Timeout an D8 nicht als 500 endet. Der Konsistenztest gegen compose prüft, dass jeder Dienst nur sein eigenes Secret trägt und nur identity die Hashes. `make k8s-lint` prüft dasselbe am gerenderten Chart.
