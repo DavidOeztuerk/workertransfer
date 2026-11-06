@@ -103,11 +103,6 @@ secrets:
   # Separate from the services' tokens, expressly (ADR-0027 §4.4): "may trigger
   # a mail" and "may erase everything about a person" must not be the same paper.
   erasureSecret: ""
-  # And another: the door in front of the evidence (ADR-0044). Whoever may
-  # trigger a mail need not learn which AI providers this instance uses. EMPTY
-  # here means: the door is shut, the report answers 404 — which is the right
-  # default in a cluster without the need.
-  evidenceSecret: ""
   # Who a service is at the doors of the others (ADR-0057). Each client needs its
   # secret and the hash of it; `scripts/k8s-up.sh` makes the pairs. Listed here so
   # that a client left out fails `required` instead of silently not existing.
@@ -124,14 +119,13 @@ secrets:
     scout: { secret: "", hash: "" }
     transfer: { secret: "", hash: "" }
 
-  # The master key. It encrypts a person's AI key AND the data-protection key
-  # ring (ADR-0046), so EVERY service needs it — not just identity. Missing, a
-  # pod dies at startup naming this variable.
+  # The master key. It encrypts a person's AI key and stands at identity-service
+  # alone (ADR-0058). Missing, that pod dies at startup naming this variable.
   secretsKey: ""
-  # The database is reachable only inside the cluster and has no NodePort. A
-  # fixed value keeps `kubectl exec ... psql` simple; whoever wants to change
-  # that sets something else here.
-  postgresPassword: worker
+  # What each service holds alone needs no value here: per entry of `services`
+  # the chart rolls and keeps WORKER_DB_PASSWORD_<DATABASE>,
+  # WORKER_KEYRING_KEY_<DATABASE> and WORKER_EVIDENCE_SECRET_<DATABASE> (ADR-0058).
+  # `existingSecret` has to carry these keys, and POSTGRES_PASSWORD with them.
 
 # The key for the drafting help (ADR-0024). EMPTY means: it is off, and the UI
 # says so. It never stands in the repository — for a local run
@@ -154,12 +148,18 @@ draftingUrl: https://api.mistral.ai/v1/chat/completions
 # --- Postgres ---------------------------------------------------------------
 # enabled: false in staging/production, then `host` points at the managed
 # database. The services notice nothing of it: they only know their connection
-# string, and that is assembled from host/user/password.
+# string, and that is assembled from host, database and their own role.
+#
+# With enabled: false scripts/initdb is of no use, it needs a superuser and the
+# socket. The operator creates per entry of `services` what ADR-0058 asks for: a
+# role `svc_<database>` with the password WORKER_DB_PASSWORD_<DATABASE>, that role
+# as owner of the database, and CONNECT and TEMPORARY revoked from PUBLIC.
 postgres:
   enabled: true
   image: postgres:17-alpine
   host: postgres
   port: 5432
+  # The superuser. No service logs in with it, and it has no network login.
   user: worker
   storage: 4Gi
   # Only for completeness: the entrypoint creates this one alone, every further

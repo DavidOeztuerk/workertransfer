@@ -44,12 +44,10 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            // The master key. Without it the service throws while resolving —
-            // and that is exactly what it should do, see `SecretStore`.
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));

@@ -73,14 +73,16 @@ answer nothing.
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: POSTGRES_PASSWORD
+      key: {{ printf "WORKER_DB_PASSWORD_%s" (upper $svc.database) }}
 {{/*
 The key is called like the database, because the service asks for it that way:
 `GetConnectionString("<name>")`. Two names for the same thing would be two
 opportunities to let them drift apart.
+
+The login is the service's own role, owner of this database alone (ADR-0058).
 */}}
 - name: {{ printf "ConnectionStrings__%s" $svc.database }}
-  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=%s;Password=$(DB_PASSWORD)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $root.Values.postgres.user | quote }}
+  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=svc_%s;Password=$(DB_PASSWORD)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $svc.database | quote }}
 {{/*
 The shared secrets. Listed one by one instead of `envFrom` over the whole
 Secret: otherwise EVERY service would also get the drafting help's key, and one
@@ -140,23 +142,34 @@ pass every service's egress boundary.
 The door in front of the evidence, and it stands at EVERY service: each one
 answers its own operator report (ADR-0044). A paper of its own, expressly —
 whoever may trigger a mail need not learn which AI providers this instance uses.
+And one per service (ADR-0058): a leaked one opens one report and not fifteen.
 EMPTY means: the door is shut and the report answers 404.
 */}}
 - name: Evidence__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_EVIDENCE_SECRET
+      key: {{ printf "WORKER_EVIDENCE_SECRET_%s" (upper $svc.database) }}
 {{/*
-The master key, at EVERY service. It encrypts the data-protection key ring
-(ADR-0046) and a person's AI key. Without it the pod does not start — which is
-right, because in the clear nothing is stored.
+The key this service's data-protection key ring lies under (ADR-0058). Without
+it the pod does not start.
 */}}
+- name: WORKERTRANSFER_KEYRING_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: {{ printf "WORKER_KEYRING_KEY_%s" (upper $svc.database) }}
+{{/*
+The master key, at identity-service alone. With it and the row out of identity's
+database every person's AI key opens.
+*/}}
+{{- if eq $svc.name "identity-service" }}
 - name: WORKERTRANSFER_SECRETS_KEY
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_SECRETS_KEY
+{{- end }}
 {{- if $svc.drafting }}
 {{/*
 The drafting help (ADR-0024). EMPTY means: it is off, and the UI says so — no

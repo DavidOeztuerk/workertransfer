@@ -78,6 +78,7 @@ Everything has a `make` target, and the target is the twin of what CI runs. `mak
 ```bash
 make env            # FIRST, in a fresh clone: writes .env, rolls the secrets, generates the token key pair and the service clients
 make env-m2m        # an .env from before 05.11.2026: adds the missing client pairs, overwrites nothing
+make db-roles       # a stack that has run before: one role per service; adds what .env lacks, keeps the data (ADR-0058)
 make check          # the gate: build, then test, then the frontend — fail-fast
 make build          # dotnet build. Warnings are errors (Directory.Build.props)
 make test           # the suites, ONE AT A TIME (see below)
@@ -186,6 +187,8 @@ Correlation and tenant flow through the request, set by middleware in `ServiceDe
 ### Persistence
 
 EF Core, one database per service — **no shared database and no cross-service repository abstraction** (ADR-0004). Migrations apply at startup and retry **only transient failures**.
+
+**One role per service, owner of its own database alone; the superuser has no network login and enters no database a role owns; the master key stands at identity alone, and each service's key ring has its own key** (ADR-0058). → `wt-stack`
 
 **Aggregates come back detached from the repositories.** A mutation reaches the database only via an explicit save. Forgetting it costs nothing at test time and silently loses the write in production.
 

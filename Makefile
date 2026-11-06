@@ -9,7 +9,7 @@ DOTNET_SLN := WorkerTransfer.slnx
 
 .PHONY: help check check-dotnet check-web build test test-web validate validate-e2e e2e ai-check \
         fix dev env up down images route-map analyze evidence evidence-check \
-        env-m2m control-plane control-plane-oidc control-plane-down keycloak keycloak-down k8s-up k8s-down k8s-lint k8s-seed clean
+        env-m2m db-roles control-plane control-plane-oidc control-plane-down keycloak keycloak-down k8s-up k8s-down k8s-lint k8s-seed clean
 
 help:  # This list.
 	@# `0-9` in the pattern, otherwise k8s-up/-down/-seed/-lint are missing —
@@ -97,7 +97,7 @@ env:  # Create .env: roll the secrets, generate the token key pair and the servi
 		echo "To roll again: rm .env && make env"; \
 	else \
 		cp .env.example .env; \
-		for s in WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY WORKERTRANSFER_EVIDENCE_SECRET; do \
+		for s in WORKERTRANSFER_ERASURE_SECRET WORKERTRANSFER_SECRETS_KEY; do \
 			value=$$(openssl rand -base64 32); \
 			tmp=$$(mktemp); \
 			awk -v k="$$s" -v v="$$value" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
@@ -113,7 +113,8 @@ env:  # Create .env: roll the secrets, generate the token key pair and the servi
 			awk -v k="$$k" -v v="$$v" '$$0 == k "=" { print k "=" v; next } { print }' .env > "$$tmp" && mv "$$tmp" .env; \
 		done; \
 		bash scripts/env-m2m.sh .env; \
-		echo ".env created: three secrets rolled, one key pair generated."; \
+		bash scripts/env-services.sh .env; \
+		echo ".env created: secrets rolled, one key pair generated."; \
 		echo "It is ignored and does not belong in git."; \
 	fi
 
@@ -121,6 +122,19 @@ env-m2m:  # Add missing service client pairs to an existing .env (ADR-0057).
 	@# `make env` leaves an existing .env alone, because it carries third-party
 	@# secrets. This adds only what is missing and overwrites nothing.
 	@bash scripts/env-m2m.sh .env
+
+db-roles: env-m2m  # Move a stack that has run before to one role per service (ADR-0058).
+	@# Adds what is missing to .env and overwrites nothing, then runs the same
+	@# script an empty volume gets. The volume stays; only the internal table
+	@# `dataprotection_keys` is emptied once, and the services fill it again.
+	@#
+	@# `up` and not `restart`: Postgres has to take the new environment. Through
+	@# the socket, because after this the superuser has no network login.
+	@bash scripts/env-services.sh .env
+	docker compose stop $$(docker compose config --services | grep -v '^postgres$$')
+	docker compose up -d --wait postgres
+	docker compose exec -T postgres /docker-entrypoint-initdb.d/01-service-roles.sh
+	@echo "One role per service. Next: make up"
 
 up:  # The whole stack locally: Postgres, Mailpit, fourteen services, gateway, UI.
 	docker compose up -d --build
@@ -171,7 +185,7 @@ images:  # Build both shipped images. The local twin of the CI job.
 # here it is only rendered, never applied. Without them this target does not
 # check the chart to the end.
 M2M_CLIENTS = advisor applications assessment companies jobs messages notification profile resume scout transfer
-HELM_PROBE = --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
+HELM_PROBE = --set-file postgres.initScript=scripts/initdb/01-service-roles.sh \
 	--set secrets.jwtPrivateKey=throwaway --set secrets.jwtPublicKey=throwaway \
 	$(foreach client,$(M2M_CLIENTS),--set secrets.m2m.$(client).secret=throwaway --set secrets.m2m.$(client).hash=throwaway)
 

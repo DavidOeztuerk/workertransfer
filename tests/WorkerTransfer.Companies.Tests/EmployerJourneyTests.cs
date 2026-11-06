@@ -26,7 +26,7 @@ public class EmployerJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:companies", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("environment", "Development");

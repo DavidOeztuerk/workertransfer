@@ -152,13 +152,22 @@ for client in $M2M_CLIENTS; do
   m2m_args+=(--set "secrets.m2m.$client.secret=$secret" --set "secrets.m2m.$client.hash=$hash")
 done
 
+# The half of a database password that lives in the volume does not follow the
+# Secret (ADR-0058): a volume from an earlier release keeps its roles, or has none.
+# `--wait` then runs out with services that do not get in, far from the cause.
 helm upgrade --install "$RELEASE" "$CHART" \
-  --set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql \
+  --set-file postgres.initScript=scripts/initdb/01-service-roles.sh \
   --set aiKey="${WORKERTRANSFER_AI_KEY:-}" \
   --set secrets.jwtPrivateKey="$jwt_private" \
   --set secrets.jwtPublicKey="$jwt_public" \
   "${m2m_args[@]}" \
-  --wait --timeout 12m
+  --wait --timeout 12m || {
+  red "The release did not become ready."
+  red "If the services report 'password authentication failed', the volume is older than this release."
+  red "Throw it away: make k8s-down && make k8s-up"
+  red "Or keep the data: kubectl exec postgres-0 -- /docker-entrypoint-initdb.d/01-service-roles.sh"
+  exit 1
+}
 
 # ---------------------------------------------------------------------------
 step "Proof 1 — every pod ready"
