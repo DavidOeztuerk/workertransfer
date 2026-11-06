@@ -72,6 +72,13 @@ if printf '%s\n' "$facts" | grep -q ' shared-m2m$'; then
   complain "a NOELIA_M2M_ value stands in a ConfigMap, and every pod loads it."
 fi
 
+# The superuser enters no database a role owns (ADR-0058), not even for a probe.
+if ! grep -q 'pg_isready' "$rendering"; then
+  complain "no Postgres probe found, so this check reads nothing."
+elif grep 'pg_isready' "$rendering" | grep -qv '"-d", "postgres"'; then
+  complain "a Postgres probe does not ask the database postgres."
+fi
+
 # Without it the entrypoint sources the script instead of running it.
 if ! grep -q 'defaultMode: 0555' "$rendering"; then
   complain "the initdb ConfigMap is not mounted executable."

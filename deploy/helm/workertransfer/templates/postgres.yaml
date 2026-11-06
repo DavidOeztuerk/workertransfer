@@ -115,16 +115,19 @@ spec:
           start at once — measured: `pg_isready ... timed out after 1s`. If the
           database's readiness flaps, EVERY service briefly loses its route to
           it.
+
+          `postgres` and not the bootstrap database: that one belongs to a role,
+          and the superuser enters no database a role owns (ADR-0058).
           */}}
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.bootstrapDatabase | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", "postgres"]
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", "postgres"]
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 6
