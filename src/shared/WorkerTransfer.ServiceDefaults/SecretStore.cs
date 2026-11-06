@@ -40,30 +40,71 @@ public sealed class SecretStore
     /// <summary>The environment variable the master key stands in.</summary>
     public const string Variable = "WORKERTRANSFER_SECRETS_KEY";
 
-    private readonly byte[] _masterKey;
+    private readonly SealedText _sealed;
 
     /// <summary>Reads the master key out of the configuration.</summary>
     /// <param name="configuration">The service's configuration.</param>
     /// <exception cref="MasterKeyMissing">It is not set.</exception>
-    public SecretStore(IConfiguration configuration)
+    public SecretStore(IConfiguration configuration) =>
+        _sealed = new SealedText(configuration, Variable);
+
+    /// <summary>Encrypts a secret.</summary>
+    /// <param name="plainText">What is to be deposited.</param>
+    /// <returns>Base64 of vector, checksum and ciphertext.</returns>
+    public string Encrypt(string plainText) => _sealed.Encrypt(plainText);
+
+    /// <summary>Decrypts a secret.</summary>
+    /// <remarks>
+    /// Returns <c>null</c> instead of throwing. An unreadable secret is not a
+    /// program error here but a master key that was changed — and the right
+    /// answer to that is "none is deposited", not a crash while drafting.
+    /// </remarks>
+    /// <param name="stored">What stood in the row.</param>
+    /// <returns>The plaintext, or <c>null</c>.</returns>
+    public string? Decrypt(string? stored) => _sealed.Decrypt(stored);
+
+    /// <summary>The last four characters — for recognising, not for using.</summary>
+    /// <param name="plainText">The secret.</param>
+    /// <returns>At most four characters.</returns>
+    public static string Suffix(string plainText) =>
+        string.IsNullOrEmpty(plainText) || plainText.Length <= 4
+            ? string.Empty
+            : plainText[^4..];
+}
+
+/// <summary>AES-GCM under one key from the environment.</summary>
+/// <remarks>
+/// One implementation for <see cref="SecretStore"/> and <see cref="KeyRingSecret"/>:
+/// a second encryption beside it would be a second thing to get right. Its format
+/// must not change, or every stored AI key stops opening (<c>KeyRingSecretTests</c>).
+/// </remarks>
+internal sealed class SealedText
+{
+    private readonly byte[] _key;
+
+    /// <summary>Reads the key out of the configuration.</summary>
+    /// <param name="configuration">The service's configuration.</param>
+    /// <param name="variable">Where the key stands.</param>
+    /// <exception cref="MasterKeyMissing">It is not set.</exception>
+    public SealedText(IConfiguration configuration, string variable)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var raw = configuration[Variable] ?? Environment.GetEnvironmentVariable(Variable);
+        var raw = configuration[variable] ?? Environment.GetEnvironmentVariable(variable);
 
         if (string.IsNullOrWhiteSpace(raw))
         {
-            throw new MasterKeyMissing(Variable);
+            throw new MasterKeyMissing(variable);
         }
 
         // An arbitrarily long string becomes 32 bytes. SHA-256 and not the
         // bytes themselves: `make env` rolls base64, and its length hangs on
         // the source of randomness — but AES demands exactly 16, 24 or 32.
-        _masterKey = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        _key = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
     }
 
-    /// <summary>Encrypts a secret.</summary>
-    /// <param name="plainText">What is to be deposited.</param>
+    /// <summary>Encrypts a text.</summary>
+    /// <param name="plainText">The text.</param>
     /// <returns>Base64 of vector, checksum and ciphertext.</returns>
     public string Encrypt(string plainText)
     {
@@ -74,20 +115,15 @@ public sealed class SecretStore
         var cipherText = new byte[content.Length];
         var checksum = new byte[AesGcm.TagByteSizes.MaxSize];
 
-        using var aes = new AesGcm(_masterKey, AesGcm.TagByteSizes.MaxSize);
+        using var aes = new AesGcm(_key, AesGcm.TagByteSizes.MaxSize);
         aes.Encrypt(nonce, content, cipherText, checksum);
 
         return Convert.ToBase64String([.. nonce, .. checksum, .. cipherText]);
     }
 
-    /// <summary>Decrypts a secret.</summary>
-    /// <remarks>
-    /// Returns <c>null</c> instead of throwing. An unreadable secret is not a
-    /// program error here but a master key that was changed — and the right
-    /// answer to that is "none is deposited", not a crash while drafting.
-    /// </remarks>
-    /// <param name="stored">What stood in the row.</param>
-    /// <returns>The plaintext, or <c>null</c>.</returns>
+    /// <summary>Decrypts a text.</summary>
+    /// <param name="stored">What was stored.</param>
+    /// <returns>The plaintext, or <c>null</c> if it does not open.</returns>
     public string? Decrypt(string? stored)
     {
         if (string.IsNullOrWhiteSpace(stored))
@@ -111,7 +147,7 @@ public sealed class SecretStore
             var cipherText = bytes.AsSpan(nonceLength + checksumLength);
             var plainText = new byte[cipherText.Length];
 
-            using var aes = new AesGcm(_masterKey, checksumLength);
+            using var aes = new AesGcm(_key, checksumLength);
             aes.Decrypt(nonce, cipherText, checksum, plainText);
 
             return Encoding.UTF8.GetString(plainText);
@@ -121,12 +157,4 @@ public sealed class SecretStore
             return null;
         }
     }
-
-    /// <summary>The last four characters — for recognising, not for using.</summary>
-    /// <param name="plainText">The secret.</param>
-    /// <returns>At most four characters.</returns>
-    public static string Suffix(string plainText) =>
-        string.IsNullOrEmpty(plainText) || plainText.Length <= 4
-            ? string.Empty
-            : plainText[^4..];
 }

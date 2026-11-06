@@ -67,6 +67,8 @@ public static class TransferInfrastructure
         services.AddKeyRing<TransferDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpIdentityLookup.ClientName).AddServiceCall(ServiceAudiences.Identity);
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IMarketStore, EfMarketStore>();

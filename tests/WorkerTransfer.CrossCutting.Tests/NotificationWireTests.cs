@@ -51,8 +51,7 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new TransferPost.NotificationSettings
                 {
-                    BaseUrl = address,
-                    Secret = "probe"
+                    BaseUrl = address
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "market_request"));
 
@@ -64,8 +63,7 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ApplicationsPost.NotificationSettings
                 {
-                    BaseUrl = address,
-                    Secret = "probe"
+                    BaseUrl = address
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "application_status"));
 
@@ -77,8 +75,7 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ResumePost.NotificationSettings
                 {
-                    BaseUrl = address,
-                    Secret = "probe"
+                    BaseUrl = address
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "resume_request"));
 
@@ -97,8 +94,7 @@ public class NotificationWireTests
                 factory,
                 Options.Create(new ScoutPost.NotificationSettings
                 {
-                    BaseUrl = address,
-                    Secret = "probe"
+                    BaseUrl = address
                 }))
                 .DeliverAsync(new SubjectId(Recipient), "profile_discovered"));
 
@@ -128,8 +124,7 @@ public class NotificationWireTests
             new StubFactory(listener),
             Options.Create(new MailSettings
             {
-                BaseUrl = "http://probe.invalid",
-                Secret = "probe"
+                BaseUrl = "http://probe.invalid"
             }),
             NullLogger<HttpMailer>.Instance)
             .SendAsync(new SubjectId(Recipient));

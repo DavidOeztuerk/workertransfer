@@ -34,7 +34,7 @@ public class ApplicationJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:applications", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Secret", ErasureSecret);

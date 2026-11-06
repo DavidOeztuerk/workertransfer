@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -21,7 +22,6 @@ namespace WorkerTransfer.Identity.Tests;
 [Collection(PostgresCollection.Name)]
 public class InternalMembersTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
     private const string Password = "secret-and-long-enough";
 
     private WebApplicationFactory<Program> _service = null!;
@@ -36,10 +36,10 @@ public class InternalMembersTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));
@@ -88,16 +88,19 @@ public class InternalMembersTests(Postgres postgres) : IAsyncLifetime
             Guid.Parse(me.GetProperty("user_id").GetString()!));
     }
 
-    private HttpClient WithSecret(string secret = NotifySecret)
+    private HttpClient WithToken(string token)
     {
         var browser = Browser();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", secret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return browser;
     }
 
-    /// <summary>Without the secret the endpoint is invisible.</summary>
+    /// <summary>A caller on the list of the member doors.</summary>
+    private HttpClient Entitled() => WithToken(TokenShape.ServiceToken("transfer", "identity"));
+
+    /// <summary>Without a token the endpoint is invisible.</summary>
     [Fact]
-    public async Task Without_the_secret_it_is_404()
+    public async Task Without_a_token_it_is_404()
     {
         var (company, _) = await CompanyWithMember();
 
@@ -106,28 +109,28 @@ public class InternalMembersTests(Postgres postgres) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    /// <summary>A guessed secret does not lift the door.</summary>
+    /// <summary>A guessed token does not lift the door.</summary>
     [Fact]
-    public async Task A_guessed_secret_is_404()
+    public async Task A_guessed_token_is_404()
     {
         var (company, _) = await CompanyWithMember();
 
-        var response = await WithSecret("guessed")
+        var response = await WithToken("guessed")
             .GetAsync($"/internal/companies/{company}/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     /// <summary>
-    /// With the secret the id comes — and it travels as <c>subject_id</c>, not
+    /// With a token the id comes — and it travels as <c>subject_id</c>, not
     /// as <c>subjectId</c>.
     /// </summary>
     [Fact]
-    public async Task With_the_secret_the_members_come_back_in_snake_case()
+    public async Task With_a_token_the_members_come_back_in_snake_case()
     {
         var (company, subject) = await CompanyWithMember();
 
-        var response = await WithSecret().GetAsync($"/internal/companies/{company}/members");
+        var response = await Entitled().GetAsync($"/internal/companies/{company}/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -149,7 +152,7 @@ public class InternalMembersTests(Postgres postgres) : IAsyncLifetime
     [Fact]
     public async Task An_unknown_company_is_an_empty_list()
     {
-        var response = await WithSecret()
+        var response = await Entitled()
             .GetAsync($"/internal/companies/{Guid.CreateVersion7()}/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

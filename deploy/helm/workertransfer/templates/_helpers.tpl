@@ -73,14 +73,16 @@ answer nothing.
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: POSTGRES_PASSWORD
+      key: {{ printf "WORKER_DB_PASSWORD_%s" (upper $svc.database) }}
 {{/*
 The key is called like the database, because the service asks for it that way:
 `GetConnectionString("<name>")`. Two names for the same thing would be two
 opportunities to let them drift apart.
+
+The login is the service's own role, owner of this database alone (ADR-0058).
 */}}
 - name: {{ printf "ConnectionStrings__%s" $svc.database }}
-  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=%s;Password=$(DB_PASSWORD)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $root.Values.postgres.user | quote }}
+  value: {{ printf "Host=%s;Port=%v;Database=%s;Username=svc_%s;Password=$(DB_PASSWORD)" $root.Values.postgres.host $root.Values.postgres.port $svc.database $svc.database | quote }}
 {{/*
 The shared secrets. Listed one by one instead of `envFrom` over the whole
 Secret: otherwise EVERY service would also get the drafting help's key, and one
@@ -111,75 +113,62 @@ place that can create an acting principal.
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_ERASURE_SECRET
 {{/*
-The notification secret is called differently depending on the side and is THE
-SAME: at identity-service it is `Notify__Secret` (it checks it), at every
-service with `Identity__BaseUrl` it is `Identity__Secret` (it presents it), and
-the sending services carry it as `Notifications__Secret`.
-
-Expressly a DIFFERENT one from the erasure's (ADR-0027 §4.4): "may trigger a
-mail" and "may erase everything about a person" must not be the same paper. The
-conditions are independent: applications-service has BOTH addresses and needs
-BOTH names for the same secret.
+Who a service is at the doors of the others (ADR-0057). Each pod gets its OWN
+secret and nothing else; identity-service alone gets the hashes. The endpoint
+stands here and not in the shared `-env` ConfigMap: a host named there would
+pass every service's egress boundary.
 */}}
+{{- if $svc.m2mClient }}
+- name: NOELIA_M2M_TOKEN_ENDPOINT
+  value: "http://identity-service:8001/m2m/token"
+- name: NOELIA_M2M_CLIENT_ID
+  value: {{ $svc.m2mClient | quote }}
+- name: NOELIA_M2M_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: {{ printf "WORKER_M2M_%s_SECRET" (upper $svc.m2mClient) }}
+{{- end }}
+{{- if eq $svc.name "identity-service" }}
+{{- range $client, $_ := $root.Values.secrets.m2m }}
+- name: {{ printf "NOELIA_M2M_CLIENT_%s_SECRET_HASH" (upper $client) }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: {{ printf "WORKER_M2M_%s_SECRET_HASH" (upper $client) }}
+{{- end }}
+{{- end }}
 {{/*
 The door in front of the evidence, and it stands at EVERY service: each one
-answers its own operator report (ADR-0044). A third paper, expressly — whoever
-may trigger a mail need not learn which AI providers this instance uses. EMPTY
-means: the door is shut and the report answers 404.
+answers its own operator report (ADR-0044). A paper of its own, expressly —
+whoever may trigger a mail need not learn which AI providers this instance uses.
+And one per service (ADR-0058): a leaked one opens one report and not fifteen.
+EMPTY means: the door is shut and the report answers 404.
 */}}
 - name: Evidence__Secret
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_EVIDENCE_SECRET
+      key: {{ printf "WORKER_EVIDENCE_SECRET_%s" (upper $svc.database) }}
 {{/*
-The master key, at EVERY service. It encrypts the data-protection key ring
-(ADR-0046) and a person's AI key. Without it the pod does not start — which is
-right, because in the clear nothing is stored.
+The key this service's data-protection key ring lies under (ADR-0058). Without
+it the pod does not start.
 */}}
+- name: WORKERTRANSFER_KEYRING_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "workertransfer.secretName" $root }}
+      key: {{ printf "WORKER_KEYRING_KEY_%s" (upper $svc.database) }}
+{{/*
+The master key, at identity-service alone. With it and the row out of identity's
+database every person's AI key opens.
+*/}}
+{{- if eq $svc.name "identity-service" }}
 - name: WORKERTRANSFER_SECRETS_KEY
   valueFrom:
     secretKeyRef:
       name: {{ include "workertransfer.secretName" $root }}
       key: WORKER_SECRETS_KEY
-{{- if or (eq $svc.name "identity-service") (eq $svc.name "profile-service") }}
-{{/*
-profile-service checks it at its internal search door (ADR-0036). EMPTY would
-mean there: the door is shut — it answers 404, and the scout would search into
-the void without a sound.
-*/}}
-- name: Notify__Secret
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NOTIFY_SECRET
-{{- end }}
-{{- if hasKey ($svc.env | default dict) "Identity__BaseUrl" }}
-- name: Identity__Secret
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NOTIFY_SECRET
-{{- end }}
-{{- if hasKey ($svc.env | default dict) "Profile__BaseUrl" }}
-{{/*
-The same secret once more under a fourth name: scout-service searches through
-profile-service's internal door. EMPTY would mean there not "everything" but
-"nothing is searched" — and as a failure, so "not set up" does not look like
-"there is nobody".
-*/}}
-- name: Profile__Secret
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NOTIFY_SECRET
-{{- end }}
-{{- if hasKey ($svc.env | default dict) "Notifications__BaseUrl" }}
-- name: Notifications__Secret
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "workertransfer.secretName" $root }}
-      key: WORKER_NOTIFY_SECRET
 {{- end }}
 {{- if $svc.drafting }}
 {{/*

@@ -30,8 +30,6 @@ public sealed class HttpAiAccessLookup(
     /// <summary>The name under which the client is registered.</summary>
     public const string ClientName = "identity-internal";
 
-    private const string SecretHeader = "X-Notify-Secret";
-
     private readonly CompanyMemberSettings _identity = identity.Value;
     private readonly CoverLetterSettings _draft = draft.Value;
 
@@ -61,7 +59,7 @@ public sealed class HttpAiAccessLookup(
     private async Task<AiAccess> FromAccountAsync(
         SubjectId subject, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_identity.BaseUrl) || string.IsNullOrEmpty(_identity.Secret))
+        if (string.IsNullOrEmpty(_identity.BaseUrl))
         {
             return new AiAccess("none", string.Empty, string.Empty, string.Empty);
         }
@@ -76,7 +74,6 @@ public sealed class HttpAiAccessLookup(
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
                 new Uri(new Uri(_identity.BaseUrl), $"/internal/account/{subject.Value}/ai"));
-            request.Headers.Add(SecretHeader, _identity.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }

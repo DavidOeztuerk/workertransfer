@@ -162,8 +162,7 @@ public sealed class HttpCompanySite(
 /// <summary>identity-service's internal door, for the company's proven domain.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>) — the same two the role
-/// lookup reads.
+/// <c>Identity__Timeout</c>) — the same two the role lookup reads.
 /// </remarks>
 public sealed class IdentityLookupSettings
 {
@@ -173,14 +172,11 @@ public sealed class IdentityLookupSettings
     /// <summary>The base address of identity-service.</summary>
     public string BaseUrl { get; set; } = string.Empty;
 
-    /// <summary>The services' shared secret.</summary>
-    public string Secret { get; set; } = string.Empty;
-
     /// <summary>How long to wait.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 }
 
-/// <summary>A company's proven domain (ADR-0019), behind the shared secret.</summary>
+/// <summary>A company's proven domain (ADR-0019), through identity's door.</summary>
 public sealed class HttpCompanyDomains(
     IHttpClientFactory factory,
     IOptions<IdentityLookupSettings> settings) : ICompanyDomains
@@ -193,9 +189,9 @@ public sealed class HttpCompanyDomains(
     /// <inheritdoc />
     public async Task<string?> DomainAsync(TenantId company, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_settings.BaseUrl) || string.IsNullOrEmpty(_settings.Secret))
+        if (string.IsNullOrEmpty(_settings.BaseUrl))
         {
-            throw new SourceSilent("Identity:BaseUrl or Identity:Secret is not set.");
+            throw new SourceSilent("Identity:BaseUrl is not set.");
         }
 
         using var client = factory.CreateClient(ClientName);
@@ -203,7 +199,6 @@ public sealed class HttpCompanyDomains(
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), $"/internal/companies/{company.Value}"));
-        request.Headers.Add("X-Notify-Secret", _settings.Secret);
 
         HttpResponseMessage response;
 

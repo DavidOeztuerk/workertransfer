@@ -105,6 +105,27 @@ public static class TokenShape
         return curve;
     }
 
+    /// <summary>A service token, as identity-service would issue it.</summary>
+    public static string Service(string client, string audience)
+    {
+        var handler = new JwtSecurityTokenHandler();
+
+        return handler.WriteToken(handler.CreateJwtSecurityToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer,
+            Audience = audience,
+            TokenType = "noelia-service+jwt",
+            Claims = new Dictionary<string, object>
+            {
+                ["client_id"] = client,
+                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString()
+            },
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(
+                new ECDsaSecurityKey(Curve) { KeyId = KeyId }, SecurityAlgorithms.EcdsaSha256)
+        }));
+    }
+
     public static string Person(Guid subject)
     {
         var token = new JwtSecurityToken(

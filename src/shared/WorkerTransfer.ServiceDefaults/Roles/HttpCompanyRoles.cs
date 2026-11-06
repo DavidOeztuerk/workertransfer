@@ -9,12 +9,11 @@ namespace WorkerTransfer.ServiceDefaults.Roles;
 
 /// <summary>Where identity-service answers internal queries.</summary>
 /// <remarks>
-/// The same section and the same secret as for applications-service's member
-/// query — a second name for the same address would be the one left behind at
+/// The same section as for applications-service's member query — a second name for the same address would be the one left behind at
 /// the next move.
 /// <para>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>); renaming one alone leaves its value on the default,
+/// <c>Identity__Timeout</c>); renaming one alone leaves its value on the default,
 /// silently.
 /// </para>
 /// </remarks>
@@ -25,9 +24,6 @@ public sealed class CompanyRoleSettings
 
     /// <summary>Where identity-service answers.</summary>
     public string BaseUrl { get; set; } = string.Empty;
-
-    /// <summary>The shared secret of the internal doors.</summary>
-    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long an answer is waited for.</summary>
     /// <remarks>
@@ -47,7 +43,7 @@ public sealed class CompanyRoleSettings
 /// can give.</para>
 ///
 /// <para>Calls <c>GET /internal/companies/{company}/members/{subject}/role</c>
-/// with the shared secret header. Reads the shared contract, never an anonymous
+/// as this service. Reads the shared contract, never an anonymous
 /// object: a field left unread would silently be "not an admin" here.</para>
 /// </remarks>
 public sealed class HttpCompanyRoles(
@@ -57,8 +53,6 @@ public sealed class HttpCompanyRoles(
 {
     /// <summary>The name of the client in the factory.</summary>
     public const string ClientName = "identity-roles";
-
-    private const string SecretHeader = "X-Notify-Secret";
 
     private readonly CompanyRoleSettings _settings = settings.Value;
 
@@ -73,11 +67,6 @@ public sealed class HttpCompanyRoles(
             throw new RoleLookupSilent("Identity:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Secret))
-        {
-            throw new RoleLookupSilent("Identity:Secret is not set.");
-        }
-
         using var client = clientFactory.CreateClient(ClientName);
         client.Timeout = _settings.Timeout;
 
@@ -90,7 +79,6 @@ public sealed class HttpCompanyRoles(
                 new Uri(
                     new Uri(_settings.BaseUrl),
                     $"/internal/companies/{company}/members/{subject}/role"));
-            request.Headers.Add(SecretHeader, _settings.Secret);
 
             response = await client.SendAsync(request, cancellationToken);
         }
@@ -110,13 +98,13 @@ public sealed class HttpCompanyRoles(
         using (response)
         {
             // 404 does NOT mean "not a member" here: the internal endpoint
-            // answers 404 when the secret is missing or wrong. Read as "no
-            // role", a mis-wired secret would turn into a clean-looking 403
+            // answers 404 to a caller it refuses. Read as "no role", a mis-wired
+            // service would turn into a clean-looking 403
             // everywhere — and nobody would go looking for it.
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 throw new RoleLookupSilent(
-                    "identity-service (internal) unreachable or secret invalid.");
+                    "identity-service (internal) unreachable or refused this caller.");
             }
 
             if (!response.IsSuccessStatusCode)

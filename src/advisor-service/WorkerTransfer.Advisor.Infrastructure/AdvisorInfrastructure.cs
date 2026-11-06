@@ -77,6 +77,8 @@ public static class AdvisorInfrastructure
         services.AddKeyRing<AdvisorDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpLookups.ClientName).AddServiceCall(ServiceAudiences.Identity);
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<ICallerToken, HttpCallerToken>();

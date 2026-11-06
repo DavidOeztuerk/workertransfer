@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\companies-service\WorkerTransfer.Companies.Domain\WorkerTransfer.Companies.Domain.csproj" />
     <ProjectReference Include="..\..\src\companies-service\WorkerTransfer.Companies.Infrastructure\WorkerTransfer.Companies.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\ServiceCredentials.cs" Link="ServiceCredentials.cs" />
+    <Compile Include="..\Shared\ServiceCallProbe.cs" Link="ServiceCallProbe.cs" />
+  </ItemGroup>
 </Project>

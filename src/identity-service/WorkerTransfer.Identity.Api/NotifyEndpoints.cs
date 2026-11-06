@@ -1,8 +1,7 @@
 using Noelia.Core.Identity;
 using MediatR;
-using Microsoft.Extensions.Options;
 using WorkerTransfer.Identity.Application.Notification;
-using WorkerTransfer.Identity.Infrastructure.Mail;
+using Noelia.Infrastructure.Security.ServiceTokens;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Identity.Api;
@@ -23,33 +22,21 @@ namespace WorkerTransfer.Identity.Api;
 /// </remarks>
 public static class NotifyEndpoints
 {
-    /// <summary>The header notification-service sends along.</summary>
-    private const string SecretHeader = "X-Notify-Secret";
-
     /// <summary>What comes in: an id, nothing else.</summary>
     private sealed record NotifyBodyV1(
         [property: System.Text.Json.Serialization.JsonPropertyName("user_id")] Guid UserId);
 
-    /// <summary>Maps the one endpoint.</summary>
-    public static IEndpointRouteBuilder MapNotifyEndpoints(this IEndpointRouteBuilder app)
+    /// <summary>Maps the one endpoint onto the service's one door group.</summary>
+    public static IEndpointRouteBuilder MapNotifyEndpoints(this IEndpointRouteBuilder doors)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(doors);
 
-        app.MapPost("/internal/notify", async (
+        doors.MapPost("/notify", async (
             NotifyBodyV1 body,
             IMediator mediator,
-            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!MayNotify(context, settings.Value))
-            {
-                // 404 instead of 401: a 401 confirms the endpoint exists.
-                await ProblemDetailsMiddleware.Write(
-                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
-                return;
-            }
-
             ArgumentNullException.ThrowIfNull(body);
 
             // The result is discarded. Whether the person exists and whether
@@ -60,26 +47,8 @@ public static class NotifyEndpoints
                 new ReportNewsCommand(new SubjectId(body.UserId)), cancellationToken);
 
             context.Response.StatusCode = StatusCodes.Status202Accepted;
-        });
+        }).RequireServiceCaller(ServiceClients.Notification);
 
-        return app;
-    }
-
-    /// <summary>Whether this request carries the secret.</summary>
-    /// <remarks>
-    /// An empty configured secret shuts the endpoint. Compared in fixed time so
-    /// the answer's duration says nothing about how much of a guess was right.
-    /// </remarks>
-    private static bool MayNotify(HttpContext context, NotifySettings settings)
-    {
-        if (string.IsNullOrEmpty(settings.Secret)
-            || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
-        {
-            return false;
-        }
-
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(settings.Secret));
+        return doors;
     }
 }

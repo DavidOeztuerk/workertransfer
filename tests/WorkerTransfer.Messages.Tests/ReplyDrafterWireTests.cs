@@ -172,7 +172,7 @@ public sealed class ReplyDrafterWireTests
                 BaseUrl = $"http://127.0.0.1:{port}/v1/chat/completions",
                 Timeout = TimeSpan.FromSeconds(10)
             }),
-            Options.Create(new IdentitySettings { BaseUrl = identity, Secret = identity.Length > 0 ? "s" : "" }),
+            Options.Create(new IdentitySettings { BaseUrl = identity }),
             companyAi ?? new NoCompanyAccess(),
             NullLogger<HttpReplyDrafter>.Instance);
 

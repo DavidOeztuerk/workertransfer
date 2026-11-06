@@ -23,7 +23,9 @@ Verdrahtung hinter **einem** `Add<Name>Infrastructure()` (ADR-0003).
 
 **Drei Schritte drumherum, und kein neues Dockerfile** (ADR-0028):
 
-1. Die Datenbank in `scripts/initdb/`
+1. Der Name in der Liste von `scripts/initdb/01-service-roles.sh` und von
+   `scripts/service-secrets.sh`, die drei Geheimnisse in `.env.example`; ein
+   bestehender Stack bekommt Rolle und Datenbank mit `make db-roles` (ADR-0058)
 2. Der Einstiegspunkt in `docker/dotnet-service.Dockerfile`
 3. Ein kopierter Block in `docker-compose.yml` mit drei geänderten Werten
    — plus die Route in `src/gateway/WorkerTransfer.Gateway/ocelot.json`

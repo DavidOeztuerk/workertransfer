@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -22,7 +23,6 @@ namespace WorkerTransfer.Identity.Tests;
 public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
 {
     private const string Password = "secret-and-long-enough";
-    private const string NotifySecret = "notify-secret";
     private const string Key = "sk-ant-company-secret-7f3a";
 
     private WebApplicationFactory<Program> _service = null!;
@@ -39,9 +39,9 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_sender)));
@@ -102,7 +102,8 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
         await boss.PutAsJsonAsync($"/companies/{company}/ai/key", new { key = Key });
 
         var service = _service.CreateClient();
-        service.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        service.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.ServiceToken("jobs", "identity"));
         var access = JsonDocument.Parse(
             await (await service.GetAsync($"/internal/companies/{company}/ai")).Content.ReadAsStringAsync()).RootElement;
 
@@ -122,7 +123,8 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
         await boss.PutAsJsonAsync($"/companies/{company}/ai", new { ai_provider = "openai", ai_model = "gpt-5" });
 
         var service = _service.CreateClient();
-        service.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        service.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.ServiceToken("jobs", "identity"));
         var access = JsonDocument.Parse(
             await (await service.GetAsync($"/internal/companies/{company}/ai")).Content.ReadAsStringAsync()).RootElement;
 
@@ -182,7 +184,8 @@ public class CompanyAiTests(Postgres postgres) : IAsyncLifetime
         view.GetProperty("ai_base_url").GetString().Should().Be(address);
 
         var service = _service.CreateClient();
-        service.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        service.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.ServiceToken("jobs", "identity"));
         var access = JsonDocument.Parse(
             await (await service.GetAsync($"/internal/companies/{company}/ai")).Content.ReadAsStringAsync()).RootElement;
 

@@ -31,7 +31,6 @@ namespace WorkerTransfer.Notification.Tests;
 [Collection(PostgresCollection.Name)]
 public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
 
     private WebApplicationFactory<Program> _service = null!;
     private readonly ProbeMailer _mailer = new();
@@ -44,11 +43,10 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:BaseUrl", "http://identity.test");
-            host.UseSetting("Identity:Secret", NotifySecret);
             host.UseSetting("Erasure:Secret", "erasure-secret");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
@@ -260,7 +258,8 @@ public class DiscoveryTests(Postgres postgres) : IAsyncLifetime
     private Task<HttpResponseMessage> Notify(Guid subject, string kind = "profile_discovered")
     {
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.Service("transfer", "notification"));
 
         return browser.PostAsJsonAsync(
             new Uri("/internal/notifications", UriKind.Relative), new { user_id = subject, kind = kind });

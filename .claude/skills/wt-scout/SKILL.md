@@ -55,8 +55,8 @@ that was measured to fall:
 `/candidates` searched with AND — every hit then satisfies every condition,
 every tick would be set, and "which skill is missing" would have no answer;
 condition 1 would be empty too, since there would be nothing to sort. The
-internal door in profile-service (`GET /internal/profiles/search`, behind the
-shared secret, no gateway route) therefore searches with OR, and it is the only
+internal door in profile-service (`GET /internal/profiles/search`, for scout
+alone, no gateway route) therefore searches with OR, and it is the only
 mode left.
 
 **That door deliberately does not ask the ledger.** The check stands one line

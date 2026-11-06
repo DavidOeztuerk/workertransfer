@@ -101,7 +101,7 @@ public sealed class OpenInvitationsHandler(
 
 /// <summary>What role does this human being have in this company?</summary>
 /// <remarks>
-/// <para>For service to service, without a caller: the secret at the internal
+/// <para>For service to service, without a caller: the list at the internal
 /// endpoint IS the authorisation. The public queries check the asker's
 /// membership first, because they answer a human being — here a service answers
 /// a service.</para>
@@ -133,7 +133,7 @@ public sealed class InternalRoleHandler(IMembershipRepository memberships)
 
 /// <summary>Who a company is — name and proven domain.</summary>
 /// <remarks>
-/// <para>For service to service, without a caller: the secret at the internal
+/// <para>For service to service, without a caller: the list at the internal
 /// endpoint IS the authorisation.</para>
 ///
 /// <para><strong>Why advisor-service needs this.</strong> A person may exclude

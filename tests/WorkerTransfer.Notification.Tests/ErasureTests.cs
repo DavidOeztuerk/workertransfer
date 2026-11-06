@@ -18,7 +18,6 @@ namespace WorkerTransfer.Notification.Tests;
 public class ErasureTests(Postgres postgres) : IAsyncLifetime
 {
     private const string ErasureSecret = "erasure-secret";
-    private const string NotifySecret = "notify-secret";
 
     private WebApplicationFactory<Program> _service = null!;
 
@@ -29,11 +28,10 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:notification", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Identity:BaseUrl", "http://identity.test");
-            host.UseSetting("Identity:Secret", NotifySecret);
             host.UseSetting("Erasure:Secret", ErasureSecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
@@ -122,13 +120,15 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     /// not be the same piece of paper (ADR-0027 §4.4).
     /// </remarks>
     [Fact]
-    public async Task The_notify_secret_does_not_open_the_erasure()
+    public async Task A_service_token_does_not_open_the_erasure()
     {
         var anna = Guid.CreateVersion7();
         await Notify(anna);
 
+        var token = TokenShape.Service("transfer", "notification");
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", NotifySecret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        browser.DefaultRequestHeaders.Add("X-Erasure-Secret", token);
 
         var response = await browser.PostAsJsonAsync("/erasure", new { user_id = anna });
 
@@ -189,7 +189,8 @@ public class ErasureTests(Postgres postgres) : IAsyncLifetime
     private async Task<HttpResponseMessage> Notify(Guid subject)
     {
         var browser = _service.CreateClient();
-        browser.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        browser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.Service("transfer", "notification"));
 
         var response = await browser.PostAsJsonAsync(
             "/internal/notifications", new { user_id = subject, kind = "market_request" });

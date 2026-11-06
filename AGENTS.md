@@ -4,7 +4,7 @@ The short reference. `CLAUDE.md` and its skills under `.claude/skills/` carry th
 
 ## What this is
 
-WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Noelia 7.0.1** (a shared foundation library from nuget.org) with a React frontend.
+WorkerTransfer is a consent-first talent-mobility platform, written in **.NET 10 on Noelia 7.1.1** (a shared foundation library from nuget.org) with a React frontend.
 
 It was a Python (`uv`) monorepo until August 2026 and was translated by hand. **No Python remains** — no `uv`, `ruff`, `mypy`, `pytest`, `alembic`, no `apps/<service>`, no `packages/worker-*`. A document that names those is describing the predecessor. `docs/MIGRATION-STAND.md` says what changed and what was measured.
 
@@ -47,8 +47,9 @@ cd web && pnpm e2e                 # the Playwright journeys (needs `make up`)
 ## Commands
 
 ```bash
-make env            # FIRST in a fresh clone: writes .env, rolls four secrets,
-                    #   and generates the ECDSA token key pair
+make env            # FIRST in a fresh clone: writes .env, rolls the secrets,
+                    #   generates the ECDSA token key pair and the service clients
+make env-m2m        # an .env from before 05.11.2026: adds the missing client pairs
 make check          # the gate, fail-fast
 make build / test   # .NET only, in that order
 make check-web      # pnpm check + test + build
@@ -112,7 +113,8 @@ Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuG
 - **`EnvironmentFile.Load()` is the first line of all fifteen `Program.cs`**, before `CreateBuilder`: the configuration builder reads the environment once, when it builds.
 - **A set variable wins.** In compose and in the cluster the environment comes from there; a file in the image must never override it.
 - Precedence: set environment > `.env` > `appsettings.json`.
-- `WORKERTRANSFER_SECRETS_KEY` is required in **every** service now — it encrypts the data-protection key ring as well as a person's AI key. A test host that forgets it fails at resolve time, not at build time.
+- `WORKERTRANSFER_KEYRING_KEY` is required in **every** service: it encrypts that service's data-protection key ring, and each has its own value (ADR-0058). A test host that forgets it fails at startup, not at build time. `WORKERTRANSFER_SECRETS_KEY` opens a person's AI key and stands at identity-service alone.
+- **One database role per service** (`svc_<database>`, owner of its database alone), and the superuser has no network login (ADR-0058). `scripts/initdb/01-service-roles.sh` does it, `make db-roles` on a volume that has run before.
 
 ## The route map
 
@@ -134,7 +136,7 @@ Restore needs no login: `Noelia.*` comes from nuget.org (since 10.09.2026). `NuG
 - **One image for all sixteen entry points** (fifteen services and the gateway, ADR-0028) — `SERVICE_DIR` comes from the environment, not a build arg. The entrypoint finds the single `*.runtimeconfig.json` and **`cd`s into that directory**: ASP.NET's content root is the working directory.
 - **`curl` is in the runtime image** so the container can answer its own healthcheck. The probe used to be `dotnet --version`, which can never work without an SDK (exit 155) — every service read `unhealthy` while serving fine.
 - **One probe in the `x-service` anchor** for all fourteen services and the gateway, asking `/health/live`, port derived from `ASPNETCORE_URLS` so no second list can drift.
-- **Routes and initdb SQL come from the compose files** via `--set-file`, never copied. Both are `required`.
+- **The initdb script comes from the same file compose mounts**, via `--set-file`, never copied, and it is `required`. Mounted with `defaultMode: 0555`, or the entrypoint sources it.
 - **Probes must set `timeoutSeconds`** — the default is 1 s and it once restarted three healthy services.
 - **The web image is a built artifact**, so URLs come from `window.__WT_CONFIG__` at runtime, not from `VITE_*` at build time.
 - **`replicaCount` stays 1** for the fourteen services, and for one reason now: every service migrates its schema at startup, so two pods race on one schema. (The dispatcher's missing `SKIP LOCKED` is fixed.) The **gateway** is pinned separately — the auth brake counts in-process.

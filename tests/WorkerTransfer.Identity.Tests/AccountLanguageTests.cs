@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -25,7 +26,6 @@ namespace WorkerTransfer.Identity.Tests;
 [Collection(PostgresCollection.Name)]
 public class AccountLanguageTests(Postgres postgres) : IAsyncLifetime
 {
-    private const string NotifySecret = "notify-secret";
     private const string Password = "secret-and-long-enough";
 
     private WebApplicationFactory<Program> _service = null!;
@@ -40,10 +40,10 @@ public class AccountLanguageTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            host.UseSetting("Notify:Secret", NotifySecret);
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));
@@ -190,7 +190,8 @@ public class AccountLanguageTests(Postgres postgres) : IAsyncLifetime
         var subject = Guid.Parse(session!.User!.UserId);
 
         var notifier = Browser();
-        notifier.DefaultRequestHeaders.Add("X-Notify-Secret", NotifySecret);
+        notifier.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.ServiceToken("notification", "identity"));
         var reported = await notifier.PostAsJsonAsync(
             "/internal/notify", new { user_id = subject });
 

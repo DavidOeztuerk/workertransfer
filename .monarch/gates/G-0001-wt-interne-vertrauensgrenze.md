@@ -6,7 +6,7 @@ rank: A
 risk_tags: [auth, pii, infra]
 repo: workertransfer
 state: proposed
-quests: [Q-0001, Q-0002, Q-0003, Q-0004]
+quests: [Q-0002, Q-0004]
 boss: "Ein kompromittierter Fachdienst (z. B. notifications) kann weder Personendaten noch KI-Schlüssel anderer Konten lesen – belegt durch Q-0001- und Q-0002-Bosse grün in CI"
 estimate: { session_pct: 70, weekly_pct: 9, gold_usd: 0 }
 board: { provider: github, milestone: 1 }

@@ -147,22 +147,16 @@ public class TopologyTests
     public void Every_service_database_is_created_too()
     {
         var root = RepositoryRoot.Find();
-        var sql = File.ReadAllText(Path.Combine(
-            root, "scripts", "initdb", "01-create-service-databases.sql"));
+        var script = File.ReadAllText(Path.Combine(
+            root, "scripts", "initdb", "01-service-roles.sh"));
 
-        // Comments away first. Without that a commented-out line read like a
-        // created database — measured: the counter-probe "a database is
-        // missing" stayed green, because `-- CREATE DATABASE notification` hit
-        // the same expression as the real line.
-        var withoutComments = Regex.Replace(
-            sql, @"^\s*--.*$", string.Empty, RegexOptions.Multiline);
-
-        var created = Regex.Matches(withoutComments, @"CREATE DATABASE (\w+)")
-            .Select(hit => hit.Groups[1].Value)
+        // The list and nothing else: a commented-out line must not read like a
+        // created database. Measured: the counter-probe "a database is missing"
+        // stayed green until comments stopped counting.
+        var created = Regex.Match(script, "^databases=\"(?<names>[a-z ]+)\"", RegexOptions.Multiline)
+            .Groups["names"].Value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .ToHashSet(StringComparer.Ordinal);
-
-        // `identity` is created by the Postgres entrypoint itself (POSTGRES_DB).
-        created.Add("identity");
 
         foreach (var entry in Chart.Value)
         {

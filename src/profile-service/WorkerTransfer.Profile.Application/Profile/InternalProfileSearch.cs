@@ -21,8 +21,7 @@ namespace WorkerTransfer.Profile.Application.Profile;
 /// Two places would be two truths — and the silent half of them shows profiles
 /// nobody released.</para>
 ///
-/// <para>That is why this query hangs on a door behind the shared secret and
-/// has no gateway route. Whoever calls it is a service, and it still has to ask
+/// <para>That is why this query hangs on a door and has no gateway route. Whoever calls it is a service, and it still has to ask
 /// the ledger.</para>
 ///
 /// <para><strong>OR and not AND, unlike <c>/candidates</c>.</strong> Under AND

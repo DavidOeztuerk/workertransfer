@@ -1,4 +1,8 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
+using Noelia.Infrastructure.Builder;
+using Noelia.Infrastructure.Security.ServiceTokens;
 using WorkerTransfer.Identity.Api;
 using WorkerTransfer.Identity.Api.Permissions;
 using WorkerTransfer.Identity.Infrastructure;
@@ -19,7 +23,29 @@ const string serviceName = "identity-service";
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
     ArtificialIntelligence.Used,
-    girder => girder.AsIssuer());
+    noelia => noelia
+        .AsIssuer()
+        .UseServiceTokenIssuer(issuer => issuer
+            .Clients(builder.Configuration, ServiceClients.All)
+            .Audiences(ServiceAudiences.All))
+        .UseServiceCallers(ServiceAudiences.Identity));
+
+// The one brake inside a service (ADR-0057). `.Without(RateLimiting)` holds for
+// everything behind the gateway, which sees one origin. `/m2m/token` has no
+// gateway route: services call it directly, each from an address of its own.
+const string tokenBrake = "m2m-token";
+builder.Services.AddRateLimiter(limiter =>
+{
+    // The framework's default is 503, which a caller reads as "service down".
+    limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    limiter.AddPolicy(tokenBrake, context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 600,
+            Window = TimeSpan.FromMinutes(1)
+        }));
+});
 
 // Since Girder 4.0.2 the policy machinery comes out of the defaults:
 // `NoeliaModule.Authorization` calls `AddAuthorization()` and thereby brings
@@ -48,13 +74,23 @@ await app.MigrateSchemaAsync<IdentityDbContext>();
 
 app.UseWorkerTransferDefaults(builder.Environment, serviceName);
 
+// Behind the defaults, so that a refusal carries its correlation id.
+app.UseRateLimiter();
+
 app.MapAuthEndpoints();
 app.MapExternalLoginEndpoints();
 app.MapRegistrationEndpoints();
 app.MapCompanyEndpoints();
-app.MapNotifyEndpoints();
 app.MapErasureEndpoints();
-app.MapInternalEndpoints();
+
+// ONE group with ONE fallback: two fallbacks on `/internal` would be two equal
+// routes, and an unknown path would end in an AmbiguousMatchException, a 500.
+var doors = app.MapGroup("/internal");
+doors.MapNotifyEndpoints();
+doors.MapInternalEndpoints();
+doors.MapServiceFallback();
+
+app.MapServiceTokenEndpoint().RequireRateLimiting(tokenBrake);
 
 await app.RunAsync();
 

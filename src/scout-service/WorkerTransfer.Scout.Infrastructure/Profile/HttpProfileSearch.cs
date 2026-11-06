@@ -10,10 +10,10 @@ using WorkerTransfer.Scout.Domain.Searches;
 
 namespace WorkerTransfer.Scout.Infrastructure.Profile;
 
-/// <summary>Where profile-service can be reached, and what identifies us there.</summary>
+/// <summary>Where profile-service can be reached.</summary>
 /// <remarks>
 /// The section and the property names ARE the environment keys
-/// (<c>Profile__BaseUrl</c>, <c>Profile__Secret</c>, <c>Profile__Timeout</c>);
+/// (<c>Profile__BaseUrl</c>, <c>Profile__Timeout</c>);
 /// renaming one alone leaves its value on the default, silently.
 /// </remarks>
 public sealed class ProfileSettings
@@ -29,15 +29,6 @@ public sealed class ProfileSettings
     /// line.
     /// </remarks>
     public string BaseUrl { get; set; } = "http://profile-service:8003";
-
-    /// <summary>The shared secret of the internal doors.</summary>
-    /// <remarks>
-    /// <strong>Empty means: no search happens</strong> — as a failure, not as an
-    /// empty result. An empty hit list would look like "there is nobody", and
-    /// that is a statement about people that would stem from a missing
-    /// environment variable.
-    /// </remarks>
-    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long to wait for an answer.</summary>
     /// <remarks>
@@ -67,8 +58,6 @@ public sealed class HttpProfileSearch(
 {
     /// <summary>The name the client is registered under.</summary>
     public const string Client = "profile";
-
-    private const string SecretHeader = "X-Notify-Secret";
 
     private readonly ProfileSettings _settings = settings.Value;
 
@@ -112,21 +101,19 @@ public sealed class HttpProfileSearch(
         // A 404 IS NO EMPTY RESULT HERE, and that was a real defect.
         //
         // The search door has no "not found" case: it answers with a page, or it
-        // does not let us in — without the shared secret it answers 404 instead
-        // of 401, so as not to give itself away. Exactly that happened when
-        // `Notify__Secret` was missing at profile-service: the door said 404,
-        // this place turned it into `items: []`, the endpoint answered 200 — and
-        // the UI claimed there was nobody.
+        // does not let us in — with a 404 instead of a 401, so as not to give
+        // itself away. Exactly that happened when the door's credential was
+        // missing at profile-service: the door said 404, this place turned it
+        // into `items: []`, the endpoint answered 200 — and the UI claimed there
+        // was nobody.
         //
         // Measured on the running stack: twelve E2E journeys red, and the route
         // map stayed green because it checks status codes and not bodies. "Not
-        // set up" must not look like "there is nobody" — the same rule that
-        // already stood further down for the empty secret, only at the place
-        // where it was missing.
+        // set up" must not look like "there is nobody".
         return page is null
             ? throw new ProfileSearchSilent(
-                "profile-service answered 404 to the search — the shared secret "
-                + "is refused or the door is closed")
+                "profile-service answered 404 to the search — this caller is "
+                + "refused or the door is closed")
             : new ProfileHitPage([.. page.Items.Select(ToHit)], page.Next);
     }
 
@@ -164,20 +151,11 @@ public sealed class HttpProfileSearch(
             throw new ProfileSearchSilent("Profile:BaseUrl is not set.");
         }
 
-        if (string.IsNullOrEmpty(_settings.Secret))
-        {
-            // As a failure and not as an empty result: "not set up" must not
-            // look like "there is nobody".
-            throw new ProfileSearchSilent("Profile:Secret is not set.");
-        }
-
         using var client = factory.CreateClient(Client);
         client.Timeout = _settings.Timeout;
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_settings.BaseUrl), path));
-
-        request.Headers.Add(SecretHeader, _settings.Secret);
 
         HttpResponseMessage response;
 

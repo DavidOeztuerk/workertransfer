@@ -17,8 +17,8 @@ policy:
     payment: { min_rank: S, paths: ["src/**/Payments/**"] }
     auth: { min_rank: A, paths: ["src/identity-service/**", "src/gateway/**", "src/shared/WorkerTransfer.ServiceDefaults/**"] }
     pii: { min_rank: A, paths: ["src/consent-service/**", "src/shared/WorkerTransfer.Contracts.Erasure/**"] }
-    secrets: { min_rank: S, paths: [".env", ".env.*", "scripts/env-secret.sh", "scripts/keycloak.sh"] }
-    infra: { min_rank: A, paths: ["docker-compose.yml", "docker/**", "deploy/**", ".github/workflows/**", "scripts/k8s-*.sh"] }
+    secrets: { min_rank: S, paths: [".env", ".env.local", ".env.development", ".env.staging", ".env.production", ".env.test", "scripts/env-secret.sh", "scripts/keycloak.sh"] }
+    infra: { min_rank: A, paths: [".env.example", "docker-compose.yml", "docker/**", "deploy/**", ".github/workflows/**", "scripts/k8s-*.sh"] }
     migration: { min_rank: B, paths: ["**/Migrations/**"] }
   deny_bash: ["git push --force*", "git reset --hard*", "dotnet ef database drop*", "monarch permit*", "monarch promote*"]
   protect_paths: [".monarch/ledger/**", ".monarch/local/**", ".monarch/shadows/*/shadow.yaml"]

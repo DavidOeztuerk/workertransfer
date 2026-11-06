@@ -1,20 +1,19 @@
 using Noelia.Core.Identity;
 using MediatR;
-using Microsoft.Extensions.Options;
 using WorkerTransfer.Profile.Application.Profile;
 using WorkerTransfer.Profile.Contracts;
 using WorkerTransfer.Profile.Domain.Profile;
-using WorkerTransfer.Profile.Infrastructure.Internal;
+using Noelia.Infrastructure.Security.ServiceTokens;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Profile.Api;
 
-/// <summary>Internal service-to-service endpoints — behind the shared secret.</summary>
+/// <summary>Internal service-to-service endpoints — scout-service alone may call them.</summary>
 /// <remarks>
 /// <para>These endpoints have <strong>no gateway route</strong>. They lie under
 /// <c>/internal/</c> and behave like <c>/internal/notify</c> and
-/// <c>/internal/notifications</c>: without the secret they answer 404 (not
-/// 401), so they do not betray themselves through a method nobody uses.</para>
+/// <c>/internal/notifications</c>: to everyone not on the list they answer 404
+/// (not 401), so they do not betray themselves through a method nobody uses.</para>
 ///
 /// <para><strong>They do not ask the ledger, and that is the most delicate
 /// sentence of this file.</strong> The caller is scout-service, and the release
@@ -30,28 +29,21 @@ namespace WorkerTransfer.Profile.Api;
 /// </remarks>
 public static class InternalEndpoints
 {
-    private const string SecretHeader = "X-Notify-Secret";
-
     /// <summary>Maps the internal routes.</summary>
     public static IEndpointRouteBuilder MapInternalEndpoints(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
+        var doors = app.MapGroup("/internal");
+
         // The search for scout-service. Only over NAMED skills (ADR-0033):
         // profile-service knows no evidence, and this route is one reason to
         // leave it that way.
-        app.MapGet("/internal/profiles/search", async (
+        doors.MapGet("/profiles/search", async (
             IMediator mediator,
-            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!MayAsk(context, settings.Value))
-            {
-                await NotFound(context);
-                return;
-            }
-
             var query = context.Request.Query;
 
             var page = await mediator.Send(
@@ -70,22 +62,15 @@ public static class InternalEndpoints
                     [.. page.Items.Select(Hit)],
                     page.Next?.Write()),
                 cancellationToken);
-        });
+        }).RequireServiceCaller(ServiceClients.Scout);
 
         // A single profile — for the draft of an approach.
-        app.MapGet("/internal/profiles/{subjectId:guid}", async (
+        doors.MapGet("/profiles/{subjectId:guid}", async (
             Guid subjectId,
             IMediator mediator,
-            IOptions<NotifySettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!MayAsk(context, settings.Value))
-            {
-                await NotFound(context);
-                return;
-            }
-
             var profile = await mediator.Send(
                 new MyProfileQuery(new SubjectId(subjectId)), cancellationToken);
 
@@ -99,7 +84,9 @@ public static class InternalEndpoints
             }
 
             await context.Response.WriteAsJsonAsync(Hit(profile), cancellationToken);
-        });
+        }).RequireServiceCaller(ServiceClients.Scout);
+
+        doors.MapServiceFallback();
 
         return app;
     }
@@ -130,17 +117,4 @@ public static class InternalEndpoints
     private static Task NotFound(HttpContext context) =>
         ProblemDetailsMiddleware.Write(
             context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
-
-    private static bool MayAsk(HttpContext context, NotifySettings settings)
-    {
-        if (string.IsNullOrEmpty(settings.Secret)
-            || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
-        {
-            return false;
-        }
-
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(settings.Secret));
-    }
 }

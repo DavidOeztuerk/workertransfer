@@ -12,7 +12,6 @@ using WorkerTransfer.Profile.Domain.Profile;
 using WorkerTransfer.Profile.Infrastructure.Consent;
 using WorkerTransfer.Profile.Infrastructure.Draft;
 using WorkerTransfer.Profile.Infrastructure.Erasure;
-using WorkerTransfer.Profile.Infrastructure.Internal;
 using WorkerTransfer.Profile.Infrastructure.Persistence;
 using WorkerTransfer.ServiceDefaults.Checks;
 using WorkerTransfer.Profile.Contracts;
@@ -55,8 +54,6 @@ public static class ProfileInfrastructure
         services.Configure<ErasureSettings>(
             configuration.GetSection(ErasureSettings.Section));
         // The internal door through which scout-service searches. Empty means: shut.
-        services.Configure<NotifySettings>(
-            configuration.GetSection(NotifySettings.Section));
 
         services.AddSingleton(_ => ProfileDbContextFactory.DataSource(connectionString));
         services.AddDbContext<ProfileDbContext>((provider, options) =>
@@ -66,6 +63,7 @@ public static class ProfileInfrastructure
         services.AddKeyRing<ProfileDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(HttpDrafter.IdentityClient).AddServiceCall(ServiceAudiences.Identity);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<IProfileStore, EfProfileStore>();

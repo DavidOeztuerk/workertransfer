@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Applications.Api;
 using WorkerTransfer.Applications.Infrastructure;
 using WorkerTransfer.Applications.Infrastructure.Persistence;
@@ -14,7 +15,8 @@ const string serviceName = "applications-service";
 // No AsIssuer(): only identity-service holds the private half of the key.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.Used);
+    ArtificialIntelligence.Used,
+    noelia => noelia.UseServiceTokenClient());
 
 builder.Services.AddApplicationsInfrastructure(
     builder.Configuration,

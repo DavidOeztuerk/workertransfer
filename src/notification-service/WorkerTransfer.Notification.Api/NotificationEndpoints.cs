@@ -1,11 +1,10 @@
 using Noelia.Core.Identity;
 using MediatR;
-using Microsoft.Extensions.Options;
 using WorkerTransfer.Notification.Application.Notifications;
 using WorkerTransfer.Notification.Application.Ports;
 using WorkerTransfer.Notification.Contracts;
 using WorkerTransfer.Notification.Domain.Notifications;
-using WorkerTransfer.Notification.Infrastructure.Mail;
+using Noelia.Infrastructure.Security.ServiceTokens;
 using WorkerTransfer.ServiceDefaults;
 
 namespace WorkerTransfer.Notification.Api;
@@ -13,13 +12,6 @@ namespace WorkerTransfer.Notification.Api;
 /// <summary>The service entrance, the inbox and the switches.</summary>
 public static class NotificationEndpoints
 {
-    /// <summary>The header a service sends along.</summary>
-    /// <remarks>
-    /// A browser cannot set it without knowing the secret, and it does not know
-    /// it.
-    /// </remarks>
-    private const string SecretHeader = "X-Notify-Secret";
-
     /// <summary>Maps the five routes of this service.</summary>
     public static IEndpointRouteBuilder MapNotificationEndpoints(
         this IEndpointRouteBuilder app)
@@ -32,8 +24,8 @@ public static class NotificationEndpoints
         // exists and whether they want mail.
         // `/internal/notifications` and not `/notifications`.
         //
-        // Without the shared secret the service deliberately answers 404 and
-        // not 401: a 401 would confirm that the endpoint exists. For as long as
+        // Whoever is not on the list gets 404 and not 401: a 401 would confirm
+        // that the endpoint exists. For as long as
         // it lay under `/notifications`, the framework took exactly that
         // concealment away again — the path has a gateway route (because of
         // `/notifications/me`), so EVERY method reached the service, and on
@@ -43,22 +35,15 @@ public static class NotificationEndpoints
         // Under `/internal/` there is no gateway route, as with `/erasure` and
         // `/internal/notify`. All three service-to-service doors then behave
         // alike, and none gives itself away over a method nobody uses.
-        app.MapPost("/internal/notifications", async (
+        var doors = app.MapGroup("/internal");
+
+        doors.MapPost("/notifications", async (
             NotifyV1 body,
             IMediator mediator,
             IMailer mailer,
-            IOptions<MailSettings> settings,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
-            if (!MayNotify(context, settings.Value))
-            {
-                // 404 instead of 401: a 401 confirms the endpoint exists.
-                await ProblemDetailsMiddleware.Write(
-                    context, StatusCodes.Status404NotFound, "Request failed", "Not Found");
-                return;
-            }
-
             ArgumentNullException.ThrowIfNull(body);
 
             if (NotificationKinds.Read(body.Kind) is not { } kind)
@@ -85,7 +70,12 @@ public static class NotificationEndpoints
                 // be rolled back. The mailer does not throw.
                 await mailer.SendAsync(subject, cancellationToken);
             }
-        });
+        }).RequireServiceCaller(
+            ServiceClients.Advisor, ServiceClients.Applications, ServiceClients.Assessment,
+            ServiceClients.Messages, ServiceClients.Resume, ServiceClients.Scout,
+            ServiceClients.Transfer);
+
+        doors.MapServiceFallback();
 
         var mine = app.MapGroup("/notifications/me");
 
@@ -183,25 +173,6 @@ public static class NotificationEndpoints
         });
 
         return app;
-    }
-
-    /// <summary>Whether this request carries the services' secret.</summary>
-    /// <remarks>
-    /// An empty configured secret shuts the endpoint. Compared in fixed time,
-    /// so the duration of the answer says nothing about how much of a guess
-    /// was right.
-    /// </remarks>
-    private static bool MayNotify(HttpContext context, MailSettings settings)
-    {
-        if (string.IsNullOrEmpty(settings.Secret)
-            || !context.Request.Headers.TryGetValue(SecretHeader, out var presented))
-        {
-            return false;
-        }
-
-        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-            System.Text.Encoding.UTF8.GetBytes(presented.ToString()),
-            System.Text.Encoding.UTF8.GetBytes(settings.Secret));
     }
 
     private static Task NotAuthenticated(HttpContext context) =>

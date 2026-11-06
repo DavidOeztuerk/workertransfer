@@ -75,6 +75,7 @@ public static class AssessmentInfrastructure
         services.AddKeyRing<AssessmentDbContext>();
 
         services.AddHttpClient();
+        services.AddHttpClient(nameof(HttpNotifier)).AddServiceCall(ServiceAudiences.Notification);
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<ICallerToken, HttpCallerToken>();

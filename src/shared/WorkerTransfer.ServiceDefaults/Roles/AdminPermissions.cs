@@ -131,7 +131,7 @@ public static class AdminPermissionExtensions
         services.Configure<CompanyRoleSettings>(
             configuration.GetSection(CompanyRoleSettings.Section));
 
-        services.AddHttpClient(HttpCompanyRoles.ClientName);
+        services.AddHttpClient(HttpCompanyRoles.ClientName).AddServiceCall(ServiceAudiences.Identity);
         services.AddSingleton(new CompanyPermissions(adminOnly, recruiter));
         services.TryAddScoped<ICompanyRoles, HttpCompanyRoles>();
         services.AddScoped<IAuthorizationHandler, AdminPermission>();

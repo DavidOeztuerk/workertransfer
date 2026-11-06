@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -43,13 +44,10 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:PrivateKey", TokenShape.PrivateKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Mail:WebUrl", "http://localhost:5173");
-            host.UseSetting("Notify:Secret", "notify-secret");
-            // The master key. Without it the service throws while resolving —
-            // and that is exactly what it should do, see `SecretStore`.
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
             host.UseSetting("environment", "Development");
             host.ConfigureTestServices(services =>
                 services.Replace(ServiceDescriptor.Singleton<IMailSender>(_mail)));
@@ -268,10 +266,10 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
     }
 
     /// <summary>
-    /// The internal wire carries the key — without the secret it is invisible.
+    /// The internal wire carries the key — without a token it is invisible.
     /// </summary>
     [Fact]
-    public async Task Without_the_secret_the_internal_access_does_not_exist()
+    public async Task Without_a_token_the_internal_access_does_not_exist()
     {
         var (_, subject) = await SignedIn();
 
@@ -284,7 +282,8 @@ public class SettingsTests(Postgres postgres) : IAsyncLifetime
     private HttpClient Internal()
     {
         var client = _service.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Notify-Secret", "notify-secret");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TokenShape.ServiceToken("profile", "identity"));
         return client;
     }
 

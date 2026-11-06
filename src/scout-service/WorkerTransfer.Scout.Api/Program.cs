@@ -1,3 +1,4 @@
+using Noelia.Infrastructure.Builder;
 using WorkerTransfer.Scout.Api;
 using WorkerTransfer.Scout.Infrastructure;
 using WorkerTransfer.Scout.Infrastructure.Persistence;
@@ -14,7 +15,8 @@ const string serviceName = "scout-service";
 // No AsIssuer(): this service verifies tokens, it does not issue any.
 builder.Services.AddWorkerTransferDefaults(
     builder.Configuration, builder.Environment, serviceName,
-    ArtificialIntelligence.Used);
+    ArtificialIntelligence.Used,
+    noelia => noelia.UseServiceTokenClient());
 
 builder.Services.AddScoutInfrastructure(
     builder.Configuration,

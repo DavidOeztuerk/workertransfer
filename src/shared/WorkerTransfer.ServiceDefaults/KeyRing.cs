@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.DataProtection.XmlEncryption;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -53,9 +54,10 @@ public static class KeyRing
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // TryAdd, because identity-service already registers it for the AI
-        // access.
-        services.TryAddSingleton<SecretStore>();
+        // A type of its own, because in identity-service SecretStore stands in
+        // the same container: of two registrations of one type the last wins,
+        // and the ring would lie under the master key again (ADR-0058).
+        services.TryAddSingleton<KeyRingSecret>();
 
         services.AddSingleton<IXmlRepository, KeyRingStore<TContext>>();
         // Only the encryptor comes from the container. The decryptor is rebuilt
@@ -195,14 +197,43 @@ internal sealed class KeyRingStore<TContext>(IServiceProvider provider) : IXmlRe
     }
 }
 
-/// <summary>Encrypts the key ring under the operator's master key.</summary>
+/// <summary>The key this service's ring lies under, and nothing else does.</summary>
 /// <remarks>
-/// The same <see cref="SecretStore"/> as for a person's AI access: AES-GCM, one
-/// key from the environment. A second encryption beside it would be a second
-/// place where somebody would have to look for the master key.
+/// <para><strong>Not the master key, and one per service.</strong> Fourteen
+/// services needed the master key for this alone, and a service taken over could
+/// open every person's AI key with it (ADR-0058). No fallback onto it either: it
+/// would stay in every service for the sake of entries nobody needs.</para>
+///
+/// <para>A changed key costs what is protected with the ring, today a sign-in
+/// with a foreign provider that is under way. It costs no stored data.</para>
 /// </remarks>
-/// <param name="store">This installation's master key.</param>
-internal sealed class MasterKeyEncryptor(SecretStore store) : IXmlEncryptor
+public sealed class KeyRingSecret
+{
+    /// <summary>The environment variable the key stands in.</summary>
+    public const string Variable = "WORKERTRANSFER_KEYRING_KEY";
+
+    private readonly SealedText _sealed;
+
+    /// <summary>Reads the key out of the configuration.</summary>
+    /// <param name="configuration">The service's configuration.</param>
+    /// <exception cref="MasterKeyMissing">It is not set.</exception>
+    public KeyRingSecret(IConfiguration configuration) =>
+        _sealed = new SealedText(configuration, Variable);
+
+    /// <summary>Encrypts a key of the ring.</summary>
+    /// <param name="plainText">The key.</param>
+    /// <returns>What is stored.</returns>
+    public string Encrypt(string plainText) => _sealed.Encrypt(plainText);
+
+    /// <summary>Decrypts a key of the ring.</summary>
+    /// <param name="stored">What was stored.</param>
+    /// <returns>The key, or <c>null</c> if it does not open.</returns>
+    public string? Decrypt(string? stored) => _sealed.Decrypt(stored);
+}
+
+/// <summary>Encrypts the key ring under its own key.</summary>
+/// <param name="store">This service's ring key.</param>
+internal sealed class MasterKeyEncryptor(KeyRingSecret store) : IXmlEncryptor
 {
     /// <summary>The element that wraps an encrypted key.</summary>
     internal const string Envelope = "wtProtectedKey";
@@ -225,7 +256,7 @@ internal sealed class MasterKeyEncryptor(SecretStore store) : IXmlEncryptor
 /// <para><strong>The framework builds this type itself, from the name stored in
 /// the key</strong>, and only through a constructor taking an
 /// <c>IServiceProvider</c> or nothing. A registration as <c>IXmlDecryptor</c> is
-/// never asked. With a <c>SecretStore</c> constructor every start logged
+/// never asked. With a typed constructor every start logged
 /// <c>MissingMethodException</c>, discarded the stored keys and made new ones —
 /// the ring lay in the database and was never read back.</para>
 ///
@@ -237,18 +268,18 @@ internal sealed class MasterKeyEnvelope(IServiceProvider services) : IXmlDecrypt
 {
     /// <inheritdoc />
     /// <remarks>
-    /// An unreadable ring throws here and is not passed over in silence: a
-    /// master key that was changed should be noticed at startup and not as "all
-    /// tokens are suddenly invalid" at the first human being.
+    /// This throw does not stop a start: the framework logs the entry as an
+    /// error, skips it and makes a new key (measured, ADR-0058). What it leaves
+    /// is one error per unreadable entry at every start.
     /// </remarks>
     public XElement Decrypt(XElement encryptedElement)
     {
         ArgumentNullException.ThrowIfNull(encryptedElement);
 
-        var plainText = services.GetRequiredService<SecretStore>().Decrypt(encryptedElement.Value)
+        var plainText = services.GetRequiredService<KeyRingSecret>().Decrypt(encryptedElement.Value)
             ?? throw new InvalidOperationException(
                 "A key of the ring cannot be decrypted. That happens when "
-                + $"{SecretStore.Variable} was changed.");
+                + $"{KeyRingSecret.Variable} was changed.");
 
         return XElement.Parse(plainText);
     }

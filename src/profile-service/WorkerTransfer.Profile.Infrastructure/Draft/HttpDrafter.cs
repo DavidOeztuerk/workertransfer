@@ -57,11 +57,10 @@ public sealed class DraftSettings
     public string Provider { get; set; } = ModelWire.OpenAiCompatible;
 }
 
-/// <summary>identity-service's internal door, and the paper that opens it.</summary>
+/// <summary>Where identity-service's internal door is.</summary>
 /// <remarks>
 /// The property names ARE the environment keys (<c>Identity__BaseUrl</c>,
-/// <c>Identity__Secret</c>, <c>Identity__Timeout</c>); renaming one alone
-/// leaves its value on the default, silently. Empty means: no own access is
+/// <c>Identity__Timeout</c>); renaming one alone leaves its value on the default, silently. Empty means: no own access is
 /// asked for, and the platform's model drafts.
 /// </remarks>
 public sealed class IdentitySettings
@@ -71,9 +70,6 @@ public sealed class IdentitySettings
 
     /// <summary>The base address of identity-service.</summary>
     public string BaseUrl { get; set; } = string.Empty;
-
-    /// <summary>The services' shared secret.</summary>
-    public string Secret { get; set; } = string.Empty;
 
     /// <summary>How long to wait.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
@@ -188,7 +184,7 @@ public sealed class HttpDrafter(
     /// <summary>Her own access — or <c>null</c> when she set none up.</summary>
     private async Task<AiAccessV1?> OwnAccessAsync(SubjectId subject, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_identity.BaseUrl) || string.IsNullOrEmpty(_identity.Secret))
+        if (string.IsNullOrEmpty(_identity.BaseUrl))
         {
             return null;
         }
@@ -198,7 +194,6 @@ public sealed class HttpDrafter(
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get, new Uri(new Uri(_identity.BaseUrl), $"/internal/account/{subject.Value}/ai"));
-        request.Headers.Add("X-Notify-Secret", _identity.Secret);
 
         HttpResponseMessage response;
 

@@ -55,8 +55,10 @@ Three things are easy to get wrong here:
 - **The secrets and the realm belong together.** The admin password, the client secret and the operator's password are rolled once into `.control-plane/keycloak.env` (mode 600). Missing file over an existing volume means the script refuses rather than rolling new ones nothing in the realm knows.
 - **The OIDC start proves less than the local one, and says so.** Signed out every page redirects to Keycloak — and building that address needs the discovery document, so the redirect proves the control plane reached Keycloak and trusted it. Whether it *collects* needs a sign-in; the local mode measures that.
 
-It presents the same paper as the dashboard it reads
-(`WORKERTRANSFER_EVIDENCE_SECRET`) and no second one. Empty means every service
-answers 404 and the fleet stays empty without anything being broken.
+It presents each service's own paper (`WORKERTRANSFER_EVIDENCE_SECRET_<SERVICE>`,
+ADR-0058), handed over from the environment as
+`ControlPlane__Fleets__0__Services__<i>__OperatorSecret` by the service's place in
+the fleet file, and a secret never stands in that file. Without its paper a service
+answers 404, and the script stops rather than show an empty fleet.
 `.control-plane/` holds its history, signing key and key ring and is
 git-ignored.

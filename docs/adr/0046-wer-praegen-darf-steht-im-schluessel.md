@@ -106,6 +106,10 @@ Gerüst registriert ihn ohnehin — man kann ihn nicht abwählen, nur konfigurie
 — und ein Tor, das dauerhaft rot steht, wird nach der zweiten Woche ignoriert und
 ist dann schlechter als keins.
 
+> **Überholt (ADR-0058):** Seit ADR-0053 versiegelt `ExternalLoginEndpoints.cs`
+> mit dem Bund das Flow-Cookie der fremden Anmeldung. Das ist die einzige lesende
+> Stelle.
+
 **Postgres, kein Zwischenspeicher im Prozess.** Noelias `UseDataProtection` legt
 den Bund in den registrierten Cache-Anbieter; ohne Redis wäre das
 `Noelia.InMemory`, und der stirbt mit dem Prozess — die Prüfung würde grün, ohne
@@ -117,6 +121,10 @@ zwei Instanzen lesen denselben Bund.
 benutzt `Geheimnisspeicher` — dieselbe AES-GCM-Mechanik wie für den KI-Zugang
 einer Person, derselbe `WORKERTRANSFER_SECRETS_KEY`. Eine zweite Verschlüsselung
 daneben wäre eine zweite Stelle, an der jemand den Hauptschlüssel suchen müsste.
+
+> **Überholt (ADR-0058):** Der Bund liegt unter einem eigenen Schlüssel je Dienst
+> (`KeyRingSecret`, `WORKERTRANSFER_KEYRING_KEY`). Die Mechanik ist dieselbe, den
+> Hauptschlüssel trägt nur noch identity.
 
 Drei Dinge daran sind Entscheidungen und keine Nebensachen:
 
@@ -130,7 +138,9 @@ Drei Dinge daran sind Entscheidungen und keine Nebensachen:
   bewusst keine Treiberabhängigkeit hält.
 - **Ein unlesbarer Bund wirft.** Wer `WORKERTRANSFER_SECRETS_KEY` wechselt, soll
   das beim Start erfahren und nicht daran, dass plötzlich jedes geschützte Token
-  ungültig ist.
+  ungültig ist. **Überholt (ADR-0058):** Das Gerüst meldet einen unlesbaren Eintrag
+  als Fehler, überspringt ihn und legt einen neuen Schlüssel an. Der Start bricht
+  nicht ab.
 
 `SchluesselbundreiseTests` prüft beides, was der Befund liest — Ablage und
 Verschlüsselung —, und liest zusätzlich die Zeile aus der Datenbank: eine

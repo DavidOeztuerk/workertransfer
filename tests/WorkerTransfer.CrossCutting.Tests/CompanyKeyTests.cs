@@ -156,7 +156,7 @@ public sealed class CompanyKeyTests
         var hosts = new CompanyAiHosts();
         var lookup = new HttpCompanyAiAccess(
             new Factory(recorder),
-            Options.Create(new CompanyRoleSettings { BaseUrl = "http://identity-service:8001", Secret = "s" }),
+            Options.Create(new CompanyRoleSettings { BaseUrl = "http://identity-service:8001" }),
             hosts, NullLogger<HttpCompanyAiAccess>.Instance);
 
         (await lookup.AccessAsync(Guid.CreateVersion7())).Should().BeNull();
@@ -186,7 +186,7 @@ public sealed class CompanyKeyTests
         var factory = new Factory(recorder);
         var lookup = new HttpCompanyAiAccess(
             factory,
-            Options.Create(new CompanyRoleSettings { BaseUrl = "http://identity-service:8001", Secret = "s" }),
+            Options.Create(new CompanyRoleSettings { BaseUrl = "http://identity-service:8001" }),
             hosts ?? new CompanyAiHosts(),
             NullLogger<HttpCompanyAiAccess>.Instance);
 

@@ -17,15 +17,16 @@ metadata:
     {{- include "workertransfer.labels" . | nindent 4 }}
 data:
   {{/*
-  Comes via --set-file from scripts/initdb/01-create-service-databases.sql —
-  the same file docker compose reads. One source, not two.
+  Comes via --set-file from scripts/initdb/01-service-roles.sh — the same file
+  docker compose reads. One source, not two. The key has to end in `.sh`, or the
+  entrypoint hands bash to psql.
 
   `required` instead of a silent fallback: an empty initdb step would only
-  stand out nine services later, with "database ... does not exist" going
+  stand out nine services later, with "password authentication failed" going
   round in circles.
   */}}
-  01-create-service-databases.sql: |
-    {{- required "postgres.initSql is missing — install with `--set-file postgres.initSql=scripts/initdb/01-create-service-databases.sql` (scripts/k8s-up.sh does that)." .Values.postgres.initSql | nindent 4 }}
+  01-service-roles.sh: |
+    {{- required "postgres.initScript is missing — install with `--set-file postgres.initScript=scripts/initdb/01-service-roles.sh` (scripts/k8s-up.sh does that)." .Values.postgres.initScript | nindent 4 }}
 ---
 apiVersion: v1
 kind: Service
@@ -89,6 +90,17 @@ spec:
             */}}
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
+            {{/*
+            The script sets these on the roles. Whoever is superuser in this pod
+            reaches everything anyway, so all of them here widen nothing.
+            */}}
+            {{- range .Values.services }}
+            - name: {{ printf "WORKERTRANSFER_DB_PASSWORD_%s" (upper .database) }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "workertransfer.secretName" $ }}
+                  key: {{ printf "WORKER_DB_PASSWORD_%s" (upper .database) }}
+            {{- end }}
           ports:
             - name: postgres
               containerPort: {{ .Values.postgres.port }}
@@ -103,23 +115,30 @@ spec:
           start at once — measured: `pg_isready ... timed out after 1s`. If the
           database's readiness flaps, EVERY service briefly loses its route to
           it.
+
+          `postgres` and not the bootstrap database: that one belongs to a role,
+          and the superuser enters no database a role owns (ADR-0058).
           */}}
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.bootstrapDatabase | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", "postgres"]
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}]
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", "postgres"]
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 6
       volumes:
+        {{/*
+        Executable, or the entrypoint sources the script instead of running it.
+        */}}
         - name: initdb
           configMap:
             name: {{ .Release.Name }}-postgres-initdb
+            defaultMode: 0555
   volumeClaimTemplates:
     - metadata:
         name: data

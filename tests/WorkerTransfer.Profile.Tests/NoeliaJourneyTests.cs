@@ -53,7 +53,7 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Erasure:Secret", ErasureSecret);
@@ -142,6 +142,42 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
             .Should().Be(WithoutCorrelation(await without.Content.ReadAsStringAsync()));
     }
 
+    /// <summary>A leaked secret opens one service and not the next (ADR-0058).</summary>
+    /// <remarks>
+    /// The boss of Q-0004, on two hosts that differ in the secret alone. That no
+    /// two containers share one is held by <c>ServiceSecretTests</c>, and CI's
+    /// <c>images</c> job asks the same question of the real stack.
+    /// </remarks>
+    [Fact]
+    public async Task The_secret_of_another_service_opens_nothing_here()
+    {
+        const string neighbourSecret = "secret-of-the-neighbour";
+
+        using var neighbour = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        {
+            host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
+            host.UseSetting("Evidence:Secret", neighbourSecret);
+            host.UseSetting("environment", "Development");
+        });
+
+        var leaked = neighbour.CreateClient();
+        leaked.DefaultRequestHeaders.Add("X-Noelia-Operator", Secret);
+
+        (await leaked.GetAsync("/noelia/report.json")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+
+        var own = neighbour.CreateClient();
+        own.DefaultRequestHeaders.Add("X-Noelia-Operator", neighbourSecret);
+
+        (await own.GetAsync("/noelia/report.json")).StatusCode
+            .Should().Be(HttpStatusCode.OK, "otherwise this test proves only a closed door");
+    }
+
     /// <summary>Without a configured secret the door is shut — even with the header.</summary>
     /// <remarks>
     /// <strong>Empty means shut, not open.</strong> Without this test the branch
@@ -156,7 +192,7 @@ public class NoeliaJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
             host.UseSetting("Evidence:Secret", "");
@@ -461,7 +497,7 @@ public sealed class ReadinessJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
         });
@@ -533,10 +569,10 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
             host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-suite");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-suite");
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-ring");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-ring");
         });
 
         return Task.CompletedTask;
@@ -599,6 +635,34 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
         }
     }
 
+    /// <summary>Without its key a service does not come up, and says which one.</summary>
+    /// <remarks>
+    /// A service that came up anyway would fail at the first sign-in that needs
+    /// the ring, far from the cause.
+    /// </remarks>
+    [Fact]
+    public void A_service_without_the_ring_key_does_not_start()
+    {
+        using var keyless = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
+        {
+            host.UseSetting("ConnectionStrings:profile", postgres.ConnectionString);
+            host.UseSetting("Jwt:PublicKey", TokenShape.PublicKey);
+            host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
+            host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
+            host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
+        });
+
+        var starting = () => keyless.Server;
+
+        starting.Should().Throw<Exception>()
+            .Where(error => error.ToString().Contains(KeyRingSecret.Variable, StringComparison.Ordinal));
+    }
+
+    /// <summary>Only identity opens a person's AI key (ADR-0058).</summary>
+    [Fact]
+    public void This_service_holds_no_master_key() =>
+        _service.Services.GetService<SecretStore>().Should().BeNull();
+
     /// <summary>What one process protected, the next one can still read.</summary>
     /// <remarks>
     /// The whole point of a ring in the database: a replaced container must
@@ -623,7 +687,7 @@ public sealed class KeyRingJourneyTests(Postgres postgres) : IAsyncLifetime
             host.UseSetting("Jwt:KeyId", TokenShape.KeyId);
             host.UseSetting("JwtSettings:Issuer", TokenShape.Issuer);
             host.UseSetting("JwtSettings:Audience", TokenShape.Audience);
-            host.UseSetting(SecretStore.Variable, "test-master-key-for-the-ring");
+            host.UseSetting(KeyRingSecret.Variable, "test-ring-key-for-the-ring");
         });
 
         second.Services.GetRequiredService<IDataProtectionProvider>()
