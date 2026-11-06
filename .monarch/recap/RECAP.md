@@ -1,17 +1,20 @@
 # RECAP
 
 ## Stand
-- Zeitpunkt: 2026-11-05T19:17:05Z
+- Zeitpunkt: 2026-11-06T03:57:30Z
 - Plan: Pro
-- Mana 5h: 77% (Limit 90%, Reset 2026-11-05T22:20:00Z)
-- Mana 7d: 67% (Limit 96%, Reset 2026-11-11T11:00:00Z)
+- Mana 5h: 69% (Limit 90%, Reset 2026-11-06T05:50:00Z)
+- Mana 7d: 76% (Limit 96%, Reset 2026-11-11T11:00:00Z)
 - Limits: 5h 90%, 7d 96% (adaptive)
 
 ## Aktiv
 - keine aktive Quest
 
 ## Erledigt
-- Q-0003 [A] verified: Compose: Dienst-, Postgres- und Mailpit-Ports nur auf Loopback - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587642, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587701, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587195, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587636, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587439
+- Q-0002 [A] cleared: DB-Rolle je Dienst, Master-Key nur wo nötig - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915618, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915517, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915290, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915771, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915651, https://github.com/DavidOeztuerk/workertransfer/pull/110
+- Q-0003 [A] cleared: Compose: Dienst-, Postgres- und Mailpit-Ports nur auf Loopback - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587642, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587701, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587195, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587636, https://github.com/DavidOeztuerk/workertransfer/actions/runs/40508698213/job/122204587439, https://github.com/DavidOeztuerk/workertransfer/pull/110
+- Q-0004 [A] cleared: Operator-Secret je Dienst - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915618, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915517, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915290, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915771, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915651, https://github.com/DavidOeztuerk/workertransfer/pull/110
+- Q-0043 [A] cleared: `/internal/*` je Tür und Aufrufer eigenes Recht (ersetzt Q-0001) - https://github.com/DavidOeztuerk/workertransfer/pull/110 - Evidence: https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915618, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915517, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915290, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915771, https://github.com/DavidOeztuerk/workertransfer/actions/runs/42153375917/job/127681915651, https://github.com/DavidOeztuerk/workertransfer/pull/110
 
 ## Offen
 - Q-0054: Neue CLAUDE.md höchstens etwa 20 KB; enthält nur, was jede Session braucht: was WT ist, Layout, wichtigste Befehle, Architektur-Regeln kurz, je eine verbindliche Zeile pro tragender Regel mit Verweis, Conventions that bite, Docs-Karte
@@ -25,7 +28,7 @@
 - Q-0054: develop vor und nach dem Merge grün
 
 ## Nächster konkreter Schritt
-Q-0043 ist inreview (3e40063c: drei major-Befunde der Warden-Code-Runde behoben). ADR-0058 Fassung 2 steht in 70c92ecb, Design freigegeben (Warden approve-with-conditions, Auflagen eingearbeitet, keine Delta-Runde nötig). Scope von Q-0002 und Q-0004 ist per gate_plan erweitert. Issues angelegt: noelia #62 und #63, monarch #69, workertransfer #134. Als Nächstes: 1. quest accept und start Q-0002. 2. Ticket nach bugs/ legen, Text in .monarch/knowledge/bug-pruefung-der-tueren-laeuft-vor-den-routen.md, Verweis auf noelia #62; das heilt auch den toten Verweis in InternalDoorsTests.cs:296. 3. TDD nach ADR-0058: zuerst scripts/initdb/01-service-roles.sh und der Boss CrossServiceDbAccess_Denied in CrossCutting (Testcontainers ins csproj, kein Skip), dann der Bestandstest mit den echten Migrationen, KeyRingSecret, Compose, make db-roles, Helm, appsettings, Testwirte mit SecretStore.Variable (erst EINE Reihe), Doku (ADR-0046, AGENTS.md, wt-stack, commands/dienst.md, Kopf der Compose-Datei). Healthcheck im Zustand PASSWORD NULL messen, das hat noch niemand gefahren. 4. Q-0004 nach dem ADR-Abschnitt. 5. Eine Warden-Runde über den PR-Stand, zugleich Code-Runde von Q-0002 und Schlussrunde; Verdict per gate verdict. 6. gh pr ready 110, gate merge, Quests clearen, aufräumen nach Standardregel 2. Im Kurzbericht nennen: Owner-Aktionen make env-m2m und make db-roles; Q-0010 listet Getrennte Schlüssel je Zweck noch als eigenes Ziel.
+G-0001 ist in develop (5ae80a5a), Q-0002, Q-0003, Q-0004 und Q-0043 sind gecleart. Owner-Aktion: make db-roles und make up. Offen: Issues 135 bis 138; Q-0044 und Q-0045 als eigenes Gate (Punkt 13). Weiter mit Punkt 2 der Prioliste.
 
 ## Offene Entscheidungen
 - Noelia-Fehler gefunden und ohne WT-Code reproduziert: noelia.m2m.caller-policy läuft beim Start vor den Routen, der Bericht zeigt für identity Fail, nach dem Start Pass mit 7 Türen. CI ist nicht betroffen, make evidence-check lokal rot für identity. Kein Umweg in WT (bugs/README.md). Der Ticket-Text liegt in .monarch/knowledge/bug-pruefung-der-tueren-laeuft-vor-den-routen.md; bugs/ liegt außerhalb des Scopes von Q-0043, gh darf keinen .monarch-Pfad nennen. Der User muss entscheiden, ob vor dem Merge ein Noelia 7.1.2 nötig ist.

@@ -5,7 +5,7 @@ kind: main
 rank: A
 severity: high
 risk_tags: [auth, pii]
-state: in_review
+state: cleared
 findings: [WT-1]
 scope:
   repo: workertransfer
@@ -23,7 +23,7 @@ dod:
   - Matrix Türen × Aufrufer + unbekannt, Wächter Route ↔ Tabelle, Konsistenztest gegen compose; je Dienst ein Test über die echte Client-Fabrik; Tests rot → grün
 boss: "InternalEndpoints_NotifySecret_CannotReadIdentityOrAiKey grün in CI"
 evidence: ["workertransfer/src/identity-service/…/Api/InternalEndpoints.cs:22,141-232", "…/Application/Account/Settings.cs:193", "docker-compose.yml (12 Dienste mit dem Secret)", "07-warden-workertransfer.md WT-1", ".monarch/knowledge/Q-0001-design.md"]
-board: { provider: github, issue: 111 }
+board: { provider: github, issue: 111, pr: 110 }
 ---
 # `/internal/*` je Tür und Aufrufer eigenes Recht (ersetzt Q-0001)
 

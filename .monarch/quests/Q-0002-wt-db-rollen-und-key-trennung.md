@@ -5,7 +5,7 @@ kind: main
 rank: A
 severity: high
 risk_tags: [infra, pii, migration]
-state: in_review
+state: cleared
 findings: [N-3, WT-5, WT-10]
 scope:
   repo: workertransfer
@@ -22,7 +22,7 @@ dod:
   - Compose, Helm, make env, .env.example, CI, Doku angepasst; Noelia-Ticket liegt in bugs/
 boss: "CrossServiceDbAccess_Denied (Dienst A kann identity-DB nicht lesen) grün in CI"
 evidence: ["docker-compose.yml:130-136 + 15× Username=worker", "deploy/helm/…/values.yaml:112-120", "src/shared/…/KeyRing.cs:58", "07-warden-workertransfer.md N-3"]
-board: { provider: github, issue: 112 }
+board: { provider: github, issue: 112, pr: 110 }
 ---
 # DB-Rolle je Dienst, Master-Key nur wo nötig
 

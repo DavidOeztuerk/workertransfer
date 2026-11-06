@@ -5,7 +5,7 @@ kind: side
 rank: A
 severity: low
 risk_tags: [auth]
-state: in_review
+state: cleared
 findings: [D4]
 scope:
   repo: workertransfer
@@ -17,7 +17,7 @@ dod:
   - make env würfelt 15 Werte; Rotation je Dienst möglich; make evidence und make evidence-check fragen je Dienst mit dessen Secret
 boss: "Leak-Probe: Secret von Dienst A öffnet /noelia von Dienst B nicht (404)"
 evidence: ["docker-compose.yml:115-122", "scripts/control-plane.sh:69,129", "CP Program.cs:510, FleetCollector.cs:448", "07-warden-workertransfer.md D4"]
-board: { provider: github, issue: 114 }
+board: { provider: github, issue: 114, pr: 110 }
 ---
 # Operator-Secret je Dienst
 

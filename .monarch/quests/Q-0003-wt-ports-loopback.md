@@ -5,7 +5,7 @@ kind: main
 rank: A
 severity: medium
 risk_tags: [infra, auth]
-state: verified
+state: cleared
 findings: [D5, N-1, WT-5]
 scope:
   repo: workertransfer
