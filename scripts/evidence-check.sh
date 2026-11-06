@@ -28,17 +28,8 @@ for tool in curl python3; do
     printf '%s✗%s %s is missing.\n' "$RED" "$OFF" "$tool" >&2; exit 1; }
 done
 
-if [[ -f .env ]]; then
-  SECRET=$(grep -E '^WORKERTRANSFER_EVIDENCE_SECRET=' .env | head -1 | cut -d= -f2-)
-fi
-SECRET="${WORKERTRANSFER_EVIDENCE_SECRET:-${SECRET:-}}"
-
-if [[ -z "$SECRET" ]]; then
-  printf '%s✗%s WORKERTRANSFER_EVIDENCE_SECRET is not set.\n' "$RED" "$OFF" >&2
-  echo "   Without it every evidence address answers 404 — rightly, but then" >&2
-  echo "   there is nothing to check here. \`make env\` rolls it along." >&2
-  exit 1
-fi
+# shellcheck source=scripts/service-secrets.sh
+. scripts/service-secrets.sh
 
 SERVICES=(
   "identity:8001" "consent:8002" "profile:8003" "resume:8004"
@@ -46,6 +37,18 @@ SERVICES=(
   "transfer:8009" "notification:8010" "github:8011" "scout:8012"
   "advisor:8013" "assessment:8014" "messages:8015"
 )
+
+MISSING=()
+for entry in "${SERVICES[@]}"; do
+  [[ -n "$(evidence_secret_of "${entry%%:*}")" ]] || MISSING+=("${entry%%:*}")
+done
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  printf '%s✗%s No evidence secret for: %s\n' "$RED" "$OFF" "${MISSING[*]}" >&2
+  echo "   Without one that address answers 404 — rightly, but then there is" >&2
+  echo "   nothing to check there. \`make db-roles\` adds them to an existing .env." >&2
+  exit 1
+fi
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -62,7 +65,7 @@ for entry in "${SERVICES[@]}"; do
   port="${entry##*:}"
 
   if ! curl -fsS --max-time 15 \
-       -H "X-Noelia-Operator: ${SECRET}" \
+       -H "X-Noelia-Operator: $(evidence_secret_of "$name")" \
        "http://localhost:${port}/noelia/report.json" \
        -o "${WORK}/${name}.json" 2>/dev/null; then
     SILENT+=("$name")

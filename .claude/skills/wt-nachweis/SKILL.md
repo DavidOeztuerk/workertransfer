@@ -204,7 +204,9 @@ cannot end up in a finding. ADR-0026 says the same for events.
 **The door is its own piece of paper.** `Evidence__Secret`, deliberately
 neither the notification secret nor the erasure one: "may trigger a mail", "may
 delete everything about a person" and "may see which providers this instance
-uses" are three different rights. **Empty means shut**, and shut answers
+uses" are three different rights. And one per service
+(`WORKERTRANSFER_EVIDENCE_SECRET_<SERVICE>`, ADR-0058): a leaked one opens one
+report and not fifteen. **Empty means shut**, and shut answers
 **404**, not 403 — an operations surface whose existence you can guess is itself
 a disclosure. A path below that names no section is 404 too.
 

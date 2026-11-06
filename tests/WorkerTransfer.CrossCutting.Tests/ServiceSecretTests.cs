@@ -127,6 +127,99 @@ public sealed class ServiceSecretTests
             .Should().BeEquivalentTo(RepositoryRoot.Services());
     }
 
+    /// <summary>Who asks a service's report does so with that service's secret.</summary>
+    /// <remarks>
+    /// One shared variable read here would pass every other check and leave
+    /// <c>make evidence</c> answering 404 fifteen times.
+    /// </remarks>
+    [Theory]
+    [InlineData("scripts/evidence.sh")]
+    [InlineData("scripts/evidence-check.sh")]
+    public void An_evidence_script_asks_with_the_secret_of_the_service(string script)
+    {
+        var text = File.ReadAllText(Path.Combine(Root, script));
+
+        text.Should().Contain("X-Noelia-Operator: $(evidence_secret_of \"$name\")");
+        text.Should().NotContain("WORKERTRANSFER_EVIDENCE_SECRET=");
+    }
+
+    [Fact]
+    public async Task The_environment_wins_over_the_file_as_everywhere_else()
+    {
+        var folder = Directory.CreateTempSubdirectory();
+
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(folder.FullName, ".env"),
+                "WORKERTRANSFER_EVIDENCE_SECRET_CONSENT=from-the-file\n");
+
+            (await SecretOf("consent", folder.FullName)).Should().Be("from-the-file");
+
+            (await SecretOf("consent", folder.FullName, "from-the-environment"))
+                .Should().Be("from-the-environment");
+
+            (await SecretOf("jobs", folder.FullName))
+                .Should().BeEmpty("a key the file does not hold must not end a script running under `set -e`");
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>The control plane gets a secret by place, so the places must be the services.</summary>
+    [Fact]
+    public void The_fleet_file_names_every_service_and_holds_no_secret()
+    {
+        var fleet = File.ReadAllText(Path.Combine(Root, "scripts", "control-plane-fleet.json"));
+
+        fleet.Should().NotContain("OperatorSecret", "the file lies in the repository");
+
+        Regex.Matches(fleet, "\"Name\": \"(?<name>[a-z]+)-service\"", RegexOptions.None, TimeSpan.FromSeconds(5))
+            .Select(hit => hit.Groups["name"].Value)
+            .Should().BeEquivalentTo(RepositoryRoot.Services());
+
+        var script = File.ReadAllText(Path.Combine(Root, "scripts", "control-plane.sh"));
+
+        script.Should().Contain("ControlPlane__Fleets__0__Services__${index}__OperatorSecret=");
+        script.Should().NotContain(
+            "ControlPlane__OperatorSecret", "a shared value is exactly what ADR-0058 ends");
+    }
+
+    private static async Task<string> SecretOf(string service, string folder, string? fromEnvironment = null)
+    {
+        var library = Path.Combine(Root, "scripts", "service-secrets.sh");
+
+        var start = new ProcessStartInfo("bash")
+        {
+            ArgumentList =
+            {
+                "-c",
+                "set -euo pipefail; . \"$0\"; evidence_secret_of \"$1\"",
+                library,
+                service,
+            },
+            WorkingDirectory = folder,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        if (fromEnvironment is not null)
+        {
+            start.Environment[$"WORKERTRANSFER_EVIDENCE_SECRET_{service.ToUpperInvariant()}"] = fromEnvironment;
+        }
+
+        using var shell = Process.Start(start)!;
+        var output = shell.StandardOutput.ReadToEndAsync();
+        var error = shell.StandardError.ReadToEndAsync();
+        await shell.WaitForExitAsync();
+
+        shell.ExitCode.Should().Be(0, await error);
+
+        return await output;
+    }
+
     /// <summary>The one step an owner runs against a file only they hold.</summary>
     [Fact]
     public async Task Filling_a_env_file_adds_whole_values_and_touches_nothing_else()

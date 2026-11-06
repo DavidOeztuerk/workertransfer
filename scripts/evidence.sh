@@ -33,20 +33,8 @@ for tool in curl openssl python3; do
   command -v "$tool" >/dev/null || { red "$tool is missing."; exit 1; }
 done
 
-# The secret comes from .env — the same file the stack takes it from. Without
-# it every evidence address answers 404, and that is the right answer: empty
-# means the door is shut.
-if [[ -f .env ]]; then
-  # shellcheck disable=SC1091
-  SECRET=$(grep -E '^WORKERTRANSFER_EVIDENCE_SECRET=' .env | head -1 | cut -d= -f2-)
-fi
-SECRET="${WORKERTRANSFER_EVIDENCE_SECRET:-${SECRET:-}}"
-
-if [[ -z "$SECRET" ]]; then
-  red "WORKERTRANSFER_EVIDENCE_SECRET is not set."
-  echo "   \`make env\` writes a .env and rolls it along." >&2
-  exit 1
-fi
+# shellcheck source=scripts/service-secrets.sh
+. scripts/service-secrets.sh
 
 # The fourteen services and their ports — the same list as in
 # docker-compose.yml. It stands here a second time, and that is the price for
@@ -58,6 +46,20 @@ SERVICES=(
   "transfer:8009" "notification:8010" "github:8011" "scout:8012"
   "advisor:8013" "assessment:8014" "messages:8015"
 )
+
+# One secret per service (ADR-0058), from .env — the same file the stack takes
+# them from. Without one that address answers 404, and that is the right answer:
+# empty means the door is shut.
+MISSING=()
+for entry in "${SERVICES[@]}"; do
+  [[ -n "$(evidence_secret_of "${entry%%:*}")" ]] || MISSING+=("${entry%%:*}")
+done
+
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  red "No evidence secret for: ${MISSING[*]}"
+  echo "   \`make db-roles\` adds them to an existing .env." >&2
+  exit 1
+fi
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -72,7 +74,7 @@ for entry in "${SERVICES[@]}"; do
   port="${entry##*:}"
 
   if curl -fsS --max-time 10 \
-       -H "X-Noelia-Operator: ${SECRET}" \
+       -H "X-Noelia-Operator: $(evidence_secret_of "$name")" \
        "http://localhost:${port}/noelia/report.json" \
        -o "${WORK}/${name}.json" 2>/dev/null; then
     REACHED=$((REACHED + 1))
@@ -85,8 +87,8 @@ done
 
 if [[ $REACHED -eq 0 ]]; then
   red "No service answered. Is the stack running? \`make up\`."
-  echo "   And does it carry the secret? A .env without" >&2
-  echo "   WORKERTRANSFER_EVIDENCE_SECRET does not let compose start at all." >&2
+  echo "   And does it carry the secrets? A .env without the" >&2
+  echo "   WORKERTRANSFER_EVIDENCE_SECRET_<SERVICE> values does not let compose start at all." >&2
   exit 1
 fi
 

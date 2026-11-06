@@ -27,8 +27,9 @@
 # looks for by filter.
 #
 # The fleet (`scripts/control-plane-fleet.json`) reaches the services through
-# their published ports. The licence and the operator secret come from `.env`
-# and never from that file.
+# their published ports. The licence and the operator secrets come from `.env`
+# and never from that file: one secret per service (ADR-0058), handed over by
+# its place in the fleet, which the control plane prefers to a shared one.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -66,12 +67,21 @@ command -v dotnet >/dev/null || { red "dotnet is missing."; exit 1; }
 [[ -f .env ]] || { red ".env is missing — \`make env\` first."; exit 1; }
 
 value() { grep -E "^$1=" .env | head -1 | cut -d= -f2- || true; }
-SECRET="$(value WORKERTRANSFER_EVIDENCE_SECRET)"
 LICENCE="$(value WORKERTRANSFER_NOELIA_LICENCE)"
 
-# Without the paper every service answers 404 and the fleet stays empty
-# without anything looking broken.
-[[ -n "$SECRET" ]] || { red "WORKERTRANSFER_EVIDENCE_SECRET is empty in .env."; exit 1; }
+# shellcheck source=scripts/service-secrets.sh
+. scripts/service-secrets.sh
+
+# Without its paper a service answers 404, and the fleet stays empty without
+# anything looking broken.
+OPERATOR_SECRETS=()
+index=0
+for service in $(python3 -c 'import json; print(*(s["Name"] for s in json.load(open("scripts/control-plane-fleet.json"))["ControlPlane"]["Fleets"][0]["Services"]))'); do
+  secret="$(evidence_secret_of "${service%-service}")"
+  [[ -n "$secret" ]] || { red "No evidence secret for $service in .env — \`make db-roles\` adds it."; exit 1; }
+  OPERATOR_SECRETS+=("ControlPlane__Fleets__0__Services__${index}__OperatorSecret=$secret")
+  index=$((index + 1))
+done
 
 # A fleet that answers nothing is collected as fourteen unreachable services.
 # Say it here instead of on a page.
@@ -123,10 +133,9 @@ fi
   cd "$STATE"
   # `env` and not a prefix: the values travel as one array, and the secret
   # stays out of this file's text.
-  env "${ACCESS[@]}" \
+  env "${ACCESS[@]}" "${OPERATOR_SECRETS[@]}" \
   ASPNETCORE_ENVIRONMENT=Development \
   ASPNETCORE_URLS="http://localhost:$PORT" \
-  ControlPlane__OperatorSecret="$SECRET" \
   ControlPlane__Licence="$LICENCE" \
   ControlPlane__HistoryPath="$STATE/fleet-history.db" \
   ControlPlane__OperatorAuditPath="$STATE/operator-audit.db" \

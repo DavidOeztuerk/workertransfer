@@ -5,7 +5,7 @@ kind: side
 rank: A
 severity: low
 risk_tags: [auth]
-state: proposed
+state: in_progress
 findings: [D4]
 scope:
   repo: workertransfer

@@ -351,6 +351,18 @@ jobs:
           echo "POST /auth/register -> ${status}"
           [ "$status" = "201" ] || { echo "::error::Registration delivered ${status}."; cat answer.json; exit 1; }
 
+      # What compose really hands the containers (ADR-0058): identity's evidence
+      # secret opens identity's report and answers 404 at the next service. The
+      # first half keeps the second from passing on a door that is simply shut.
+      - name: A leaked evidence secret opens one service
+        run: |
+          secret=$(grep -E '^WORKERTRANSFER_EVIDENCE_SECRET_IDENTITY=' .env | cut -d= -f2-)
+          own=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Noelia-Operator: ${secret}" http://localhost:8001/noelia/report.json)
+          leaked=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Noelia-Operator: ${secret}" http://localhost:8002/noelia/report.json)
+          echo "identity -> ${own}, consent -> ${leaked}"
+          [ "$own" = "200" ] || { echo "::error::The own secret delivered ${own}, expected 200."; exit 1; }
+          [ "$leaked" = "404" ] || { echo "::error::Another service's secret delivered ${leaked}, expected 404."; exit 1; }
+
       # The whole route map: every endpoint, every capacity.
       #
       # It stands here and not in the test suite, because it needs the running
